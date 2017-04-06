@@ -14,7 +14,28 @@ func (s *State) StartTorrentSyncing() error {
 		return fmt.Errorf("State is not using torrents, yet torrent sync was called")
 	}
 
+	// Upload we have done up to
+	var done uint32 = 0
 	for {
+		// Leaders do not need to sync torrents, they need to upload
+		if s.IsLeader() {
+			// If we have not uploaded a height we have completed, increment done and upload
+			if done < s.EntryDBHeightComplete {
+				for done < s.EntryDBHeightComplete {
+					done++
+					s.UploadDBState(done)
+				}
+			} else {
+				// If we did not just launch, and we are synced, and uploaded --> Long sleep
+				if s.EntryDBHeightComplete > 0 && s.GetHighestKnownBlock() == s.EntryDBHeightComplete {
+					time.Sleep(30 * time.Second)
+				}
+				// Short sleep otherwise, still loading some from disk
+				time.Sleep(5 * time.Second)
+			}
+			continue
+		}
+
 		// We can adjust the sleep at the end depending on what we do in the loop
 		// this pass
 		rightDuration := time.Duration(time.Second * 1)
@@ -33,8 +54,12 @@ func (s *State) StartTorrentSyncing() error {
 		}
 
 		// Range of heights to request
-		lower := s.EntryDBHeightComplete //dblock.GetDatabaseHeight()
+		lower := dblock.GetDatabaseHeight()
 		upper := s.GetHighestKnownBlock()
+
+		if upper-(BATCH_SIZE*2) < lower {
+			lower = s.EntryDBHeightComplete
+		}
 
 		// If the network is at block 0, we aren't on the network
 		if upper == 0 {
@@ -73,6 +98,7 @@ func (s *State) StartTorrentSyncing() error {
 					log.Printf("[TorrentSync] Error while retrieving height %d by torrent, %s", u, err.Error())
 				} else {
 					// Connection to plugin lost, exit as it won't return
+					log.Fatal("Torrent plugin has stopped in TorrentSync")
 					return fmt.Errorf("Torrent plugin stopped")
 				}
 			}
@@ -80,7 +106,6 @@ func (s *State) StartTorrentSyncing() error {
 
 		// This tells our plugin to ignore any heights below this for retrieval
 		s.DBStateManager.CompletedHeightTo(s.EntryDBHeightComplete)
-
 		time.Sleep(rightDuration)
 	}
 }

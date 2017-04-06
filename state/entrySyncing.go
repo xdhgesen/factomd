@@ -276,7 +276,14 @@ func (s *State) GoSyncEntries() {
 		lastfirstmissing = firstMissing
 		if firstMissing < 0 {
 			s.EntryDBHeightComplete = s.GetHighestSavedBlk()
-			time.Sleep(60 * time.Second)
+			if s.EntryDBHeightComplete > 0 {
+				// If it is == 0, then we just started to load from disk. Don't sleep
+				// right away when we boot
+				time.Sleep(60 * time.Second)
+			} else {
+				// Just sleep for a little bit
+				time.Sleep(5 * time.Second)
+			}
 		}
 
 		time.Sleep(1 * time.Second)

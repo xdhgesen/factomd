@@ -51,7 +51,7 @@ func LaunchDBStateManagePlugin(path string, inQueue chan interfaces.IMsg, s *sta
 
 	// Make sure we close our client on close
 	AddInterruptHandler(func() {
-		fmt.Println("Manager pluging is now closing...")
+		fmt.Println("Manager plugin is now closing...")
 		client.Kill()
 		stop <- 0
 	})

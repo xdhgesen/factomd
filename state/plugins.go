@@ -69,14 +69,14 @@ func (u *UploadController) sortRequests() {
 	backToTopSortRequests:
 		select {
 		// Avoid defering the lock, more overhead
-		case h := <-u.requestUploadQueue:
-			if _, ok := u.uploaded[h]; ok {
+		case s := <-u.requestUploadQueue:
+			if _, ok := u.uploaded[s]; ok {
 				// Already uploaded, toss out
 				goto backToTopSortRequests
 			}
 
-			u.uploaded[h] = struct{}{}
-			u.sendUploadQueue <- h
+			u.uploaded[s] = struct{}{}
+			u.sendUploadQueue <- s
 		case <-u.quit:
 			u.quit <- 0
 			return
@@ -105,10 +105,11 @@ func (s *State) uploadBlocks() {
 				// We can make some uploads. Only loop readyFor times
 				for i := 0; i < readyFor; i++ {
 					select { // We will block if nothing is in queue and chill here
-					case h := <-u.sendUploadQueue:
-						err := s.uploadDBState(h)
+					case se := <-u.sendUploadQueue:
+						fmt.Println("Uploading", se)
+						err := s.uploadDBState(se)
 						if err != nil {
-							u.failedQueue <- heightError{Height: h, Err: err}
+							u.failedQueue <- heightError{Height: se * BATCH_SIZE, Err: err}
 						}
 					case <-u.quit:
 						u.quit <- 0
@@ -126,7 +127,8 @@ func (u *UploadController) handleErrors() {
 		case <-u.quit:
 			u.quit <- 0
 			return
-		case <-u.failedQueue:
+		case err := <-u.failedQueue:
+			fmt.Printf("UploadError %d: %s\n", err.Height, err.Err)
 			// TODO: Handle errors
 		}
 	}
@@ -154,17 +156,17 @@ func (s *State) UploadDBState(dbheight uint32) {
 	s.Uploader.requestUploadQueue <- dbheight / BATCH_SIZE
 }
 
-func (s *State) uploadDBState(height uint32) error {
-	height = height * BATCH_SIZE
+func (s *State) uploadDBState(sequence uint32) error {
+	base := sequence * BATCH_SIZE
 	// Create the torrent
 	if s.UsingTorrent() {
-		for s.EntryDBHeightComplete < height+BATCH_SIZE {
+		for s.EntryDBHeightComplete < base+BATCH_SIZE {
 			time.Sleep(2 * time.Second)
 		}
 		fullData := make([]byte, 0)
 		var i uint32
 		for i = 0; i < BATCH_SIZE; i++ {
-			msg, err := s.LoadDBState(height + i)
+			msg, err := s.LoadDBState(base + i)
 			if err != nil {
 				return err
 			}
