@@ -12,8 +12,9 @@ import (
 const BATCH_SIZE uint32 = 250
 
 type heightError struct {
-	Err    error
-	Height uint32
+	Err      error
+	Sequence uint32
+	Height   uint32
 }
 
 /**********************
@@ -106,10 +107,9 @@ func (s *State) uploadBlocks() {
 				for i := 0; i < readyFor; i++ {
 					select { // We will block if nothing is in queue and chill here
 					case se := <-u.sendUploadQueue:
-						fmt.Println("Uploading", se)
 						err := s.uploadDBState(se)
 						if err != nil {
-							u.failedQueue <- heightError{Height: se * BATCH_SIZE, Err: err}
+							u.failedQueue <- heightError{Height: se * BATCH_SIZE, Sequence: se, Err: err}
 						}
 					case <-u.quit:
 						u.quit <- 0
@@ -128,8 +128,10 @@ func (u *UploadController) handleErrors() {
 			u.quit <- 0
 			return
 		case err := <-u.failedQueue:
-			fmt.Printf("UploadError %d: %s\n", err.Height, err.Err)
-			// TODO: Handle errors
+			// Just retry in 2 seconds? We can't not do this.
+			// fmt.Printf("UploadError %d: %s\n", err.Height, err.Err)
+			time.Sleep(10 * time.Second)
+			u.sendUploadQueue <- err.Sequence
 		}
 	}
 }
@@ -160,7 +162,8 @@ func (s *State) uploadDBState(sequence uint32) error {
 	base := sequence * BATCH_SIZE
 	// Create the torrent
 	if s.UsingTorrent() {
-		for s.EntryDBHeightComplete < base+BATCH_SIZE {
+		// When we complete height X+2, we can upload to it
+		for (s.EntryDBHeightComplete - 2) < base+BATCH_SIZE {
 			time.Sleep(2 * time.Second)
 		}
 		fullData := make([]byte, 0)
@@ -169,6 +172,9 @@ func (s *State) uploadDBState(sequence uint32) error {
 			msg, err := s.LoadDBState(base + i)
 			if err != nil {
 				return err
+			}
+			if msg == nil {
+				return fmt.Errorf("msg is nil")
 			}
 			d := msg.(*messages.DBStateMsg)
 			//fmt.Printf("Uploading DBState %d, Sigs: %d\n", d.DirectoryBlock.GetDatabaseHeight(), len(d.SignatureList.List))
@@ -218,7 +224,7 @@ func (s *State) uploadDBState(sequence uint32) error {
 		if s.IsLeader() {
 			err := s.DBStateManager.UploadDBStateBytes(fullData, true)
 			if err != nil {
-				fmt.Printf("[TorrentUpload] Torrent failed to upload: %s\n", err.Error())
+				return fmt.Errorf("[TorrentUpload] Torrent failed to upload: %s\n", err.Error())
 			}
 		} else {
 			// s.DBStateManager.UploadDBStateBytes(data, false)

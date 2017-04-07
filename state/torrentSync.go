@@ -40,9 +40,6 @@ func (s *State) StartTorrentSyncing() error {
 		// this pass
 		rightDuration := time.Duration(time.Second * 1)
 
-		// How many blocks ahead of the current we should request from the plugin
-		allowed := 5000
-
 		// What is the database at
 		dblock, err := s.DB.FetchDBlockHead()
 		if err != nil || dblock == nil {
@@ -68,14 +65,17 @@ func (s *State) StartTorrentSyncing() error {
 		}
 
 		// Synced up, sleep for awhile
-		if lower == upper || upper-250 < lower {
-			rightDuration = time.Duration(20 * time.Second)
+		if lower == upper || upper-BATCH_SIZE < lower {
+			time.Sleep(20 * time.Second)
 			continue
 		}
 
 		// Prometheus
 		stateTorrentSyncingLower.Set(float64(lower))
 		stateTorrentSyncingUpper.Set(float64(upper))
+
+		// How many blocks ahead of the current we should request from the plugin
+		allowed := 5000
 
 		// What is the end height we request
 		max := lower + uint32(allowed)
@@ -87,9 +87,10 @@ func (s *State) StartTorrentSyncing() error {
 		var u uint32 = 0
 		// The torrent plugin handles dealing with lots of heights. It has it's own queueing system, so
 		// we can spam and repeat heights
+	RequestLoop:
 		for u = lower; u < max; u++ {
-			if upper-250 < max {
-				break // This means we hit the highest torrent height
+			if (upper - BATCH_SIZE) < u {
+				break RequestLoop // This means we hit the highest torrent height
 			}
 			// Plugin handles repeat requests
 			err := s.DBStateManager.RetrieveDBStateByHeight(u)
@@ -98,8 +99,9 @@ func (s *State) StartTorrentSyncing() error {
 					log.Printf("[TorrentSync] Error while retrieving height %d by torrent, %s", u, err.Error())
 				} else {
 					// Connection to plugin lost, exit as it won't return
-					log.Fatal("Torrent plugin has stopped in TorrentSync")
-					return fmt.Errorf("Torrent plugin stopped")
+					log.Println("Torrent plugin has stopped in TorrentSync")
+					time.Sleep(10 * time.Second)
+					//return fmt.Errorf("Torrent plugin stopped")
 				}
 			}
 		}
