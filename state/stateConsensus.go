@@ -319,23 +319,9 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		// Only reprocess up to 200 Entry Reveals per round.  Keeps entry reveals from hiding all the good stuff like
-		// EOM messages, DBSigs, Missing data messages, etc.  You know, the stuff we have to do BEFORE we can deal
-		// with Entry Reveal messages.  Note we are adding them to the end anyway, so this is more about not blocking
-		// the next round of processing.
-		entryCnt := 0
-		// Pointless to review a Reveal Entry;  it will be pulled into play when its commit
-		// comes around.
-		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if s.Commits[re.Entry.GetHash().Fixed()] != nil && entryCnt < 200 {
-				s.XReview = append(s.XReview, v)
-				delete(s.Holding, k)
-				entryCnt++
-			}
-		} else {
-			s.XReview = append(s.XReview, v)
-			delete(s.Holding, k)
-		}
+		s.XReview = append(s.XReview, v)
+		delete(s.Holding, k)
+
 	}
 }
 
