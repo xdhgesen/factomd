@@ -935,12 +935,13 @@ func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 	interpretationForm := "January 2, 2006"
 	t, _ := time.Parse(interpretationForm, dateOfBalances)
 	//fmt.Println(t.Unix())
-	
+
 	//fmt.Printf("%v\n", dblk.GetHeader().GetTimestamp().GetTimeSeconds())
-	fmt.Printf("%v\n", dblk.GetHeader().GetTimestamp())
-	
+	//fmt.Printf("%v\n", dblk.GetHeader().GetTimestamp())
+
 	if dblk.GetHeader().GetTimestamp().GetTimeSeconds() > t.Unix() {
-	  return nil, nil
+		fmt.Printf("stopped at block %v with date %s\n", dbheight, dateOfBalances)
+		return nil, nil
 	}
 
 	if dblk != nil && err == nil && dbheight > 0 {
