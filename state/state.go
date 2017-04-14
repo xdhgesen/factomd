@@ -929,6 +929,20 @@ func (s *State) Needed(eb interfaces.IEntryBlock) bool {
 func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 	dblk, err := s.DB.FetchDBlockByHeight(dbheight)
 
+	//change this date to select what date the balances are from
+	dateOfBalances := "January 1, 2016"
+
+	interpretationForm := "January 2, 2006"
+	t, _ := time.Parse(interpretationForm, dateOfBalances)
+	//fmt.Println(t.Unix())
+	
+	//fmt.Printf("%v\n", dblk.GetHeader().GetTimestamp().GetTimeSeconds())
+	fmt.Printf("%v\n", dblk.GetHeader().GetTimestamp())
+	
+	if dblk.GetHeader().GetTimestamp().GetTimeSeconds() > t.Unix() {
+	  return nil, nil
+	}
+
 	if dblk != nil && err == nil && dbheight > 0 {
 		if dbheight%1000 == 0 {
 			fmt.Println("xxxx Progressing ...", dbheight)
