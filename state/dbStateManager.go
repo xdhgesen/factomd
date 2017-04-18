@@ -395,6 +395,8 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
+	fmt.Printf("**1*bh P1 %10s dbht: %d L:%t, N: %t F:%d\n",
+		list.State.FactomNodeName, d.DirectoryBlock.GetHeader().GetDBHeight(), d.Locked, d.IsNew, len(d.FactoidBlock.GetEntryHashes()))
 	if d.Locked || d.IsNew {
 		return
 	}
@@ -483,8 +485,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	fs.AddTransactionBlock(d.FactoidBlock)
 	fs.AddECBlock(d.EntryCreditBlock)
 
-	fmt.Printf("**1*bh %10s dbht: %d \n", list.State.FactomNodeName, d.DirectoryBlock.GetHeader().GetDBHeight())
-
+	fmt.Printf("**1*bh P1 %10s dbht: %d L:%t, N: %t F:%d\n",
+		list.State.FactomNodeName, d.DirectoryBlock.GetHeader().GetDBHeight(), d.Locked, d.IsNew, len(d.FactoidBlock.GetEntryHashes()))
 	// Make the current exchange rate whatever we had in the previous block.
 	// UNLESS there was a FER entry processed during this block  changeheight will be left at 1 on a change block
 	if list.State.FERChangeHeight == 1 {
@@ -556,6 +558,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 			delete(s.Commits, k)
 		}
 	}
+
+	fmt.Printf("**1*bh P3 %10s dbht: %d L:%t, N: %t F:%d\n",
+		list.State.FactomNodeName, d.DirectoryBlock.GetHeader().GetDBHeight(), d.Locked, d.IsNew, len(d.FactoidBlock.GetEntryHashes()))
 
 	return
 }
