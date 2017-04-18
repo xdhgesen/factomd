@@ -1320,7 +1320,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 				prev := s.DBStates.Get(dbht - 1)
 				s.DBStates.FixupLinks(prev, dbstate)
 			}
-			s.DBStates.ProcessBlocks(dbstate)
 
 			s.CurrentMinute = 0
 			s.LLeaderHeight++

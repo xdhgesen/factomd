@@ -483,6 +483,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	fs.AddTransactionBlock(d.FactoidBlock)
 	fs.AddECBlock(d.EntryCreditBlock)
 
+	fmt.Printf("**1*bh %10s dbht: %d \n", list.State.FactomNodeName, d.DirectoryBlock.GetHeader().GetDBHeight())
+
 	// Make the current exchange rate whatever we had in the previous block.
 	// UNLESS there was a FER entry processed during this block  changeheight will be left at 1 on a change block
 	if list.State.FERChangeHeight == 1 {

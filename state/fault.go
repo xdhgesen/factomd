@@ -546,6 +546,5 @@ func (s *State) DoReset() {
 
 	s.SetLeaderTimestamp(dbs.NextTimestamp)
 
-	s.DBStates.ProcessBlocks(dbs)
 	s.AddStatus("RESET: Complete")
 }
