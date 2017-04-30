@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
-	"time"
 )
 
 func (state *State) SortOutAcks(msg interfaces.IMsg) {
@@ -23,10 +22,15 @@ func (state *State) SortOutAcks(msg interfaces.IMsg) {
 			state.msgQueue <- msg
 		}
 	}
+	for i := 0; i < 20; i++ {
+		p, b := state.Process(), state.UpdateState()
+		if !p && !b {
+			return
+		}
+	}
 }
 
 func (state *State) ValidatorLoop() {
-
 	timeStruct := new(Timer)
 	state.UpdateState()
 	for {
@@ -41,25 +45,10 @@ func (state *State) ValidatorLoop() {
 		case msg := <-state.TimerMsgQueue():
 			state.JournalMessage(msg)
 			state.SortOutAcks(msg)
-		default:
-			msg := state.inMsgQueue.Dequeue()
-			if msg != nil {
-				// Get message from the timer or input queue
-				state.JournalMessage(msg)
-				state.SortOutAcks(msg)
-			} else if state.inMsgQueue.Length() == 0 {
-				for i := 0; i < 20; i++ {
-					p, b := state.Process(), state.UpdateState()
-					if !p && !b {
-						break
-					}
-				}
-			}else {
-				p, b := state.UpdateState(), state.Process()
-				if !p && !b {
-					time.Sleep(10 * time.Millisecond)
-				}
-			}
+		case msg := <-state.InMsgQueue():
+			// Get message from the timer or input queue
+			state.JournalMessage(msg)
+			state.SortOutAcks(msg)
 		}
 	}
 }
