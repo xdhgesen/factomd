@@ -118,7 +118,11 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 		list = ""
 		for _, f := range pnodes {
-			list = list + fmt.Sprintf(" %3d", len(f.State.LeaderPL.NewEBlocks))
+			thelen := 0
+			if f.State.LeaderPL != nil {
+				thelen = len(f.State.LeaderPL.NewEBlocks)
+			}
+			list = list + fmt.Sprintf(" %3d", thelen)
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "Pending EBs", list)
 

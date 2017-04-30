@@ -994,6 +994,10 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	ack.SendOut(p.State, ack)
 	m.SendOut(p.State, m)
 
+	if ack.DBHeight > p.State.HighestAck {
+		p.State.HighestAck = ack.DBHeight
+	}
+
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
 		vm.ListAck = append(vm.ListAck, nil)

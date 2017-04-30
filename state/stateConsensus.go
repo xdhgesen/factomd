@@ -68,9 +68,10 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		s.Holding[msg.GetRepeatHash().Fixed()] = msg
 	default:
 		s.Holding[msg.GetRepeatHash().Fixed()] = msg
-		if !msg.SentInvlaid() {
+		if !msg.SentInvalid() {
 			msg.MarkSentInvalid(true)
 			s.networkInvalidMsgQueue <- msg
+			ret = true
 		}
 	}
 
@@ -119,8 +120,8 @@ func (s *State) Process() (progress bool) {
 		}
 	}
 
-	process := make(chan interfaces.IMsg, 10000)
-	room := func() bool { return len(process) < 9995 }
+	process := make(chan interfaces.IMsg, 1000)
+	room := func() bool { return len(process) < cap(process) }
 
 	var vm *VM
 	if s.Leader {
@@ -215,7 +216,7 @@ processloop:
 			if !msg.IsPeer2Peer() {
 				msg.SendOut(s, msg)
 			}
-			progress = s.UpdateState()
+			progress = s.UpdateState() || progress
 		default:
 			break processloop
 		}
@@ -254,6 +255,12 @@ func (s *State) ReviewHolding() {
 
 	highest := s.GetHighestKnownBlock()
 
+	loading := int(s.GetHighestAck())-int(s.GetHighestSavedBlk()) > 3
+
+	for _, a := range s.Acks {
+		s.ackQueue <- a
+	}
+
 	for k := range s.Holding {
 		v := s.Holding[k]
 
@@ -261,6 +268,9 @@ func (s *State) ReviewHolding() {
 
 		mm, ok := v.(*messages.MissingMsgResponse)
 		if ok {
+			if loading {
+				delete(s.Holding, k)
+			}
 			ff, ok := mm.MsgResponse.(*messages.FullServerFault)
 			if ok && ff.DBHeight < saved {
 				delete(s.Holding, k)
@@ -270,18 +280,27 @@ func (s *State) ReviewHolding() {
 
 		sf, ok := v.(*messages.ServerFault)
 		if ok && sf.DBHeight < saved {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
 		}
 
 		ff, ok := v.(*messages.FullServerFault)
 		if ok && ff.DBHeight < saved {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
 		}
 
 		eom, ok := v.(*messages.EOM)
 		if ok && ((eom.DBHeight < saved-1 && saved > 0) || (eom.DBHeight < highest-3 && highest > 2)) {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
 		}
@@ -294,8 +313,23 @@ func (s *State) ReviewHolding() {
 
 		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
 		if ok && ((dbsigmsg.DBHeight < saved-1 && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
+		}
+
+		if loading {
+			if _, ok = v.(*messages.CommitEntryMsg); ok {
+				delete(s.Holding, k)
+			}
+			if _, ok = v.(*messages.CommitChainMsg); ok {
+				delete(s.Holding, k)
+			}
+			if _, ok = v.(*messages.RevealEntryMsg); ok {
+				delete(s.Holding, k)
+			}
 		}
 
 		_, ok = s.Replay.Valid(constants.INTERNAL_REPLAY, v.GetRepeatHash().Fixed(), v.GetTimestamp(), s.GetTimestamp())
@@ -562,7 +596,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	// Just ignore missing messages for a period after going off line or starting up.
-	if s.IgnoreMissing || s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
+	if s.IgnoreMissing {
 		return
 	}
 

@@ -145,8 +145,7 @@ func (m *DBStateMissing) FollowerExecute(state interfaces.IState) {
 	if state.NetworkOutMsgQueue().Length() > 100 {
 		return
 	}
-	// TODO: Likely need to consider a limit on how many blocks we reply with.  For now,
-	// just give them what they ask for.
+
 	start := m.DBHeightStart
 	end := m.DBHeightEnd
 

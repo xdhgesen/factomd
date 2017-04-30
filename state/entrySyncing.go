@@ -81,7 +81,7 @@ func (s *State) MakeMissingEntryRequests() {
 		}
 
 		sent := 0
-		if s.inMsgQueue.Length() < constants.INMSGQUEUE_MED {
+		if s.inMsgQueue.Length() < constants.INMSGQUEUE_MED && s.GetHighestSavedBlk()-s.GetHighestAck() < 2 {
 			// Make requests for entries we don't have.
 			for k := range MissingEntryMap {
 

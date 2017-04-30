@@ -11,68 +11,54 @@ import (
 	"time"
 )
 
+func (state *State) SortOutAcks(msg interfaces.IMsg) {
+	// Sort the messages.
+	if msg != nil {
+		if state.IsReplaying == true {
+			state.ReplayTimestamp = msg.GetTimestamp()
+		}
+		if _, ok := msg.(*messages.Ack); ok {
+			state.ackQueue <- msg
+		} else {
+			state.msgQueue <- msg
+		}
+	}
+}
+
 func (state *State) ValidatorLoop() {
+
 	timeStruct := new(Timer)
+	state.UpdateState()
 	for {
-		// Check if we should shut down.
 		select {
 		case <-state.ShutdownChan:
 			fmt.Println("Closing the Database on", state.GetFactomNodeName())
 			state.DB.Close()
 			fmt.Println(state.GetFactomNodeName(), "closed")
 			return
+		case min := <-state.tickerQueue:
+			timeStruct.timer(state, min)
+		case msg := <-state.TimerMsgQueue():
+			state.JournalMessage(msg)
+			state.SortOutAcks(msg)
 		default:
-		}
-
-		// Look for pending messages, and get one if there is one.
-		var msg interfaces.IMsg
-	loop:
-		for i := 0; i < 10; i++ {
-			// Process any messages we might have queued up.
-			for i = 0; i < 10; i++ {
-				p, b := state.Process(), state.UpdateState()
-				if !p && !b {
-					break
-				}
-				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
-			}
-
-			for i := 0; i < 10; i++ {
-				select {
-				case min := <-state.tickerQueue:
-					timeStruct.timer(state, min)
-				default:
-				}
-
-				select {
-				case msg = <-state.TimerMsgQueue():
-					state.JournalMessage(msg)
-					break loop
-				default:
-				}
-
-				msg = state.InMsgQueue().Dequeue()
-				if msg != nil {
-					state.JournalMessage(msg)
-					break loop
-				} else {
-					// No messages? Sleep for a bit
-					for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
-						time.Sleep(10 * time.Millisecond)
+			msg := state.inMsgQueue.Dequeue()
+			if msg != nil {
+				// Get message from the timer or input queue
+				state.JournalMessage(msg)
+				state.SortOutAcks(msg)
+			} else if state.inMsgQueue.Length() == 0 {
+				for i := 0; i < 20; i++ {
+					p, b := state.Process(), state.UpdateState()
+					if !p && !b {
+						break
 					}
 				}
-			}
-		}
-
-		// Sort the messages.
-		if msg != nil {
-			if state.IsReplaying == true {
-				state.ReplayTimestamp = msg.GetTimestamp()
-			}
-			if _, ok := msg.(*messages.Ack); ok {
-				state.ackQueue <- msg
-			} else {
-				state.msgQueue <- msg
+			}else {
+				p, b := state.UpdateState(), state.Process()
+				if !p && !b {
+					time.Sleep(10 * time.Millisecond)
+				}
 			}
 		}
 	}
