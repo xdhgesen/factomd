@@ -168,8 +168,6 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	//ss.Holding[k] = state.Holding[k]
 	//}
 
-	ss.XReview = append(ss.XReview, state.XReview...)
-
 	ss.Acks = make(map[[32]byte]interfaces.IMsg)
 	//for k := range state.Acks {
 	//	ss.Acks[k] = state.Acks[k]
@@ -260,6 +258,8 @@ func (ss *SaveState) TrimBack(state *State, d *DBState) {
 	pl.FedServers = append(pl.FedServers[0:], ppl.FedServers...)
 	pl.AuditServers = append(pl.AuditServers[0:], ppl.AuditServers...)
 
+	pl.MakeMap()
+
 	//state.Identities = append(state.Identities[:0], pss.Identities...)
 	//state.Authorities = append(state.Authorities[:0], pss.Authorities...)
 	//state.AuthorityServerCount = pss.AuthorityServerCount
@@ -268,7 +268,6 @@ func (ss *SaveState) TrimBack(state *State, d *DBState) {
 	for k := range ss.Holding {
 		state.Holding[k] = pss.Holding[k]
 	}
-	state.XReview = append(state.XReview[:0], pss.XReview...)
 
 	/**
 	ss.EOMsyncing = state.EOMsyncing
@@ -376,6 +375,8 @@ func (ss *SaveState) RestoreFactomdState(state *State, d *DBState) {
 	pl.FedServers = append(pl.FedServers[:0], ss.FedServers...)
 	pl.AuditServers = append(pl.AuditServers[:0], ss.AuditServers...)
 
+	pl.MakeMap()
+
 	state.FactoidBalancesPMutex.Lock()
 	state.FactoidBalancesP = make(map[[32]byte]int64, 0)
 	for k := range state.FactoidBalancesP {
@@ -421,7 +422,6 @@ func (ss *SaveState) RestoreFactomdState(state *State, d *DBState) {
 	for k := range ss.Holding {
 		state.Holding[k] = ss.Holding[k]
 	}
-	state.XReview = append(state.XReview[:0], ss.XReview...)
 
 	state.Acks = make(map[[32]byte]interfaces.IMsg)
 	for k := range ss.Acks {

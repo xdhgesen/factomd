@@ -4,22 +4,34 @@
 
 package state_test
 
-/*
 import (
 	"fmt"
-	"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/state"
 	"testing"
+
+	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/primitives"
 )
 
 var _ = fmt.Print
 
-func TestFedServer(t *testing.T) {
-	state := new(State)
-	pls := NewProcessLists(state)
-	pl := pls.Get(0)
-	pl.AddFedServer(primitives.NewHash([]byte("one")))
-	pl.AddFedServer(primitives.NewHash([]byte("two")))
-	pl.AddFedServer(primitives.NewHash([]byte("three")))
+func TestMakeMap(t *testing.T) {
+	pl := new(ProcessList)
+	pl.State = new(State)
+	for i := 0; i < 100; i++ {
+		pl.FedServers = pl.FedServers[:0]
+		for j := 0; j < (i%32)+1; j++ {
+			fs := new(interfaces.FctServer)
+			fs.ChainID = primitives.Sha([]byte(fmt.Sprintf("%d %d", i, j)))
+			fs.Name = "bob"
+			fs.Online = false
+			fs.Replace = fs.ChainID
+			pl.FedServers = append(pl.FedServers, fs)
+		}
+		pl.State.LLeaderHeight = uint32(i)
+		pl.DBHeight = uint32(i)
+		pl.MakeMap()
+		fmt.Println(i, (i%32)+1, "============")
+		fmt.Println(pl.PrintMap())
+	}
 }
-*/

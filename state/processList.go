@@ -324,6 +324,8 @@ func (p *ProcessList) GetVirtualServers(minute int, identityChainID interfaces.I
 		return false, -1
 	}
 
+	p.MakeMap()
+
 	for i := 0; i < len(p.FedServers); i++ {
 		fedix := p.ServerMap[minute][i]
 		if fedix == fedIndex {
@@ -684,7 +686,6 @@ func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
 func (p *ProcessList) Process(state *State) (progress bool) {
 	dbht := state.GetHighestSavedBlk()
 	if dbht >= p.DBHeight {
-		//p.State.AddStatus(fmt.Sprintf("ProcessList.Process: VM Height is %d and Saved height is %d", dbht, state.GetHighestSavedBlk()))
 		return true
 	}
 
@@ -703,7 +704,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 			if ok {
 				vm := p.VMs[fault.VMIndex]
 				if vm.Height < int(fault.Height) {
-					//p.State.AddStatus(fmt.Sprint("VM HEIGHT IS", vm.Height, "FH IS", fault.Height))
 					break systemloop
 				}
 				if !fault.Process(p.DBHeight, p.State) {
@@ -939,15 +939,8 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 		}
 	}
 
-	if _, ok := m.(*messages.MissingMsg); ok {
-		panic("This shouldn't happen")
-	}
-
 	toss := func(hint string) {
-		fmt.Println("dddd TOSS in Process List", p.State.FactomNodeName, hint)
-		fmt.Println("dddd TOSS in Process List", p.State.FactomNodeName, ack.String())
-		fmt.Println("dddd TOSS in Process List", p.State.FactomNodeName, m.String())
-		delete(p.State.Holding, ack.GetHash().Fixed())
+		delete(p.State.Holding, m.GetRepeatHash().Fixed())
 		delete(p.State.Acks, ack.GetHash().Fixed())
 	}
 
@@ -970,10 +963,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	if len(vm.List) > int(ack.Height) && vm.List[ack.Height] != nil {
 		if vm.List[ack.Height].GetMsgHash().IsSameAs(m.GetMsgHash()) {
-			fmt.Printf("dddd %-30s %10s %s\n", "xxxxxxxxx PL Duplicate   ", p.State.GetFactomNodeName(), m.String())
-			fmt.Printf("dddd %-30s %10s %s\n", "xxxxxxxxx PL Duplicate   ", p.State.GetFactomNodeName(), ack.String())
-			fmt.Printf("dddd %-30s %10s %s\n", "xxxxxxxxx PL Duplicate vm", p.State.GetFactomNodeName(), vm.List[ack.Height].String())
-			fmt.Printf("dddd %-30s %10s %s\n", "xxxxxxxxx PL Duplicate vm", p.State.GetFactomNodeName(), vm.ListAck[ack.Height].String())
 			toss("2")
 			return
 		}
@@ -994,7 +983,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, m.GetMsgHash().Fixed(), m.GetTimestamp(), now)
 
 	delete(p.State.Acks, ack.GetHash().Fixed())
-	delete(p.State.Holding, m.GetMsgHash().Fixed())
+	delete(p.State.Holding, m.GetRepeatHash().Fixed())
 
 	// Both the ack and the message hash to the same GetHash()
 	m.SetLocal(false)
@@ -1004,6 +993,10 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	ack.SendOut(p.State, ack)
 	m.SendOut(p.State, m)
+
+	if ack.DBHeight > p.State.HighestAck {
+		p.State.HighestAck = ack.DBHeight
+	}
 
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
@@ -1146,6 +1139,7 @@ func (p *ProcessList) Reset() bool {
 	}
 	p.SortFedServers()
 	p.SortAuditServers()
+	p.MakeMap()
 
 	p.OldMsgs = make(map[[32]byte]interfaces.IMsg)
 	p.OldAcks = make(map[[32]byte]interfaces.IMsg)

@@ -31,10 +31,7 @@ var _ = (*hash.Hash32)(nil)
 //***************************************************************
 
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
-	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
-	if !ok {
-		return
-	}
+
 	s.SetString()
 	msg.ComputeVMIndex(s)
 
@@ -56,21 +53,25 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			s.LeaderPL.DBHeight+1 >= s.GetHighestKnownBlock() {
 			if len(vm.List) == 0 {
 				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex)
-				s.XReview = append(s.XReview, msg)
+				s.MsgQueue() <- msg
 			} else {
-				msg.LeaderExecute(s)
+				_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
+				if ok {
+					msg.LeaderExecute(s)
+				}
 			}
 		} else {
 			msg.FollowerExecute(s)
 		}
 		ret = true
 	case 0:
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
+		s.Holding[msg.GetRepeatHash().Fixed()] = msg
 	default:
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
-		if !msg.SentInvlaid() {
+		s.Holding[msg.GetRepeatHash().Fixed()] = msg
+		if !msg.SentInvalid() {
 			msg.MarkSentInvalid(true)
 			s.networkInvalidMsgQueue <- msg
+			ret = true
 		}
 	}
 
@@ -119,8 +120,8 @@ func (s *State) Process() (progress bool) {
 		}
 	}
 
-	process := make(chan interfaces.IMsg, 10000)
-	room := func() bool { return len(process) < 9995 }
+	process := make(chan interfaces.IMsg, 1000)
+	room := func() bool { return len(process) < cap(process) }
 
 	var vm *VM
 	if s.Leader {
@@ -144,8 +145,6 @@ func (s *State) Process() (progress bool) {
 		process <- msg
 		s.DBStatesReceived[ix] = nil
 	}
-
-	s.ReviewHolding()
 
 	// Process acknowledgements if we have some.
 ackLoop:
@@ -185,29 +184,41 @@ emptyLoop:
 
 	// Reprocess any stalled messages, but not so much compared inbound messages
 	// Process last first
+	now := s.GetTimestamp()
+	if s.ResendHolding == nil {
+		s.ResendHolding = now
+	}
 skipreview:
-	for {
-		for _, msg := range s.XReview {
-			if !room() {
-				break skipreview
-			}
+	switch {
+	case now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 300:
+	default:
+		s.ResendHolding = now
+
+		s.ReviewHolding()
+		for _, msg := range s.Holding {
 			if msg == nil {
 				continue
 			}
+			if !room() {
+				break skipreview
+			}
 			process <- msg
-			progress = s.executeMsg(vm, msg) || progress
 		}
-		s.XReview = s.XReview[:0]
 		break
 	}
 
-	for len(process) > 0 {
-		msg := <-process
-		s.executeMsg(vm, msg)
-		if !msg.IsPeer2Peer() {
-			msg.SendOut(s, msg)
+processloop:
+	for {
+		select {
+		case msg := <-process:
+			s.executeMsg(vm, msg)
+			if !msg.IsPeer2Peer() {
+				msg.SendOut(s, msg)
+			}
+			progress = s.UpdateState() || progress
+		default:
+			break processloop
 		}
-		s.UpdateState()
 	}
 
 	return
@@ -236,29 +247,18 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // review if this is a leader, and those messages are that leader's
 // responsibility
 func (s *State) ReviewHolding() {
-	if len(s.XReview) > 0 {
-		return
-	}
-
-	if s.inMsgQueue.Length() > 10 {
-		return
-	}
-
-	now := s.GetTimestamp()
-	if s.resendHolding == nil {
-		s.resendHolding = now
-	}
-	if now.GetTimeMilli()-s.resendHolding.GetTimeMilli() < 300 {
-		return
-	}
 
 	s.DB.Trim()
 
-	s.resendHolding = now
 	// Anything we are holding, we need to reprocess.
-	s.XReview = make([]interfaces.IMsg, 0)
 
 	highest := s.GetHighestKnownBlock()
+
+	loading := int(s.GetHighestKnownBlock())-int(s.GetHighestSavedBlk()) > 3
+
+	for _, a := range s.Acks {
+		s.ackQueue <- a
+	}
 
 	for k := range s.Holding {
 		v := s.Holding[k]
@@ -267,6 +267,9 @@ func (s *State) ReviewHolding() {
 
 		mm, ok := v.(*messages.MissingMsgResponse)
 		if ok {
+			if loading {
+				delete(s.Holding, k)
+			}
 			ff, ok := mm.MsgResponse.(*messages.FullServerFault)
 			if ok && ff.DBHeight < saved {
 				delete(s.Holding, k)
@@ -276,18 +279,27 @@ func (s *State) ReviewHolding() {
 
 		sf, ok := v.(*messages.ServerFault)
 		if ok && sf.DBHeight < saved {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
 		}
 
 		ff, ok := v.(*messages.FullServerFault)
 		if ok && ff.DBHeight < saved {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
 		}
 
 		eom, ok := v.(*messages.EOM)
 		if ok && ((eom.DBHeight < saved-1 && saved > 0) || (eom.DBHeight < highest-3 && highest > 2)) {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
 		}
@@ -300,8 +312,23 @@ func (s *State) ReviewHolding() {
 
 		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
 		if ok && ((dbsigmsg.DBHeight < saved-1 && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
+			if loading {
+				delete(s.Holding, k)
+			}
 			delete(s.Holding, k)
 			continue
+		}
+
+		if loading {
+			if _, ok = v.(*messages.CommitEntryMsg); ok {
+				delete(s.Holding, k)
+			}
+			if _, ok = v.(*messages.CommitChainMsg); ok {
+				delete(s.Holding, k)
+			}
+			if _, ok = v.(*messages.RevealEntryMsg); ok {
+				delete(s.Holding, k)
+			}
 		}
 
 		_, ok = s.Replay.Valid(constants.INTERNAL_REPLAY, v.GetRepeatHash().Fixed(), v.GetTimestamp(), s.GetTimestamp())
@@ -329,8 +356,6 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		s.XReview = append(s.XReview, v)
-		delete(s.Holding, k)
 	}
 }
 
@@ -400,8 +425,8 @@ func (s *State) AddDBState(isNew bool,
 // Returns true if it finds a match, puts the message in holding, or invalidates the message
 func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 
-	s.Holding[m.GetMsgHash().Fixed()] = m
-	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
+	s.Holding[m.GetRepeatHash().Fixed()] = m
+	ack, _ := s.Acks[m.GetHash().Fixed()].(*messages.Ack)
 
 	if ack != nil {
 		m.SetLeaderChainID(ack.GetLeaderChainID())
@@ -422,9 +447,9 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
 
-	s.Holding[m.GetMsgHash().Fixed()] = m
+	s.Holding[m.GetRepeatHash().Fixed()] = m
 
-	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
+	ack, _ := s.Acks[m.GetHash().Fixed()].(*messages.Ack)
 	if ack != nil {
 		pl := s.ProcessLists.Get(ack.DBHeight)
 		pl.AddToProcessList(ack, m)
@@ -439,6 +464,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 
 	if ack.DBHeight > s.HighestKnown {
 		s.HighestKnown = ack.DBHeight
+		s.HighestAck = ack.DBHeight
 	}
 
 	pl := s.ProcessLists.Get(ack.DBHeight)
@@ -451,7 +477,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	}
 
 	s.Acks[ack.GetHash().Fixed()] = ack
-	m, _ := s.Holding[ack.GetHash().Fixed()]
+	m, _ := s.Holding[ack.GetRepeatHash().Fixed()]
 	if m != nil {
 		m.FollowerExecute(s)
 	}
@@ -585,13 +611,13 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 				_, okff := s.Replay.Valid(constants.INTERNAL_REPLAY, fullFault.GetRepeatHash().Fixed(), fullFault.GetTimestamp(), s.GetTimestamp())
 
 				if okff {
-					s.XReview = append(s.XReview, fullFault)
+					s.MsgQueue() <- fullFault
 				} else {
 					pl.AddToSystemList(fullFault)
 				}
 				s.MissingResponseAppliedCnt++
 			} else if pl != nil && int(fullFault.Height) >= pl.System.Height {
-				s.XReview = append(s.XReview, fullFault)
+				s.MsgQueue() <- fullFault
 				s.MissingResponseAppliedCnt++
 			}
 
@@ -627,10 +653,10 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	// Put these messages and ackowledgements that I have not seen yet back into the queues to process.
 	if okr {
-		s.XReview = append(s.XReview, ack)
+		s.MsgQueue() <- ack
 	}
 	if okm {
-		s.XReview = append(s.XReview, msg)
+		s.MsgQueue() <- msg
 	}
 
 	// If I've seen both, put them in the process list.
@@ -694,7 +720,7 @@ func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
 
 func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 	// Don't respond to missing messages if we are behind.
-	if len(s.inMsgQueue) > 100 {
+	if s.inMsgQueue.Length() > constants.INMSGQUEUE_LOW {
 		return
 	}
 
@@ -741,7 +767,7 @@ func (s *State) FollowerExecuteCommitChain(m interfaces.IMsg) {
 	cc := m.(*messages.CommitChainMsg)
 	re := s.Holding[cc.CommitChain.EntryHash.Fixed()]
 	if re != nil {
-		s.XReview = append(s.XReview, re)
+		s.MsgQueue() <- re
 		re.SendOut(s, re)
 	}
 }
@@ -751,14 +777,14 @@ func (s *State) FollowerExecuteCommitEntry(m interfaces.IMsg) {
 	ce := m.(*messages.CommitEntryMsg)
 	re := s.Holding[ce.CommitEntry.EntryHash.Fixed()]
 	if re != nil {
-		s.XReview = append(s.XReview, re)
+		s.MsgQueue() <- re
 		re.SendOut(s, re)
 	}
 }
 
 func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
-	s.Holding[m.GetMsgHash().Fixed()] = m
-	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
+	s.Holding[m.GetRepeatHash().Fixed()] = m
+	ack, _ := s.Acks[m.GetHash().Fixed()].(*messages.Ack)
 
 	if ack != nil {
 		m.SendOut(s, m)
@@ -783,7 +809,6 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		delete(s.Holding, m.GetRepeatHash().Fixed())
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		return
 	}
 
@@ -843,7 +868,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	eom.MsgHash = nil
 	ack := s.NewAck(m, nil).(*messages.Ack)
 
-	s.Acks[eom.GetMsgHash().Fixed()] = ack
+	s.Acks[eom.GetHash().Fixed()] = ack
 	m.SetLocal(false)
 	s.FollowerExecuteEOM(m)
 	s.UpdateState()
@@ -874,7 +899,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		delete(s.Holding, m.GetRepeatHash().Fixed())
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		return
 	}
 
@@ -891,7 +915,7 @@ func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
 	cc := m.(*messages.CommitChainMsg)
 	re := s.Holding[cc.CommitChain.EntryHash.Fixed()]
 	if re != nil {
-		s.XReview = append(s.XReview, re)
+		s.MsgQueue() <- re
 		re.SendOut(s, re)
 	}
 }
@@ -901,7 +925,7 @@ func (s *State) LeaderExecuteCommitEntry(m interfaces.IMsg) {
 	ce := m.(*messages.CommitEntryMsg)
 	re := s.Holding[ce.CommitEntry.EntryHash.Fixed()]
 	if re != nil {
-		s.XReview = append(s.XReview, re)
+		s.MsgQueue() <- re
 		re.SendOut(s, re)
 	}
 }
@@ -931,10 +955,10 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 	m.SetMinute(ack.Minute)
 
 	// Put the acknowledgement in the Acks so we can tell if AddToProcessList() adds it.
-	s.Acks[m.GetMsgHash().Fixed()] = ack
+	s.Acks[m.GetHash().Fixed()] = ack
 	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(ack, m)
 	// If it was added, then get rid of the matching Commit.
-	if s.Acks[m.GetMsgHash().Fixed()] != nil {
+	if s.Acks[m.GetHash().Fixed()] != nil {
 		s.PutCommit(eh, commit)
 		m.FollowerExecute(s)
 	} else {
@@ -1011,7 +1035,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		entry := s.Holding[h.Fixed()]
 		if entry != nil {
 			entry.SendOut(s, entry)
-			s.XReview = append(s.XReview, entry)
+			s.MsgQueue() <- entry
 			delete(s.Holding, h.Fixed())
 		}
 		return true
@@ -1033,7 +1057,7 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		entry := s.Holding[h.Fixed()]
 		if entry != nil {
 			entry.SendOut(s, entry)
-			s.XReview = append(s.XReview, entry)
+			s.MsgQueue() <- entry
 			delete(s.Holding, h.Fixed())
 		}
 		return true
@@ -1547,7 +1571,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			}
 			return false
 		}
-		s.ReviewHolding()
 		s.Saving = false
 		s.DBSigDone = true
 	}
@@ -1905,6 +1928,13 @@ func (s *State) SetHighestAck(dbht uint32) {
 func (s *State) GetHighestSavedBlk() uint32 {
 	v := s.DBStates.GetHighestSavedBlk()
 	HighestSaved.Set(float64(v))
+	if v > s.HighestKnown {
+		s.HighestKnown = v + 1
+	}
+	if v > s.HighestAck {
+		s.HighestAck = v + 1
+	}
+
 	return v
 }
 
@@ -1912,6 +1942,9 @@ func (s *State) GetHighestSavedBlk() uint32 {
 func (s *State) GetHighestCompletedBlk() uint32 {
 	v := s.DBStates.GetHighestCompletedBlk()
 	HighestCompleted.Set(float64(v))
+	if v > s.HighestAck {
+		s.HighestAck = v + 1
+	}
 	return v
 }
 
