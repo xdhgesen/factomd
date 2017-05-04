@@ -786,7 +786,6 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
-		delete(s.Holding, m.GetRepeatHash().Fixed())
 		delete(s.Holding, m.GetMsgHash().Fixed())
 		return
 	}
@@ -877,7 +876,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
-		delete(s.Holding, m.GetRepeatHash().Fixed())
 		delete(s.Holding, m.GetMsgHash().Fixed())
 		return
 	}
@@ -1411,6 +1409,13 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	pl := s.ProcessLists.Get(dbheight)
 	vm := s.ProcessLists.Get(dbheight).VMs[msg.GetVMIndex()]
+
+	// If the DBSig doesn't validate, we are done.  Toss it, and return.
+	if msg.Validate(s) != 1 {
+		vm.List[0] = nil
+		vm.ListAck[0] = nil
+		return false
+	}
 
 	if uint32(pl.System.Height) >= dbs.SysHeight {
 		s.DBSigSys = true
