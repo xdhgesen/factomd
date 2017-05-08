@@ -369,7 +369,7 @@ func (s *State) AddDBState(isNew bool,
 		s.DBSigProcessed = 0
 		s.StartDelay = s.GetTimestamp().GetTimeMilli()
 		s.RunLeader = false
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
+		s.LeaderPL = s.ProcessLists.GetSafe(s.LLeaderHeight)
 
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
@@ -1181,8 +1181,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		return false
 	}
 
-	pl := s.ProcessLists.Get(dbheight)
-	vm := s.ProcessLists.Get(dbheight).VMs[msg.GetVMIndex()]
+	pl := s.ProcessLists.GetSafe(dbheight)
+	vm := pl.VMs[msg.GetVMIndex()]
 
 	if uint32(pl.System.Height) >= e.SysHeight {
 		s.EOMSys = true
@@ -1441,7 +1441,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 		if s.LLeaderHeight > 0 && s.GetHighestCompletedBlk()+1 < s.LLeaderHeight {
 
-			pl := s.ProcessLists.Get(dbs.DBHeight - 1)
+			pl := s.ProcessLists.GetSafe(dbs.DBHeight - 1)
 			if !pl.Complete() {
 				dbstate := s.DBStates.Get(int(dbs.DBHeight - 1))
 				if dbstate == nil || (!dbstate.Locked && !dbstate.Saved) {
@@ -1544,7 +1544,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		s.Saving = false
 		s.DBSigDone = true
 	}
-	fmt.Println("**** dbstate: dbsig fail 6")
+
 	return false
 	/*
 		err := s.LeaderPL.AdminBlock.AddDBSig(dbs.ServerIdentityChainID, dbs.DBSignature)
@@ -1567,7 +1567,7 @@ func (s *State) ProcessFullServerFault(dbheight uint32, msg interfaces.IMsg) boo
 		return false
 	}
 
-	pl := s.ProcessLists.Get(fullFault.DBHeight)
+	pl := s.ProcessLists.GetSafe(fullFault.DBHeight)
 	if pl == nil {
 		return false
 	}
@@ -1777,7 +1777,7 @@ func (s *State) ProcessFullServerFault(dbheight uint32, msg interfaces.IMsg) boo
 
 func (s *State) GetMsg(vmIndex int, dbheight int, height int) (interfaces.IMsg, error) {
 
-	pl := s.ProcessLists.Get(uint32(dbheight))
+	pl := s.ProcessLists.GetSafe(uint32(dbheight))
 	if pl == nil {
 		return nil, errors.New("No Process List")
 	}
@@ -1837,7 +1837,7 @@ func (s *State) UpdateECs(ec interfaces.IEntryCreditBlock) {
 
 func (s *State) GetNewEBlocks(dbheight uint32, hash interfaces.IHash) interfaces.IEntryBlock {
 	if dbheight <= s.GetHighestSavedBlk()+1 {
-		pl := s.ProcessLists.Get(dbheight)
+		pl := s.ProcessLists.GetSafe(dbheight)
 		if pl == nil {
 			return nil
 		}
@@ -1920,7 +1920,7 @@ func (s *State) GetHighestKnownBlock() uint32 {
 func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 	ok := false
 	if rt {
-		pl := s.ProcessLists.Get(s.LLeaderHeight)
+		pl := s.ProcessLists.GetSafe(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
 			defer pl.FactoidBalancesTMutex.Unlock()
@@ -1957,7 +1957,7 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 	ok := false
 	if rt {
-		pl := s.ProcessLists.Get(s.LLeaderHeight)
+		pl := s.ProcessLists.GetSafe(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
 			defer pl.ECBalancesTMutex.Unlock()

@@ -239,7 +239,7 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 			continue
 		}
 
-		existsEB = st.ProcessLists.Get(st.LLeaderHeight - 1).GetNewEBlocks(ele.ChainID)
+		existsEB = st.ProcessLists.GetSafe(st.LLeaderHeight - 1).GetNewEBlocks(ele.ChainID)
 		if existsEB != nil {
 			skipped++
 			count--

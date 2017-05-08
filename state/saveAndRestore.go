@@ -103,7 +103,7 @@ type SaveState struct {
 func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss = new(SaveState)
 	ss.DBHeight = d.DirectoryBlock.GetHeader().GetDBHeight()
-	pl := state.ProcessLists.Get(ss.DBHeight)
+	pl := state.ProcessLists.GetSafe(ss.DBHeight)
 
 	if pl == nil {
 		return nil
@@ -212,11 +212,11 @@ func (ss *SaveState) TrimBack(state *State, d *DBState) {
 	if pss == nil {
 		return
 	}
-	ppl := state.ProcessLists.Get(ss.DBHeight)
+	ppl := state.ProcessLists.GetSafe(ss.DBHeight)
 	if ppl == nil {
 		return
 	}
-	pl := state.ProcessLists.Get(ss.DBHeight + 1)
+	pl := state.ProcessLists.GetSafe(ss.DBHeight + 1)
 	if pl == nil {
 		return
 	}

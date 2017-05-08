@@ -45,10 +45,10 @@ func (lists *ProcessLists) UpdateState(dbheight uint32) (progress bool) {
 		lists.Lists = newlist
 	}
 	dbstate := lists.State.DBStates.Get(int(dbheight))
-	pl := lists.Get(dbheight)
-	for pl.Complete() || (dbstate != nil && (dbstate.Signed || dbstate.Saved)) {
+	pl := lists.GetSafe(dbheight)
+	for (pl != nil && pl.Complete()) || (dbstate != nil && (dbstate.Signed || dbstate.Saved)) {
 		dbheight++
-		pl = lists.Get(dbheight)
+		pl = lists.GetSafe(dbheight)
 		dbstate = lists.State.DBStates.Get(int(dbheight))
 	}
 	if pl == nil {

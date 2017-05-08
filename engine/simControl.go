@@ -231,7 +231,7 @@ func SimControl(listenTo int) {
 
 					f := fnodes[listenTo]
 
-					pl := f.State.ProcessLists.Get(uint32(ht))
+					pl := f.State.ProcessLists.GetSafe(uint32(ht))
 					if pl == nil {
 						os.Stderr.WriteString("No Process List found")
 					} else {
@@ -282,7 +282,7 @@ func SimControl(listenTo int) {
 						ABlock := dsmsg.AdminBlock
 						os.Stderr.WriteString(fmt.Sprintln(ABlock.String()))
 					} else {
-						pl := f.State.ProcessLists.Get(uint32(ht))
+						pl := f.State.ProcessLists.GetSafe(uint32(ht))
 						if pl == nil || pl.AdminBlock == nil {
 							os.Stderr.WriteString(fmt.Sprintln("Could not find this Admin block"))
 						} else {
@@ -314,7 +314,7 @@ func SimControl(listenTo int) {
 						ECBlock := dsmsg.EntryCreditBlock
 						os.Stderr.WriteString(fmt.Sprint(ECBlock.String()))
 					} else {
-						pl := f.State.ProcessLists.Get(uint32(ht))
+						pl := f.State.ProcessLists.GetSafe(uint32(ht))
 						if pl == nil || pl.EntryCreditBlock == nil {
 							os.Stderr.WriteString(fmt.Sprintln("Could not find this Entry Credit Block"))
 						} else {
@@ -378,7 +378,7 @@ func SimControl(listenTo int) {
 						DBlock := dsmsg.DirectoryBlock
 						os.Stderr.WriteString(fmt.Sprint(DBlock.String()))
 					} else {
-						pl := f.State.ProcessLists.Get(uint32(ht))
+						pl := f.State.ProcessLists.GetSafe(uint32(ht))
 						if pl == nil || pl.DirectoryBlock == nil {
 							os.Stderr.WriteString(fmt.Sprintln("Could not find this directory block"))
 						} else {
@@ -1109,7 +1109,7 @@ func printProcessList(watchPL *int, value int, listenTo *int) {
 		b := fnode.State.GetHighestSavedBlk()
 		fnode.State.ProcessLists.SetString = true
 		nprt = nprt + fnode.State.ProcessLists.Str
-		pl := fnode.State.ProcessLists.Get(b)
+		pl := fnode.State.ProcessLists.GetSafe(b)
 		if pl != nil {
 			nprt = nprt + pl.PrintMap()
 			if out != nprt {

@@ -289,7 +289,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 func systemFaults(f *FactomNode) string {
 	dbheight := f.State.LLeaderHeight
-	pl := f.State.ProcessLists.Get(dbheight)
+	pl := f.State.ProcessLists.GetSafe(dbheight)
 	if pl == nil {
 		return ""
 	}
@@ -316,9 +316,9 @@ func faultSummary() string {
 	for i, fnode := range fnodes {
 		if verboseFaultOutput || !fnode.State.GetNetStateOff() {
 			b := fnode.State.GetHighestSavedBlk()
-			pl := fnode.State.ProcessLists.Get(b + 1)
+			pl := fnode.State.ProcessLists.GetSafe(b + 1)
 			if pl == nil {
-				pl = fnode.State.ProcessLists.Get(b)
+				pl = fnode.State.ProcessLists.GetSafe(b)
 			}
 			if pl != nil {
 				if i == 0 {

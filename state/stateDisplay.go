@@ -204,9 +204,9 @@ func DeepStateDisplayCopy(s *State) (*DisplayState, error) {
 	ds.RawSummary = prt
 
 	b := s.GetHighestSavedBlk()
-	pl := s.ProcessLists.Get(b + 1)
+	pl := s.ProcessLists.GetSafe(b + 1)
 	if pl == nil {
-		pl = s.ProcessLists.Get(b)
+		pl = s.ProcessLists.GetSafe(b)
 	}
 	if pl != nil && pl.FedServers != nil {
 		ds.PrintMap = pl.PrintMap()

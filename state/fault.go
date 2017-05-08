@@ -361,7 +361,7 @@ func (s *State) FollowerExecuteSFault(m interfaces.IMsg) {
 		return
 	}
 
-	pl := s.ProcessLists.Get(sf.DBHeight)
+	pl := s.ProcessLists.GetSafe(sf.DBHeight)
 
 	if pl == nil || pl.VMs[sf.VMIndex].WhenFaulted == 0 {
 		// If no such ProcessList exists, or if we don't consider
@@ -458,7 +458,7 @@ func (s *State) matchFault(sf *messages.ServerFault) {
 func (s *State) FollowerExecuteFullFault(m interfaces.IMsg) {
 	fullFault, _ := m.(*messages.FullServerFault)
 
-	pl := s.ProcessLists.Get(fullFault.DBHeight)
+	pl := s.ProcessLists.GetSafe(fullFault.DBHeight)
 
 	if pl == nil {
 		s.Holding[m.GetMsgHash().Fixed()] = m

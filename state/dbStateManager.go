@@ -281,8 +281,8 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	d.EntryCreditBlock.GetHeader().SetDBHeight(currentDBHeight)
 
 	// Admin Block Fixup
-	previousPL := list.State.ProcessLists.Get(previousDBHeight)
-	currentPL := list.State.ProcessLists.Get(currentDBHeight)
+	previousPL := list.State.ProcessLists.GetSafe(previousDBHeight)
+	currentPL := list.State.ProcessLists.GetSafe(currentDBHeight)
 
 	// Servers
 	previousFeds := previousPL.FedServers
@@ -291,7 +291,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 
 	// DB Sigs
 	majority := (len(currentFeds) / 2) + 1
-	lenDBSigs := len(list.State.ProcessLists.Get(currentDBHeight).DBSignatures)
+	lenDBSigs := len(list.State.ProcessLists.GetSafe(currentDBHeight).DBSignatures)
 	if lenDBSigs < majority {
 		//list.State.AddStatus(fmt.Sprintf("FIXUPLINKS: return without processing: lenDBSigs)(%v) < majority(%d)",
 		//	lenDBSigs,
@@ -302,7 +302,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	//list.State.AddStatus(fmt.Sprintf("FIXUPLINKS: Adding the first %d dbsigs",
 	//	majority))
 
-	for i, sig := range list.State.ProcessLists.Get(currentDBHeight).DBSignatures {
+	for i, sig := range list.State.ProcessLists.GetSafe(currentDBHeight).DBSignatures {
 		if i < majority {
 			d.AdminBlock.AddDBSig(sig.ChainID, sig.Signature)
 		} else {
@@ -375,7 +375,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	d.DirectoryBlock.SetECBlockHash(d.EntryCreditBlock)
 	d.DirectoryBlock.SetFBlockHash(d.FactoidBlock)
 
-	pl := list.State.ProcessLists.Get(currentDBHeight)
+	pl := list.State.ProcessLists.GetSafe(currentDBHeight)
 
 	//for _, eb := range pl.NewEBlocks {
 	//	eb.BuildHeader()
@@ -436,7 +436,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	d.SaveStruct = SaveFactomdState(list.State, d)
 
 	ht := d.DirectoryBlock.GetHeader().GetDBHeight()
-	pl := list.State.ProcessLists.Get(ht)
+	pl := list.State.ProcessLists.GetSafe(ht)
 	pln := list.State.ProcessLists.Get(ht + 1)
 
 	if pl == nil {
@@ -575,13 +575,13 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 		return true
 	}
 
-	pl := list.State.ProcessLists.Get(dbheight)
+	pl := list.State.ProcessLists.GetSafe(dbheight)
 	if pl == nil || !pl.Complete() {
 		return
 	}
 
 	// If we don't have the next dbstate yet, see if we have all the signatures.
-	pl = list.State.ProcessLists.Get(dbheight + 1)
+	pl = list.State.ProcessLists.GetSafe(dbheight + 1)
 	if pl == nil {
 		return
 	}
@@ -653,7 +653,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		panic(err.Error())
 	}
 
-	pl := list.State.ProcessLists.Get(uint32(dbheight))
+	pl := list.State.ProcessLists.GetSafe(uint32(dbheight))
 
 	if len(d.EntryBlocks) > 0 {
 		for _, eb := range d.EntryBlocks {

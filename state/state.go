@@ -1110,7 +1110,7 @@ func (s *State) LoadSpecificMsg(dbheight uint32, vm int, plistheight uint32) (in
 }
 
 func (s *State) LoadSpecificMsgAndAck(dbheight uint32, vmIndex int, plistheight uint32) (interfaces.IMsg, interfaces.IMsg, error) {
-	pl := s.ProcessLists.Get(dbheight)
+	pl := s.ProcessLists.GetSafe(dbheight)
 	if pl == nil {
 		return nil, nil, fmt.Errorf("%s", "Nil Process List")
 	}
@@ -1631,7 +1631,7 @@ func (s *State) RemoveAuditServer(dbheight uint32, hash interfaces.IHash) {
 }
 
 func (s *State) GetFedServers(dbheight uint32) []interfaces.IFctServer {
-	pl := s.ProcessLists.Get(dbheight)
+	pl := s.ProcessLists.GetSafe(dbheight)
 	if pl != nil {
 		return pl.FedServers
 	}
@@ -1639,7 +1639,7 @@ func (s *State) GetFedServers(dbheight uint32) []interfaces.IFctServer {
 }
 
 func (s *State) GetAuditServers(dbheight uint32) []interfaces.IFctServer {
-	pl := s.ProcessLists.Get(dbheight)
+	pl := s.ProcessLists.GetSafe(dbheight)
 	if pl != nil {
 		return pl.AuditServers
 	}
@@ -2094,7 +2094,7 @@ func (s *State) SetStringQueues() {
 	if s.Leader && s.LeaderVMIndex >= 0 {
 		vmi = s.LeaderVMIndex
 	}
-	vmt0 := s.ProcessLists.Get(s.LLeaderHeight)
+	vmt0 := s.ProcessLists.GetSafe(s.LLeaderHeight)
 	var vmt *VM
 	lmin := "-"
 	if vmt0 != nil && vmi >= 0 {
@@ -2116,7 +2116,7 @@ func (s *State) SetStringQueues() {
 	X := "_"
 	W := "_"
 	N := "_"
-	list := s.ProcessLists.Get(s.LLeaderHeight)
+	list := s.ProcessLists.GetSafe(s.LLeaderHeight)
 	if found {
 		L = "L"
 		if list != nil {
@@ -2315,7 +2315,7 @@ func (s *State) SetOut(o bool) {
 }
 
 func (s *State) GetSystemHeight(dbheight uint32) int {
-	pl := s.ProcessLists.Get(dbheight)
+	pl := s.ProcessLists.GetSafe(dbheight)
 	if pl == nil {
 		return -1
 	}
@@ -2325,7 +2325,7 @@ func (s *State) GetSystemHeight(dbheight uint32) int {
 // Gets the system message at the given dbheight, and given height in the
 // System list
 func (s *State) GetSystemMsg(dbheight uint32, height uint32) interfaces.IMsg {
-	pl := s.ProcessLists.Get(dbheight)
+	pl := s.ProcessLists.GetSafe(dbheight)
 	if pl == nil {
 		return nil
 	}
