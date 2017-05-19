@@ -16,7 +16,7 @@ import (
 )
 
 func has(s *State, entry interfaces.IHash) bool {
-	if s.GetHighestKnownBlock()-s.GetHighestSavedBlk() > 100 {
+	if s.DBFinished == false {
 		time.Sleep(30 * time.Millisecond)
 	}
 	exists, _ := s.DB.DoesKeyExist(databaseOverlay.ENTRY, entry.Bytes())
