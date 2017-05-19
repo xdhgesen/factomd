@@ -79,8 +79,8 @@ func NetStart(s *state.State) {
 	rpcPasswordflag := flag.String("rpcpass", "", "Password to protect factomd local API. Ignored if rpcuser is blank")
 	factomdTLSflag := flag.Bool("tls", false, "Set to true to require encrypted connections to factomd API and Control Panel") //to get tls, run as "factomd -tls=true"
 	factomdLocationsflag := flag.String("selfaddr", "", "comma seperated IPAddresses and DNS names of this factomd to use when creating a cert file")
-	fastPtr := flag.Bool("fast", true, "If true, factomd will fast-boot from a file.")
-	fastLocationPtr := flag.String("fastlocation", "", "Directory to put the fast-boot file in.")
+	fastPtr := NewBoolFlag("fast", true, "If true, factomd will fast-boot from a file.")
+	fastLocationPtr := NewStringFlag("fastlocation", "", "Directory to put the fast-boot file in.")
 	memProfileRate := flag.Int("mpr", 512*1024, "Set the Memory Profile Rate to update profiling per X bytes allocated. Default 512K, set to 1 to profile everything, 0 to disable.")
 
 	flag.Parse()
@@ -185,13 +185,11 @@ func NetStart(s *state.State) {
 		s.FactomdLocations += factomdLocations
 	}
 
-	if fast == false {
-		s.StateSaverStruct.FastBoot = false
+	if fast.IsSet {
+		s.StateSaverStruct.FastBoot = fast.Value
 	}
-	if fastLocationPtr != nil {
-		if *fastLocationPtr != "" {
-			s.StateSaverStruct.FastBootLocation = *fastLocationPtr
-		}
+	if fastLocationPtr.IsSet {
+		s.StateSaverStruct.FastBootLocation = fastLocationPtr.Value
 	}
 
 	fmt.Println(">>>>>>>>>>>>>>>>")
