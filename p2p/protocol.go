@@ -80,9 +80,9 @@ var (
 
 const (
 	// ProtocolVersion is the latest version this package supports
-	ProtocolVersion uint16 = 529
+	ProtocolVersion uint16 = 8
 	// ProtocolVersionMinimum is the earliest version this package supports
-	ProtocolVersionMinimum uint16 = 529
+	ProtocolVersionMinimum uint16 = 8
 )
 
 // NetworkIdentifier represents the P2P network we are participating in (eg: test, nmain, etc.)
