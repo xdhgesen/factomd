@@ -128,7 +128,7 @@ var (
 		Help: "Instrumenting the inmsg queue",
 	})
 	CurrentMessageQueueInMsgEtcdHashPickup = prometheus.NewGauge(prometheus.GaugeOpts{
-		Name: "factomd_state_queue_current_inmsg_etcdpickup",
+		Name: "factomd_state_queue_current_inmsg_etcdhashpickup",
 		Help: "Instrumenting the inmsg queue",
 	})
 	CurrentMessageQueueInMsgMissingMsg = prometheus.NewGauge(prometheus.GaugeOpts{
@@ -221,7 +221,7 @@ var (
 		Help: "Instrumenting the inmsg queue",
 	})
 	TotalMessageQueueInMsgEtcdHashPickup = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "factomd_state_queue_total_inmsg_etcdpickup",
+		Name: "factomd_state_queue_total_inmsg_etcdhashpickup",
 		Help: "Instrumenting the inmsg queue",
 	})
 	TotalMessageQueueInMsgMissingMsg = prometheus.NewCounter(prometheus.CounterOpts{
@@ -319,7 +319,7 @@ var (
 		Help: "Instrumenting the netoutmsg queue",
 	})
 	TotalMessageQueueNetOutMsgEtcdHashPickup = prometheus.NewCounter(prometheus.CounterOpts{
-		Name: "factomd_state_queue_total_netoutmsg_etcdpickup",
+		Name: "factomd_state_queue_total_netoutmsg_etcdhashpickup",
 		Help: "Instrumenting the netoutmsg queue",
 	})
 	TotalMessageQueueNetOutMsgMissingMsg = prometheus.NewCounter(prometheus.CounterOpts{

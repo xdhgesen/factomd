@@ -7,26 +7,29 @@ package messages
 import (
 	"fmt"
 
+	"encoding/hex"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
 //A placeholder structure for messages
-type InvalidDirectoryBlock struct {
+type EtcdHashPickup struct {
 	MessageBase
 	Timestamp interfaces.Timestamp
 
-	Signature interfaces.IFullSignature
+	RequestHash interfaces.IHash
+	Signature   interfaces.IFullSignature
 
 	//Not marshalled
 	hash interfaces.IHash
 }
 
-var _ interfaces.IMsg = (*InvalidDirectoryBlock)(nil)
-var _ Signable = (*InvalidDirectoryBlock)(nil)
+var _ interfaces.IMsg = (*EtcdHashPickup)(nil)
+var _ Signable = (*EtcdHashPickup)(nil)
 
-func (a *InvalidDirectoryBlock) IsSameAs(b *InvalidDirectoryBlock) bool {
+func (a *EtcdHashPickup) IsSameAs(b *EtcdHashPickup) bool {
 	if b == nil {
 		return false
 	}
@@ -48,7 +51,7 @@ func (a *InvalidDirectoryBlock) IsSameAs(b *InvalidDirectoryBlock) bool {
 	return true
 }
 
-func (m *InvalidDirectoryBlock) Sign(key interfaces.Signer) error {
+func (m *EtcdHashPickup) Sign(key interfaces.Signer) error {
 	signature, err := SignSignable(m, key)
 	if err != nil {
 		return err
@@ -57,32 +60,36 @@ func (m *InvalidDirectoryBlock) Sign(key interfaces.Signer) error {
 	return nil
 }
 
-func (m *InvalidDirectoryBlock) GetSignature() interfaces.IFullSignature {
+func (m *EtcdHashPickup) GetSignature() interfaces.IFullSignature {
 	return m.Signature
 }
 
-func (m *InvalidDirectoryBlock) VerifySignature() (bool, error) {
+func (m *EtcdHashPickup) VerifySignature() (bool, error) {
 	return VerifyMessage(m)
 }
 
-func (m *InvalidDirectoryBlock) Process(uint32, interfaces.IState) bool { return true }
+func (m *EtcdHashPickup) Process(uint32, interfaces.IState) bool { return true }
 
-func (m *InvalidDirectoryBlock) GetRepeatHash() interfaces.IHash {
+func (m *EtcdHashPickup) GetRepeatHash() interfaces.IHash {
 	return m.GetMsgHash()
 }
 
-func (m *InvalidDirectoryBlock) GetHash() interfaces.IHash {
-	if m.hash == nil {
-		data, err := m.MarshalForSignature()
-		if err != nil {
-			panic(fmt.Sprintf("Error in CommitChain.GetHash(): %s", err.Error()))
+func (m *EtcdHashPickup) GetHash() interfaces.IHash {
+	return m.RequestHash
+
+	/*
+		if m.hash == nil {
+			data, err := m.MarshalForSignature()
+			if err != nil {
+				panic(fmt.Sprintf("Error in CommitChain.GetHash(): %s", err.Error()))
+			}
+			m.hash = primitives.Sha(data)
 		}
-		m.hash = primitives.Sha(data)
-	}
-	return m.hash
+		return m.hash
+	*/
 }
 
-func (m *InvalidDirectoryBlock) GetMsgHash() interfaces.IHash {
+func (m *EtcdHashPickup) GetMsgHash() interfaces.IHash {
 	if m.MsgHash == nil {
 		data, err := m.MarshalBinary()
 		if err != nil {
@@ -93,15 +100,15 @@ func (m *InvalidDirectoryBlock) GetMsgHash() interfaces.IHash {
 	return m.MsgHash
 }
 
-func (m *InvalidDirectoryBlock) GetTimestamp() interfaces.Timestamp {
+func (m *EtcdHashPickup) GetTimestamp() interfaces.Timestamp {
 	return m.Timestamp
 }
 
-func (m *InvalidDirectoryBlock) Type() byte {
-	return constants.INVALID_DIRECTORY_BLOCK_MSG
+func (m *EtcdHashPickup) Type() byte {
+	return constants.ETCD_HASH_PICKUP_MSG
 }
 
-func (m *InvalidDirectoryBlock) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
+func (m *EtcdHashPickup) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Error unmarshalling: %v", r)
@@ -119,6 +126,14 @@ func (m *InvalidDirectoryBlock) UnmarshalBinaryData(data []byte) (newData []byte
 		return nil, err
 	}
 
+	if m.RequestHash == nil {
+		m.RequestHash = primitives.NewZeroHash()
+	}
+	newData, err = m.RequestHash.UnmarshalBinaryData(newData)
+	if err != nil {
+		return nil, err
+	}
+
 	//TODO: expand
 
 	if len(newData) > 0 {
@@ -132,12 +147,12 @@ func (m *InvalidDirectoryBlock) UnmarshalBinaryData(data []byte) (newData []byte
 	return newData, nil
 }
 
-func (m *InvalidDirectoryBlock) UnmarshalBinary(data []byte) error {
+func (m *EtcdHashPickup) UnmarshalBinary(data []byte) error {
 	_, err := m.UnmarshalBinaryData(data)
 	return err
 }
 
-func (m *InvalidDirectoryBlock) MarshalBinary() (data []byte, err error) {
+func (m *EtcdHashPickup) MarshalBinary() (data []byte, err error) {
 	resp, err := m.MarshalForSignature()
 	if err != nil {
 		return nil, err
@@ -154,7 +169,7 @@ func (m *InvalidDirectoryBlock) MarshalBinary() (data []byte, err error) {
 	return resp, nil
 }
 
-func (m *InvalidDirectoryBlock) MarshalForSignature() (data []byte, err error) {
+func (m *EtcdHashPickup) MarshalForSignature() (data []byte, err error) {
 	var buf primitives.Buffer
 	buf.Write([]byte{m.Type()})
 	if d, err := m.Timestamp.MarshalBinary(); err != nil {
@@ -163,28 +178,33 @@ func (m *InvalidDirectoryBlock) MarshalForSignature() (data []byte, err error) {
 		buf.Write(d)
 	}
 
+	if d, err := m.RequestHash.MarshalBinary(); err != nil {
+		return nil, err
+	} else {
+		buf.Write(d)
+	}
 	//TODO: expand
 
 	return buf.DeepCopyBytes(), nil
 }
 
-func (m *InvalidDirectoryBlock) String() string {
+func (m *EtcdHashPickup) String() string {
 	return "Invalid Directory Block"
 }
 
-func (m *InvalidDirectoryBlock) DBHeight() int {
+func (m *EtcdHashPickup) DBHeight() int {
 	return 0
 }
 
-func (m *InvalidDirectoryBlock) ChainID() []byte {
+func (m *EtcdHashPickup) ChainID() []byte {
 	return nil
 }
 
-func (m *InvalidDirectoryBlock) ListHeight() int {
+func (m *EtcdHashPickup) ListHeight() int {
 	return 0
 }
 
-func (m *InvalidDirectoryBlock) SerialHash() []byte {
+func (m *EtcdHashPickup) SerialHash() []byte {
 	return nil
 }
 
@@ -192,26 +212,40 @@ func (m *InvalidDirectoryBlock) SerialHash() []byte {
 //  < 0 -- Message is invalid.  Discard
 //  0   -- Cannot tell if message is Valid
 //  1   -- Message is valid
-func (m *InvalidDirectoryBlock) Validate(state interfaces.IState) int {
+func (m *EtcdHashPickup) Validate(state interfaces.IState) int {
 	return 0
 }
 
 // Returns true if this is a message for this server to execute as
 // a leader.
-func (m *InvalidDirectoryBlock) ComputeVMIndex(state interfaces.IState) {
+func (m *EtcdHashPickup) ComputeVMIndex(state interfaces.IState) {
 }
 
 // Execute the leader functions of the given message
-func (m *InvalidDirectoryBlock) LeaderExecute(state interfaces.IState) {
+func (m *EtcdHashPickup) LeaderExecute(state interfaces.IState) {
 }
 
-func (m *InvalidDirectoryBlock) FollowerExecute(interfaces.IState) {
+func (m *EtcdHashPickup) FollowerExecute(interfaces.IState) {
 }
 
-func (e *InvalidDirectoryBlock) JSONByte() ([]byte, error) {
+func (e *EtcdHashPickup) JSONByte() ([]byte, error) {
 	return primitives.EncodeJSON(e)
 }
 
-func (e *InvalidDirectoryBlock) JSONString() (string, error) {
+func (e *EtcdHashPickup) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
+}
+
+func NewEtcdHashPickup(state interfaces.IState, requestHash string) interfaces.IMsg {
+	msg := new(EtcdHashPickup)
+
+	msg.Peer2Peer = false // Always a peer2peer request.
+	msg.Timestamp = state.GetTimestamp()
+	myString, err := hex.DecodeString(requestHash)
+	if err == nil {
+		msg.RequestHash = primitives.NewHash(myString)
+	} else {
+		msg.RequestHash = primitives.NewHash([]byte(myString))
+	}
+	return msg
 }

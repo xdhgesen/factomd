@@ -113,7 +113,7 @@ func measureMessage(channel IPrometheusChannel, msg interfaces.IMsg, increment b
 		channel.FactTx(increment)
 	case constants.HEARTBEAT_MSG: // 11
 		channel.Heartbeat(increment)
-	case constants.INVALID_DIRECTORY_BLOCK_MSG: // 12
+	case constants.ETCD_HASH_PICKUP_MSG: // 12
 		channel.EtcdHashPickup(increment)
 	case constants.MISSING_MSG: // 13
 		channel.MissingMsg(increment)

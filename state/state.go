@@ -93,6 +93,8 @@ type State struct {
 	CustomNetworkID         []byte
 	CustomBootstrapIdentity string
 	CustomBootstrapKey      string
+	EtcdAddress             string
+	EtcdUUID                string
 
 	IdentityChainID      interfaces.IHash // If this node has an identity, this is it
 	Identities           []*Identity      // Identities of all servers in management chain
@@ -171,6 +173,7 @@ type State struct {
 	StartDelayLimit int64
 	DBFinished      bool
 	RunLeader       bool
+	BootTime        int64 // Time in seconds that we last booted
 
 	// Ignore missing messages for a period to allow rebooting a network where your
 	// own messages from the previously executing network can confuse you.
@@ -225,7 +228,7 @@ type State struct {
 	ResendHolding interfaces.Timestamp         // Timestamp to gate resending holding to neighbors
 	Holding       map[[32]byte]interfaces.IMsg // Hold Messages
 	XReview       []interfaces.IMsg            // After the EOM, we must review the messages in Holding
-	Acks          map[[32]byte]interfaces.IMsg // Hold Acknowledgemets
+	Acks          map[[32]byte]interfaces.IMsg // Hold Acknowledgements
 	Commits       map[[32]byte]interfaces.IMsg // Commit Messages
 
 	InvalidMessages      map[[32]byte]interfaces.IMsg
@@ -329,6 +332,8 @@ type State struct {
 	AckChange uint32
 
 	StateSaverStruct StateSaverStruct
+	// Plugins
+	useEtcd bool
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -475,6 +480,10 @@ func (s *State) SetDelay(delay int64) {
 	s.Delay = delay
 }
 
+func (s *State) GetBootTime() int64 {
+	return s.BootTime
+}
+
 func (s *State) GetDropRate() int {
 	return s.DropRate
 }
@@ -551,6 +560,10 @@ func (s *State) IncECommits() {
 	s.ECommits++
 }
 
+func (s *State) PickUpFromHash(msgHash string) {
+	s.NetworkOutMsgQueue().Enqueue(messages.NewEtcdHashPickup(s, msgHash))
+}
+
 func (s *State) GetAckChange() error {
 	change, err := util.GetChangeAcksHeight(s.filename)
 	if err != nil {
@@ -616,6 +629,8 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.RpcPass = cfg.App.FactomdRpcPass
 		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
 		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
+		s.EtcdAddress = cfg.App.EtcdAddress
+		s.EtcdUUID = cfg.App.EtcdUUID
 
 		s.FactomdTLSEnable = cfg.App.FactomdTlsEnabled
 		if cfg.App.FactomdTlsPrivateKey == "/full/path/to/factomdAPIpriv.key" {
@@ -720,6 +735,7 @@ func (s *State) Init() {
 	s.StartDelay = s.GetTimestamp().GetTimeMilli() // We cant start as a leader until we know we are upto date
 	s.RunLeader = false
 	s.IgnoreMissing = true
+	s.BootTime = s.GetTimestamp().GetTimeSeconds()
 
 	if s.LogPath == "stdout" {
 		wsapi.InitLogs(s.LogPath, s.LogLevel)

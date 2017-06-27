@@ -66,7 +66,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		s.Holding[msg.GetMsgHash().Fixed()] = msg
 	default:
 		s.Holding[msg.GetMsgHash().Fixed()] = msg
-		if !msg.SentInvlaid() {
+		if !msg.SentInvalid() {
 			msg.MarkSentInvalid(true)
 			s.networkInvalidMsgQueue <- msg
 		}

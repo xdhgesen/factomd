@@ -85,6 +85,13 @@ func NetStart(s *state.State) {
 	logLvlPtr := flag.String("loglvl", "none", "Set log level to either: debug, info, notice, warning, error, critical, alert, emergency or none")
 	logFilePtr := flag.Bool("logfile", false, "Use to set logging to use a file rather than stdout")
 
+	// Plugins
+	pluginPath := flag.String("plugin", "", "Input the path to any plugin binaries")
+
+	// 	Etcd Plugin
+	useEtcd := flag.Bool("etcd", false, "If true, use etcd along with the default p2p network for current-block messages.")
+	etcdExclusive := flag.Bool("etcd-exclusive", false, "If true, use etcd _instead of_ the default p2p network for current-block messages.")
+
 	flag.Parse()
 
 	ackbalanceHash := *ackBalanceHashPtr
@@ -398,7 +405,41 @@ func NetStart(s *state.State) {
 		p2pProxy.StartProxy()
 		// Command line peers lets us manually set special peers
 		p2pNetwork.DialSpecialPeersString(peers)
-		go networkHousekeeping() // This goroutine executes once a second to keep the proxy apprised of the network status.
+
+		if *useEtcd {
+			p2pProxy.SetWeight(100)
+			etcdManager, err := LaunchEtcdPlugin(*pluginPath, fnodes[0].State.EtcdAddress, fnodes[0].State.EtcdUUID, "factom")
+			if err != nil {
+				time.Sleep(3 * time.Second)
+				etcdManager, err = LaunchEtcdPlugin(*pluginPath, fnodes[0].State.EtcdAddress, fnodes[0].State.EtcdUUID, "factom")
+				if err != nil {
+					fmt.Printf("Encountered an error while trying to initiate Etcd plugin (again): %s\n", err.Error())
+					panic("Plugin manager not working")
+				}
+			}
+			p2pProxy.EtcdManager = etcdManager
+			p2pProxy.SetUseEtcd(true)
+			fnodes[0].State.SetUseEtcd(true)
+			s.SetUseEtcd(true)
+
+			if *etcdExclusive {
+				p2pProxy.SetUseEtcdExclusive(true)
+			}
+
+			etcdRetryBeginTime := time.Now()
+			etcdReady := false
+			for !etcdReady {
+				etcdReady, err = etcdManager.Ready()
+				if err != nil {
+					fmt.Printf("Etcd retry err: %s\n", err.Error())
+				}
+				time.Sleep(time.Second)
+			}
+			etcdRetryTimeElapsed := time.Since(etcdRetryBeginTime)
+			fmt.Printf("Etcd retry took: %s\n", etcdRetryTimeElapsed)
+		}
+
+		go networkHousekeeping(s) // This goroutine executes once a second to keep the proxy apprised of the network status.
 	}
 
 	switch net {
@@ -608,7 +649,10 @@ func setupFirstAuthority(s *state.State) {
 	s.Authorities = append(s.Authorities, &auth)
 }
 
-func networkHousekeeping() {
+func networkHousekeeping(s *state.State) {
+	if s.UsingEtcd() {
+		return
+	}
 	for {
 		time.Sleep(1 * time.Second)
 		p2pProxy.SetWeight(p2pNetwork.GetNumberConnections())

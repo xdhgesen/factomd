@@ -102,7 +102,7 @@ func (m *MessageBase) MarkSentInvalid(b bool) {
 	m.MarkInvalid = b
 }
 
-func (m *MessageBase) SentInvlaid() bool {
+func (m *MessageBase) SentInvalid() bool {
 	return m.MarkInvalid
 }
 
