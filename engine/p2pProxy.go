@@ -141,9 +141,9 @@ func (f *P2PProxy) GetNameTo() string {
 
 func (f *P2PProxy) Send(msg interfaces.IMsg) error {
 	if f.UsingEtcd() {
-		err := f.SendIntoEtcd(msg)
+		go f.SendIntoEtcd(msg)
 		if f.UsingEtcdExclusive() {
-			return err
+			return nil
 		}
 	}
 
@@ -232,18 +232,20 @@ func (f *P2PProxy) Recieve() (interfaces.IMsg, error) {
 
 			switch data.(type) {
 			case factomMessage:
-				fmessage := data.(factomMessage)
-				//f.trace(fmessage.AppHash, fmessage.AppType, "P2PProxy.Recieve()", "N")
-				msg, err := messages.UnmarshalMessage(fmessage.Message)
-				if nil == err {
-					msg.SetNetworkOrigin(fmessage.PeerHash)
+				if !f.UsingEtcdExclusive() {
+					fmessage := data.(factomMessage)
+					//f.trace(fmessage.AppHash, fmessage.AppType, "P2PProxy.Recieve()", "N")
+					msg, err := messages.UnmarshalMessage(fmessage.Message)
+					if nil == err {
+						msg.SetNetworkOrigin(fmessage.PeerHash)
+					}
+					// if 1 < f.debugMode {
+					// 	f.logMessage(msg, true) // NODE_TALK_FIX
+					// 	fmt.Printf(".")
+					// }
+					f.bytesIn += len(fmessage.Message)
+					return msg, err
 				}
-				// if 1 < f.debugMode {
-				// 	f.logMessage(msg, true) // NODE_TALK_FIX
-				// 	fmt.Printf(".")
-				// }
-				f.bytesIn += len(fmessage.Message)
-				return msg, err
 			default:
 				// fmt.Printf("Garbage on f.BroadcastIn. %+v", data)
 				if f.UsingEtcd() {
@@ -267,7 +269,7 @@ func (f *P2PProxy) SweepEtcd() {
 		if newMsgBytes != nil && len(newMsgBytes) > 0 {
 			f.BroadcastIn <- newMsgBytes
 		} else {
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }

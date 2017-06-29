@@ -402,12 +402,8 @@ func NetStart(s *state.State) {
 		} else {
 			p2pNetwork.StartLogging(uint8(0))
 		}
-		p2pProxy.StartProxy()
-		// Command line peers lets us manually set special peers
-		p2pNetwork.DialSpecialPeersString(peers)
 
 		if *useEtcd {
-			p2pProxy.SetWeight(100)
 			etcdManager, err := LaunchEtcdPlugin(*pluginPath, fnodes[0].State.EtcdAddress, fnodes[0].State.EtcdUUID, "factom")
 			if err != nil {
 				time.Sleep(3 * time.Second)
@@ -439,7 +435,11 @@ func NetStart(s *state.State) {
 			fmt.Printf("Etcd retry took: %s\n", etcdRetryTimeElapsed)
 		}
 
-		go networkHousekeeping(s) // This goroutine executes once a second to keep the proxy apprised of the network status.
+		p2pProxy.StartProxy()
+		// Command line peers lets us manually set special peers
+		p2pNetwork.DialSpecialPeersString(peers)
+
+		go networkHousekeeping() // This goroutine executes once a second to keep the proxy apprised of the network status.
 	}
 
 	switch net {
@@ -649,10 +649,7 @@ func setupFirstAuthority(s *state.State) {
 	s.Authorities = append(s.Authorities, &auth)
 }
 
-func networkHousekeeping(s *state.State) {
-	if s.UsingEtcd() {
-		return
-	}
+func networkHousekeeping() {
 	for {
 		time.Sleep(1 * time.Second)
 		p2pProxy.SetWeight(p2pNetwork.GetNumberConnections())
