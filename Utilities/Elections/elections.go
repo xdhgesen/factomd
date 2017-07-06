@@ -11,7 +11,19 @@ import (
 	"math/rand"
 	"sync"
 	"time"
+	"bytes"
 )
+
+/*********************************************************************
+	General Network random election with unique IDs
+
+	1) Candidate Nodes detect a fault in a leader
+	2) Calculate rank for all candidates for round
+	3) Highest rank candidate issues its nomination
+	4) Leaders ack (includes nomination)
+	5) Leaders ack2 (all nominations)
+
+**********************************************************************/
 
 const level string = "level"
 const bolt string = "bolt"
@@ -126,7 +138,10 @@ type node struct {
 	messages     map[[32]byte]interfaces.IHash
 	msgSync      sync.Mutex
 	leaders      []int
+	audits       []int
+	rankaudits   [][]int  // audits sorted by rank by VM
 	processlists [][]message
+	listHeight   int
 }
 
 func (n *node) MaxLen() (max int) {
@@ -145,6 +160,10 @@ func (n *node) GetID() int {
 func (n *node) AddLeader(id int) {
 	n.leaders = append(n.leaders, id)
 	n.processlists = append(n.processlists, make([]message, 0))
+}
+
+func (n *node) AddAudit(id int) {
+	n.audits = append(n.audits, id)
 }
 
 func (n *node) IsLeader() (index int, leader bool) {
@@ -200,14 +219,14 @@ mainloop:
 					syncts = primitives.NewTimestampNow()
 				}
 				n.processlists[eom.VM] = append(n.processlists[eom.VM], eom)
-				maxlen := n.MaxLen()
+				n.listHeight = n.MaxLen()
 				for _, pl := range n.processlists {
-					if len(pl) != maxlen {
+					if len(pl) != n.listHeight {
 						continue mainloop
 					}
 				}
 				syncing = false
-				str := fmt.Sprintf("Node%2d blk ht: %5d   ==== ", n.ID, maxlen)
+				str := fmt.Sprintf("Node%2d blk ht: %5d   ==== ", n.leaders[eom.VM], n.listHeight)
 				for i, pl := range n.processlists {
 					str = str + fmt.Sprintf(" %1d[%04d]  ", i, len(pl))
 				}
@@ -219,10 +238,9 @@ mainloop:
 			then := syncts.GetTimeMilli()
 			_, leader := n.IsLeader()
 			if leader && syncing && (now-then > 1000) {
-				maxlen := n.MaxLen()
-				str := fmt.Sprintf("Node%2d blk ht: %5d   XXXX ", n.ID, maxlen)
+				str := fmt.Sprintf("Node%2d blk ht: %5d   XXXX ", n.ID, n.listHeight)
 				for i, pl := range n.processlists {
-					if len(pl) == maxlen {
+					if len(pl) == n.listHeight {
 						str = str + fmt.Sprintf(" %1d[%04d]  ", n.leaders[i], len(pl))
 					} else {
 						str = str + fmt.Sprintf("X%1d[%04d]X ", n.leaders[i], len(pl))
@@ -267,11 +285,53 @@ func (n *node) Broadcast(msg message) {
 	}
 }
 
+/*********************************************************************
+	General Network random election with unique IDs
+
+	1) Candidate/Leader Nodes detect a fault in a leader
+	2) Calculate rank for all candidates for round
+	3) Highest rank candidate issues its nomination
+	4) Leaders ack (includes nomination)
+	5) Leaders ack2 (all nominations)
+	6) If election fails (times out), increment round and go to 2)
+	7) Done!
+
+**********************************************************************/
+// Rank is the hash ( vm + listHeight + ID + round)
+func (n *node) CalculateRanks(vm int, round int) {
+	var rank []interfaces.IHash		// List of ranks
+	copy(n.rankaudits[vm],n.audits)	// Init the list of audits (we'll sort in a bit)
+
+	for _,a := range n.rankaudits[vm] {
+		var stuff []byte
+		stuff = append(stuff,byte(vm))
+		stuff = append(stuff,byte(n.listHeight>>3),byte(n.listHeight>>2),byte(n.listHeight>>1),byte(n.listHeight))
+		stuff = append(stuff,byte(a>>3),byte(a>>2),byte(a>>1),byte(a))
+		stuff = append(stuff,byte(round>>3),byte(round>>2),byte(round>>1),byte(round))
+		rank = append(rank, primitives.Sha(stuff))
+	}
+
+	for i := 0; i < len(rank)-1; i++ {
+		for j:=i; j < len(rank)-1-i; j++ {
+			if bytes.Compare(rank[j].Bytes(),rank[j+1].Bytes()) > 0 {
+				r := rank[j]
+				rank[j]=rank[j+1]
+				rank[j+1]=r
+
+				ra := n.rankaudits[j]
+				n.rankaudits[j]=n.rankaudits[j+1]
+				n.rankaudits[j+1]=ra
+			}
+		}
+	}
+
+}
+
 ////////////////////////////// main //////////////////////
 
 func main() {
 	lcnt := 5 // Number of leaders
-	lim := 10 // Number of nodes
+	lim := 20 // Number of nodes
 
 	for i := 0; i < lim; i++ {
 		n := new(node)
@@ -281,6 +341,9 @@ func main() {
 		nodes = append(nodes, n)
 		for j := 0; j < lcnt; j++ {
 			n.AddLeader(j)
+		}
+		for j := lcnt; j < lim; j++{
+			n.AddAudit(j)
 		}
 	}
 
