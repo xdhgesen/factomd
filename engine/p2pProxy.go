@@ -269,7 +269,7 @@ func (f *P2PProxy) SweepEtcd() {
 		if newMsgBytes != nil && len(newMsgBytes) > 0 {
 			f.BroadcastIn <- newMsgBytes
 		} else {
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
 }

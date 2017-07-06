@@ -265,6 +265,11 @@ func (s *State) ReviewHolding() {
 			delete(s.Holding, k)
 		}
 
+		_, ok := v.(*messages.RevealEntryMsg)
+		if ok {
+			continue
+		}
+
 		mm, ok := v.(*messages.MissingMsgResponse)
 		if ok {
 			ff, ok := mm.MsgResponse.(*messages.FullServerFault)
