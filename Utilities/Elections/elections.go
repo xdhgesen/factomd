@@ -5,13 +5,13 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"math/rand"
 	"sync"
 	"time"
-	"bytes"
 )
 
 /*********************************************************************
@@ -139,7 +139,7 @@ type node struct {
 	msgSync      sync.Mutex
 	leaders      []int
 	audits       []int
-	rankaudits   [][]int  // audits sorted by rank by VM
+	rankaudits   [][][]int // vm, round, audit ID
 	processlists [][]message
 	listHeight   int
 }
@@ -226,7 +226,8 @@ mainloop:
 					}
 				}
 				syncing = false
-				str := fmt.Sprintf("Node%2d blk ht: %5d   ==== ", n.leaders[eom.VM], n.listHeight)
+				n.rankaudits = make([][][]int, len(n.leaders))
+				str := fmt.Sprintf("Node%2d blk ht: %5d   ---- ", n.leaders[eom.VM], n.listHeight)
 				for i, pl := range n.processlists {
 					str = str + fmt.Sprintf(" %1d[%04d]  ", i, len(pl))
 				}
@@ -236,14 +237,18 @@ mainloop:
 			//fmt.Println("Times:", syncts.GetTime().String(), time.Now().String())
 			now := primitives.NewTimestampNow().GetTimeMilli()
 			then := syncts.GetTimeMilli()
-			_, leader := n.IsLeader()
-			if leader && syncing && (now-then > 1000) {
+			//	_, leader := n.IsLeader()
+			if syncing && (now-then > 1000) {
 				str := fmt.Sprintf("Node%2d blk ht: %5d   XXXX ", n.ID, n.listHeight)
 				for i, pl := range n.processlists {
 					if len(pl) == n.listHeight {
 						str = str + fmt.Sprintf(" %1d[%04d]  ", n.leaders[i], len(pl))
 					} else {
 						str = str + fmt.Sprintf("X%1d[%04d]X ", n.leaders[i], len(pl))
+						ranks := n.CalculateRanks(i, len(n.rankaudits[i]))
+						for _, rh := range ranks {
+							fmt.Println(rh.String())
+						}
 					}
 				}
 				fmt.Println(str)
@@ -291,40 +296,65 @@ func (n *node) Broadcast(msg message) {
 	1) Candidate/Leader Nodes detect a fault in a leader
 	2) Calculate rank for all candidates for round
 	3) Highest rank candidate issues its nomination
-	4) Leaders ack (includes nomination)
-	5) Leaders ack2 (all nominations)
+	4) Leaders ack1 (includes nomination)
+	5) Leaders ack2 (includes nomination, sent only after getting a majority of ack1)
 	6) If election fails (times out), increment round and go to 2)
 	7) Done!
 
 **********************************************************************/
-// Rank is the hash ( vm + listHeight + ID + round)
-func (n *node) CalculateRanks(vm int, round int) {
-	var rank []interfaces.IHash		// List of ranks
-	copy(n.rankaudits[vm],n.audits)	// Init the list of audits (we'll sort in a bit)
 
-	for _,a := range n.rankaudits[vm] {
+type nominate struct {
+	VM     int
+	ID     int
+	height int
+	round  int
+}
+
+type leaderAck1 struct {
+	msg      *nominate
+	leaderID int
+}
+
+type leaderAck2 struct {
+	msg      *nominate
+	leaderID int
+}
+
+// Rank is the hash ( vm + listHeight + ID + round)
+// Returns the Rank List
+func (n *node) CalculateRanks(vm int, round int) (rank []interfaces.IHash) {
+	if len(n.rankaudits[vm]) <= round {
+		n.rankaudits[vm] = append(n.rankaudits[vm], make([]int, 0))
+	}
+	copy(n.rankaudits[vm][round], n.audits) // Init the list of audits (we'll sort in a bit)
+
+	if n.rankaudits[vm] == nil {
+		n.rankaudits[vm] = make([][]int, 0)
+	}
+
+	for _, a := range n.rankaudits[vm][round] {
 		var stuff []byte
-		stuff = append(stuff,byte(vm))
-		stuff = append(stuff,byte(n.listHeight>>3),byte(n.listHeight>>2),byte(n.listHeight>>1),byte(n.listHeight))
-		stuff = append(stuff,byte(a>>3),byte(a>>2),byte(a>>1),byte(a))
-		stuff = append(stuff,byte(round>>3),byte(round>>2),byte(round>>1),byte(round))
+		stuff = append(stuff, byte(vm))
+		stuff = append(stuff, byte(n.listHeight>>3), byte(n.listHeight>>2), byte(n.listHeight>>1), byte(n.listHeight))
+		stuff = append(stuff, byte(a>>3), byte(a>>2), byte(a>>1), byte(a))
+		stuff = append(stuff, byte(round>>3), byte(round>>2), byte(round>>1), byte(round))
 		rank = append(rank, primitives.Sha(stuff))
 	}
 
 	for i := 0; i < len(rank)-1; i++ {
-		for j:=i; j < len(rank)-1-i; j++ {
-			if bytes.Compare(rank[j].Bytes(),rank[j+1].Bytes()) > 0 {
+		for j := i; j < len(rank)-1-i; j++ {
+			if bytes.Compare(rank[j].Bytes(), rank[j+1].Bytes()) > 0 {
 				r := rank[j]
-				rank[j]=rank[j+1]
-				rank[j+1]=r
+				rank[j] = rank[j+1]
+				rank[j+1] = r
 
-				ra := n.rankaudits[j]
-				n.rankaudits[j]=n.rankaudits[j+1]
-				n.rankaudits[j+1]=ra
+				ra := n.rankaudits[vm][round][j]
+				n.rankaudits[vm][round][j] = n.rankaudits[vm][round][j+1]
+				n.rankaudits[vm][round][j+1] = ra
 			}
 		}
 	}
-
+	return
 }
 
 ////////////////////////////// main //////////////////////
@@ -338,11 +368,12 @@ func main() {
 		n.ID = i
 		n.messages = make(map[[32]byte]interfaces.IHash, 0)
 		n.toProcess = make(chan message, 1000)
+		n.rankaudits = make([][][]int, lim)
 		nodes = append(nodes, n)
 		for j := 0; j < lcnt; j++ {
 			n.AddLeader(j)
 		}
-		for j := lcnt; j < lim; j++{
+		for j := lcnt; j < lim; j++ {
 			n.AddAudit(j)
 		}
 	}
