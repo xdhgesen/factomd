@@ -25,7 +25,7 @@ type TransAddress struct {
 	Address interfaces.IAddress `json:"address"`
 	// Not marshalled
 	UserAddress string `json:"useraddress"`
-	ECAmount    uint64
+	ECAmount    uint64 `json:"credits"`
 }
 
 var _ interfaces.ITransAddress = (*TransAddress)(nil)
