@@ -25,6 +25,7 @@ type TransAddress struct {
 	Address interfaces.IAddress `json:"address"`
 	// Not marshalled
 	UserAddress string `json:"useraddress"`
+	ECAmount    uint64
 }
 
 var _ interfaces.ITransAddress = (*TransAddress)(nil)
@@ -35,6 +36,10 @@ func RandomTransAddress() interfaces.ITransAddress {
 	ta.Amount = random.RandUInt64()
 	ta.UserAddress = random.RandomString()
 	return ta
+}
+
+func (t *TransAddress) SetECAmount(amount uint64){
+	t.ECAmount = amount
 }
 
 func (t *TransAddress) SetUserAddress(v string) {

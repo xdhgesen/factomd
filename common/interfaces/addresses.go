@@ -18,6 +18,7 @@ type ITransAddress interface {
 	GetAddress() IAddress
 	SetAddress(IAddress)
 	IsSameAs(ITransAddress) bool
+	SetECAmount(uint64)
 
 	CustomMarshalTextInput() ([]byte, error)
 	CustomMarshalTextOutput() ([]byte, error)
