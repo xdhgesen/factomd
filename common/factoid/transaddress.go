@@ -38,7 +38,7 @@ func RandomTransAddress() interfaces.ITransAddress {
 	return ta
 }
 
-func (t *TransAddress) SetECAmount(amount uint64){
+func (t *TransAddress) SetECAmount(amount uint64) {
 	t.ECAmount = amount
 }
 
