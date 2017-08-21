@@ -41,6 +41,27 @@ var _ interfaces.IMsg = (*Ack)(nil)
 var _ Signable = (*Ack)(nil)
 var AckBalanceHash = true
 
+func (m *Ack) GenerateSerialHash(prev *Ack) (interfaces.IHash, error) {
+	if prev == nil {
+		//If this is the first ack, return MessageHash
+		return m.MessageHash
+	}
+	//Otherwise, hash the MessageHashes together
+	h, err := primitives.CreateHash(prev.MessageHash, m.MessageHash)
+	if err != nil {
+		return nil, err
+	}
+	return h, nil
+}
+
+func (m *Ack) VerifySerialHash(prev *Ack) (bool, error) {
+	h, err := m.GenerateSerialHash(prev)
+	if err != nil {
+		return false, nil
+	}
+	return m.SerialHash.IsSameAs(h), nil
+}
+
 func (m *Ack) GetRepeatHash() interfaces.IHash {
 	return m.GetMsgHash()
 }

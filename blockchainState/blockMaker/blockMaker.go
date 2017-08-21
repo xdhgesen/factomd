@@ -15,12 +15,14 @@ import (
 type BlockMaker struct {
 	Mutex sync.RWMutex
 
+	NumberOfLeaders int
+
 	ProcessedEBEntries  []*EBlockEntry
 	ProcessedFBEntries  []interfaces.ITransaction
 	ProcessedABEntries  []interfaces.IABEntry
 	ProcessedECBEntries []*ECBlockEntry
 
-	PendingMessages map[string]*PendingMessages
+	VMs map[int]*VM
 
 	BState *blockchainState.BlockchainState
 
@@ -31,6 +33,7 @@ type BlockMaker struct {
 
 func NewBlockMaker() *BlockMaker {
 	bm := new(BlockMaker)
+	bm.NumberOfLeaders = 1
 	bm.BState = blockchainState.NewBSLocalNet()
 	return bm
 }
@@ -44,47 +47,64 @@ type MsgAckPair struct {
 	Ack     *messages.Ack
 }
 
-type PendingMessages struct {
+func ChainIDToVMIndex(h interfaces.IHash, numberOfLeaders int) int {
+	hash := h.Bytes()
+
+	if numberOfLeaders < 2 {
+		return 0
+	}
+
+	v := uint64(0)
+	for _, b := range hash {
+		v += uint64(b)
+	}
+
+	r := int(v % uint64(numberOfLeaders))
+	return r
+}
+
+type VM struct {
 	Mutex sync.RWMutex
 
 	DBHeight uint32
 
 	LatestHeight uint32
-	LatestAck    interfaces.IMsg
+	LatestAck    *messages.Ack
 
 	PendingPairs []*MsgAckPair
 }
 
-func (bm *BlockMaker) GetPendingMessages(chainID interfaces.IHash) *PendingMessages {
+func (bm *BlockMaker) GetVM(chainID interfaces.IHash) *VM {
 	bm.Mutex.Lock()
 	defer bm.Mutex.Unlock()
 
-	pm := bm.PendingMessages[chainID.String()]
-	if pm == nil {
-		pm = new(PendingMessages)
-		bm.PendingMessages[chainID.String()] = pm
+	index := ChainIDToVMIndex(chainID, bm.NumberOfLeaders)
+	vm := bm.VMs[index]
+	if vm == nil {
+		vm = new(VMs)
+		bm.VMs[index] = vm
 	}
 
-	return pm
+	return vm
 }
 
-func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) {
+func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
 	chainID := msg.GetEntryChainID()
-	pm := bm.GetPendingMessages(chainID)
+	vm := bm.GetVM(chainID)
 
-	pm.Mutex.Lock()
-	defer pm.Mutex.Unlock()
+	vm.Mutex.Lock()
+	defer vm.Mutex.Unlock()
 
-	if ack.Height < pm.LatestHeight {
+	if ack.Height < vm.LatestHeight {
 		//We already processed this message, nothing to do
-		return
+		return nil
 	}
-	if ack.Height == pm.LatestHeight {
-		if pm.LatestAck != nil {
+	if ack.Height == vm.LatestHeight {
+		if vm.LatestAck != nil {
 			//We already processed this message as well
 			//AND it's not the first message!
 			//Nothing to do
-			return
+			return nil
 		}
 	}
 
@@ -95,42 +115,67 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 	pair.Message = msg
 
 	inserted := false
-	for i := 0; i < len(pm.PendingPairs); i++ {
+	for i := 0; i < len(vm.PendingPairs); i++ {
 		//Looking for first pair that is higher than the current Height, so we can insert our pair before the other one
-		if pm.PendingPairs[i].Ack.Height > pair.Ack.Height {
+		if vm.PendingPairs[i].Ack.Height > pair.Ack.Height {
 			index := i - 1
 			if index < 0 {
 				//Inserting as the first entry
-				pm.PendingPairs = append([]*MsgAckPair{pair}, pm.PendingPairs...)
+				vm.PendingPairs = append([]*MsgAckPair{pair}, vm.PendingPairs...)
 			} else {
 				//Inserting somewhere in the middle
-				pm.PendingPairs = append(pm.PendingPairs[:index], append([]*MsgAckPair{pair}, pm.PendingPairs[index:]...))
+				vm.PendingPairs = append(vm.PendingPairs[:index], append([]*MsgAckPair{pair}, vm.PendingPairs[index:]...))
 			}
 			break
 		}
+		if vm.PendingPairs[i].Ack.Height == pair.Ack.Height {
+			//TODO: figure out what to do when an ACK has the same height
+			//If it's not the same or something?
+		}
 	}
 	if inserted == false {
-		pm.PendingPairs = append(pm.PendingPairs, pair)
+		vm.PendingPairs = append(vm.PendingPairs, pair)
 	}
 
 	//Iterate over pending pairs and process them one by one until we're stuck
 	for {
-		if len(pm.PendingPairs) == 0 {
+		if len(vm.PendingPairs) == 0 {
 			break
 		}
-		if pm.LatestAck == nil {
-			if pm.PendingPairs[0].Ack.Height != 0 {
+		if vm.LatestAck == nil {
+			if vm.PendingPairs[0].Ack.Height != 0 {
 				//We're expecting first message and we didn't find one
 				break
 			}
 		} else {
-			if pm.LatestHeight != pm.PendingPairs[0].Ack.Height-1 {
+			if vm.LatestHeight != vm.PendingPairs[0].Ack.Height-1 {
 				//We didn't find the next pair
 				break
 			}
 		}
 
+		pair = vm.PendingPairs[0]
+		ok, err := pair.Ack.VerifySerialHash(vm.LatestAck)
+		if err != nil {
+			return err
+		}
+		if ok == false {
+			//TODO: reject the ACK or something?
+		}
+
 		//Actually processing the message
 		//TODO: do
+		switch chainID.String() {
+		case "000000000000000000000000000000000000000000000000000000000000000a":
+			break
+		case "000000000000000000000000000000000000000000000000000000000000000c":
+			break
+		case "000000000000000000000000000000000000000000000000000000000000000f":
+			break
+		default:
+			break
+		}
 	}
+
+	return nil
 }
