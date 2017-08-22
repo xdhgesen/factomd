@@ -5,9 +5,11 @@
 package blockMaker
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/FactomProject/factomd/blockchainState"
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 )
@@ -165,12 +167,36 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 
 		//Actually processing the message
 		//TODO: do
+		msgType := pair.Message.Type()
+
 		switch chainID.String() {
 		case "000000000000000000000000000000000000000000000000000000000000000a":
 			break
 		case "000000000000000000000000000000000000000000000000000000000000000c":
+			switch msgType {
+			case constants.COMMIT_CHAIN_MSG:
+				break
+			case constants.COMMIT_ENTRY_MSG:
+				break
+			default:
+				return fmt.Errorf("Invalid message type")
+				break
+			}
 			break
 		case "000000000000000000000000000000000000000000000000000000000000000f":
+			if msgType != constants.FACTOID_TRANSACTION_MSG {
+				return fmt.Errorf("Invalid message type")
+			}
+			m := pair.Message.(*messages.FactoidTransaction)
+			tx := m.GetTransaction()
+
+			err = bm.ProcessFactoidTransaction(tx)
+			if err != nil {
+				return err
+			}
+
+			//...
+
 			break
 		default:
 			break

@@ -40,11 +40,11 @@ func (bm *BlockMaker) ProcessECEntry(e interfaces.IECBlockEntry) error {
 	ebe := new(ECBlockEntry)
 	ebe.Entry = e
 	ebe.Minute = bm.CurrentMinute
-	if bm.BState.ProcessECEntry(e) != nil {
-		bm.PendingECBEntries = append(bm.PendingECBEntries, ebe)
-	} else {
-		bm.ProcessedECBEntries = append(bm.ProcessedECBEntries, ebe)
+	err := bm.BState.ProcessECEntry(e)
+	if err != nil {
+		return err
 	}
+	bm.ProcessedECBEntries = append(bm.ProcessedECBEntries, ebe)
 	return nil
 }
 

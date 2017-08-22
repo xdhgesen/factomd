@@ -35,10 +35,10 @@ func (bm *BlockMaker) BuildFBlock() (interfaces.IFBlock, error) {
 }
 
 func (bm *BlockMaker) ProcessFactoidTransaction(e interfaces.ITransaction) error {
-	if bm.BState.ProcessFactoidTransaction(e, bm.BState.ExchangeRate) != nil {
-		bm.PendingFBEntries = append(bm.PendingFBEntries, e)
-	} else {
-		bm.ProcessedFBEntries = append(bm.ProcessedFBEntries, e)
+	err := bm.BState.ProcessFactoidTransaction(e, bm.BState.ExchangeRate)
+	if err != nil {
+		return err
 	}
+	bm.ProcessedFBEntries = append(bm.ProcessedFBEntries, e)
 	return nil
 }

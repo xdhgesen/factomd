@@ -35,9 +35,8 @@ func (bm *BlockMaker) BuildABlock() (interfaces.IAdminBlock, error) {
 func (bm *BlockMaker) ProcessABEntry(e interfaces.IABEntry) error {
 	err := bm.BState.ProcessABlockEntry(e)
 	if err != nil {
-		bm.PendingABEntries = append(bm.PendingABEntries, e)
-	} else {
-		bm.ProcessedABEntries = append(bm.ProcessedABEntries, e)
+		return err
 	}
+	bm.ProcessedABEntries = append(bm.ProcessedABEntries, e)
 	return nil
 }
