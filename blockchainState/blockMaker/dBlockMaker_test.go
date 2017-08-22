@@ -32,8 +32,6 @@ func TestBuildBlockSet(t *testing.T) {
 		}
 	}
 
-	bm.SetCurrentMinute(0)
-
 	ecEntries := ecb.GetBody().GetEntries()
 	for _, v := range ecEntries {
 		if v.ECID() == entryCreditBlock.ECIDMinuteNumber {
@@ -52,8 +50,6 @@ func TestBuildBlockSet(t *testing.T) {
 		}
 	}
 
-	bm.SetCurrentMinute(0)
-
 	abe := ab.GetABEntries()
 	for _, v := range abe {
 		err := bm.ProcessABEntry(v)
@@ -62,8 +58,6 @@ func TestBuildBlockSet(t *testing.T) {
 		}
 	}
 	bm.SetABlockHeaderExpansionArea(ab.GetHeader().GetHeaderExpansionArea())
-
-	bm.SetCurrentMinute(0)
 
 	eb, es := testHelper.CreateTestEntryBlock(nil)
 	eb.GetHeader().SetDBHeight(1)

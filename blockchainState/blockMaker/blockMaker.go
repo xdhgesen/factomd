@@ -29,8 +29,6 @@ type BlockMaker struct {
 	BState *blockchainState.BlockchainState
 
 	ABlockHeaderExpansionArea []byte
-
-	CurrentMinute int
 }
 
 func NewBlockMaker() *BlockMaker {
@@ -38,10 +36,6 @@ func NewBlockMaker() *BlockMaker {
 	bm.NumberOfLeaders = 1
 	bm.BState = blockchainState.NewBSLocalNet()
 	return bm
-}
-
-func (bm *BlockMaker) SetCurrentMinute(m int) {
-	bm.CurrentMinute = m
 }
 
 type MsgAckPair struct {
@@ -68,7 +62,8 @@ func ChainIDToVMIndex(h interfaces.IHash, numberOfLeaders int) int {
 type VM struct {
 	Mutex sync.RWMutex
 
-	DBHeight uint32
+	DBHeight      uint32
+	CurrentMinute int
 
 	LatestHeight uint32
 	LatestAck    *messages.Ack
@@ -175,8 +170,25 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		case "000000000000000000000000000000000000000000000000000000000000000c":
 			switch msgType {
 			case constants.COMMIT_CHAIN_MSG:
+				m := pair.Message.(*messages.CommitChainMsg)
+				e := m.CommitChain
+				err = bm.ProcessECEntry(e, vm.CurrentMinute)
+				if err != nil {
+					return err
+				}
+
+				//...
 				break
 			case constants.COMMIT_ENTRY_MSG:
+				m := pair.Message.(*messages.CommitEntryMsg)
+				e := m.CommitEntry
+				err = bm.ProcessECEntry(e, vm.CurrentMinute)
+				if err != nil {
+					return err
+				}
+
+				//...
+
 				break
 			default:
 				return fmt.Errorf("Invalid message type")
@@ -199,6 +211,19 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 
 			break
 		default:
+			if msgType != constants.REVEAL_ENTRY_MSG {
+				return fmt.Errorf("Invalid message type")
+			}
+			m := pair.Message.(*messages.RevealEntryMsg)
+			e := m.Entry
+
+			err = bm.ProcessEBEntry(e, vm.CurrentMinute)
+			if err != nil {
+				return err
+			}
+
+			//...
+
 			break
 		}
 	}

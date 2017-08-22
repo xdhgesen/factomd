@@ -36,10 +36,10 @@ func (bm *BlockMaker) BuildECBlock() (interfaces.IEntryCreditBlock, error) {
 	return ecBlock, nil
 }
 
-func (bm *BlockMaker) ProcessECEntry(e interfaces.IECBlockEntry) error {
+func (bm *BlockMaker) ProcessECEntry(e interfaces.IECBlockEntry, minute int) error {
 	ebe := new(ECBlockEntry)
 	ebe.Entry = e
-	ebe.Minute = bm.CurrentMinute
+	ebe.Minute = minute
 	err := bm.BState.ProcessECEntry(e)
 	if err != nil {
 		return err

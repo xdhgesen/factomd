@@ -54,10 +54,10 @@ func (bm *BlockMaker) BuildEBlocks() ([]interfaces.IEntryBlock, []interfaces.IEB
 	return eBlocks, ebEntries, nil
 }
 
-func (bm *BlockMaker) ProcessEBEntry(e interfaces.IEntry) error {
+func (bm *BlockMaker) ProcessEBEntry(e interfaces.IEntry, minute int) error {
 	ebe := new(EBlockEntry)
 	ebe.Entry = e
-	ebe.Minute = bm.CurrentMinute
+	ebe.Minute = minute
 	err := bm.BState.ProcessEntryHash(e.GetHash(), primitives.NewZeroHash())
 	if err != nil {
 		return err
