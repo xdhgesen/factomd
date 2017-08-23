@@ -19,9 +19,10 @@ func TestBuildECBlocks(t *testing.T) {
 
 	bm := NewBlockMaker()
 	ecEntries := ecb.GetBody().GetEntries()
+	currentMinute := 0
 	for _, v := range ecEntries {
 		if v.ECID() == entryCreditBlock.ECIDMinuteNumber {
-			bm.SetCurrentMinute(int(v.(*entryCreditBlock.MinuteNumber).Number))
+			currentMinute = int(v.(*entryCreditBlock.MinuteNumber).Number)
 		} else {
 			if v.ECID() == entryCreditBlock.ECIDChainCommit {
 				bm.BState.ECBalances[v.(*entryCreditBlock.CommitChain).ECPubKey.String()] = 1000
@@ -29,7 +30,7 @@ func TestBuildECBlocks(t *testing.T) {
 			if v.ECID() == entryCreditBlock.ECIDEntryCommit {
 				bm.BState.ECBalances[v.(*entryCreditBlock.CommitEntry).ECPubKey.String()] = 1000
 			}
-			err := bm.ProcessECEntry(v)
+			err := bm.ProcessECEntry(v, currentMinute)
 			if err != nil {
 				t.Errorf("%v", err)
 			}

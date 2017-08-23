@@ -44,7 +44,7 @@ var AckBalanceHash = true
 func (m *Ack) GenerateSerialHash(prev *Ack) (interfaces.IHash, error) {
 	if prev == nil {
 		//If this is the first ack, return MessageHash
-		return m.MessageHash
+		return m.MessageHash, nil
 	}
 	//Otherwise, hash the MessageHashes together
 	h, err := primitives.CreateHash(prev.MessageHash, m.MessageHash)

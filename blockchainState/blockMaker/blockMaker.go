@@ -78,7 +78,7 @@ func (bm *BlockMaker) GetVM(chainID interfaces.IHash) *VM {
 	index := ChainIDToVMIndex(chainID, bm.NumberOfLeaders)
 	vm := bm.VMs[index]
 	if vm == nil {
-		vm = new(VMs)
+		vm = new(VM)
 		bm.VMs[index] = vm
 	}
 
@@ -121,7 +121,7 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 				vm.PendingPairs = append([]*MsgAckPair{pair}, vm.PendingPairs...)
 			} else {
 				//Inserting somewhere in the middle
-				vm.PendingPairs = append(vm.PendingPairs[:index], append([]*MsgAckPair{pair}, vm.PendingPairs[index:]...))
+				vm.PendingPairs = append(vm.PendingPairs[:index], append([]*MsgAckPair{pair}, vm.PendingPairs[index:]...)...)
 			}
 			break
 		}

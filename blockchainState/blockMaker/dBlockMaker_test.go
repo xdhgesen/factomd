@@ -33,9 +33,10 @@ func TestBuildBlockSet(t *testing.T) {
 	}
 
 	ecEntries := ecb.GetBody().GetEntries()
+	currentMinute := 0
 	for _, v := range ecEntries {
 		if v.ECID() == entryCreditBlock.ECIDMinuteNumber {
-			bm.SetCurrentMinute(int(v.(*entryCreditBlock.MinuteNumber).Number))
+			currentMinute = int(v.(*entryCreditBlock.MinuteNumber).Number)
 		} else {
 			if v.ECID() == entryCreditBlock.ECIDChainCommit {
 				bm.BState.ECBalances[v.(*entryCreditBlock.CommitChain).ECPubKey.String()] = 1000
@@ -43,7 +44,7 @@ func TestBuildBlockSet(t *testing.T) {
 			if v.ECID() == entryCreditBlock.ECIDEntryCommit {
 				bm.BState.ECBalances[v.(*entryCreditBlock.CommitEntry).ECPubKey.String()] = 1000
 			}
-			err := bm.ProcessECEntry(v)
+			err := bm.ProcessECEntry(v, currentMinute)
 			if err != nil {
 				t.Errorf("%v", err)
 			}
@@ -62,7 +63,7 @@ func TestBuildBlockSet(t *testing.T) {
 	eb, es := testHelper.CreateTestEntryBlock(nil)
 	eb.GetHeader().SetDBHeight(1)
 	bm.BState.PushCommit(es[0].GetHash(), es[0].GetHash())
-	err := bm.ProcessEBEntry(es[0])
+	err := bm.ProcessEBEntry(es[0], 0)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
