@@ -128,6 +128,7 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		if vm.PendingPairs[i].Ack.Height == pair.Ack.Height {
 			//TODO: figure out what to do when an ACK has the same height
 			//If it's not the same or something?
+			return nil
 		}
 	}
 	if inserted == false {
@@ -158,6 +159,8 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		}
 		if ok == false {
 			//TODO: reject the ACK or something?
+			vm.PendingPairs = vm.PendingPairs[1:]
+			return nil
 		}
 
 		//Actually processing the message
@@ -226,6 +229,9 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 
 			break
 		}
+		//Pop the processed message and set the ack to the latest one
+		vm.PendingPairs = vm.PendingPairs[1:]
+		vm.LatestAck = pair.Ack
 	}
 
 	return nil
