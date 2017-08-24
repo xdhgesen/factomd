@@ -123,6 +123,7 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 				//Inserting somewhere in the middle
 				vm.PendingPairs = append(vm.PendingPairs[:index], append([]*MsgAckPair{pair}, vm.PendingPairs[index:]...)...)
 			}
+			inserted = true
 			break
 		}
 		if vm.PendingPairs[i].Ack.Height == pair.Ack.Height {
