@@ -163,6 +163,8 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 			return nil
 		}
 
+		//TODO: validate ACK signature?
+
 		//Actually processing the message
 		//TODO: do
 		msgType := pair.Message.Type()
