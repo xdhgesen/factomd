@@ -166,7 +166,7 @@ func (m *CommitChainMsg) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-func (m *CommitChainMsg) MarshalForSignature() (data []byte, err error) {
+func (m *CommitChainMsg) MarshalBinary() (data []byte, err error) {
 	var buf primitives.Buffer
 
 	binary.Write(&buf, binary.BigEndian, m.Type())
@@ -178,14 +178,6 @@ func (m *CommitChainMsg) MarshalForSignature() (data []byte, err error) {
 	buf.Write(data)
 
 	return buf.DeepCopyBytes(), nil
-}
-
-func (m *CommitChainMsg) MarshalBinary() (data []byte, err error) {
-	resp, err := m.MarshalForSignature()
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
 }
 
 func (m *CommitChainMsg) String() string {

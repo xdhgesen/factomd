@@ -22,8 +22,6 @@ type CommitEntryMsg struct {
 
 	CommitEntry *entryCreditBlock.CommitEntry
 
-	Signature interfaces.IFullSignature
-
 	//Not marshalled
 	hash interfaces.IHash
 
@@ -33,7 +31,6 @@ type CommitEntryMsg struct {
 }
 
 var _ interfaces.IMsg = (*CommitEntryMsg)(nil)
-var _ Signable = (*CommitEntryMsg)(nil)
 var _ interfaces.IMessageWithEntry = (*CommitEntryMsg)(nil)
 
 func (a *CommitEntryMsg) GetEntryChainID() interfaces.IHash {
@@ -54,15 +51,6 @@ func (a *CommitEntryMsg) IsSameAs(b *CommitEntryMsg) bool {
 	}
 	if a.CommitEntry != nil {
 		if a.CommitEntry.IsSameAs(b.CommitEntry) == false {
-			return false
-		}
-	}
-
-	if a.Signature == nil && b.Signature != nil {
-		return false
-	}
-	if a.Signature != nil {
-		if a.Signature.IsSameAs(b.Signature) == false {
 			return false
 		}
 	}
@@ -109,23 +97,6 @@ func (m *CommitEntryMsg) Type() byte {
 	return constants.COMMIT_ENTRY_MSG
 }
 
-func (m *CommitEntryMsg) Sign(key interfaces.Signer) error {
-	signature, err := SignSignable(m, key)
-	if err != nil {
-		return err
-	}
-	m.Signature = signature
-	return nil
-}
-
-func (m *CommitEntryMsg) GetSignature() interfaces.IFullSignature {
-	return m.Signature
-}
-
-func (m *CommitEntryMsg) VerifySignature() (bool, error) {
-	return VerifyMessage(m)
-}
-
 func (m *CommitEntryMsg) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -145,14 +116,6 @@ func (m *CommitEntryMsg) UnmarshalBinaryData(data []byte) (newData []byte, err e
 	}
 	m.CommitEntry = ce
 
-	if len(newData) > 0 {
-		m.Signature = new(primitives.Signature)
-		newData, err = m.Signature.UnmarshalBinaryData(newData)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	return newData, nil
 }
 
@@ -161,7 +124,7 @@ func (m *CommitEntryMsg) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-func (m *CommitEntryMsg) MarshalForSignature() (data []byte, err error) {
+func (m *CommitEntryMsg) MarshalBinary() (data []byte, err error) {
 	var buf primitives.Buffer
 
 	binary.Write(&buf, binary.BigEndian, m.Type())
@@ -173,23 +136,6 @@ func (m *CommitEntryMsg) MarshalForSignature() (data []byte, err error) {
 	buf.Write(data)
 
 	return buf.DeepCopyBytes(), nil
-}
-
-func (m *CommitEntryMsg) MarshalBinary() (data []byte, err error) {
-	resp, err := m.MarshalForSignature()
-	if err != nil {
-		return nil, err
-	}
-	sig := m.GetSignature()
-
-	if sig != nil {
-		sigBytes, err := sig.MarshalBinary()
-		if err != nil {
-			return nil, err
-		}
-		return append(resp, sigBytes...), nil
-	}
-	return resp, nil
 }
 
 func (m *CommitEntryMsg) String() string {

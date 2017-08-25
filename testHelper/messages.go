@@ -1,6 +1,7 @@
 package testHelper
 
 import (
+	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -16,7 +17,7 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 		m := new(messages.FactoidTransaction)
 		m.Transaction = v
 		msgs = append(msgs, m)
-		ack := AckAMessage(m)
+		ack := AckAMessage(m, 0)
 		acks = append(acks, ack)
 	}
 
@@ -47,7 +48,7 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 		}
 		msgs = append(msgs, msg)
 
-		ack := AckAMessage(msg)
+		ack := AckAMessage(msg, minute)
 		acks = append(acks, ack)
 	}
 	entries := map[string]*entryBlock.Entry{}
@@ -66,7 +67,7 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 
 		msgs = append(msgs, msg)
 
-		ack := AckAMessage(msg)
+		ack := AckAMessage(msg, minute)
 		acks = append(acks, ack)
 	}
 
@@ -81,14 +82,14 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 
 		msgs = append(msgs, msg)
 
-		ack := AckAMessage(msg)
+		ack := AckAMessage(msg, minute)
 		acks = append(acks, ack)
 	}
 
 	return msgs, acks
 }
 
-func AckAMessage(msg interfaces.IMsg) interfaces.IMsg {
+func AckAMessage(msg interfaces.IMsg, minute int) interfaces.IMsg {
 	ack := new(messages.Ack)
 
 	return ack
