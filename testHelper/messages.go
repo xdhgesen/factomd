@@ -122,7 +122,7 @@ func (ms *MsgSet) PushMessage(msg interfaces.IMsg, minute int) {
 	}
 }
 
-func (ms *MsgSet) CreateAcks() {
+func (ms *MsgSet) CreateAcks(dbheight uint32) {
 	fIndex := 0
 	ecIndex := 0
 	eIndex := 0
@@ -136,19 +136,27 @@ func (ms *MsgSet) CreateAcks() {
 			if ms.FBMessages[fIndex].Minute >= minute {
 				break
 			}
+			lastAck = AckMessage(ms.FBMessages[fIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
+			ms.Acks = append(ms.Acks, lastAck)
 		}
 
 		for ; ecIndex < len(ms.ECBMessages); ecIndex++ {
 			if ms.ECBMessages[ecIndex].Minute >= minute {
 				break
 			}
+			lastAck = AckMessage(ms.ECBMessages[ecIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
+			ms.Acks = append(ms.Acks, lastAck)
 		}
 
 		for ; eIndex < len(ms.EBMessages); eIndex++ {
 			if ms.EBMessages[eIndex].Minute >= minute {
 				break
 			}
+			lastAck = AckMessage(ms.EBMessages[eIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
+			ms.Acks = append(ms.Acks, lastAck)
 		}
+
+		//TODO: generate EOM
 	}
 }
 
@@ -170,4 +178,29 @@ func (ms *MsgSet) GetMsgs() []interfaces.IMsg {
 
 func (ms *MsgSet) GetAcks() []interfaces.IMsg {
 	return ms.Acks
+}
+
+func AckMessage(msg interfaces.IMsg, minute int, dbheight uint32, prevAck interfaces.IMsg, key *primitives.PrivateKey) interfaces.IMsg {
+	ack := new(messages.Ack)
+
+	ack.MessageHash = msg.GetHash()
+	ack.DBHeight = dbheight
+	if prevAck == nil {
+		ack.Height = 0
+	} else {
+		ack.Height = prevAck.(*messages.Ack).Height + 1
+	}
+
+	h, err := ack.GenerateSerialHash(prevAck.(*messages.Ack))
+	if err != nil {
+		panic(err)
+	}
+	ack.SerialHash = h
+
+	err = ack.Sign(key)
+	if err != nil {
+		panic(err)
+	}
+
+	return ack
 }
