@@ -1,24 +1,27 @@
 package testHelper
 
 import (
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
+	"github.com/FactomProject/factomd/common/primitives"
 )
 
-func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) {
+func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfaces.IMsg, []interfaces.IMsg) {
 	msgs := []interfaces.IMsg{}
 	acks := []interfaces.IMsg{}
+
+	ms := new(MsgSet)
+	ms.PrivateKey = priv
 
 	//
 
 	for _, v := range bs.FBlock.GetTransactions() {
 		m := new(messages.FactoidTransaction)
 		m.Transaction = v
-		msgs = append(msgs, m)
-		ack := AckAMessage(m, 0)
-		acks = append(acks, ack)
+		ms.PushMessage(m, 0)
 	}
 
 	minute := 0
@@ -30,13 +33,11 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 		case entryCreditBlock.ECIDChainCommit:
 			m := new(messages.CommitChainMsg)
 			m.CommitChain = v.(*entryCreditBlock.CommitChain)
-			//m.Signature ??
 			msg = m
 			break
 		case entryCreditBlock.ECIDEntryCommit:
 			m := new(messages.CommitEntryMsg)
 			m.CommitEntry = v.(*entryCreditBlock.CommitEntry)
-			//m.Signature ??
 			msg = m
 			break
 		case entryCreditBlock.ECIDMinuteNumber:
@@ -46,10 +47,7 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 		case entryCreditBlock.ECIDServerIndexNumber:
 			break
 		}
-		msgs = append(msgs, msg)
-
-		ack := AckAMessage(msg, minute)
-		acks = append(acks, ack)
+		ms.PushMessage(msg, minute)
 	}
 	entries := map[string]*entryBlock.Entry{}
 	for _, v := range bs.Entries {
@@ -80,17 +78,96 @@ func BlockSetToMessageList(bs *BlockSet) ([]interfaces.IMsg, []interfaces.IMsg) 
 		msg := new(messages.RevealEntryMsg)
 		msg.Entry = entries[v.String()]
 
-		msgs = append(msgs, msg)
-
-		ack := AckAMessage(msg, minute)
-		acks = append(acks, ack)
+		ms.PushMessage(msg, minute)
 	}
 
-	return msgs, acks
+	ms.CreateAcks()
+
+	return ms.GetMsgs(), ms.GetAcks()
 }
 
-func AckAMessage(msg interfaces.IMsg, minute int) interfaces.IMsg {
-	ack := new(messages.Ack)
+type MessageWithMinute struct {
+	Msg    interfaces.IMsg
+	Minute int
+}
 
-	return ack
+type MsgSet struct {
+	FBMessages  []*MessageWithMinute
+	ECBMessages []*MessageWithMinute
+	EBMessages  []*MessageWithMinute
+
+	Acks []interfaces.IMsg
+
+	PrivateKey *primitives.PrivateKey
+}
+
+func (ms *MsgSet) PushMessage(msg interfaces.IMsg, minute int) {
+	m := new(MessageWithMinute)
+	m.Msg = msg
+	m.Minute = minute
+
+	switch msg.Type() {
+	case constants.FACTOID_TRANSACTION_MSG:
+		ms.FBMessages = append(ms.FBMessages, m)
+		break
+	case constants.COMMIT_ENTRY_MSG:
+		ms.ECBMessages = append(ms.ECBMessages, m)
+		break
+	case constants.COMMIT_CHAIN_MSG:
+		ms.ECBMessages = append(ms.ECBMessages, m)
+		break
+	case constants.REVEAL_ENTRY_MSG:
+		ms.EBMessages = append(ms.EBMessages, m)
+		break
+	}
+}
+
+func (ms *MsgSet) CreateAcks() {
+	fIndex := 0
+	ecIndex := 0
+	eIndex := 0
+	var lastAck *messages.Ack = nil
+
+	for minute := 0; minute < 10; minute++ {
+		//Iterate over each block type up to the current minute
+		//Blocks need to be iterated in order since EBlocks rely on ECBlocks which rely on FBlocks
+
+		for ; fIndex < len(ms.FBMessages); fIndex++ {
+			if ms.FBMessages[fIndex].Minute >= minute {
+				break
+			}
+		}
+
+		for ; ecIndex < len(ms.ECBMessages); ecIndex++ {
+			if ms.ECBMessages[ecIndex].Minute >= minute {
+				break
+			}
+		}
+
+		for ; eIndex < len(ms.EBMessages); eIndex++ {
+			if ms.EBMessages[eIndex].Minute >= minute {
+				break
+			}
+		}
+	}
+}
+
+func (ms *MsgSet) GetMsgs() []interfaces.IMsg {
+	msgs := []interfaces.IMsg{}
+
+	for _, v := range ms.FBMessages {
+		msgs = append(msgs, v.Msg)
+	}
+	for _, v := range ms.ECBMessages {
+		msgs = append(msgs, v.Msg)
+	}
+	for _, v := range ms.EBMessages {
+		msgs = append(msgs, v.Msg)
+	}
+
+	return msgs
+}
+
+func (ms *MsgSet) GetAcks() []interfaces.IMsg {
+	return ms.Acks
 }
