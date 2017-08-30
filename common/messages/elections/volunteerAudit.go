@@ -30,6 +30,8 @@ type VolunteerAudit struct {
 	Minute      byte                 // Minute (-1 for dbsig)
 	Round       int                  // Voting Round
 	messageHash interfaces.IHash
+
+	Signature interfaces.IFullSignature
 }
 
 var _ interfaces.IMsg = (*VolunteerAudit)(nil)
@@ -99,8 +101,36 @@ func (m *VolunteerAudit) Type() byte {
 	return constants.VOLUNTEERAUDIT
 }
 
+func (m *VolunteerAudit) VerifySignature() (bool, error) {
+	toSign, err := m.MarshalForSignature()
+	if err != nil {
+		return false, err
+	}
+	sig := m.GetSignature()
+	if sig == nil {
+		return false, fmt.Errorf("%s", "Message signature is nil")
+	}
+	if sig.Verify(toSign) {
+		return true, nil
+	}
+	return false, errors.New("Signature is invalid")
+}
+
 func (m *VolunteerAudit) Validate(state interfaces.IState) int {
-	return 1
+	validSig, sigError := m.VerifySignature()
+
+	// If there was an error verifying the signature, message is invalid
+	if sigError != nil {
+		return -1
+	}
+
+	// If there were no errors verifying the signature, message is valid
+	if validSig {
+		return 1
+	}
+
+	// Should never happen
+	return 0
 }
 
 // Returns true if this is a message for this server to execute as
@@ -130,6 +160,22 @@ func (e *VolunteerAudit) JSONByte() ([]byte, error) {
 
 func (e *VolunteerAudit) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
+}
+
+func (m *VolunteerAudit) Sign(key interfaces.Signer) error {
+	toSign, err := m.MarshalForSignature()
+	if err != nil {
+		return err
+	}
+
+	signature := key.Sign(toSign)
+
+	m.Signature = signature
+	return nil
+}
+
+func (m *VolunteerAudit) GetSignature() interfaces.IFullSignature {
+	return m.Signature
 }
 
 func (m *VolunteerAudit) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
@@ -174,7 +220,7 @@ func (m *VolunteerAudit) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-func (m *VolunteerAudit) MarshalBinary() (data []byte, err error) {
+func (m *VolunteerAudit) MarshalForSignature() (data []byte, err error) {
 
 	var buf primitives.Buffer
 
@@ -203,6 +249,24 @@ func (m *VolunteerAudit) MarshalBinary() (data []byte, err error) {
 		return nil, e
 	}
 	return buf.DeepCopyBytes(), nil
+}
+
+func (m *VolunteerAudit) MarshalBinary() (data []byte, err error) {
+	resp, err := m.MarshalForSignature()
+	if err != nil {
+		return nil, err
+	}
+
+	sig := m.GetSignature()
+
+	if sig != nil {
+		sigBytes, err := sig.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		return append(resp, sigBytes...), nil
+	}
+	return resp, nil
 }
 
 func (m *VolunteerAudit) String() string {

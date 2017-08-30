@@ -15,7 +15,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
-func TestUnmarshalfolunteerAudit_test(t *testing.T) {
+func TestUnmarshalVolunteerAudit_test(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
 			t.Errorf("Panic caught during the test - %v", r)
@@ -34,7 +34,7 @@ func TestUnmarshalfolunteerAudit_test(t *testing.T) {
 	}
 }
 
-func TestMarshalUnmarshalAck(t *testing.T) {
+func TestMarshalUnmarshalVolunteerAudit(t *testing.T) {
 	test := func(va *VolunteerAudit, num string) {
 		_, err := va.JSONString()
 		if err != nil {
@@ -59,7 +59,7 @@ func TestMarshalUnmarshalAck(t *testing.T) {
 		}
 
 		if va.IsSameAs(va2) == false {
-			t.Error(num + " Acks are not the same")
+			t.Error(num + " VolunteerAudit are not the same")
 			fmt.Println(va.String())
 			fmt.Println(va2.String())
 		}

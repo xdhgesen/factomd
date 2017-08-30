@@ -3,11 +3,12 @@ package elections
 import (
 	"bytes"
 	"fmt"
+	"time"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/elections"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-	"time"
 )
 
 var _ = fmt.Print
@@ -262,6 +263,7 @@ func Run(s *state.State) {
 					V.DBHeight = uint32(e.DBHeight)
 					V.Minute = byte(e.Minute)
 					V.Round = e.round[e.electing]
+					V.Sign(s.GetServerPrivateKey())
 					fmt.Printf("eee %10s %s %s\n", e.Name, "I'm an Audit Server and I Volunteer", V.String())
 					V.SendOut(s, V)
 				}
