@@ -96,6 +96,7 @@ type MsgSet struct {
 	ECBMessages []*MessageWithMinute
 	EBMessages  []*MessageWithMinute
 
+	EOMs []interfaces.IMsg
 	Acks []interfaces.IMsg
 
 	PrivateKey *primitives.PrivateKey
@@ -156,7 +157,20 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 			ms.Acks = append(ms.Acks, lastAck)
 		}
 
-		//TODO: generate EOM
+		eom := new(messages.EOM)
+		eom.DBHeight = dbheight
+		eom.SysHash = primitives.NewZeroHash()
+		eom.ChainID = primitives.NewZeroHash()
+		eom.Minute = byte(minute)
+
+		err = eom.Sign(ms.PrivateKey)
+		if err != nil {
+			panic(err)
+		}
+		ms.EOMs = append(ms.EOMs, eom)
+
+		lastAck = AckMessage(eom, minute, dbheight, lastAck, ms.PrivateKey)
+		ms.Acks = append(ms.Acks, lastAck)
 	}
 }
 
@@ -171,6 +185,9 @@ func (ms *MsgSet) GetMsgs() []interfaces.IMsg {
 	}
 	for _, v := range ms.EBMessages {
 		msgs = append(msgs, v.Msg)
+	}
+	for _, v := range ms.EOMs {
+		msgs = append(msgs, v)
 	}
 
 	return msgs
