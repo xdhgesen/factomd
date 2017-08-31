@@ -10,13 +10,8 @@ import (
 )
 
 func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfaces.IMsg, []interfaces.IMsg) {
-	msgs := []interfaces.IMsg{}
-	acks := []interfaces.IMsg{}
-
 	ms := new(MsgSet)
 	ms.PrivateKey = priv
-
-	//
 
 	for _, v := range bs.FBlock.GetTransactions() {
 		m := new(messages.FactoidTransaction)
@@ -63,10 +58,7 @@ func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfa
 		msg := new(messages.RevealEntryMsg)
 		msg.Entry = entries[v.String()]
 
-		msgs = append(msgs, msg)
-
-		ack := AckAMessage(msg, minute)
-		acks = append(acks, ack)
+		ms.PushMessage(msg, minute)
 	}
 
 	minute = 0
@@ -81,7 +73,7 @@ func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfa
 		ms.PushMessage(msg, minute)
 	}
 
-	ms.CreateAcks()
+	ms.CreateAcks(uint32(bs.Height))
 
 	return ms.GetMsgs(), ms.GetAcks()
 }
@@ -163,7 +155,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 		eom.ChainID = primitives.NewZeroHash()
 		eom.Minute = byte(minute)
 
-		err = eom.Sign(ms.PrivateKey)
+		err := eom.Sign(ms.PrivateKey)
 		if err != nil {
 			panic(err)
 		}
@@ -197,7 +189,7 @@ func (ms *MsgSet) GetAcks() []interfaces.IMsg {
 	return ms.Acks
 }
 
-func AckMessage(msg interfaces.IMsg, minute int, dbheight uint32, prevAck interfaces.IMsg, key *primitives.PrivateKey) interfaces.IMsg {
+func AckMessage(msg interfaces.IMsg, minute int, dbheight uint32, prevAck *messages.Ack, key *primitives.PrivateKey) *messages.Ack {
 	ack := new(messages.Ack)
 
 	ack.MessageHash = msg.GetHash()
@@ -205,10 +197,10 @@ func AckMessage(msg interfaces.IMsg, minute int, dbheight uint32, prevAck interf
 	if prevAck == nil {
 		ack.Height = 0
 	} else {
-		ack.Height = prevAck.(*messages.Ack).Height + 1
+		ack.Height = prevAck.Height + 1
 	}
 
-	h, err := ack.GenerateSerialHash(prevAck.(*messages.Ack))
+	h, err := ack.GenerateSerialHash(prevAck)
 	if err != nil {
 		panic(err)
 	}
