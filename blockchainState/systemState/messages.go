@@ -299,6 +299,13 @@ func (ss *SystemState) ProcessInvalidAckMessage(msg interfaces.IMsg) error {
 	return nil
 }
 
+func (ss *SystemState) ProcessInvalidDirectoryBlockMessage(msg interfaces.IMsg) error {
+	if msg.Type() != constants.INVALID_DIRECTORY_BLOCK_MSG {
+		return fmt.Errorf("Invalid message type forwarded for processing")
+	}
+	return nil
+}
+
 func (ss *SystemState) ProcessMissingMessage(msg interfaces.IMsg) error {
 	if msg.Type() != constants.MISSING_MSG {
 		return fmt.Errorf("Invalid message type forwarded for processing")

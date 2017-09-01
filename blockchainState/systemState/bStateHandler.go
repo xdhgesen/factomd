@@ -122,13 +122,13 @@ func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBl
 		bh.DB.CancelMultiBatch()
 		return err
 	}
-	err = bh.DB.ProcessECBlockMultiBatch(ecBlock)
+	err = bh.DB.ProcessECBlockMultiBatch(ecBlock, false)
 	if err != nil {
 		bh.DB.CancelMultiBatch()
 		return err
 	}
 	for _, e := range eBlocks {
-		err = bh.DB.ProcessEBlockMultiBatch(e)
+		err = bh.DB.ProcessEBlockMultiBatch(e, false)
 		if err != nil {
 			return err
 		}
@@ -145,6 +145,8 @@ func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBl
 	if err != nil {
 		return err
 	}
+
+	return nil
 }
 
 func (bh *BStateHandler) HandleCommitChainMsg() error {

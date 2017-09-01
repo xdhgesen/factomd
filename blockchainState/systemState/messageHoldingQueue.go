@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
@@ -43,11 +42,11 @@ func (mhq *MessageHoldingQueue) AddAck(ack interfaces.IMsg) {
 	mhq.Semaphore.Lock()
 	defer mhq.Semaphore.Unlock()
 
-	if ack.SetExpireTime().GetTimeMilli() == 0 {
-		ack.SetExpiretime(primitives.NewTimestampNow())
+	if ack.GetExpireTime().GetTimeMilli() == 0 {
+		ack.SetExpireTime(primitives.NewTimestampNow())
 	}
 	if ack.GetResendTime().GetTimeMilli() == 0 {
-		ack.SetResendtime(primitives.NewTimestampNow())
+		ack.SetResendTime(primitives.NewTimestampNow())
 	}
 
 	mhq.Acks[ack.GetHash().String()] = ack
@@ -58,11 +57,11 @@ func (mhq *MessageHoldingQueue) AddMessage(msg interfaces.IMsg) {
 	mhq.Semaphore.Lock()
 	defer mhq.Semaphore.Unlock()
 
-	if msg.SetExpireTime().GetTimeMilli() == 0 {
-		msg.SetExpiretime(primitives.NewTimestampNow())
+	if msg.GetExpireTime().GetTimeMilli() == 0 {
+		msg.SetExpireTime(primitives.NewTimestampNow())
 	}
 	if msg.GetResendTime().GetTimeMilli() == 0 {
-		msg.SetResendtime(primitives.NewTimestampNow())
+		msg.SetResendTime(primitives.NewTimestampNow())
 	}
 
 	mhq.Messages[msg.GetHash().String()] = msg
@@ -104,14 +103,14 @@ func (mhq *MessageHoldingQueue) GetMessagesForResend() []interfaces.IMsg {
 
 	nowT := primitives.NewTimestampNow()
 	now := nowT.GetTimeMilli()
-	for k, v := range mhq.Acks {
+	for _, v := range mhq.Acks {
 		res := v.GetResendTime().GetTimeMilli()
 		if now-res > ResendTime {
 			v.SetResendTime(nowT)
 			answer = append(answer, v)
 		}
 	}
-	for k, v := range mhq.Messages {
+	for _, v := range mhq.Messages {
 		res := v.GetResendTime().GetTimeMilli()
 		if now-res > ResendTime {
 			v.SetResendTime(nowT)

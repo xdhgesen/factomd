@@ -16,7 +16,7 @@ func GetSigListFromBlockSet(bs *BlockSet) *messages.SigList {
 	abe := bs.ABlock.GetABEntries()
 	for _, v := range abe {
 		if v.Type() == constants.TYPE_DB_SIGNATURE {
-			sl.List = append(sl.List, v.(*adminBlock.DBSignatureEntry).PrevDBSig)
+			sl.List = append(sl.List, &v.(*adminBlock.DBSignatureEntry).PrevDBSig)
 		}
 	}
 
@@ -33,9 +33,15 @@ func BlockSetToDBStateMsg(bs *BlockSet, sigList *messages.SigList) interfaces.IM
 	msg.FactoidBlock = bs.FBlock
 	msg.EntryCreditBlock = bs.ECBlock
 	msg.EBlocks = []interfaces.IEntryBlock{bs.EBlock, bs.AnchorEBlock}
-	msg.Entries = bs.Entries
 
-	msg.SignatureList = sigList
+	entries := []interfaces.IEBEntry{}
+	for _, w := range bs.Entries {
+		entries = append(entries, w)
+	}
+
+	msg.Entries = entries
+
+	msg.SignatureList = *sigList
 
 	return nil
 }
