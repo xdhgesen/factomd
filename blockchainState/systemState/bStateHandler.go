@@ -80,7 +80,7 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	for i := len(bh.PendingDBStateMsgs) - 1; i >= 0; i-- {
 		if bh.PendingDBStateMsgs[i].DirectoryBlock.GetDatabaseHeight() <= bh.MainBState.DBlockHeight {
 			//We already dealt with this DBState, deleting the message
-			bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs[:i], bh.PendingDBStateMsgs[i+1:])
+			bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs[:i], bh.PendingDBStateMsgs[i+1:]...)
 		}
 		if bh.PendingDBStateMsgs[i].DirectoryBlock.GetDatabaseHeight() == bh.MainBState.DBlockHeight+1 {
 			//Next DBState to process - do it now

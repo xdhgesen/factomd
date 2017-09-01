@@ -1,6 +1,7 @@
 package testHelper
 
 import (
+	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
@@ -8,6 +9,36 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 )
+
+func GetSigListFromBlockSet(bs *BlockSet) *messages.SigList {
+	sl := new(messages.SigList)
+
+	abe := bs.ABlock.GetABEntries()
+	for _, v := range abe {
+		if v.Type() == constants.TYPE_DB_SIGNATURE {
+			sl.List = append(sl.List, v.(*adminBlock.DBSignatureEntry).PrevDBSig)
+		}
+	}
+
+	sl.Length = uint32(len(sl.List))
+
+	return sl
+}
+
+func BlockSetToDBStateMsg(bs *BlockSet, sigList *messages.SigList) interfaces.IMsg {
+	msg := new(messages.DBStateMsg)
+
+	msg.DirectoryBlock = bs.DBlock
+	msg.AdminBlock = bs.ABlock
+	msg.FactoidBlock = bs.FBlock
+	msg.EntryCreditBlock = bs.ECBlock
+	msg.EBlocks = []interfaces.IEntryBlock{bs.EBlock, bs.AnchorEBlock}
+	msg.Entries = bs.Entries
+
+	msg.SignatureList = sigList
+
+	return nil
+}
 
 func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfaces.IMsg, []interfaces.IMsg) {
 	ms := new(MsgSet)
