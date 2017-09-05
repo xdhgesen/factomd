@@ -16,6 +16,7 @@ func TestProcessDBStateMessage(t *testing.T) {
 	ss := new(SystemState)
 	ss.BStateHandler = new(BStateHandler)
 	ss.BStateHandler.MainBState = blockchainState.NewBSLocalNet()
+	ss.BStateHandler.DB = testHelper.CreateEmptyTestDatabaseOverlay()
 
 	blocks := testHelper.CreateFullTestBlockSet()
 	prev := blocks[0]
@@ -34,5 +35,12 @@ func TestProcessDBStateMessage(t *testing.T) {
 		if err != nil {
 			t.Errorf("%v", err)
 		}
+		prev = v
+	}
+
+	//Check if we have processed all but the last DBState Messages
+	//(can't process the last one since we don't have the proper signatures!)
+	if ss.BStateHandler.MainBState.DBlockHeight != uint32(prev.Height-1) {
+		t.Errorf("Wrong DBlockHeight - %v vs %v", ss.BStateHandler.MainBState.DBlockHeight, uint32(prev.Height))
 	}
 }

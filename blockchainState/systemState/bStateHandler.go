@@ -44,8 +44,15 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 
 	height := dbStateMsg.DirectoryBlock.GetDatabaseHeight()
 	if bh.MainBState.DBlockHeight >= height {
-		//Nothing to do - we're already ahead
-		return nil
+		if height != 0 {
+			//Nothing to do - we're already ahead
+			return nil
+		}
+		if !bh.MainBState.DBlockHead.KeyMR.IsZero() {
+			//Nothing to do - we're already ahead
+			return nil
+		}
+		//We're processing genesis block!
 	}
 	if bh.MainBState.DBlockHeight+1 < height {
 		//DBStateMsg is too far ahead - ignore it for now
