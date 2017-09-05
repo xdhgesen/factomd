@@ -13,6 +13,9 @@ import (
 
 func (ss *SystemState) ProcessMessage(msg interfaces.IMsg) error {
 	var err error
+	if msg == nil {
+		return fmt.Errorf("Nil message passed")
+	}
 	switch msg.Type() {
 	case constants.EOM_MSG:
 		err = ss.ProcessEOMMessage(msg)

@@ -43,7 +43,7 @@ func BlockSetToDBStateMsg(bs *BlockSet, sigList *messages.SigList) interfaces.IM
 
 	msg.SignatureList = *sigList
 
-	return nil
+	return msg
 }
 
 func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfaces.IMsg, []interfaces.IMsg) {
