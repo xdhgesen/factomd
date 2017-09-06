@@ -99,6 +99,12 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	}
 
 	//TODO: overwrite BlockMaker if appropriate
+	s, err := bh.MainBState.Clone()
+	if err != nil {
+		return nil
+	}
+	bh.BlockMaker = blockMaker.NewBlockMaker()
+	bh.BlockMaker.BState = s
 
 	return nil
 }

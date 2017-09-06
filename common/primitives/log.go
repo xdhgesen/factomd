@@ -53,7 +53,15 @@ func EncodeJSONString(data interface{}) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return string(encoded), err
+	return string(encoded), nil
+}
+
+func EncodeJSONStringIndented(data interface{}) (string, error) {
+	s, err := json.MarshalIndent(data, "", "\t")
+	if err != nil {
+		return "", err
+	}
+	return string(s), nil
 }
 
 func DecodeJSONString(data string, v interface{}) error {

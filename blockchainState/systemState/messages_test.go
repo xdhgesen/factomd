@@ -79,4 +79,13 @@ func TestProcessBlockMessageSet(t *testing.T) {
 			t.Errorf("%v", err)
 		}
 	}
+
+	bs, err := ss.BStateHandler.BlockMaker.BuildBlockSet()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	str, _ := primitives.EncodeJSONStringIndented(bs)
+
+	t.Errorf("%v", str)
 }
