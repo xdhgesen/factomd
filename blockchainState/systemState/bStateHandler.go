@@ -176,3 +176,8 @@ func (bh *BStateHandler) HandleRevealEntryMsg() error {
 
 	return nil
 }
+
+func (bh *BStateHandler) HandleFactoidTransactionMsg() error {
+
+	return nil
+}

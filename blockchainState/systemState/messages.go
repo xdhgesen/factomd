@@ -9,6 +9,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 )
 
 func (ss *SystemState) ProcessMessage(msg interfaces.IMsg) error {
@@ -178,6 +179,11 @@ func (ss *SystemState) ProcessCommitChainMessage(msg interfaces.IMsg) error {
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
 		//TODO: process properly
+		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
+		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -192,6 +198,11 @@ func (ss *SystemState) ProcessCommitEntryMessage(msg interfaces.IMsg) error {
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
 		//TODO: process properly
+		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
+		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -234,6 +245,11 @@ func (ss *SystemState) ProcessEntryBlockResponseMessage(msg interfaces.IMsg) err
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
 		//TODO: process properly
+		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
+		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -248,6 +264,11 @@ func (ss *SystemState) ProcessEOMMessage(msg interfaces.IMsg) error {
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
 		//TODO: process properly
+		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
+		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil
@@ -268,7 +289,7 @@ func (ss *SystemState) ProcessFactoidTransactionMessage(msg interfaces.IMsg) err
 	ss.MessageHoldingQueue.AddMessage(msg)
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
-		//TODO: process properly
+
 	}
 
 	return nil
@@ -360,6 +381,11 @@ func (ss *SystemState) ProcessRevealEntryMessage(msg interfaces.IMsg) error {
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
 		//TODO: process properly
+		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
+		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil

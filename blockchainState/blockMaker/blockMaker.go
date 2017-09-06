@@ -35,6 +35,7 @@ func NewBlockMaker() *BlockMaker {
 	bm := new(BlockMaker)
 	bm.NumberOfLeaders = 1
 	bm.BState = blockchainState.NewBSLocalNet()
+	bm.VMs = map[int]*VM{}
 	return bm
 }
 
