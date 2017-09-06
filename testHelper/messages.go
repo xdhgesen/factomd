@@ -77,7 +77,11 @@ func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfa
 			continue
 			break
 		case entryCreditBlock.ECIDServerIndexNumber:
+			//TODO: do
 			break
+		}
+		if msg == nil {
+			continue
 		}
 		ms.PushMessage(msg, minute)
 	}
@@ -132,6 +136,10 @@ type MsgSet struct {
 }
 
 func (ms *MsgSet) PushMessage(msg interfaces.IMsg, minute int) {
+	if msg == nil {
+		panic("msg == nil")
+	}
+
 	m := new(MessageWithMinute)
 	m.Msg = msg
 	m.Minute = minute
@@ -191,6 +199,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 		eom.SysHash = primitives.NewZeroHash()
 		eom.ChainID = primitives.NewZeroHash()
 		eom.Minute = byte(minute)
+		eom.Timestamp = primitives.NewTimestampFromMilliseconds(0)
 
 		err := eom.Sign(ms.PrivateKey)
 		if err != nil {
@@ -242,6 +251,8 @@ func AckMessage(msg interfaces.IMsg, minute int, dbheight uint32, prevAck *messa
 		panic(err)
 	}
 	ack.SerialHash = h
+	ack.Timestamp = primitives.NewTimestampFromMilliseconds(0)
+	ack.LeaderChainID = primitives.NewZeroHash() //TODO: fill properly
 
 	err = ack.Sign(key)
 	if err != nil {
