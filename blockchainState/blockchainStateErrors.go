@@ -165,6 +165,14 @@ func (bs *BlockchainState) HandlePostBlockErrors(dBlockHash interfaces.IHash) er
 		}
 	}
 
+	//Double-spent Factoid transactions
+	if dBlockHash.String() == "1263c3c9d7fa74ab3f01147c4c9fbfd7e2686ec98936c50b0f10abbdbdf72183" {
+		delete(bs.RecentFactoidTransactions, "73d67bd021b64fc68367a92f7b4e38652c9f30a5dce72c512e7d5f97f039574c")
+	}
+	if dBlockHash.String() == "fe0054cd0724b37b597ccb43490a734fd534ffe9f9025affecea32af934fb132" {
+		delete(bs.RecentFactoidTransactions, "f595ac480f4209cf470e1b3725b1005818d238d1adc8df10ba70934bb24b4a3f")
+	}
+
 	return nil
 }
 

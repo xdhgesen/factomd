@@ -11,7 +11,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
-func (bs *BlockchainState) ProcessFBlock(fBlock interfaces.IFBlock) error {
+func (bs *BlockchainState) ProcessFBlock(fBlock interfaces.IFBlock, dblockTimestamp interfaces.Timestamp) error {
 	bs.Init()
 
 	if bs.FBlockHead.KeyMR.String() != fBlock.GetPrevKeyMR().String() {
@@ -30,17 +30,33 @@ func (bs *BlockchainState) ProcessFBlock(fBlock interfaces.IFBlock) error {
 
 	transactions := fBlock.GetTransactions()
 	for _, v := range transactions {
-		err := bs.ProcessFactoidTransaction(v, fBlock.GetExchRate())
+		err := bs.ProcessFactoidTransaction(v, fBlock.GetExchRate(), dblockTimestamp)
 		if err != nil {
 			return err
 		}
 	}
 	bs.ExchangeRate = fBlock.GetExchRate()
+
 	return nil
 }
 
-func (bs *BlockchainState) ProcessFactoidTransaction(tx interfaces.ITransaction, exchangeRate uint64) error {
+func (bs *BlockchainState) ProcessFactoidTransaction(tx interfaces.ITransaction, exchangeRate uint64, dblockTimestamp interfaces.Timestamp) error {
 	bs.Init()
+
+	if bs.RecentFactoidTransactions[tx.GetHash().String()] > 0 {
+		return fmt.Errorf("Double-spend!")
+		fmt.Printf("DOUBLE SPEND DETECTED! %v\n", tx.GetHash())
+	} else {
+		bs.RecentFactoidTransactions[tx.GetHash().String()] = tx.GetTimestamp().GetTimeMilliUInt64()
+	}
+
+	if tx.GetTimestamp().GetTimeMilliUInt64() < dblockTimestamp.GetTimeMilliUInt64()-FACTOIDTXEXPIRATIONTIME {
+		return fmt.Errorf("Timestamp precedes dblock!")
+	}
+	if tx.GetTimestamp().GetTimeMilliUInt64() > dblockTimestamp.GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME {
+		return fmt.Errorf("Timestamp is too far ahead!")
+	}
+
 	ins := tx.GetInputs()
 	//First iterate over the inputs to make sure they have enough money before anything gets applied
 	for _, w := range ins {
@@ -68,11 +84,25 @@ func (bs *BlockchainState) ProcessFactoidTransaction(tx interfaces.ITransaction,
 
 func (bs *BlockchainState) CanProcessFactoidTransaction(tx interfaces.ITransaction) bool {
 	bs.Init()
+	if bs.RecentFactoidTransactions[tx.GetHash().String()] > 0 {
+		//double-spend
+		return false
+	}
 	ins := tx.GetInputs()
 	for _, w := range ins {
 		if bs.FBalances[w.GetAddress().String()] < int64(w.GetAmount()) {
+			//not enough input balances
 			return false
 		}
 	}
 	return true
+}
+
+func (bs *BlockchainState) RemoveExpiredFactoidTransactions(t interfaces.Timestamp) {
+	timeMilli := t.GetTimeMilliUInt64()
+	for k, v := range bs.RecentFactoidTransactions {
+		if v+FACTOIDTXEXPIRATIONTIME < timeMilli {
+			delete(bs.RecentFactoidTransactions, k)
+		}
+	}
 }

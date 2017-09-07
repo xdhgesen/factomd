@@ -17,6 +17,7 @@ import (
 
 const COMMITEXPIRATIONM1 uint32 = 500
 const COMMITEXPIRATIONM2 uint32 = 20 //TODO: set properly
+const FACTOIDTXEXPIRATIONTIME uint64 = uint64(COMMITEXPIRATIONM2) * 10 * 60 * 1000
 
 const M2SWITCHHEIGHT uint32 = 70411 //TODO: double-check
 
@@ -42,6 +43,10 @@ type BlockchainState struct {
 	ExchangeRate uint64
 
 	PendingCommits map[string]*PendingCommit //entry hash: current DBlock height
+
+	//For tracking which factoid transactions have been used lately
+	//To make sure we're not double-spending
+	RecentFactoidTransactions map[string]uint64 //entry hash: Millitimestamp
 
 	IdentityManager identity.IdentityManager
 }
@@ -98,6 +103,9 @@ func (bs *BlockchainState) Init() {
 	if bs.ABlockHeadRefHash == nil {
 		bs.ABlockHeadRefHash = primitives.NewZeroHash().(*primitives.Hash)
 	}
+	if bs.RecentFactoidTransactions == nil {
+		bs.RecentFactoidTransactions = map[string]uint64{}
+	}
 }
 
 func (bs *BlockchainState) ProcessBlockSet(dBlock interfaces.IDirectoryBlock, aBlock interfaces.IAdminBlock, fBlock interfaces.IFBlock, ecBlock interfaces.IEntryCreditBlock,
@@ -118,7 +126,7 @@ func (bs *BlockchainState) ProcessBlockSet(dBlock interfaces.IDirectoryBlock, aB
 	if err != nil {
 		return err
 	}
-	err = bs.ProcessFBlock(fBlock)
+	err = bs.ProcessFBlock(fBlock, dBlock.GetTimestamp())
 	if err != nil {
 		return err
 	}
@@ -130,6 +138,8 @@ func (bs *BlockchainState) ProcessBlockSet(dBlock interfaces.IDirectoryBlock, aB
 	if err != nil {
 		return err
 	}
+
+	bs.RemoveExpiredFactoidTransactions(dBlock.GetTimestamp())
 
 	err = bs.HandlePostBlockErrors(dBlock.DatabasePrimaryIndex())
 	if err != nil {
