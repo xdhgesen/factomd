@@ -289,7 +289,11 @@ func (ss *SystemState) ProcessFactoidTransactionMessage(msg interfaces.IMsg) err
 	ss.MessageHoldingQueue.AddMessage(msg)
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) {
-
+		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
+		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
+		if err != nil {
+			return nil
+		}
 	}
 
 	return nil
