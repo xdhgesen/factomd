@@ -50,7 +50,7 @@ func (bs *BlockchainState) ProcessFactoidTransaction(tx interfaces.ITransaction,
 		bs.RecentFactoidTransactions[tx.GetHash().String()] = tx.GetTimestamp().GetTimeMilliUInt64()
 	}
 
-	if tx.GetTimestamp().GetTimeMilliUInt64() < dblockTimestamp.GetTimeMilliUInt64()-FACTOIDTXEXPIRATIONTIME {
+	if tx.GetTimestamp().GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME < dblockTimestamp.GetTimeMilliUInt64() {
 		return fmt.Errorf("Timestamp precedes dblock!")
 	}
 	if tx.GetTimestamp().GetTimeMilliUInt64() > dblockTimestamp.GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME {

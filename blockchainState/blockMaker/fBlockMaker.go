@@ -35,7 +35,8 @@ func (bm *BlockMaker) BuildFBlock() (interfaces.IFBlock, error) {
 }
 
 func (bm *BlockMaker) ProcessFactoidTransaction(e interfaces.ITransaction) error {
-	err := bm.BState.ProcessFactoidTransaction(e, bm.BState.ExchangeRate)
+	//TODO: forward the correct timestamp
+	err := bm.BState.ProcessFactoidTransaction(e, bm.BState.ExchangeRate, e.GetTimestamp())
 	if err != nil {
 		return err
 	}

@@ -44,7 +44,7 @@ func CreateTestDirectoryBlockHeaderWithNetworkID(prevBlock *directoryBlock.Direc
 		header.SetDBHeight(0)
 		header.SetPrevFullHash(primitives.NewZeroHash())
 		header.SetPrevKeyMR(primitives.NewZeroHash())
-		header.SetTimestamp(primitives.NewTimestampFromMinutes(1234))
+		header.SetTimestamp(primitives.NewTimestampFromSeconds(0))
 	} else {
 		header.SetDBHeight(prevBlock.Header.GetDBHeight() + 1)
 		header.SetPrevFullHash(prevBlock.GetHash())
@@ -53,7 +53,8 @@ func CreateTestDirectoryBlockHeaderWithNetworkID(prevBlock *directoryBlock.Direc
 			panic(err)
 		}
 		header.SetPrevKeyMR(keyMR)
-		header.SetTimestamp(primitives.NewTimestampFromMinutes(prevBlock.Header.GetTimestamp().GetTimeMinutesUInt32() + 1))
+
+		header.SetTimestamp(primitives.NewTimestampFromSeconds(60 * 10 * uint32(prevBlock.Header.GetDBHeight()+1)))
 	}
 
 	header.SetVersion(1)

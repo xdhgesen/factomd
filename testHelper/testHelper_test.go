@@ -101,10 +101,10 @@ func TestCreateFullTestBlockSet(t *testing.T) {
 	}
 
 	if set[BlockCount-1].AnchorEBlock.GetChainID().String() != AnchorBlockHeadPrimaryIndex {
-		t.Errorf("Wrong anblock hash - %v vs %v", set[BlockCount-1].AnchorEBlock.GetChainID().String(), AnchorBlockHeadPrimaryIndex)
+		t.Errorf("Wrong ablock hash - %v vs %v", set[BlockCount-1].AnchorEBlock.GetChainID().String(), AnchorBlockHeadPrimaryIndex)
 	}
 	if set[BlockCount-1].AnchorEBlock.DatabasePrimaryIndex().String() != AnchorBlockHeadSecondaryIndex {
-		t.Errorf("Wrong anblock hash - %v vs %v", set[BlockCount-1].AnchorEBlock.DatabasePrimaryIndex().String(), AnchorBlockHeadSecondaryIndex)
+		t.Errorf("Wrong ablock hash - %v vs %v", set[BlockCount-1].AnchorEBlock.DatabasePrimaryIndex().String(), AnchorBlockHeadSecondaryIndex)
 	}
 }
 
