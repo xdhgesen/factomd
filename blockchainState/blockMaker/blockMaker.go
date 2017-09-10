@@ -218,15 +218,25 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 
 			break
 		default:
-			if msgType != constants.REVEAL_ENTRY_MSG {
-				return fmt.Errorf("Invalid message type")
-			}
-			m := pair.Message.(*messages.RevealEntryMsg)
-			e := m.Entry
+			switch msgType {
+			case constants.REVEAL_ENTRY_MSG:
+				m := pair.Message.(*messages.RevealEntryMsg)
+				e := m.Entry
 
-			err = bm.ProcessEBEntry(e, vm.CurrentMinute)
-			if err != nil {
-				return err
+				err = bm.ProcessEBEntry(e, vm.CurrentMinute)
+				if err != nil {
+					return err
+				}
+
+				//...
+
+				break
+			case constants.EOM_MSG:
+
+				break
+			default:
+				panic("x")
+				return fmt.Errorf("Invalid message type")
 			}
 
 			//...
