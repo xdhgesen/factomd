@@ -182,7 +182,7 @@ func (ss *SystemState) ProcessCommitChainMessage(msg interfaces.IMsg) error {
 		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
 		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -201,7 +201,7 @@ func (ss *SystemState) ProcessCommitEntryMessage(msg interfaces.IMsg) error {
 		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
 		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -248,7 +248,7 @@ func (ss *SystemState) ProcessEntryBlockResponseMessage(msg interfaces.IMsg) err
 		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
 		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -267,7 +267,7 @@ func (ss *SystemState) ProcessEOMMessage(msg interfaces.IMsg) error {
 		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
 		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -292,7 +292,7 @@ func (ss *SystemState) ProcessFactoidTransactionMessage(msg interfaces.IMsg) err
 		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
 		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 
@@ -388,7 +388,7 @@ func (ss *SystemState) ProcessRevealEntryMessage(msg interfaces.IMsg) error {
 		ack := ss.MessageHoldingQueue.GetAck(msg.GetHash()).(*messages.Ack)
 		err := ss.BStateHandler.BlockMaker.ProcessAckedMessage(msg.(interfaces.IMessageWithEntry), ack)
 		if err != nil {
-			return nil
+			return err
 		}
 	}
 

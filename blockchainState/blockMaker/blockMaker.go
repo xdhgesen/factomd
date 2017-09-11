@@ -87,6 +87,7 @@ func (bm *BlockMaker) GetVM(chainID interfaces.IHash) *VM {
 }
 
 func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
+	fmt.Printf("ProcessAckedMessage #%v - %v\n", ack.Height, msg.GetHash())
 	chainID := msg.GetEntryChainID()
 	vm := bm.GetVM(chainID)
 
@@ -137,6 +138,8 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		vm.PendingPairs = append(vm.PendingPairs, pair)
 	}
 
+	fmt.Printf("len of PendingPairs - %v\n", len(vm.PendingPairs))
+
 	//Iterate over pending pairs and process them one by one until we're stuck
 	for {
 		if len(vm.PendingPairs) == 0 {
@@ -145,11 +148,13 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		if vm.LatestAck == nil {
 			if vm.PendingPairs[0].Ack.Height != 0 {
 				//We're expecting first message and we didn't find one
+				panic("x")
 				break
 			}
 		} else {
 			if vm.LatestHeight != vm.PendingPairs[0].Ack.Height-1 {
 				//We didn't find the next pair
+				panic("x")
 				break
 			}
 		}
@@ -157,11 +162,13 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		pair = vm.PendingPairs[0]
 		ok, err := pair.Ack.VerifySerialHash(vm.LatestAck)
 		if err != nil {
+			panic("x")
 			return err
 		}
 		if ok == false {
 			//TODO: reject the ACK or something?
 			vm.PendingPairs = vm.PendingPairs[1:]
+			panic("x")
 			return nil
 		}
 
@@ -170,6 +177,8 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		//Actually processing the message
 		//TODO: do
 		msgType := pair.Message.Type()
+
+		fmt.Printf("Processing message %v - %v\n", msgType, chainID)
 
 		switch chainID.String() {
 		case "000000000000000000000000000000000000000000000000000000000000000a":
@@ -213,6 +222,7 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 			if err != nil {
 				return err
 			}
+			fmt.Printf("Processed Factoid Tx\n")
 
 			//...
 
@@ -232,6 +242,14 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 
 				break
 			case constants.EOM_MSG:
+				m := pair.Message.(*messages.EOM)
+				if vm.CurrentMinute != int(m.Minute) {
+					return fmt.Errorf("Invalid minute - %v vs %v", vm.CurrentMinute, int(m.Minute))
+				}
+				vm.CurrentMinute = int(m.Minute) + 1
+				fmt.Printf("Current minute - %v\n", vm.CurrentMinute)
+
+				//...
 
 				break
 			default:
@@ -244,8 +262,10 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 			break
 		}
 		//Pop the processed message and set the ack to the latest one
+		vm.LatestHeight = pair.Ack.Height
 		vm.PendingPairs = vm.PendingPairs[1:]
 		vm.LatestAck = pair.Ack
+		fmt.Printf("Remaining tx - %v\n", len(vm.PendingPairs))
 	}
 
 	return nil
