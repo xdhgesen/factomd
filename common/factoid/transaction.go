@@ -17,6 +17,7 @@ import (
 var _ = debug.PrintStack
 
 type Transaction struct {
+	Txid interfaces.IHash `json:"txid"`
 	// version     uint64         Version of transaction. Hardcoded, naturally.
 	MilliTimestamp uint64 `json:"millitimestamp"`
 	// #inputs     uint8          number of inputs
@@ -503,7 +504,7 @@ func (t *Transaction) UnmarshalBinaryData(data []byte) ([]byte, error) {
 			return nil, err
 		}
 	}
-
+	t.Txid = t.GetSigHash()
 	return buf.DeepCopyBytes(), nil
 }
 
