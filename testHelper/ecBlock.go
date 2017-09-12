@@ -13,7 +13,7 @@ import (
 func createECEntriesfromBlocks(fBlock interfaces.IFBlock, eBlocks []*entryBlock.EBlock, height int) []interfaces.IECBlockEntry {
 	ecEntries := []interfaces.IECBlockEntry{}
 	ecEntries = append(ecEntries, entryCreditBlock.NewServerIndexNumber2(uint8(height%10+1)))
-	for i := 0; i < height%10; i++ {
+	for i := 0; i < height%8+2; i++ {
 		ecEntries = append(ecEntries, entryCreditBlock.NewMinuteNumber(uint8(i+1)))
 	}
 
@@ -36,7 +36,7 @@ func createECEntriesfromBlocks(fBlock interfaces.IFBlock, eBlocks []*entryBlock.
 			ecEntries = append(ecEntries, NewCommitEntry(eBlock))
 		}
 	}
-	for i := height % 10; i < 10; i++ {
+	for i := height%8 + 2; i < 10; i++ {
 		ecEntries = append(ecEntries, entryCreditBlock.NewMinuteNumber(uint8(i+1)))
 	}
 

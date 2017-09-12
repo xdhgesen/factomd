@@ -1,6 +1,8 @@
 package testHelper
 
 import (
+	"fmt"
+
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
@@ -91,27 +93,35 @@ func BlockSetToMessageList(bs *BlockSet, priv *primitives.PrivateKey) ([]interfa
 	}
 
 	minute = 0
+	reveals := []*messages.RevealEntryMsg{}
 	for _, v := range bs.EBlock.GetEntryHashes() {
 		if v.IsMinuteMarker() {
 			minute = int(v.ToMinute())
+			for _, msg := range reveals {
+				ms.PushMessage(msg, minute)
+			}
+			reveals = []*messages.RevealEntryMsg{}
 			continue
 		}
 		msg := new(messages.RevealEntryMsg)
 		msg.Entry = entries[v.String()]
-
-		ms.PushMessage(msg, minute)
+		reveals = append(reveals, msg)
 	}
 
 	minute = 0
+	reveals = []*messages.RevealEntryMsg{}
 	for _, v := range bs.AnchorEBlock.GetEntryHashes() {
 		if v.IsMinuteMarker() {
 			minute = int(v.ToMinute())
+			for _, msg := range reveals {
+				ms.PushMessage(msg, minute)
+			}
+			reveals = []*messages.RevealEntryMsg{}
 			continue
 		}
 		msg := new(messages.RevealEntryMsg)
 		msg.Entry = entries[v.String()]
-
-		ms.PushMessage(msg, minute)
+		reveals = append(reveals, msg)
 	}
 
 	ms.CreateAcks(uint32(bs.Height))
@@ -169,7 +179,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 	for minute := 0; minute < 10; minute++ {
 		//Iterate over each block type up to the current minute
 		//Blocks need to be iterated in order since EBlocks rely on ECBlocks which rely on FBlocks
-
+		fmt.Printf("Minute %v\n", minute)
 		for ; fIndex < len(ms.FBMessages); fIndex++ {
 			if ms.FBMessages[fIndex].Minute >= minute {
 				break
@@ -178,12 +188,16 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 			ms.Acks = append(ms.Acks, lastAck)
 		}
 
+		fmt.Printf("Number of EC messages - %v\n", len(ms.ECBMessages))
+		fmt.Printf("Next minute - %v\n", ms.ECBMessages[0].Minute)
 		for ; ecIndex < len(ms.ECBMessages); ecIndex++ {
 			if ms.ECBMessages[ecIndex].Minute >= minute {
+				fmt.Printf("%v >= %v\n", ms.ECBMessages[ecIndex].Minute, minute)
 				break
 			}
 			lastAck = AckMessage(ms.ECBMessages[ecIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
 			ms.Acks = append(ms.Acks, lastAck)
+			fmt.Printf("Acked an EC message at height %v\n", lastAck.Height)
 		}
 
 		for ; eIndex < len(ms.EBMessages); eIndex++ {
@@ -192,6 +206,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 			}
 			lastAck = AckMessage(ms.EBMessages[eIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
 			ms.Acks = append(ms.Acks, lastAck)
+			fmt.Printf("Acked an E Message at height %v\n", lastAck.Height)
 		}
 
 		eom := new(messages.EOM)
