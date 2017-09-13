@@ -138,8 +138,6 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		vm.PendingPairs = append(vm.PendingPairs, pair)
 	}
 
-	fmt.Printf("len of PendingPairs - %v\n", len(vm.PendingPairs))
-
 	//Iterate over pending pairs and process them one by one until we're stuck
 	for {
 		if len(vm.PendingPairs) == 0 {
@@ -148,13 +146,11 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		if vm.LatestAck == nil {
 			if vm.PendingPairs[0].Ack.Height != 0 {
 				//We're expecting first message and we didn't find one
-				panic("x")
 				break
 			}
 		} else {
 			if vm.LatestHeight != vm.PendingPairs[0].Ack.Height-1 {
 				//We didn't find the next pair
-				panic("x")
 				break
 			}
 		}
@@ -162,13 +158,11 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		pair = vm.PendingPairs[0]
 		ok, err := pair.Ack.VerifySerialHash(vm.LatestAck)
 		if err != nil {
-			panic("x")
 			return err
 		}
 		if ok == false {
 			//TODO: reject the ACK or something?
 			vm.PendingPairs = vm.PendingPairs[1:]
-			panic("x")
 			return nil
 		}
 
@@ -265,7 +259,6 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		vm.LatestHeight = pair.Ack.Height
 		vm.PendingPairs = vm.PendingPairs[1:]
 		vm.LatestAck = pair.Ack
-		fmt.Printf("Remaining tx - %v\n", len(vm.PendingPairs))
 	}
 
 	return nil
