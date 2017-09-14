@@ -62,7 +62,7 @@ func (bm *BlockMaker) BuildBlockSet() (*BlockSet, error) {
 	}
 
 	for _, v := range eBlocks {
-		err = dBlock.AddEntry(v.GetChainID(), v.GetHash())
+		err = dBlock.AddEntry(v.GetChainID(), v.DatabasePrimaryIndex())
 		if err != nil {
 			return nil, err
 		}
