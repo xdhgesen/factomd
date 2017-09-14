@@ -10,25 +10,13 @@ import (
 	"github.com/FactomProject/factomd/util"
 )
 
-func createECEntriesfromBlocks(fBlock interfaces.IFBlock, eBlocks []*entryBlock.EBlock, height int) []interfaces.IECBlockEntry {
+func createECEntriesfromBlocks(eBlocks []*entryBlock.EBlock, height int) []interfaces.IECBlockEntry {
 	ecEntries := []interfaces.IECBlockEntry{}
 	ecEntries = append(ecEntries, entryCreditBlock.NewServerIndexNumber2(uint8(height%10+1)))
 	for i := 0; i < height%8+2; i++ {
 		ecEntries = append(ecEntries, entryCreditBlock.NewMinuteNumber(uint8(i+1)))
 	}
 
-	trans := fBlock.GetTransactions()
-	for _, t := range trans {
-		ecOut := t.GetECOutputs()
-		for i, ec := range ecOut {
-			increase := new(entryCreditBlock.IncreaseBalance)
-			increase.ECPubKey = primitives.Byte32ToByteSlice32(ec.GetAddress().Fixed())
-			increase.TXID = t.GetHash()
-			increase.Index = uint64(i)
-			increase.NumEC = ec.GetAmount() / fBlock.GetExchRate()
-			ecEntries = append(ecEntries, increase)
-		}
-	}
 	for _, eBlock := range eBlocks {
 		if height == 0 {
 			ecEntries = append(ecEntries, NewCommitChain(eBlock))

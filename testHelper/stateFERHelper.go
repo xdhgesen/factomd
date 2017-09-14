@@ -249,7 +249,7 @@ func CreateTestBlockSetForFER(prev *BlockSet, db *databaseOverlay.Overlay, testE
 
 	//ECBlock
 	answer.ECBlock = CreateTestEntryCreditBlock(prev.ECBlock)
-	ecEntries := createECEntriesfromBlocks(answer.FBlock, []*entryBlock.EBlock{answer.EBlock, answer.AnchorEBlock}, height)
+	ecEntries := createECEntriesfromBlocks([]*entryBlock.EBlock{answer.EBlock, answer.AnchorEBlock}, height)
 	answer.ECBlock.GetBody().SetEntries(ecEntries)
 
 	de = new(directoryBlock.DBEntry)

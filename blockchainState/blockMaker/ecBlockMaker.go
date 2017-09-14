@@ -23,7 +23,7 @@ func (bm *BlockMaker) BuildECBlock() (interfaces.IEntryCreditBlock, error) {
 		}
 		ecBlock.GetBody().AddEntry(v.Entry)
 	}
-	for ; minute < 9; minute++ {
+	for ; minute < 10; minute++ {
 		e := entryCreditBlock.NewMinuteNumber(uint8(minute + 1))
 		ecBlock.GetBody().AddEntry(e)
 	}

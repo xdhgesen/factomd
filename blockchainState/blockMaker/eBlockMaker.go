@@ -39,7 +39,7 @@ func (bm *BlockMaker) BuildEBlocks() ([]interfaces.IEntryBlock, []interfaces.IEB
 		minute := entries[0].Minute
 		for _, v := range entries {
 			if v.Minute != minute {
-				eb.AddEndOfMinuteMarker(uint8(minute + 1))
+				eb.AddEndOfMinuteMarker(uint8(minute))
 				minute = v.Minute
 			}
 			err := eb.AddEBEntry(v.Entry)
@@ -48,7 +48,7 @@ func (bm *BlockMaker) BuildEBlocks() ([]interfaces.IEntryBlock, []interfaces.IEB
 			}
 			ebEntries = append(ebEntries, v.Entry)
 		}
-		eb.AddEndOfMinuteMarker(uint8(minute + 1))
+		eb.AddEndOfMinuteMarker(uint8(minute))
 		eBlocks = append(eBlocks, eb)
 	}
 	return eBlocks, ebEntries, nil

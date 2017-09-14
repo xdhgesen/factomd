@@ -335,7 +335,7 @@ func CreateTestBlockSetWithNetworkID(prev *BlockSet, networkID uint32, transacti
 
 	//ECBlock
 	answer.ECBlock = CreateTestEntryCreditBlock(prev.ECBlock)
-	ecEntries := createECEntriesfromBlocks(answer.FBlock, []*entryBlock.EBlock{answer.EBlock, answer.AnchorEBlock}, height)
+	ecEntries := createECEntriesfromBlocks([]*entryBlock.EBlock{answer.EBlock, answer.AnchorEBlock}, height)
 	answer.ECBlock.GetBody().SetEntries(ecEntries)
 
 	de = new(directoryBlock.DBEntry)

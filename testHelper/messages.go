@@ -178,7 +178,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 		//Iterate over each block type up to the current minute
 		//Blocks need to be iterated in order since EBlocks rely on ECBlocks which rely on FBlocks
 		for ; fIndex < len(ms.FBMessages); fIndex++ {
-			if ms.FBMessages[fIndex].Minute >= minute {
+			if ms.FBMessages[fIndex].Minute > minute {
 				break
 			}
 			lastAck = AckMessage(ms.FBMessages[fIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
@@ -186,7 +186,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 		}
 
 		for ; ecIndex < len(ms.ECBMessages); ecIndex++ {
-			if ms.ECBMessages[ecIndex].Minute >= minute {
+			if ms.ECBMessages[ecIndex].Minute > minute {
 				break
 			}
 			lastAck = AckMessage(ms.ECBMessages[ecIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
@@ -194,7 +194,7 @@ func (ms *MsgSet) CreateAcks(dbheight uint32) {
 		}
 
 		for ; eIndex < len(ms.EBMessages); eIndex++ {
-			if ms.EBMessages[eIndex].Minute >= minute {
+			if ms.EBMessages[eIndex].Minute > minute {
 				break
 			}
 			lastAck = AckMessage(ms.EBMessages[eIndex].Msg, minute, dbheight, lastAck, ms.PrivateKey)
