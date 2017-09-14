@@ -66,6 +66,8 @@ func TestProcessBlockMessageSet(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 
+	ss.BStateHandler.BlockMaker.SetABlockHeaderExpansionArea(blocks[1].ABlock.GetHeader().GetHeaderExpansionArea())
+
 	messages, acks := testHelper.BlockSetToMessageList(blocks[1], priv)
 	for _, v := range messages {
 		err = ss.ProcessMessage(v)
@@ -85,9 +87,9 @@ func TestProcessBlockMessageSet(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 
-	str, _ := primitives.EncodeJSONStringIndented(bs.ECBlock)
+	str, _ := primitives.EncodeJSONStringIndented(bs.DBlock)
 	t.Errorf("%v", str)
 
-	str, _ = primitives.EncodeJSONStringIndented(blocks[1].ECBlock)
+	str, _ = primitives.EncodeJSONStringIndented(blocks[1].DBlock)
 	t.Errorf("%v", str)
 }
