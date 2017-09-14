@@ -12,7 +12,7 @@ import (
 
 func createECEntriesfromBlocks(eBlocks []*entryBlock.EBlock, height int) []interfaces.IECBlockEntry {
 	ecEntries := []interfaces.IECBlockEntry{}
-	ecEntries = append(ecEntries, entryCreditBlock.NewServerIndexNumber2(uint8(height%10+1)))
+	//ecEntries = append(ecEntries, entryCreditBlock.NewServerIndexNumber2(uint8(height%10+1)))
 	for i := 0; i < height%8+2; i++ {
 		ecEntries = append(ecEntries, entryCreditBlock.NewMinuteNumber(uint8(i+1)))
 	}

@@ -85,9 +85,9 @@ func TestProcessBlockMessageSet(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 
-	str, _ := primitives.EncodeJSONStringIndented(bs.DBlock)
+	str, _ := primitives.EncodeJSONStringIndented(bs.ECBlock)
 	t.Errorf("%v", str)
 
-	str, _ = primitives.EncodeJSONStringIndented(blocks[1].DBlock)
+	str, _ = primitives.EncodeJSONStringIndented(blocks[1].ECBlock)
 	t.Errorf("%v", str)
 }
