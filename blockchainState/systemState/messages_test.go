@@ -67,6 +67,8 @@ func TestProcessBlockMessageSet(t *testing.T) {
 	}
 
 	ss.BStateHandler.BlockMaker.SetABlockHeaderExpansionArea(blocks[1].ABlock.GetHeader().GetHeaderExpansionArea())
+	ss.BStateHandler.BlockMaker.DBlockVersion = 1
+	ss.BStateHandler.BlockMaker.DBlockTimestamp = 10
 
 	messages, acks := testHelper.BlockSetToMessageList(blocks[1], priv)
 	for _, v := range messages {
@@ -87,9 +89,14 @@ func TestProcessBlockMessageSet(t *testing.T) {
 		t.Errorf("%v", err)
 	}
 
-	str, _ := primitives.EncodeJSONStringIndented(bs.DBlock)
-	t.Errorf("%v", str)
+	if bs.DBlock.GetHash().IsSameAs(blocks[1].DBlock.GetHash()) == false {
+		t.Errorf("Blocks are not identical!")
 
-	str, _ = primitives.EncodeJSONStringIndented(blocks[1].DBlock)
-	t.Errorf("%v", str)
+		str, _ := primitives.EncodeJSONStringIndented(bs.DBlock)
+		t.Logf("%v", str)
+
+		str, _ = primitives.EncodeJSONStringIndented(blocks[1].DBlock)
+		t.Logf("%v", str)
+	}
+
 }

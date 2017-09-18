@@ -7,6 +7,7 @@ package blockMaker
 import (
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/primitives"
 )
 
 type BlockSet struct {
@@ -67,6 +68,12 @@ func (bm *BlockMaker) BuildBlockSet() (*BlockSet, error) {
 			return nil, err
 		}
 	}
+
+	t := primitives.NewTimestampFromMinutes(bm.DBlockTimestamp)
+
+	dBlock.GetHeader().SetTimestamp(t)
+	dBlock.GetHeader().SetVersion(bm.DBlockVersion)
+	dBlock.GetHeader().SetNetworkID(bm.BState.NetworkID)
 
 	bSet.DBlock = dBlock
 

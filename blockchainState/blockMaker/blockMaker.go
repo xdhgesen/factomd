@@ -29,6 +29,8 @@ type BlockMaker struct {
 	BState *blockchainState.BlockchainState
 
 	ABlockHeaderExpansionArea []byte
+	DBlockVersion             byte
+	DBlockTimestamp           uint32
 }
 
 func NewBlockMaker() *BlockMaker {
