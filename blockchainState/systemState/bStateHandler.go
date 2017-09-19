@@ -26,8 +26,9 @@ type BStateHandler struct {
 
 	//DBStateMsgs that have not been applied or dismissed yet
 	PendingDBStateMsgs []*messages.DBStateMsg
+
 	//Marking whether we're still synchronising with the network, or are we fully synched
-	FullySynched bool
+	//FullySynched bool
 }
 
 func (bh *BStateHandler) InitMainNet() {
@@ -46,6 +47,52 @@ func (bh *BStateHandler) InitLocalNet() {
 	if bh.MainBState == nil {
 		bh.MainBState = blockchainState.NewBSLocalNet()
 	}
+}
+
+func (bh *BStateHandler) LoadDatabase() error {
+	if bh.DB == nil {
+		return fmt.Errorf("No DB present")
+	}
+
+	err := bh.LoadBState()
+	if err != nil {
+		return err
+	}
+
+	start := 0
+	if bh.MainBState.DBlockHeight > 0 {
+		start = int(bh.MainBState.DBlockHeight) + 1
+	}
+
+	dbHead, err := bh.DB.FetchDBlockHead()
+	if err != nil {
+		return err
+	}
+	end := 0
+	if dbHead != nil {
+		end = int(dbHead.GetDatabaseHeight())
+	} else {
+		//database is empty, initialise it
+		//TODO: do
+	}
+
+	for i := start; i < end; i++ {
+		set := FetchBlockSet(bh.DB, i)
+
+		err := bh.MainBState.ProcessBlockSet(set.DBlock, set.ABlock, set.FBlock, set.ECBlock, set.EBlocks, set.Entries)
+		if err != nil {
+			return err
+		}
+
+		//TODO: save BState periodically
+	}
+
+	err = bh.SaveBState(bh.MainBState)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
@@ -127,6 +174,11 @@ func (bh *BStateHandler) SaveBState(bState *blockchainState.BlockchainState) err
 	return nil
 }
 
+func (bh *BStateHandler) LoadBState() error {
+	//TODO: do
+	return nil
+}
+
 func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBlock interfaces.IAdminBlock, fBlock interfaces.IFBlock,
 	ecBlock interfaces.IEntryCreditBlock, eBlocks []interfaces.IEntryBlock, entries []interfaces.IEBEntry) error {
 
@@ -176,4 +228,95 @@ func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBl
 
 func (bs *BStateHandler) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
 	return bs.BlockMaker.ProcessAckedMessage(msg, ack)
+}
+
+type BlockSet struct {
+	ABlock  interfaces.IAdminBlock
+	ECBlock interfaces.IEntryCreditBlock
+	FBlock  interfaces.IFBlock
+	DBlock  interfaces.IDirectoryBlock
+	EBlocks []interfaces.IEntryBlock
+	Entries []interfaces.IEBEntry
+}
+
+func FetchBlockSet(dbo interfaces.DBOverlay, index int) *BlockSet {
+	bs := new(BlockSet)
+
+	dBlock, err := dbo.FetchDBlockByHeight(uint32(index))
+	if err != nil {
+		panic(err)
+	}
+	bs.DBlock = dBlock
+
+	if dBlock == nil {
+		return bs
+	}
+	entries := dBlock.GetDBEntries()
+	for _, entry := range entries {
+		switch entry.GetChainID().String() {
+		case "000000000000000000000000000000000000000000000000000000000000000a":
+			aBlock, err := dbo.FetchABlock(entry.GetKeyMR())
+			if err != nil {
+				panic(err)
+			}
+			bs.ABlock = aBlock
+			break
+		case "000000000000000000000000000000000000000000000000000000000000000c":
+			ecBlock, err := dbo.FetchECBlock(entry.GetKeyMR())
+			if err != nil {
+				panic(err)
+			}
+			bs.ECBlock = ecBlock
+			break
+		case "000000000000000000000000000000000000000000000000000000000000000f":
+			fBlock, err := dbo.FetchFBlock(entry.GetKeyMR())
+			if err != nil {
+				panic(err)
+			}
+			bs.FBlock = fBlock
+			break
+		default:
+			eBlock, err := dbo.FetchEBlock(entry.GetKeyMR())
+			if err != nil {
+				panic(err)
+			}
+			bs.EBlocks = append(bs.EBlocks, eBlock)
+
+			//Fetching special entries
+			if blockchainState.IsSpecialBlock(eBlock.GetHash()) {
+				for _, v := range eBlock.GetEntryHashes() {
+					if v.IsMinuteMarker() {
+						continue
+					}
+					e, err := dbo.FetchEntry(v)
+					if err != nil {
+						panic(err)
+					}
+					if e == nil {
+						panic("Couldn't find entry " + v.String())
+					}
+					bs.Entries = append(bs.Entries, e)
+				}
+			}
+
+			/*
+				for _, v := range eBlock.GetEntryHashes() {
+					if v.IsMinuteMarker() {
+						continue
+					}
+					e, err := dbo.FetchEntry(v)
+					if err != nil {
+						panic(err)
+					}
+					if e == nil {
+						panic("Couldn't find entry " + v.String())
+					}
+					bs.Entries = append(bs.Entries, e)
+				}
+			*/
+			break
+		}
+	}
+
+	return bs
 }
