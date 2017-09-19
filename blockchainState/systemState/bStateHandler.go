@@ -36,6 +36,18 @@ func (bh *BStateHandler) InitMainNet() {
 	}
 }
 
+func (bh *BStateHandler) InitTestNet() {
+	if bh.MainBState == nil {
+		bh.MainBState = blockchainState.NewBSTestNet()
+	}
+}
+
+func (bh *BStateHandler) InitLocalNet() {
+	if bh.MainBState == nil {
+		bh.MainBState = blockchainState.NewBSLocalNet()
+	}
+}
+
 func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	if msg.Type() != constants.DBSTATE_MSG {
 		return fmt.Errorf("Invalid message type")
@@ -162,22 +174,6 @@ func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBl
 	return nil
 }
 
-func (bh *BStateHandler) HandleCommitChainMsg() error {
-
-	return nil
-}
-
-func (bh *BStateHandler) HandleCommitEntryMsg() error {
-
-	return nil
-}
-
-func (bh *BStateHandler) HandleRevealEntryMsg() error {
-
-	return nil
-}
-
-func (bh *BStateHandler) HandleFactoidTransactionMsg() error {
-
-	return nil
+func (bs *BStateHandler) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
+	return bs.BlockMaker.ProcessAckedMessage(msg, ack)
 }

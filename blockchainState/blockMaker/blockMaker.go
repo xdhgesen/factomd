@@ -89,7 +89,6 @@ func (bm *BlockMaker) GetVM(chainID interfaces.IHash) *VM {
 }
 
 func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
-	fmt.Printf("ProcessAckedMessage #%v - %v\n", ack.Height, msg.GetHash())
 	chainID := msg.GetEntryChainID()
 	vm := bm.GetVM(chainID)
 
@@ -174,8 +173,6 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		//TODO: do
 		msgType := pair.Message.Type()
 
-		fmt.Printf("Processing message %v - %v\n", msgType, chainID)
-
 		switch chainID.String() {
 		case "000000000000000000000000000000000000000000000000000000000000000a":
 			break
@@ -218,7 +215,6 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Processed Factoid Tx\n")
 
 			//...
 
@@ -243,13 +239,11 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 					return fmt.Errorf("Invalid minute - %v vs %v", vm.CurrentMinute, int(m.Minute))
 				}
 				vm.CurrentMinute = int(m.Minute) + 1
-				fmt.Printf("Current minute - %v\n", vm.CurrentMinute)
 
 				//...
 
 				break
 			default:
-				panic("x")
 				return fmt.Errorf("Invalid message type")
 			}
 

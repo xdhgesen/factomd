@@ -7,7 +7,6 @@ package systemState_test
 import (
 	"testing"
 
-	"github.com/FactomProject/factomd/blockchainState"
 	. "github.com/FactomProject/factomd/blockchainState/systemState"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/testHelper"
@@ -16,7 +15,7 @@ import (
 func TestProcessDBStateMessage(t *testing.T) {
 	ss := new(SystemState)
 	ss.BStateHandler = new(BStateHandler)
-	ss.BStateHandler.MainBState = blockchainState.NewBSLocalNet()
+	ss.BStateHandler.InitLocalNet()
 	ss.BStateHandler.DB = testHelper.CreateEmptyTestDatabaseOverlay()
 
 	blocks := testHelper.CreateFullTestBlockSet()
@@ -49,7 +48,7 @@ func TestProcessDBStateMessage(t *testing.T) {
 func TestProcessBlockMessageSet(t *testing.T) {
 	ss := new(SystemState)
 	ss.BStateHandler = new(BStateHandler)
-	ss.BStateHandler.MainBState = blockchainState.NewBSLocalNet()
+	ss.BStateHandler.InitLocalNet()
 	ss.BStateHandler.DB = testHelper.CreateEmptyTestDatabaseOverlay()
 
 	blocks := testHelper.CreateFullTestBlockSet()
