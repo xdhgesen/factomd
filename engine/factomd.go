@@ -56,7 +56,7 @@ func Factomd() {
 func isCompilerVersionOK() bool {
 	goodenough := false
 
-	if strings.Contains(runtime.Version(), "1.5") {
+	if strings.Contains(runtime.Version(), "1.9") {
 		goodenough = true
 	}
 

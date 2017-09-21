@@ -930,7 +930,7 @@ func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 	dblk, err := s.DB.FetchDBlockByHeight(dbheight)
 
 	//change this date to select what date the balances are from
-	dateOfBalances := "January 1, 2016"
+	dateOfBalances := "August 1, 2017"
 
 	interpretationForm := "January 2, 2006"
 	t, _ := time.Parse(interpretationForm, dateOfBalances)
