@@ -13,6 +13,8 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
+//https://github.com/FactomProject/FactomDocs/blob/master/Identity.md#factom-identity-chain-creation
+
 func (im *IdentityManager) ProcessIdentityEntry(entry interfaces.IEBEntry, dBlockHeight uint32, dBlockTimestamp interfaces.Timestamp, newEntry bool) error {
 	if entry.GetChainID().String()[:6] != "888888" {
 		return fmt.Errorf("Invalic chainID - expected 888888..., got %v", entry.GetChainID().String())
@@ -33,8 +35,12 @@ func (im *IdentityManager) ProcessIdentityEntry(entry interfaces.IEBEntry, dBloc
 		return fmt.Errorf("Invalid Identity Chain Entry")
 	}
 	if extIDs[0][0] != 0 {
+		if fmt.Sprintf("%x", extIDs[0]) == "466163746f6d204964656e7469747920526567697374726174696f6e20436861696e" {
+			//First entry in a chain, ignore
+			return nil
+		}
 		//We only support version 0
-		return fmt.Errorf("Invalid Identity Chain Entry version")
+		return fmt.Errorf("Invalid Identity Chain Entry version in entry %v - %v", entry.GetHash(), extIDs[0][0])
 	}
 	switch string(extIDs[1]) {
 	case "Identity Chain":
