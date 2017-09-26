@@ -23,7 +23,7 @@ func (bs *BlockchainState) ProcessECBlock(ecBlock interfaces.IEntryCreditBlock) 
 		return fmt.Errorf("Invalid ECBlock %v previous hash - expected %v, got %v\n", ecBlock.DatabasePrimaryIndex().String(), bs.ECBlockHead.Hash.String(), ecBlock.GetHeader().GetPrevFullHash().String())
 	}
 
-	if bs.DBlockHeight > M2SWITCHHEIGHT {
+	if bs.IsM2() == true {
 		//Only check in M2, since that's when this error got fixed
 		if bs.DBlockHeight != ecBlock.GetDatabaseHeight() {
 			return fmt.Errorf("Invalid ECBlock height - expected %v, got %v", bs.DBlockHeight, ecBlock.GetDatabaseHeight())

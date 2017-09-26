@@ -283,7 +283,7 @@ func FetchBlockSet(dbo interfaces.DBOverlay, index int) *BlockSet {
 			bs.EBlocks = append(bs.EBlocks, eBlock)
 
 			//Fetching special entries
-			if blockchainState.IsSpecialBlock(eBlock.GetHash()) {
+			if blockchainState.IsSpecialBlock(eBlock.GetChainID()) {
 				for _, v := range eBlock.GetEntryHashes() {
 					if v.IsMinuteMarker() {
 						continue

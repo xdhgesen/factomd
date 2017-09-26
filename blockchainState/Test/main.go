@@ -209,6 +209,24 @@ func FetchBlockSet(dbo interfaces.DBOverlay, index int) *BlockSet {
 				panic(err)
 			}
 			bs.EBlocks = append(bs.EBlocks, eBlock)
+
+			//Fetching special entries
+			if IsSpecialBlock(eBlock.GetChainID()) {
+				for _, v := range eBlock.GetEntryHashes() {
+					if v.IsMinuteMarker() {
+						continue
+					}
+					e, err := dbo.FetchEntry(v)
+					if err != nil {
+						panic(err)
+					}
+					if e == nil {
+						panic("Couldn't find entry " + v.String())
+					}
+					bs.Entries = append(bs.Entries, e)
+				}
+			}
+
 			/*
 				for _, v := range eBlock.GetEntryHashes() {
 					if v.IsMinuteMarker() {

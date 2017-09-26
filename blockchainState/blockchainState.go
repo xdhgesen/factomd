@@ -77,6 +77,10 @@ func (bs *BlockchainState) IsMainNet() bool {
 	return bs.NetworkID == constants.MAIN_NETWORK_ID
 }
 
+func (bs *BlockchainState) IsM2() bool {
+	return bs.DBlockHeight > M2SWITCHHEIGHT
+}
+
 func (bs *BlockchainState) Init() {
 	if bs.EBlockHeads == nil {
 		bs.EBlockHeads = map[string]*HashPair{}

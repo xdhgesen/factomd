@@ -83,23 +83,18 @@ func (bs *BlockchainState) ProcessEBlock(eBlock interfaces.IEntryBlock, entryMap
 			return err
 		}
 	}
-	/*
-		if IsSpecialBlock(eBlock.GetChainID()) {
-			err = bs.ProcessSpecialBlock(eBlock, entryMap)
-			if err != nil {
-				return err
-			}
+
+	if IsSpecialBlock(eBlock.GetChainID()) {
+		err = bs.ProcessSpecialBlock(eBlock, entryMap)
+		if err != nil {
+			return err
 		}
-	*/
+	}
+
 	return nil
 }
 
 func IsSpecialBlock(chainID interfaces.IHash) bool {
-	switch chainID.String() {
-	//Identity chain
-	case "888888001750ede0eff4b05f0c3f557890b256450cabbb84cada937f9c258327":
-		return true
-	}
 	if chainID.String()[:6] == "888888" {
 		return true
 	}
@@ -110,20 +105,19 @@ func (bs *BlockchainState) ProcessSpecialBlock(eBlock interfaces.IEntryBlock, en
 	bs.Init()
 	if IsSpecialBlock(eBlock.GetChainID()) == false {
 		return fmt.Errorf("Non-special block passed to ProcessSpecialBlock - %v", eBlock.GetHash().String())
-	}
-	if eBlock.GetChainID().String()[:6] == "888888" {
-		//Identity Chain
+	} else {
 		for _, v := range eBlock.GetEntryHashes() {
 			if v.IsMinuteMarker() {
 				continue
 			}
 			entry := entryMap[v.String()]
-			//fmt.Printf("Processing entry %v\n", entry.String())
+
+			if entry == nil {
+				return fmt.Errorf("Entry %v not provided!", v)
+			}
 
 			err := bs.IdentityManager.ProcessIdentityEntry(entry, bs.DBlockHeight, bs.DBlockTimestamp, true)
 			if err != nil {
-				fmt.Printf("Err - %v\n", err)
-				continue
 				return err
 			}
 		}

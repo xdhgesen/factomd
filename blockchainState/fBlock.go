@@ -50,11 +50,15 @@ func (bs *BlockchainState) ProcessFactoidTransaction(tx interfaces.ITransaction,
 		bs.RecentFactoidTransactions[tx.GetHash().String()] = tx.GetTimestamp().GetTimeMilliUInt64()
 	}
 
-	if tx.GetTimestamp().GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME < dblockTimestamp.GetTimeMilliUInt64() {
-		return fmt.Errorf("Timestamp precedes dblock!")
-	}
-	if tx.GetTimestamp().GetTimeMilliUInt64() > dblockTimestamp.GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME {
-		return fmt.Errorf("Timestamp is too far ahead!")
+	if bs.IsMainNet() == false || (bs.IsMainNet() == true && bs.IsM2()) {
+		if tx.GetTimestamp().GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME < dblockTimestamp.GetTimeMilliUInt64() {
+			return fmt.Errorf("Timestamp precedes dblock!")
+			//fmt.Printf("Tx %v - Timestamp precedes dblock! - %v vs %v, delta %v\n", tx.GetHash(), tx.GetTimestamp().GetTimeMilliUInt64(), dblockTimestamp.GetTimeMilliUInt64(), dblockTimestamp.GetTimeMilliUInt64()-tx.GetTimestamp().GetTimeMilliUInt64())
+		}
+		if tx.GetTimestamp().GetTimeMilliUInt64() > dblockTimestamp.GetTimeMilliUInt64()+FACTOIDTXEXPIRATIONTIME {
+			return fmt.Errorf("Timestamp is too far ahead!")
+			//fmt.Printf("Tx %v - Timestamp is too far ahead! - %v vs %v, delta %v\n", tx.GetHash(), tx.GetTimestamp().GetTimeMilliUInt64(), dblockTimestamp.GetTimeMilliUInt64(), tx.GetTimestamp().GetTimeMilliUInt64()-dblockTimestamp.GetTimeMilliUInt64())
+		}
 	}
 
 	ins := tx.GetInputs()
