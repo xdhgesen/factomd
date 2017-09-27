@@ -13,9 +13,11 @@ import (
 )
 
 func waitToKill(k *bool) {
-	t := rand.Int()%120 + 60
+	t := rand.Int()%30 + 20
 	for t > 0 {
-		os.Stderr.WriteString(fmt.Sprintf("     Will kill some servers in about %d seconds\n", t))
+		os.Stderr.WriteString(fmt.Sprintf("     Will kill some servers @ %d in about %d seconds\n",
+			fnodes[0].State.GetDBHeightComplete(),
+			t))
 		if t < 30 {
 			time.Sleep(time.Duration(t) * time.Second)
 		} else {
@@ -29,7 +31,7 @@ func waitToKill(k *bool) {
 // Wait some random amount of time between 0 and 2 minutes, and bring the node back.  We might
 // come back before we are faulted, or we might not.
 func bringback(f *FactomNode) {
-	t := rand.Int()%120 + 60
+	t := rand.Int()%20 + 5
 	for t > 0 {
 		if !f.State.GetNetStateOff() {
 			return
@@ -139,34 +141,33 @@ func faultTest(faulting *bool) {
 			killing = false
 			killsome = false
 			// Wait some random amount of time.
-			delta := rand.Int() % 20
+			delta := rand.Int() % 10
 			time.Sleep(time.Duration(delta) * time.Second)
 
 			kill := 1
-			maxLeadersToKill := numleaders / 2
+			maxLeadersToKill := numleaders
 			if maxLeadersToKill == 0 {
 				maxLeadersToKill = 1
 			} else {
 				kill = rand.Int() % maxLeadersToKill
 				kill++
 			}
-			kill = 1
 
 			os.Stderr.WriteString(fmt.Sprintf("Killing %3d of %3d Leaders\n", kill, numleaders))
 			for i := 0; i < kill; {
-				n := rand.Int() % len(leaders)
-				if !leaders[n].State.GetNetStateOff() {
+				n := rand.Int() % len(fnodes)
+				if !fnodes[n].State.GetNetStateOff() {
 					os.Stderr.WriteString(fmt.Sprintf("     >>>> Killing %10s %s\n",
-						leaders[n].State.FactomNodeName,
-						leaders[n].State.GetIdentityChainID().String()[4:16]))
-					leaders[n].State.SetNetStateOff(true)
-					go bringback(leaders[n])
+						fnodes[n].State.FactomNodeName,
+						fnodes[n].State.GetIdentityChainID().String()[4:16]))
+					fnodes[n].State.SetNetStateOff(true)
+					go bringback(fnodes[n])
 					i++
-					time.Sleep(time.Duration(rand.Int()%40) * time.Second)
+					time.Sleep(time.Duration(rand.Int()%10) * time.Second)
 					totalServerFaults++
 				}
 			}
-
+			os.Stderr.WriteString(fmt.Sprintf("Killed @ dbht %d", currentdbht))
 		} else {
 			time.Sleep(1 * time.Second)
 		}
