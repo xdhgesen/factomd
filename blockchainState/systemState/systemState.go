@@ -4,7 +4,10 @@
 
 package systemState
 
-import ()
+import (
+	"github.com/FactomProject/factomd/database/databaseOverlay"
+	"github.com/FactomProject/factomd/database/hybridDB"
+)
 
 type SystemState struct {
 	MessageHoldingQueue MessageHoldingQueue
@@ -12,5 +15,34 @@ type SystemState struct {
 }
 
 func (ss *SystemState) Init() {
-	ss.BStateHandler.InitMainNet()
+	if ss.BStateHandler == nil {
+		ss.BStateHandler = new(BStateHandler)
+		ss.BStateHandler.InitMainNet()
+	}
+}
+
+func (ss *SystemState) Start() {
+	err := ss.LoadDatabase()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (ss *SystemState) LoadDatabase() error {
+	levelBolt := "level"
+	path := "C:/Users/ThePiachu/.factom/m2/main-database/ldb/MAIN/factoid_level.db"
+	var dbase *hybridDB.HybridDB
+	var err error
+	if levelBolt == "bolt" {
+		dbase = hybridDB.NewBoltMapHybridDB(nil, path)
+	} else {
+		dbase, err = hybridDB.NewLevelMapHybridDB(path, false)
+		if err != nil {
+			panic(err)
+		}
+	}
+	dbo := databaseOverlay.NewOverlay(dbase)
+	ss.BStateHandler.DB = dbo
+
+	return ss.BStateHandler.LoadDatabase()
 }

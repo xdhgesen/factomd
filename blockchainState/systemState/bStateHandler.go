@@ -6,6 +6,8 @@ package systemState
 
 import (
 	"fmt"
+	"io/ioutil"
+	"strings"
 
 	"github.com/FactomProject/factomd/blockchainState"
 	"github.com/FactomProject/factomd/blockchainState/blockMaker"
@@ -63,6 +65,7 @@ func (bh *BStateHandler) LoadDatabase() error {
 	if bh.MainBState.DBlockHeight > 0 {
 		start = int(bh.MainBState.DBlockHeight) + 1
 	}
+	fmt.Printf("Start - %v\n", start)
 
 	dbHead, err := bh.DB.FetchDBlockHead()
 	if err != nil {
@@ -84,13 +87,23 @@ func (bh *BStateHandler) LoadDatabase() error {
 			return err
 		}
 
+		if i%1000 == 0 {
+			err = bh.SaveBState()
+			if err != nil {
+				return err
+			}
+			fmt.Printf("Processed Block Set %v\n", i)
+		}
+
 		//TODO: save BState periodically
 	}
 
-	err = bh.SaveBState(bh.MainBState)
+	err = bh.SaveBState()
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("End - %v\n", bh.MainBState.DBlockHeight)
 
 	return nil
 }
@@ -138,7 +151,7 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 
 	bh.MainBState = tmpBState
 
-	err = bh.SaveBState(bh.MainBState)
+	err = bh.SaveBState()
 	if err != nil {
 		return err
 	}
@@ -168,14 +181,31 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	return nil
 }
 
-func (bh *BStateHandler) SaveBState(bState *blockchainState.BlockchainState) error {
-	//TODO: figure out how often we want to save BStates
-	//TODO: do
+func (bh *BStateHandler) SaveBState() error {
+	b, err := bh.MainBState.MarshalBinaryData()
+	if err != nil {
+		return err
+	}
+	err = ioutil.WriteFile("bs.test", b, 0644)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (bh *BStateHandler) LoadBState() error {
-	//TODO: do
+	b, err := ioutil.ReadFile("bs.test")
+	if err != nil {
+		if strings.Contains(err.Error(), "The system cannot find the file specified") {
+			//File not found, nothing to do here
+			return nil
+		}
+		return err
+	}
+	err = bh.MainBState.UnmarshalBinaryData(b)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
