@@ -94,8 +94,6 @@ func (bh *BStateHandler) LoadDatabase() error {
 			}
 			fmt.Printf("Processed Block Set %v\n", i)
 		}
-
-		//TODO: save BState periodically
 	}
 
 	err = bh.SaveBState()
@@ -105,6 +103,24 @@ func (bh *BStateHandler) LoadDatabase() error {
 
 	fmt.Printf("End - %v\n", bh.MainBState.DBlockHeight)
 
+	return nil
+}
+
+func (bh *BStateHandler) StartNetworkSynch() error {
+	err := bh.CopyMainBStateToblockMaker()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (bh *BStateHandler) CopyMainBStateToblockMaker() error {
+	s, err := bh.MainBState.Clone()
+	if err != nil {
+		return err
+	}
+	bh.BlockMaker = blockMaker.NewBlockMaker()
+	bh.BlockMaker.BState = s
 	return nil
 }
 
@@ -173,7 +189,7 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	//TODO: overwrite BlockMaker if appropriate
 	s, err := bh.MainBState.Clone()
 	if err != nil {
-		return nil
+		return err
 	}
 	bh.BlockMaker = blockMaker.NewBlockMaker()
 	bh.BlockMaker.BState = s

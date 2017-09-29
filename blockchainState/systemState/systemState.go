@@ -26,6 +26,10 @@ func (ss *SystemState) Start() {
 	if err != nil {
 		panic(err)
 	}
+	err = ss.StartNetworkSynch()
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (ss *SystemState) LoadDatabase() error {
@@ -45,4 +49,15 @@ func (ss *SystemState) LoadDatabase() error {
 	ss.BStateHandler.DB = dbo
 
 	return ss.BStateHandler.LoadDatabase()
+}
+
+func (ss *SystemState) StartNetworkSynch() error {
+	err := ss.BStateHandler.StartNetworkSynch()
+	if err != nil {
+		return err
+	}
+
+	//TODO: connect to P2P
+
+	return nil
 }
