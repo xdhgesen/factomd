@@ -6,32 +6,15 @@ package engine
 
 import (
 	"fmt"
-	"time"
-
 	"math/rand"
 	"os"
+	"time"
 )
-
-func waitToKill(k *bool) {
-	t := rand.Int()%30 + 20
-	for t > 0 {
-		os.Stderr.WriteString(fmt.Sprintf("     Will kill some servers @ %d in about %d seconds\n",
-			fnodes[0].State.GetDBHeightComplete(),
-			t))
-		if t < 30 {
-			time.Sleep(time.Duration(t) * time.Second)
-		} else {
-			time.Sleep(30 * time.Second)
-		}
-		t -= 30
-	}
-	*k = true
-}
 
 // Wait some random amount of time between 0 and 2 minutes, and bring the node back.  We might
 // come back before we are faulted, or we might not.
 func bringback(f *FactomNode) {
-	t := rand.Int()%20 + 5
+	t := rand.Int()%60 + 30
 	for t > 0 {
 		if !f.State.GetNetStateOff() {
 			return
@@ -48,128 +31,141 @@ func bringback(f *FactomNode) {
 }
 
 func offlineReport(faulting *bool) {
+	stmt := ""
 	for *faulting {
 		// How many nodes are running.
-		stmt := "Offline: "
+		stmt2 := "Offline: "
 		for _, f := range fnodes {
 			if f.State.GetNetStateOff() {
-				stmt = stmt + fmt.Sprintf(" %s", f.State.FactomNodeName)
+				stmt2 = stmt2 + fmt.Sprintf(" %s", f.State.FactomNodeName)
 			}
 		}
-		if len(stmt) > 10 {
+		if len(stmt2) <= 10 {
+			stmt2 = "All online"
+		}
+
+		if stmt != stmt2 {
 			os.Stderr.WriteString(stmt + "\n")
 		}
 
-		time.Sleep(20 * time.Second)
+		stmt = stmt2
+
+		time.Sleep(5 * time.Second)
 	}
 
 }
 
+func deadman(dbheight *uint32, currentminute *int) {
+mainloop:
+	for {
+		d := *dbheight
+		m := *currentminute
+		for i := 1; i < 21; i++ {
+			time.Sleep(10 * time.Second)
+			if d < *dbheight || m < *currentminute {
+				continue mainloop
+			}
+			os.Stderr.WriteString(fmt.Sprintf("Deadman %d\n", i*10))
+		}
+
+		os.Stderr.WriteString(fmt.Sprintf("Killing factomd 'cause DBHeight %d >= %d and Minute %d >= %d",
+			d, *dbheight,
+			m, *currentminute))
+
+		if d >= *dbheight && m >= *currentminute {
+			for _, f := range fnodes {
+				f.State.ShutdownChan <- 1
+			}
+			time.Sleep(10 * time.Second)
+			os.Stderr.WriteString("Exit(1)")
+			os.Exit(1)
+		}
+	}
+}
+
 func faultTest(faulting *bool) {
-	killsome := false
-	killing := false
-	numleaders := 0
-	currentdbht := 0
-	currentminute := 0
-	goodleaders := 0
 
 	go offlineReport(faulting)
 
-	for *faulting {
-		var leaders []*FactomNode
+	var currentdbht uint32
+	var currentminute int
 
-		lastgood := goodleaders
-		goodleaders = 0
-		// How many of the running nodes are leaders
+	go deadman(&currentdbht, &currentminute)
+
+	stalls := 0
+	partitions := 0
+
+	for *faulting {
+
+		// How many of the running nodes are offline?  Wait until they are all online!
 		for _, f := range fnodes {
 			if f.State.GetNetStateOff() {
+				time.Sleep(1 * time.Second)
 				continue
-			}
-			if !f.State.Leader {
-				continue
-			}
-			if int(f.State.LLeaderHeight) < currentdbht {
-				continue
-			}
-			if int(f.State.LLeaderHeight) == currentdbht && int(f.State.CurrentMinute) < currentminute {
-				continue
-			}
-
-			goodleaders++
-			leaders = append(leaders, f)
-
-			pl := f.State.LeaderPL
-			if pl != nil && len(pl.FedServers) > numleaders {
-				numleaders = len(pl.FedServers)
 			}
 		}
 
-		if lastgood != goodleaders {
-			os.Stderr.WriteString(fmt.Sprintf("Of %d Leaders, we now have %d in working order.\n", numleaders, goodleaders))
-		}
+		progress := false
 
-		nextblk := false
-
-		lastdbht := currentdbht
-		lastminute := currentminute
 		// Look at their process lists.  How many leaders do we expect?  What is the dbheight?
 		for _, f := range fnodes {
-			if int(f.State.LLeaderHeight) > currentdbht {
-				currentminute = 0
-				currentdbht = int(f.State.LLeaderHeight)
-				nextblk = true
-			}
-			if !nextblk && f.State.CurrentMinute > currentminute {
-				currentminute = f.State.CurrentMinute
+			if f.State.LLeaderHeight > currentdbht {
+				currentdbht = f.State.LLeaderHeight
+				progress = true
 			}
 		}
 
-		if !killing && goodleaders >= numleaders {
-			if currentdbht > lastdbht || currentminute > lastminute {
-				killing = true
-				go waitToKill(&killsome)
-			}
-		}
-		// Can't run this test without at least three leaders.
-		if numleaders < 3 {
-			os.Stderr.WriteString("Not enough leaders to run fault test\n")
-			*faulting = false
-			return
-		}
-
-		if killsome && len(leaders) > 0 && goodleaders >= numleaders {
-			killing = false
-			killsome = false
-			// Wait some random amount of time.
-			delta := rand.Int() % 10
-			time.Sleep(time.Duration(delta) * time.Second)
-
-			kill := 1
-			maxLeadersToKill := numleaders
-			if maxLeadersToKill == 0 {
-				maxLeadersToKill = 1
-			} else {
-				kill = rand.Int() % maxLeadersToKill
-				kill++
-			}
-
-			os.Stderr.WriteString(fmt.Sprintf("Killing %3d of %3d Leaders\n", kill, numleaders))
-			for i := 0; i < kill; {
-				n := rand.Int() % len(fnodes)
-				if !fnodes[n].State.GetNetStateOff() {
-					os.Stderr.WriteString(fmt.Sprintf("     >>>> Killing %10s %s\n",
-						fnodes[n].State.FactomNodeName,
-						fnodes[n].State.GetIdentityChainID().String()[4:16]))
-					fnodes[n].State.SetNetStateOff(true)
-					go bringback(fnodes[n])
-					i++
-					time.Sleep(time.Duration(rand.Int()%10) * time.Second)
-					totalServerFaults++
+		lastmin := currentminute
+		currentminute = 0
+		for _, f := range fnodes {
+			if f.State.LLeaderHeight == currentdbht {
+				if f.State.CurrentMinute > currentminute {
+					currentminute = f.State.CurrentMinute
 				}
 			}
-			os.Stderr.WriteString(fmt.Sprintf("Killed @ dbht %d", currentdbht))
-		} else {
-			time.Sleep(1 * time.Second)
 		}
+
+		if !progress && lastmin < currentminute {
+			progress = true
+		}
+
+		// If we have no progress, continue to wait
+		if !progress {
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		kill := rand.Int()%(3) + 1
+
+		// Wait some random amount of time.
+		delta := rand.Int()%60 + 120
+		time.Sleep(time.Duration(delta) * time.Second)
+
+		os.Stderr.WriteString(fmt.Sprintf("Killing %3d nodes\n", kill))
+
+		partitions++
+		for i := 0; i < kill; {
+			// pick a random node
+			n := rand.Int() % len(fnodes)
+
+			// If that node not online, try again
+			if fnodes[n].State.GetNetStateOff() {
+				continue
+			}
+
+			os.Stderr.WriteString(fmt.Sprintf("     >>>> Killing %10s %s\n",
+				fnodes[n].State.FactomNodeName,
+				fnodes[n].State.GetIdentityChainID().String()[4:16]))
+			fnodes[n].State.SetNetStateOff(true)
+			go bringback(fnodes[n])
+			i++
+
+			if rand.Int()%5 == 3 {
+				time.Sleep(time.Duration(rand.Int()%10) * time.Second)
+			}
+
+			stalls++
+		}
+		os.Stderr.WriteString(fmt.Sprintf("So far, we have partitioned %d times and stalled %d nodes", partitions, stalls))
 	}
 }
