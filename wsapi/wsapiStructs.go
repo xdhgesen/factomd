@@ -32,9 +32,10 @@ type CommitEntryResponse struct {
 }
 
 type RevealEntryResponse struct {
-	Message   string `json:"message"`
-	EntryHash string `json:"entryhash"`
-	ChainID   string `json:"chainid,omitempty"`
+	Message     string `json:"message"`
+	EntryHash   string `json:"entryhash"`
+	ChainID     string `json:"chainid,omitempty"`
+	ChainIDHash string `json:"chainidhash,omitempty"`
 }
 
 type DirectoryBlockResponse struct {

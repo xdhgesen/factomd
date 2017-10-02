@@ -76,7 +76,7 @@ func (c *EBlock) GetChainID() interfaces.IHash {
 }
 
 func (c *EBlock) GetHashOfChainID() []byte {
-	return primitives.DoubleSha(c.GetChainID().Bytes())
+	return primitives.Sha(c.GetChainID().Bytes()).Bytes()
 }
 
 func (c *EBlock) GetHashOfChainIDHash() interfaces.IHash {

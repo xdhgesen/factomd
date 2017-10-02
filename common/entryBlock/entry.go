@@ -136,7 +136,7 @@ func (e *Entry) GetContent() []byte {
 }
 
 func (e *Entry) GetChainIDHash() interfaces.IHash {
-	return e.ChainID
+	return primitives.NewHash(primitives.DoubleSha(NewChainID(e).Bytes()))
 }
 
 func (e *Entry) ExternalIDs() [][]byte {

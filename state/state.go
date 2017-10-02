@@ -1285,7 +1285,8 @@ func (s *State) GetPendingEntries(params interface{}) []interfaces.IPendingEntry
 							}
 							tmp.EntryHash = cc.CommitChain.EntryHash
 
-							tmp.ChainID = cc.CommitChain.ChainIDHash
+							tmp.ChainID = nil
+							tmp.ChainIDHash = cc.CommitChain.ChainIDHash
 							if pl.DBHeight > s.GetDBHeightComplete() {
 								tmp.Status = constants.AckStatusACKString
 							} else {
@@ -1307,6 +1308,7 @@ func (s *State) GetPendingEntries(params interface{}) []interfaces.IPendingEntry
 							tmp.EntryHash = ce.CommitEntry.EntryHash
 
 							tmp.ChainID = nil
+							tmp.ChainIDHash = nil
 							if pl.DBHeight > s.GetDBHeightComplete() {
 								tmp.Status = constants.AckStatusACKString
 							} else {
@@ -1328,6 +1330,7 @@ func (s *State) GetPendingEntries(params interface{}) []interfaces.IPendingEntry
 							}
 							tmp.EntryHash = re.Entry.GetHash()
 							tmp.ChainID = re.Entry.GetChainID()
+							tmp.ChainIDHash = re.Entry.GetChainIDHash()
 							if pl.DBHeight > s.GetDBHeightComplete() {
 								tmp.Status = constants.AckStatusACKString
 							} else {
@@ -1346,6 +1349,7 @@ func (s *State) GetPendingEntries(params interface{}) []interfaces.IPendingEntry
 											if tmp.ChainID != nil {
 
 												resp[k].ChainID = tmp.ChainID
+												resp[k].ChainIDHash = primitives.NewHash(primitives.DoubleSha(tmp.ChainID.Bytes()))
 											}
 										}
 									}
@@ -1373,6 +1377,7 @@ func (s *State) GetPendingEntries(params interface{}) []interfaces.IPendingEntry
 			tmp.EntryHash = re.Entry.GetHash()
 
 			tmp.ChainID = re.Entry.GetChainID()
+			tmp.ChainIDHash = re.Entry.GetChainIDHash()
 
 			tmp.Status = constants.AckStatusNotConfirmedString
 

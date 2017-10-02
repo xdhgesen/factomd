@@ -656,6 +656,7 @@ func HandleV2RevealEntry(state interfaces.IState, params interface{}) (interface
 	resp.Message = "Entry Reveal Success"
 	resp.EntryHash = entry.GetHash().String()
 	resp.ChainID = entry.ChainID.String()
+	resp.ChainIDHash = entry.GetChainIDHash().String()
 
 	return resp, nil
 }

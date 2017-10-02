@@ -4,8 +4,6 @@
 
 package interfaces
 
-import ()
-
 type IEBEntry interface {
 	DatabaseBatchable
 	Printable
@@ -23,7 +21,8 @@ type IEntry interface {
 }
 
 type IPendingEntry struct {
-	EntryHash IHash
-	ChainID   IHash
-	Status    string
+	EntryHash   IHash
+	ChainID     IHash
+	ChainIDHash IHash
+	Status      string
 }

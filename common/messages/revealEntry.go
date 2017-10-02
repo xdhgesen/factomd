@@ -63,7 +63,7 @@ func (m *RevealEntryMsg) GetMsgHash() interfaces.IHash {
 
 func (m *RevealEntryMsg) GetChainIDHash() interfaces.IHash {
 	if m.chainIDHash == nil {
-		m.chainIDHash = primitives.Sha(m.Entry.GetChainID().Bytes())
+		m.chainIDHash.SetBytes(primitives.DoubleSha(m.Entry.GetChainID().Bytes()))
 	}
 	return m.chainIDHash
 }
