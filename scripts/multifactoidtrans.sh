@@ -23,6 +23,8 @@ for ((i=0; i < 50000; i++)); do
 echo $i
 for ((j=0; j < 10; j++)); do
 
+scripts/smallentryloadm2.sh &
+
 factom-cli rmtx  t1 2>/dev/null
 
 factom-cli newtx -q t1
@@ -31,7 +33,7 @@ factom-cli addtxoutput -q t1 $fct2 .001
 factom-cli addtxfee    -q t1 $big
 factom-cli signtx -q t1
 factom-cli sendtx -f -q -f t1
-sleep 2
+sleep 2.5
 
 factom-cli newtx -q t1
 factom-cli addtxinput  -q t1 $big .001
@@ -39,7 +41,7 @@ factom-cli addtxoutput -q t1 $fct3 .001
 factom-cli addtxfee    -q t1 $big
 factom-cli signtx -q t1
 factom-cli sendtx -f -q -f t1
-sleep 2
+sleep 2.5
 
 factom-cli newtx -q t1
 factom-cli addtxinput  -q t1 $big .001
@@ -47,7 +49,7 @@ factom-cli addtxoutput -q t1 $fct4 .001
 factom-cli addtxfee    -q t1 $big
 factom-cli signtx -q t1
 factom-cli sendtx -f -q -f t1
-sleep 2
+sleep 2.5
 
 factom-cli newtx -q t1
 factom-cli addtxinput  -q t1 $big .001
@@ -55,7 +57,7 @@ factom-cli addtxoutput -q t1 $fct5 .001
 factom-cli addtxfee    -q t1 $big
 factom-cli signtx -q t1
 factom-cli sendtx -f -q -f t1
-sleep 2
+sleep 2.5
 
 factom-cli newtx -q t1
 factom-cli addtxinput  -q t1 $big .001
@@ -64,7 +66,7 @@ factom-cli addtxfee    -q t1 $big
 factom-cli signtx -q t1
 factom-cli sendtx -f -q -f t1
 
-sleep 2
+sleep 2.5
 
 done
 

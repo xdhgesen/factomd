@@ -136,6 +136,7 @@ func faultTest(faulting *bool) {
 		}
 
 		kill := rand.Int()%(3) + 1
+		kill = 1
 
 		// Wait some random amount of time.
 		delta := rand.Int()%60 + 120
