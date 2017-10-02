@@ -1308,7 +1308,6 @@ func (s *State) GetPendingEntries(params interface{}) []interfaces.IPendingEntry
 							tmp.EntryHash = ce.CommitEntry.EntryHash
 
 							tmp.ChainID = nil
-							tmp.ChainIDHash = nil
 							if pl.DBHeight > s.GetDBHeightComplete() {
 								tmp.Status = constants.AckStatusACKString
 							} else {
