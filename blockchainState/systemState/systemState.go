@@ -5,8 +5,11 @@
 package systemState
 
 import (
+	"fmt"
+
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/hybridDB"
+	"github.com/FactomProject/factomd/p2p"
 )
 
 type SystemState struct {
@@ -58,6 +61,26 @@ func (ss *SystemState) StartNetworkSynch() error {
 	}
 
 	//TODO: connect to P2P
+
+	// Start the P2P netowork
+	connectionMetricsChannel := make(chan interface{}, p2p.StandardChannelSize)
+
+	ci := p2p.ControllerInit{
+		Port:                     "8108",
+		PeersFile:                "peers.json",
+		Network:                  p2p.MainNet,
+		Exclusive:                false,
+		SeedURL:                  "https://raw.githubusercontent.com/FactomProject/factomproject.github.io/master/seed/mainseed.txt",
+		SpecialPeers:             "",
+		ConnectionMetricsChannel: connectionMetricsChannel,
+	}
+	p2pNetwork := new(p2p.Controller).Init(ci)
+	p2pNetwork.StartNetwork()
+
+	for {
+		x := <-connectionMetricsChannel
+		fmt.Printf("%v\n", x)
+	}
 
 	return nil
 }
