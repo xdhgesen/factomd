@@ -7,7 +7,6 @@ package blockchainState
 import (
 	"bytes"
 	"encoding/gob"
-	//"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/identity"

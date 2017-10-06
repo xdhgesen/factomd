@@ -76,7 +76,7 @@ func (bs *BlockchainState) ProcessEBlock(eBlock interfaces.IEntryBlock, entryMap
 	bs.EBlockHeads[chainID].Height = eBlock.GetHeader().GetEBSequence()
 
 	eHashes := eBlock.GetEntryHashes()
-	eBlockHash := eBlock.GetHash()
+	eBlockHash, _ := eBlock.KeyMR()
 	for _, v := range eHashes {
 		err := bs.ProcessEntryHash(v, eBlockHash)
 		if err != nil {
