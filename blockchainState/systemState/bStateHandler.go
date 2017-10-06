@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"sync"
 
 	"github.com/FactomProject/factomd/blockchainState"
 	"github.com/FactomProject/factomd/blockchainState/blockMaker"
@@ -28,6 +29,11 @@ type BStateHandler struct {
 
 	//DBStateMsgs that have not been applied or dismissed yet
 	PendingDBStateMsgs []*messages.DBStateMsg
+	DBStatesSemaphore  sync.Mutex
+
+	//IF we receive any messages from the network, we know how far ahead the network is
+	HighestKnownDBlock          uint32
+	HighestKnownDBlockSemaphore sync.Mutex
 
 	//Marking whether we're still synchronising with the network, or are we fully synched
 	//FullySynched bool
@@ -129,6 +135,7 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 		return fmt.Errorf("Invalid message type")
 	}
 	dbStateMsg := msg.(*messages.DBStateMsg)
+	fmt.Printf("HandleDBStateMsg %v!\n", dbStateMsg.DirectoryBlock.GetDatabaseHeight())
 
 	height := dbStateMsg.DirectoryBlock.GetDatabaseHeight()
 	if bh.MainBState.DBlockHeight >= height {
@@ -142,6 +149,10 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 		}
 		//We're processing genesis block!
 	}
+
+	bh.DBStatesSemaphore.Lock()
+	defer bh.DBStatesSemaphore.Unlock()
+
 	if bh.MainBState.DBlockHeight+1 < height {
 		//DBStateMsg is too far ahead - ignore it for now
 		bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs, dbStateMsg)
@@ -193,6 +204,8 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	}
 	bh.BlockMaker = blockMaker.NewBlockMaker()
 	bh.BlockMaker.BState = s
+
+	fmt.Printf("HandleDBStateMsg completed!\n")
 
 	return nil
 }
@@ -273,7 +286,8 @@ func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBl
 }
 
 func (bs *BStateHandler) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
-	return bs.BlockMaker.ProcessAckedMessage(msg, ack)
+	return nil
+	//return bs.BlockMaker.ProcessAckedMessage(msg, ack)
 }
 
 type BlockSet struct {

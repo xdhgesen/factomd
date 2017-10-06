@@ -7,6 +7,8 @@ package systemState
 import (
 	"fmt"
 
+	"github.com/FactomProject/factomd/common/messages"
+	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/hybridDB"
 	"github.com/FactomProject/factomd/p2p"
@@ -15,6 +17,8 @@ import (
 type SystemState struct {
 	MessageHoldingQueue MessageHoldingQueue
 	BStateHandler       *BStateHandler
+
+	P2PNetwork *p2p.Controller
 }
 
 func (ss *SystemState) Init() {
@@ -74,13 +78,53 @@ func (ss *SystemState) StartNetworkSynch() error {
 		SpecialPeers:             "",
 		ConnectionMetricsChannel: connectionMetricsChannel,
 	}
-	p2pNetwork := new(p2p.Controller).Init(ci)
-	p2pNetwork.StartNetwork()
+	ss.P2PNetwork = new(p2p.Controller).Init(ci)
+	ss.P2PNetwork.StartNetwork()
 
 	for {
-		x := <-connectionMetricsChannel
-		fmt.Printf("%v\n", x)
+		x := <-ss.P2PNetwork.FromNetwork
+		parcel := x.(p2p.Parcel)
+		msg, err := messages.UnmarshalMessage(parcel.Payload)
+		if err != nil {
+			panic(err)
+		}
+		//fmt.Printf("%v\n", msg.String())
+		err = ss.ProcessMessage(msg)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	return nil
+}
+
+func (ss *SystemState) SetHighestKnownDBlockHeight(newHeight uint32) {
+	if newHeight <= ss.BStateHandler.HighestKnownDBlock {
+		return
+	}
+	ss.BStateHandler.HighestKnownDBlockSemaphore.Lock()
+	defer ss.BStateHandler.HighestKnownDBlockSemaphore.Unlock()
+	if newHeight <= ss.BStateHandler.HighestKnownDBlock {
+		return
+	}
+	ss.BStateHandler.HighestKnownDBlock = newHeight
+	//TODO: request DBStates
+
+	fmt.Printf("Updated DBHeight to %v\n", newHeight)
+
+	dbstate := new(messages.DBStateMissing)
+	dbstate.Timestamp = primitives.NewTimestampNow()
+	dbstate.DBHeightStart = ss.BStateHandler.MainBState.DBlockHeight
+	dbstate.DBHeightEnd = newHeight
+	fmt.Printf("Requestind DBState - %v to %v\n", dbstate.DBHeightStart, dbstate.DBHeightEnd)
+
+	b, err := dbstate.MarshalBinary()
+	if err != nil {
+		panic(err)
+	}
+
+	parcel := p2p.NewParcel(p2p.MainNet, b)
+	parcel.Header.TargetPeer = p2p.RandomPeerFlag
+
+	ss.P2PNetwork.ToNetwork <- *parcel
 }

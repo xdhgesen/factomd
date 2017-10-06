@@ -118,6 +118,11 @@ func (ss *SystemState) ProcessAckMessage(msg interfaces.IMsg) error {
 	if msg.Type() != constants.ACK_MSG {
 		return fmt.Errorf("Invalid message type forwarded for processing")
 	}
+	height := msg.(*messages.Ack).DBHeight
+	if height > ss.BStateHandler.HighestKnownDBlock {
+		//We know of a new highest block, time to set it and request DBStates
+		go ss.SetHighestKnownDBlockHeight(height)
+	}
 
 	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) == true {
 		//Nothing to do, the message is already acked
