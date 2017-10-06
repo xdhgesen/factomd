@@ -32,11 +32,42 @@ type BStateHandler struct {
 	DBStatesSemaphore  sync.Mutex
 
 	//IF we receive any messages from the network, we know how far ahead the network is
-	HighestKnownDBlock          uint32
-	HighestKnownDBlockSemaphore sync.Mutex
+	HighestKnownDBlock uint32
 
 	//Marking whether we're still synchronising with the network, or are we fully synched
 	//FullySynched bool
+}
+
+func (bh *BStateHandler) ProcessPendingDBStateMsgs() error {
+	bh.DBStatesSemaphore.Lock()
+	defer bh.DBStatesSemaphore.Unlock()
+
+	for {
+		loopAgain := false
+
+		for i := len(bh.PendingDBStateMsgs) - 1; i >= 0; i-- {
+			if bh.PendingDBStateMsgs[i].DirectoryBlock.GetDatabaseHeight() <= bh.MainBState.DBlockHeight {
+				//We already dealt with this DBState, deleting the message
+				bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs[:i], bh.PendingDBStateMsgs[i+1:]...)
+			}
+			if bh.PendingDBStateMsgs[i].DirectoryBlock.GetDatabaseHeight() == bh.MainBState.DBlockHeight+1 {
+				//Next DBState to process - do it now
+				err := bh.ApplyDBStateMsg(bh.PendingDBStateMsgs[i])
+				if err != nil {
+					return err
+				}
+				loopAgain = true
+				bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs[:i], bh.PendingDBStateMsgs[i+1:]...)
+			}
+		}
+		if loopAgain == true {
+			//We processed at least one DBState, make sure there aren't any more left to process
+			continue
+		}
+		break
+	}
+
+	return nil
 }
 
 func (bh *BStateHandler) InitMainNet() {
@@ -135,7 +166,6 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 		return fmt.Errorf("Invalid message type")
 	}
 	dbStateMsg := msg.(*messages.DBStateMsg)
-	fmt.Printf("HandleDBStateMsg %v!\n", dbStateMsg.DirectoryBlock.GetDatabaseHeight())
 
 	height := dbStateMsg.DirectoryBlock.GetDatabaseHeight()
 	if bh.MainBState.DBlockHeight >= height {
@@ -151,7 +181,31 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	}
 
 	bh.DBStatesSemaphore.Lock()
-	defer bh.DBStatesSemaphore.Unlock()
+	bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs, dbStateMsg)
+	bh.DBStatesSemaphore.Unlock()
+
+	return bh.ProcessPendingDBStateMsgs()
+}
+
+func (bh *BStateHandler) ApplyDBStateMsg(msg interfaces.IMsg) error {
+	if msg.Type() != constants.DBSTATE_MSG {
+		return fmt.Errorf("Invalid message type")
+	}
+	dbStateMsg := msg.(*messages.DBStateMsg)
+	fmt.Printf("ApplyDBStateMsg %v!\n", dbStateMsg.DirectoryBlock.GetDatabaseHeight())
+
+	height := dbStateMsg.DirectoryBlock.GetDatabaseHeight()
+	if bh.MainBState.DBlockHeight >= height {
+		if height != 0 {
+			//Nothing to do - we're already ahead
+			return nil
+		}
+		if !bh.MainBState.DBlockHead.KeyMR.IsZero() {
+			//Nothing to do - we're already ahead
+			return nil
+		}
+		//We're processing genesis block!
+	}
 
 	if bh.MainBState.DBlockHeight+1 < height {
 		//DBStateMsg is too far ahead - ignore it for now
@@ -183,20 +237,6 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 		return err
 	}
 
-	for i := len(bh.PendingDBStateMsgs) - 1; i >= 0; i-- {
-		if bh.PendingDBStateMsgs[i].DirectoryBlock.GetDatabaseHeight() <= bh.MainBState.DBlockHeight {
-			//We already dealt with this DBState, deleting the message
-			bh.PendingDBStateMsgs = append(bh.PendingDBStateMsgs[:i], bh.PendingDBStateMsgs[i+1:]...)
-		}
-		if bh.PendingDBStateMsgs[i].DirectoryBlock.GetDatabaseHeight() == bh.MainBState.DBlockHeight+1 {
-			//Next DBState to process - do it now
-			err = bh.HandleDBStateMsg(bh.PendingDBStateMsgs[i])
-			if err != nil {
-				return err
-			}
-		}
-	}
-
 	//TODO: overwrite BlockMaker if appropriate
 	s, err := bh.MainBState.Clone()
 	if err != nil {
@@ -205,7 +245,7 @@ func (bh *BStateHandler) HandleDBStateMsg(msg interfaces.IMsg) error {
 	bh.BlockMaker = blockMaker.NewBlockMaker()
 	bh.BlockMaker.BState = s
 
-	fmt.Printf("HandleDBStateMsg completed!\n")
+	fmt.Printf("ApplyDBStateMsg %v completed!\n", dbStateMsg.DirectoryBlock.GetDatabaseHeight())
 
 	return nil
 }
