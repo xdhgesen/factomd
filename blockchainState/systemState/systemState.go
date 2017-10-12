@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
@@ -20,13 +21,17 @@ type SystemState struct {
 	MessageHoldingQueue MessageHoldingQueue
 	BStateHandler       *BStateHandler
 
-	P2PNetwork *p2p.Controller
+	P2PNetwork  *p2p.Controller
+	OutMsgQueue chan interfaces.IMsg
 }
 
 func (ss *SystemState) Init() {
 	if ss.BStateHandler == nil {
 		ss.BStateHandler = new(BStateHandler)
 		ss.BStateHandler.InitMainNet()
+	}
+	if ss.OutMsgQueue == nil {
+		ss.OutMsgQueue = make(chan interfaces.IMsg, 1000)
 	}
 }
 

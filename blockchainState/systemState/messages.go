@@ -231,6 +231,21 @@ func (ss *SystemState) ProcessDBStateMissingMessage(msg interfaces.IMsg) error {
 	if msg.Type() != constants.DBSTATE_MISSING_MSG {
 		return fmt.Errorf("Invalid message type forwarded for processing")
 	}
+
+	dbStateMissing := msg.(*messages.DBStateMissing)
+	start := dbStateMissing.DBHeightStart
+	end := dbStateMissing.DBHeightEnd
+	if end > start+20 {
+		end = start + 20
+	}
+	for i := start; i <= end; i++ {
+		dbStateMsg, err := ss.BStateHandler.GetDBStateMsgForHeight(i)
+		if err != nil {
+			return err
+		}
+		ss.OutMsgQueue <- dbStateMsg
+	}
+
 	return nil
 }
 
