@@ -265,7 +265,7 @@ func (bh *BStateHandler) SaveBState() error {
 func (bh *BStateHandler) LoadBState() error {
 	b, err := ioutil.ReadFile("bs.test")
 	if err != nil {
-		if strings.Contains(err.Error(), "The system cannot find the file specified") {
+		if strings.Contains(err.Error(), "The system cannot find the file specified") || strings.Contains(err.Error(), "no such file or directory") {
 			//File not found, nothing to do here
 			return nil
 		}
