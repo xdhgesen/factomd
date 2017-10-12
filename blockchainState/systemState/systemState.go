@@ -13,6 +13,7 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/hybridDB"
 	"github.com/FactomProject/factomd/p2p"
+	"github.com/FactomProject/factomd/util"
 )
 
 type SystemState struct {
@@ -42,7 +43,8 @@ func (ss *SystemState) Start() {
 
 func (ss *SystemState) LoadDatabase() error {
 	levelBolt := "level"
-	path := "C:/Users/ThePiachu/.factom/m2/main-database/ldb/MAIN/factoid_level.db"
+	homedir := util.GetHomeDir()
+	path := homedir + "/.factom/m2/main-database/ldb/MAIN/factoid_level.db"
 	var dbase *hybridDB.HybridDB
 	var err error
 	if levelBolt == "bolt" {

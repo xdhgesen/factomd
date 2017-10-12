@@ -9,6 +9,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/hybridDB"
+	"github.com/FactomProject/factomd/util"
 )
 
 const level string = "level"
@@ -36,7 +37,8 @@ func main() {
 		path := os.Args[2]
 	*/
 	levelBolt := "level"
-	path := "C:/Users/ThePiachu/.factom/m2/main-database/ldb/MAIN/factoid_level.db"
+	homedir := util.GetHomeDir()
+	path := homedir + "/.factom/m2/main-database/ldb/MAIN/factoid_level.db"
 	var dbase *hybridDB.HybridDB
 	var err error
 	if levelBolt == bolt {
