@@ -11,18 +11,7 @@ import (
 )
 
 func GetSigListFromBlockSet(bs *BlockSet) *messages.SigList {
-	sl := new(messages.SigList)
-
-	abe := bs.ABlock.GetABEntries()
-	for _, v := range abe {
-		if v.Type() == constants.TYPE_DB_SIGNATURE {
-			sl.List = append(sl.List, &v.(*adminBlock.DBSignatureEntry).PrevDBSig)
-		}
-	}
-
-	sl.Length = uint32(len(sl.List))
-
-	return sl
+	return messages.ExtractSigListFromABlock(bs.ABlock)
 }
 
 func BlockSetToDBStateMsg(bs *BlockSet, sigList *messages.SigList) interfaces.IMsg {

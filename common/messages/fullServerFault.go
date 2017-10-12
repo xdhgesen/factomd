@@ -55,6 +55,21 @@ type SigList struct {
 	List   []interfaces.IFullSignature
 }
 
+func ExtractSigListFromABlock(aBlock interfaces.IAdminBlock) *SigList {
+	sl := new(SigList)
+
+	abe := aBlock.GetABEntries()
+	for _, v := range abe {
+		if v.Type() == constants.TYPE_DB_SIGNATURE {
+			sl.List = append(sl.List, &v.(*adminBlock.DBSignatureEntry).PrevDBSig)
+		}
+	}
+
+	sl.Length = uint32(len(sl.List))
+
+	return sl
+}
+
 var _ interfaces.IMsg = (*FullServerFault)(nil)
 var _ Signable = (*FullServerFault)(nil)
 

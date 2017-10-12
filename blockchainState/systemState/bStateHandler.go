@@ -117,9 +117,15 @@ func (bh *BStateHandler) LoadDatabase() error {
 	}
 
 	for i := start; i < end; i++ {
-		set := FetchBlockSet(bh.DB, i)
+		set, err := FetchBlockSet(bh.DB, i, false)
+		if err != nil {
+			return err
+		}
+		if set == nil {
+			panic("BlockSet not found!")
+		}
 
-		err := bh.MainBState.ProcessBlockSet(set.DBlock, set.ABlock, set.FBlock, set.ECBlock, set.EBlocks, set.Entries)
+		err = bh.MainBState.ProcessBlockSet(set.DBlock, set.ABlock, set.FBlock, set.ECBlock, set.EBlocks, set.Entries)
 		if err != nil {
 			return err
 		}
@@ -330,6 +336,38 @@ func (bs *BStateHandler) ProcessAckedMessage(msg interfaces.IMessageWithEntry, a
 	return bs.BlockMaker.ProcessAckedMessage(msg, ack)
 }
 
+func (bs *BStateHandler) GetDBStateMsgForHeight(height uint32) (interfaces.IMsg, error) {
+	dbHash := bs.MainBState.GetDBlockHashByHeight(height)
+	if dbHash == nil {
+		return nil, nil
+	}
+	dbHashNext := bs.MainBState.GetDBlockHashByHeight(height + 1)
+	if dbHash == nil {
+		return nil, nil
+	}
+	bSet, err := FetchBlockSetByDBHash(bs.DB, dbHash, true)
+	if err != nil {
+		return nil, err
+	}
+	aBlock, err := FetchABlockFromDBHash(bs.DB, dbHashNext)
+	if err != nil {
+		return nil, err
+	}
+	sigList := messages.ExtractSigListFromABlock(aBlock)
+
+	msg := new(messages.DBStateMsg)
+
+	msg.DirectoryBlock = bSet.DBlock
+	msg.AdminBlock = bSet.ABlock
+	msg.FactoidBlock = bSet.FBlock
+	msg.EntryCreditBlock = bSet.ECBlock
+	msg.EBlocks = bSet.EBlocks
+	msg.Entries = bSet.Entries
+	msg.SignatureList = *sigList
+
+	return msg, nil
+}
+
 type BlockSet struct {
 	ABlock  interfaces.IAdminBlock
 	ECBlock interfaces.IEntryCreditBlock
@@ -339,51 +377,73 @@ type BlockSet struct {
 	Entries []interfaces.IEBEntry
 }
 
-func FetchBlockSet(dbo interfaces.DBOverlay, index int) *BlockSet {
-	bs := new(BlockSet)
-
-	dBlock, err := dbo.FetchDBlockByHeight(uint32(index))
+func FetchABlockFromDBHash(dbo interfaces.DBOverlay, h interfaces.IHash) (interfaces.IAdminBlock, error) {
+	dBlock, err := dbo.FetchDBlock(h)
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	if dBlock == nil {
+		return nil, nil
+	}
+
+	entries := dBlock.GetDBEntries()
+	for _, entry := range entries {
+		if entry.GetChainID().String() == "000000000000000000000000000000000000000000000000000000000000000a" {
+			aBlock, err := dbo.FetchABlock(entry.GetKeyMR())
+			if err != nil {
+				return nil, err
+			}
+			return aBlock, nil
+		}
+	}
+
+	return nil, fmt.Errorf("ABlock not found in DBlock!")
+}
+
+func FetchBlockSetByDBHash(dbo interfaces.DBOverlay, h interfaces.IHash, fetchAllEntries bool) (*BlockSet, error) {
+	bs := new(BlockSet)
+	dBlock, err := dbo.FetchDBlock(h)
+	if err != nil {
+		return nil, err
+	}
+
+	if dBlock == nil {
+		return nil, nil
 	}
 	bs.DBlock = dBlock
 
-	if dBlock == nil {
-		return bs
-	}
 	entries := dBlock.GetDBEntries()
 	for _, entry := range entries {
 		switch entry.GetChainID().String() {
 		case "000000000000000000000000000000000000000000000000000000000000000a":
 			aBlock, err := dbo.FetchABlock(entry.GetKeyMR())
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			bs.ABlock = aBlock
 			break
 		case "000000000000000000000000000000000000000000000000000000000000000c":
 			ecBlock, err := dbo.FetchECBlock(entry.GetKeyMR())
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			bs.ECBlock = ecBlock
 			break
 		case "000000000000000000000000000000000000000000000000000000000000000f":
 			fBlock, err := dbo.FetchFBlock(entry.GetKeyMR())
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			bs.FBlock = fBlock
 			break
 		default:
 			eBlock, err := dbo.FetchEBlock(entry.GetKeyMR())
 			if err != nil {
-				panic(err)
+				return nil, err
 			}
 			bs.EBlocks = append(bs.EBlocks, eBlock)
 
-			//Fetching special entries
-			if blockchainState.IsSpecialBlock(eBlock.GetChainID()) {
+			if fetchAllEntries == true || blockchainState.IsSpecialBlock(eBlock.GetChainID()) {
 				for _, v := range eBlock.GetEntryHashes() {
 					if v.IsMinuteMarker() {
 						continue
@@ -399,24 +459,17 @@ func FetchBlockSet(dbo interfaces.DBOverlay, index int) *BlockSet {
 				}
 			}
 
-			/*
-				for _, v := range eBlock.GetEntryHashes() {
-					if v.IsMinuteMarker() {
-						continue
-					}
-					e, err := dbo.FetchEntry(v)
-					if err != nil {
-						panic(err)
-					}
-					if e == nil {
-						panic("Couldn't find entry " + v.String())
-					}
-					bs.Entries = append(bs.Entries, e)
-				}
-			*/
 			break
 		}
 	}
 
-	return bs
+	return bs, nil
+}
+
+func FetchBlockSet(dbo interfaces.DBOverlay, index int, fetchAllEntries bool) (*BlockSet, error) {
+	h, err := dbo.FetchDBKeyMRByHeight(uint32(index))
+	if err != nil {
+		return nil, err
+	}
+	return FetchBlockSetByDBHash(dbo, h, fetchAllEntries)
 }

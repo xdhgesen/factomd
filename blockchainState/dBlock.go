@@ -84,3 +84,10 @@ func (bs *BlockchainState) CheckDBlockEntries(dBlock interfaces.IDirectoryBlock)
 
 	return nil
 }
+
+func (bs *BlockchainState) GetDBlockHashByHeight(height uint32) interfaces.IHash {
+	if len(bs.DBlockList) >= int(height) {
+		return nil
+	}
+	return bs.DBlockList[int(height)]
+}
