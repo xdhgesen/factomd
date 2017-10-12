@@ -16,7 +16,7 @@ func TestBuildEBlocks(t *testing.T) {
 	eb.GetHeader().SetDBHeight(1)
 	bm := NewBlockMaker()
 	bm.BState.PushCommit(es[0].GetHash(), es[0].GetHash())
-	err := bm.ProcessEBEntry(es[0], 0)
+	err := bm.ProcessEBEntry(es[0], 3)
 	if err != nil {
 		t.Errorf("%v", err)
 	}
