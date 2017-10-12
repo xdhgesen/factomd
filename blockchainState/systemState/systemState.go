@@ -134,7 +134,7 @@ func (ss *SystemState) KeepDBStatesUpToDate() {
 		dbstate.Timestamp = primitives.NewTimestampNow()
 		dbstate.DBHeightStart = ss.BStateHandler.MainBState.DBlockHeight
 		dbstate.DBHeightEnd = ss.BStateHandler.HighestKnownDBlock
-		fmt.Printf("Requestind DBState - %v to %v\n", dbstate.DBHeightStart, dbstate.DBHeightEnd)
+		fmt.Printf("Requesting DBState - %v to %v\n", dbstate.DBHeightStart, dbstate.DBHeightEnd)
 
 		b, err := dbstate.MarshalBinary()
 		if err != nil {

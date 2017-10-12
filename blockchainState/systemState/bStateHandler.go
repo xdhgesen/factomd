@@ -144,14 +144,14 @@ func (bh *BStateHandler) LoadDatabase() error {
 }
 
 func (bh *BStateHandler) StartNetworkSynch() error {
-	err := bh.CopyMainBStateToblockMaker()
+	err := bh.CopyMainBStateToBlockMaker()
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (bh *BStateHandler) CopyMainBStateToblockMaker() error {
+func (bh *BStateHandler) CopyMainBStateToBlockMaker() error {
 	s, err := bh.MainBState.Clone()
 	if err != nil {
 		return err
@@ -326,8 +326,8 @@ func (bh *BStateHandler) SaveBlockSetToDB(dBlock interfaces.IDirectoryBlock, aBl
 }
 
 func (bs *BStateHandler) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack *messages.Ack) error {
-	return nil
-	//return bs.BlockMaker.ProcessAckedMessage(msg, ack)
+	//return nil
+	return bs.BlockMaker.ProcessAckedMessage(msg, ack)
 }
 
 type BlockSet struct {
