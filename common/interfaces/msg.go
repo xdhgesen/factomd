@@ -120,6 +120,11 @@ type IMsg interface {
 	GetResendTime() Timestamp
 	SetExpireTime(t Timestamp)
 	GetExpireTime() Timestamp
+
+	GetDestinationPeer() string
+	SetDestinationPeer(s string)
+	GetSourcePeer() string
+	SetSourcePeer(s string)
 }
 
 type IMessageWithEntry interface {

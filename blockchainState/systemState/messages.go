@@ -243,6 +243,7 @@ func (ss *SystemState) ProcessDBStateMissingMessage(msg interfaces.IMsg) error {
 		if err != nil {
 			return err
 		}
+		dbStateMsg.SetDestinationPeer(msg.GetSourcePeer())
 		ss.OutMsgQueue <- dbStateMsg
 	}
 

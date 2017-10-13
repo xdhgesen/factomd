@@ -89,6 +89,7 @@ func (ss *SystemState) StartNetworkSynch() error {
 	ss.P2PNetwork = new(p2p.Controller).Init(ci)
 	ss.P2PNetwork.StartNetwork()
 
+	go ss.HandleOutQueue()
 	go ss.KeepDBStatesUpToDate()
 
 	for {
@@ -98,6 +99,7 @@ func (ss *SystemState) StartNetworkSynch() error {
 		if err != nil {
 			panic(err)
 		}
+		msg.SetSourcePeer(msg.GetNetworkOrigin())
 		//fmt.Printf("%v\n", msg.String())
 		err = ss.ProcessMessage(msg)
 		if err != nil {
@@ -141,13 +143,22 @@ func (ss *SystemState) KeepDBStatesUpToDate() {
 		dbstate.DBHeightEnd = ss.BStateHandler.HighestKnownDBlock
 		fmt.Printf("Requesting DBState - %v to %v\n", dbstate.DBHeightStart, dbstate.DBHeightEnd)
 
-		b, err := dbstate.MarshalBinary()
+		dbstate.SetDestinationPeer(p2p.RandomPeerFlag)
+		ss.OutMsgQueue <- dbstate
+	}
+}
+
+func (ss *SystemState) HandleOutQueue() {
+	for {
+		msg := <-ss.OutMsgQueue
+
+		b, err := msg.MarshalBinary()
 		if err != nil {
 			panic(err)
 		}
 
 		parcel := p2p.NewParcel(p2p.MainNet, b)
-		parcel.Header.TargetPeer = p2p.RandomPeerFlag
+		parcel.Header.TargetPeer = msg.GetDestinationPeer()
 
 		ss.P2PNetwork.ToNetwork <- *parcel
 	}

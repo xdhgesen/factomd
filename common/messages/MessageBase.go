@@ -37,6 +37,26 @@ type MessageBase struct {
 	Stalled     bool // This message is currently stalled
 	MarkInvalid bool
 	Sigvalid    bool
+
+	//BlockchainState variables
+	SourcePeer      string
+	DestinationPeer string
+}
+
+func (m *MessageBase) GetDestinationPeer() string {
+	return m.DestinationPeer
+}
+
+func (m *MessageBase) SetDestinationPeer(s string) {
+	m.DestinationPeer = s
+}
+
+func (m *MessageBase) GetSourcePeer() string {
+	return m.SourcePeer
+}
+
+func (m *MessageBase) SetSourcePeer(s string) {
+	m.SourcePeer = s
 }
 
 func (m *MessageBase) SetResendTime(t interfaces.Timestamp) {
