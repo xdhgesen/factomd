@@ -5,11 +5,13 @@
 package messages
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -101,14 +103,6 @@ func (m *InvalidDirectoryBlock) Type() byte {
 	return constants.INVALID_DIRECTORY_BLOCK_MSG
 }
 
-func (m *InvalidDirectoryBlock) Int() int {
-	return -1
-}
-
-func (m *InvalidDirectoryBlock) Bytes() []byte {
-	return nil
-}
-
 func (m *InvalidDirectoryBlock) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -180,6 +174,10 @@ func (m *InvalidDirectoryBlock) String() string {
 	return "Invalid Directory Block"
 }
 
+func (m *InvalidDirectoryBlock) LogFields() log.Fields {
+	return log.Fields{}
+}
+
 func (m *InvalidDirectoryBlock) DBHeight() int {
 	return 0
 }
@@ -207,7 +205,6 @@ func (m *InvalidDirectoryBlock) Validate(state interfaces.IState) int {
 // Returns true if this is a message for this server to execute as
 // a leader.
 func (m *InvalidDirectoryBlock) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -223,8 +220,4 @@ func (e *InvalidDirectoryBlock) JSONByte() ([]byte, error) {
 
 func (e *InvalidDirectoryBlock) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *InvalidDirectoryBlock) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }

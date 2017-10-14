@@ -5,8 +5,6 @@
 package directoryBlock
 
 import (
-	"bytes"
-	"encoding/binary"
 	"encoding/json"
 	"fmt"
 
@@ -17,21 +15,76 @@ import (
 var _ = fmt.Print
 
 type DBlockHeader struct {
-	Version   byte
-	NetworkID uint32
+	Version   byte   `json:"version"`
+	NetworkID uint32 `json:"networkid"`
 
-	BodyMR       interfaces.IHash
-	PrevKeyMR    interfaces.IHash
-	PrevFullHash interfaces.IHash
+	BodyMR       interfaces.IHash `json:"bodymr"`
+	PrevKeyMR    interfaces.IHash `json:"prevkeymr"`
+	PrevFullHash interfaces.IHash `json:"prevfullhash"`
 
-	Timestamp  uint32 //in minutes
-	DBHeight   uint32
-	BlockCount uint32
+	Timestamp  uint32 `json:"timestamp"` //in minutes
+	DBHeight   uint32 `json:"dbheight"`
+	BlockCount uint32 `json:"blockcount"`
 }
 
 var _ interfaces.Printable = (*DBlockHeader)(nil)
 var _ interfaces.BinaryMarshallable = (*DBlockHeader)(nil)
 var _ interfaces.IDirectoryBlockHeader = (*DBlockHeader)(nil)
+
+func (h *DBlockHeader) Init() {
+	if h.BodyMR == nil {
+		h.BodyMR = primitives.NewZeroHash()
+	}
+	if h.PrevKeyMR == nil {
+		h.PrevKeyMR = primitives.NewZeroHash()
+	}
+	if h.PrevFullHash == nil {
+		h.PrevFullHash = primitives.NewZeroHash()
+	}
+}
+
+func (a *DBlockHeader) IsSameAs(b interfaces.IDirectoryBlockHeader) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+
+	bb, ok := b.(*DBlockHeader)
+	if ok == false {
+		return false
+	}
+
+	if a.Version != bb.Version {
+		return false
+	}
+	if a.NetworkID != bb.NetworkID {
+		return false
+	}
+
+	if a.BodyMR.IsSameAs(bb.BodyMR) == false {
+		return false
+	}
+	if a.PrevKeyMR.IsSameAs(bb.PrevKeyMR) == false {
+		return false
+	}
+	if a.PrevFullHash.IsSameAs(bb.PrevFullHash) == false {
+		return false
+	}
+
+	if a.Timestamp != bb.Timestamp {
+		return false
+	}
+	if a.DBHeight != bb.DBHeight {
+		return false
+	}
+	if a.BlockCount != bb.BlockCount {
+		return false
+	}
+
+	return true
+}
 
 func (h *DBlockHeader) GetVersion() byte {
 	return h.Version
@@ -105,54 +158,58 @@ func (e *DBlockHeader) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *DBlockHeader) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (e *DBlockHeader) String() string {
+	e.Init()
 	var out primitives.Buffer
-	out.WriteString(fmt.Sprintf("  Version:         %v\n", e.Version))
-	out.WriteString(fmt.Sprintf("  NetworkID:       %x\n", e.NetworkID))
-	out.WriteString(fmt.Sprintf("  BodyMR:          %s\n", e.BodyMR.String()))
-	out.WriteString(fmt.Sprintf("  PrevKeyMR:       %s\n", e.PrevKeyMR.String()))
-	out.WriteString(fmt.Sprintf("  PrevFullHash:    %s\n", e.PrevFullHash.String()))
-	out.WriteString(fmt.Sprintf("  Timestamp:       %d\n", e.Timestamp))
-	out.WriteString(fmt.Sprintf("  Timestamp Str:   %s\n", e.GetTimestamp().String()))
-	out.WriteString(fmt.Sprintf("  DBHeight:        %d\n", e.DBHeight))
-	out.WriteString(fmt.Sprintf("  BlockCount:      %d\n", e.BlockCount))
+	out.WriteString(fmt.Sprintf("  version:         %v\n", e.Version))
+	out.WriteString(fmt.Sprintf("  networkid:       %x\n", e.NetworkID))
+	out.WriteString(fmt.Sprintf("  bodymr:          %s\n", e.BodyMR.String()))
+	out.WriteString(fmt.Sprintf("  prevkeymr:       %s\n", e.PrevKeyMR.String()))
+	out.WriteString(fmt.Sprintf("  prevfullhash:    %s\n", e.PrevFullHash.String()))
+	out.WriteString(fmt.Sprintf("  timestamp:       %d\n", e.Timestamp))
+	out.WriteString(fmt.Sprintf("  timestamp str:   %s\n", e.GetTimestamp().String()))
+	out.WriteString(fmt.Sprintf("  dbheight:        %d\n", e.DBHeight))
+	out.WriteString(fmt.Sprintf("  blockcount:      %d\n", e.BlockCount))
 
 	return (string)(out.DeepCopyBytes())
 }
 
 func (b *DBlockHeader) MarshalBinary() ([]byte, error) {
-	var buf primitives.Buffer
+	b.Init()
+	buf := primitives.NewBuffer(nil)
 
-	buf.WriteByte(b.Version)
-	binary.Write(&buf, binary.BigEndian, b.NetworkID)
-
-	data, err := b.BodyMR.MarshalBinary()
+	err := buf.PushByte(b.Version)
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
-
-	data, err = b.PrevKeyMR.MarshalBinary()
+	err = buf.PushUInt32(b.NetworkID)
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
-
-	data, err = b.PrevFullHash.MarshalBinary()
+	err = buf.PushBinaryMarshallable(b.BodyMR)
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
-
-	binary.Write(&buf, binary.BigEndian, b.Timestamp)
-
-	binary.Write(&buf, binary.BigEndian, b.DBHeight)
-
-	binary.Write(&buf, binary.BigEndian, b.BlockCount)
+	err = buf.PushBinaryMarshallable(b.PrevKeyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(b.PrevFullHash)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushUInt32(b.Timestamp)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushUInt32(b.DBHeight)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushUInt32(b.BlockCount)
+	if err != nil {
+		return nil, err
+	}
 
 	if b.BlockCount > 100000 {
 		panic("Send: Blockcount too great in directory block")
@@ -161,46 +218,53 @@ func (b *DBlockHeader) MarshalBinary() ([]byte, error) {
 	return buf.DeepCopyBytes(), err
 }
 
-func (b *DBlockHeader) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling Directory Block Header: %v", r)
-		}
-	}()
+func (b *DBlockHeader) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
+	var err error
 
-	//	fmt.Printf("Unmarshal %x\n",data[:113])
-
-	newData = data
-	b.Version, newData = newData[0], newData[1:]
-
-	b.NetworkID, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
+	b.Version, err = buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
+	b.NetworkID, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
 
 	b.BodyMR = new(primitives.Hash)
-	newData, err = b.BodyMR.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(b.BodyMR)
 	if err != nil {
-		return
+		return nil, err
 	}
-
 	b.PrevKeyMR = new(primitives.Hash)
-	newData, err = b.PrevKeyMR.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(b.PrevKeyMR)
 	if err != nil {
-		return
+		return nil, err
 	}
-
 	b.PrevFullHash = new(primitives.Hash)
-	newData, err = b.PrevFullHash.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(b.PrevFullHash)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	b.Timestamp, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
-	b.DBHeight, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
-	b.BlockCount, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
+	b.Timestamp, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
+	b.DBHeight, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
+	b.BlockCount, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
 
 	if b.BlockCount > 100000 {
 		panic("Receive: Blockcount too great in directory block" + fmt.Sprintf(":::: %d", b.BlockCount))
 	}
-	return
+
+	return buf.DeepCopyBytes(), nil
 }
 
 func (b *DBlockHeader) UnmarshalBinary(data []byte) (err error) {
@@ -213,7 +277,7 @@ type ExpandedDBlockHeader DBlockHeader
 func (e DBlockHeader) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		ExpandedDBlockHeader
-		ChainID string
+		ChainID string `json:"chainid"`
 	}{
 		ExpandedDBlockHeader: ExpandedDBlockHeader(e),
 		ChainID:              "000000000000000000000000000000000000000000000000000000000000000d",
@@ -226,6 +290,7 @@ func (e DBlockHeader) MarshalJSON() ([]byte, error) {
 
 func NewDBlockHeader() *DBlockHeader {
 	d := new(DBlockHeader)
+
 	d.BodyMR = primitives.NewZeroHash()
 	d.PrevKeyMR = primitives.NewZeroHash()
 	d.PrevFullHash = primitives.NewZeroHash()

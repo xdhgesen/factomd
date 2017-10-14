@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"runtime/debug"
 	"strconv"
 	"strings"
 
@@ -22,7 +21,6 @@ import (
  ********************************/
 
 func AddCommas(v int64) (ret string) {
-
 	pos := true
 	if v < 0 {
 		pos = false
@@ -90,61 +88,6 @@ func WriteNumber8(out *Buffer, num uint8) {
 	str := hex.EncodeToString(buf.DeepCopyBytes())
 	out.WriteString(str)
 
-}
-
-/**************************************
- * Printing Helper Functions for debugging
- **************************************/
-
-func PrtStk() {
-	Prtln()
-	debug.PrintStack()
-}
-
-func Prt(a ...interface{}) {
-	fmt.Print(a...)
-}
-
-func Prtln(a ...interface{}) {
-	fmt.Println(a...)
-}
-
-func PrtData(data []byte) {
-	if data == nil || len(data) == 0 {
-		fmt.Print("No Data Here")
-	} else {
-		var nl string = "\n"
-		for i, b := range data {
-			fmt.Print(nl)
-			nl = ""
-			fmt.Printf("%2.2X ", int(b))
-			if i%32 == 31 {
-				nl = "\n"
-			} else if i%8 == 7 {
-				fmt.Print(" | ")
-			}
-		}
-	}
-}
-func PrtDataL(title string, data []byte) {
-	fmt.Println()
-	fmt.Println(title)
-	fmt.Print("========================-+-========================-+-========================-+-========================")
-	PrtData(data)
-	fmt.Println("\n========================-+-========================-+-========================-+-========================")
-}
-
-// Does a new line, then indents as specified. DON'T end
-// a Print with a CR!
-func CR(level int) {
-	Prtln()
-	PrtIndent(level)
-}
-
-func PrtIndent(level int) {
-	for i := 0; i < level && i < 10; i++ { // Indent up to 10 levels.
-		Prt("    ") //   by printing leading spaces
-	}
 }
 
 /************************************************
@@ -270,6 +213,9 @@ func ConvertAddressToUser(prefix []byte, addr interfaces.IAddress) []byte {
 
 // Convert Factoid Addresses
 func ConvertFctAddressToUserStr(addr interfaces.IAddress) string {
+	//NOTE: This converts the final hash into user-readable string, NOT the public key!
+	//In practical terms, you'll need to convert the public key into RCD,
+	//then hash it before using this function!
 	userd := ConvertAddressToUser(FactoidPrefix, addr)
 	return base58.Encode(userd)
 }
@@ -301,19 +247,26 @@ func ConvertECPrivateToUserStr(addr interfaces.IAddress) string {
 // Returns false if the checksum is wrong.
 //
 func validateUserStr(prefix []byte, userFAddr string) bool {
+
 	if len(userFAddr) != 52 {
 		return false
-
 	}
+
 	v := base58.Decode(userFAddr)
+	if len(v) < 3 {
+		return false
+	}
+
 	if bytes.Compare(prefix, v[:2]) != 0 {
 		return false
 
 	}
+
 	sha256d := Sha(Sha(v[:34]).Bytes()).Bytes()
 	if bytes.Compare(sha256d[:4], v[34:]) != 0 {
 		return false
 	}
+
 	return true
 }
 

@@ -5,9 +5,10 @@
 package factoid
 
 import (
-	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
+
 	"github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -27,17 +28,13 @@ type RCD_1 struct {
 
 var _ interfaces.IRCD = (*RCD_1)(nil)
 
-/*************************************
- *       Stubs
- *************************************/
-
-func (b RCD_1) GetHash() interfaces.IHash {
-	return nil
-}
-
 /***************************************
  *       Methods
  ***************************************/
+
+func (b RCD_1) IsSameAs(rcd interfaces.IRCD) bool {
+	return b.String() == rcd.String()
+}
 
 func (b RCD_1) UnmarshalBinary(data []byte) error {
 	_, err := b.UnmarshalBinaryData(data)
@@ -52,8 +49,9 @@ func (e *RCD_1) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *RCD_1) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
+// MarshalJSON will prepend the RCD type
+func (e *RCD_1) MarshalJSON() ([]byte, error) {
+	return json.Marshal(fmt.Sprintf("%x", append([]byte{0x01}, e.PublicKey[:]...)))
 }
 
 func (b RCD_1) String() string {
@@ -113,19 +111,10 @@ func (w1 RCD_1) NumberOfSignatures() int {
 	return 1
 }
 
-func (a1 *RCD_1) IsEqual(addr interfaces.IBlock) []interfaces.IBlock {
-	a2, ok := addr.(*RCD_1)
-
-	if !ok || a1.PublicKey != a2.PublicKey { // Not the right object or sigature
-		r := make([]interfaces.IBlock, 0, 5)
-		return append(r, a1)
-	}
-
-	return nil
-}
-
 func (t *RCD_1) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-
+	if data == nil || len(data) < 1+constants.ADDRESS_LENGTH {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	typ := int8(data[0])
 	data = data[1:]
 

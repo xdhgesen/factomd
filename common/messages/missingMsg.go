@@ -5,13 +5,14 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //Structure to request missing messages in a node's process list
@@ -98,14 +99,6 @@ func (m *MissingMsg) Type() byte {
 	return constants.MISSING_MSG
 }
 
-func (m *MissingMsg) Int() int {
-	return -1
-}
-
-func (m *MissingMsg) Bytes() []byte {
-	return nil
-}
-
 func (m *MissingMsg) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -144,7 +137,7 @@ func (m *MissingMsg) UnmarshalBinaryData(data []byte) (newData []byte, err error
 
 	m.Peer2Peer = true // Always a peer2peer request.
 
-	return data, nil
+	return
 }
 
 func (m *MissingMsg) UnmarshalBinary(data []byte) error {
@@ -201,6 +194,15 @@ func (m *MissingMsg) String() string {
 		m.GetMsgHash().Bytes()[:3])
 }
 
+func (m *MissingMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "missingmsg",
+		"vm":        m.VMIndex,
+		"dbheight":  m.DBHeight,
+		"asking":    m.Asking.String()[:8],
+		"sysheight": m.SystemHeight,
+		"hash":      m.GetMsgHash().String()[:6]}
+}
+
 func (m *MissingMsg) ChainID() []byte {
 	return nil
 }
@@ -224,7 +226,6 @@ func (m *MissingMsg) Validate(state interfaces.IState) int {
 }
 
 func (m *MissingMsg) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 func (m *MissingMsg) LeaderExecute(state interfaces.IState) {
@@ -243,10 +244,6 @@ func (e *MissingMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *MissingMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 // AddHeight: Add a Missing Message Height to the request
 func (e *MissingMsg) AddHeight(h uint32) {
 	e.ProcessListHeight = append(e.ProcessListHeight, h)
@@ -254,7 +251,6 @@ func (e *MissingMsg) AddHeight(h uint32) {
 
 // NewMissingMsg: Build a missing Message request, and add the first Height
 func NewMissingMsg(state interfaces.IState, vm int, dbHeight uint32, processlistHeight uint32) *MissingMsg {
-
 	msg := new(MissingMsg)
 
 	msg.Asking = state.GetIdentityChainID()

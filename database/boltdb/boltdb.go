@@ -85,7 +85,6 @@ func (db *BoltDB) Delete(bucket []byte, key []byte) error {
 
 // Can't trim a real database
 func (db *BoltDB) Trim() {
-
 }
 
 func (db *BoltDB) Close() error {
@@ -267,4 +266,27 @@ func (db *BoltDB) Init(bucketList [][]byte, filename string) {
 			return nil
 		})
 	}
+}
+
+func (db *BoltDB) DoesKeyExist(bucket, key []byte) (bool, error) {
+	db.Sem.RLock()
+	defer db.Sem.RUnlock()
+
+	var v []byte
+	db.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(bucket)
+		if b == nil {
+			return nil
+		}
+		v = b.Get(key)
+		if v == nil {
+			return nil
+		}
+		return nil
+	})
+	if v == nil { // If the value is undefined, return nil
+		return false, nil
+	}
+
+	return true, nil
 }

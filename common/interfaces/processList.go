@@ -12,7 +12,7 @@ type IProcessList interface {
 	SortFedServers()
 	SortAuditServers()
 	SortDBSigs()
-	FedServerFor(minute int, hash []byte) IFctServer
+	FedServerFor(minute int, hash []byte) IServer
 	GetVirtualServers(minute int, identityChainID IHash) (found bool, index int)
 	GetFedServerIndexHash(identityChainID IHash) (bool, int)
 	GetAuditServerIndexHash(identityChainID IHash) (bool, int)
@@ -37,8 +37,6 @@ type IProcessList interface {
 	ResetDiffSigTally()
 	IncrementDiffSigTally()
 	CheckDiffSigTally() bool
-	//GetRequest(now int64, vmIndex int, height int, waitSeconds int64) IRequest
-	AskDBState(vmIndex int, height int) int
 	Ask(vmIndex int, height int, waitSeconds int64, tag int) int
 	TrimVMList(height uint32, vmIndex int)
 	//Process(state IState) (progress bool)
@@ -47,6 +45,7 @@ type IProcessList interface {
 	ContainsDBSig(serverID IHash) bool
 	AddDBSig(serverID IHash, sig IFullSignature)
 	String() string
+	IsPendingChainHead(chainID IHash) bool
 }
 
 type IRequest interface {

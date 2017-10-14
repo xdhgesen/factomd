@@ -1,7 +1,6 @@
 package adminBlock
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -10,13 +9,22 @@ import (
 )
 
 type RevealMatryoshkaHash struct {
-	IdentityChainID interfaces.IHash
-	MHash           interfaces.IHash
+	IdentityChainID interfaces.IHash `json:"identitychainid"`
+	MHash           interfaces.IHash `json:"mhash"`
 }
 
 var _ interfaces.Printable = (*RevealMatryoshkaHash)(nil)
 var _ interfaces.BinaryMarshallable = (*RevealMatryoshkaHash)(nil)
 var _ interfaces.IABEntry = (*RevealMatryoshkaHash)(nil)
+
+func (e *RevealMatryoshkaHash) Init() {
+	if e.IdentityChainID == nil {
+		e.IdentityChainID = primitives.NewZeroHash()
+	}
+	if e.MHash == nil {
+		e.MHash = primitives.NewZeroHash()
+	}
+}
 
 func (m *RevealMatryoshkaHash) Type() byte {
 	return constants.TYPE_REVEAL_MATRYOSHKA
@@ -30,44 +38,52 @@ func NewRevealMatryoshkaHash(identityChainID interfaces.IHash, mHash interfaces.
 }
 
 func (c *RevealMatryoshkaHash) UpdateState(state interfaces.IState) error {
-
+	c.Init()
 	return nil
 }
 
-func (e *RevealMatryoshkaHash) MarshalBinary() (data []byte, err error) {
+func (e *RevealMatryoshkaHash) MarshalBinary() ([]byte, error) {
+	e.Init()
 	var buf primitives.Buffer
 
-	buf.Write([]byte{e.Type()})
-	buf.Write(e.IdentityChainID.Bytes())
-	buf.Write(e.MHash.Bytes())
+	err := buf.PushByte(e.Type())
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.IdentityChainID)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.MHash)
+	if err != nil {
+		return nil, err
+	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
 func (e *RevealMatryoshkaHash) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling Reveal Matryoshka Hash: %v", r)
-		}
-	}()
-	newData = data
-	if newData[0] != e.Type() {
+	buf := primitives.NewBuffer(data)
+	b, err := buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
+	if b != e.Type() {
 		return nil, fmt.Errorf("Invalid Entry type")
 	}
 
-	newData = newData[1:]
 	e.IdentityChainID = new(primitives.Hash)
-	newData, err = e.IdentityChainID.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(e.IdentityChainID)
 	if err != nil {
-		return
+		return nil, err
 	}
 	e.MHash = new(primitives.Hash)
-	newData, err = e.MHash.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(e.MHash)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (e *RevealMatryoshkaHash) UnmarshalBinary(data []byte) (err error) {
@@ -83,11 +99,8 @@ func (e *RevealMatryoshkaHash) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *RevealMatryoshkaHash) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (e *RevealMatryoshkaHash) String() string {
+	e.Init()
 	str := fmt.Sprintf("    E: %35s -- %17s %8x %12s %x",
 		"RevealMatryoshkaHash",
 		"IdentityChainID", e.IdentityChainID.Bytes()[3:5],

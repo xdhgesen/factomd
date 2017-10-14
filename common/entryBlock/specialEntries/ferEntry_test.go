@@ -1,3 +1,7 @@
+// Copyright 2017 Factom Foundation
+// Use of this source code is governed by the MIT
+// license that can be found in the LICENSE file.
+
 package specialEntries_test
 
 import (
@@ -7,6 +11,25 @@ import (
 	//"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/common/entryBlock/specialEntries"
 )
+
+func TestUnmarshalNilFEREntry(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
+
+	a := new(FEREntry)
+	err := a.UnmarshalBinary(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	err = a.UnmarshalBinary([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
 
 func TestMarshalUnmarshalFEREntry(t *testing.T) {
 	fe := new(FEREntry)

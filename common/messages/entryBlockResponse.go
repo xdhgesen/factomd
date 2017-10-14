@@ -5,8 +5,6 @@
 package messages
 
 import (
-	"bytes"
-	//	"encoding/binary"
 	"encoding/binary"
 	"fmt"
 
@@ -14,6 +12,8 @@ import (
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //Requests entry blocks from a range of DBlocks
@@ -82,14 +82,6 @@ func (m *EntryBlockResponse) Type() byte {
 	return constants.ENTRY_BLOCK_RESPONSE
 }
 
-func (m *EntryBlockResponse) Int() int {
-	return -1
-}
-
-func (m *EntryBlockResponse) Bytes() []byte {
-	return nil
-}
-
 func (m *EntryBlockResponse) GetTimestamp() interfaces.Timestamp {
 	return m.Timestamp
 }
@@ -110,7 +102,6 @@ func (m *EntryBlockResponse) Validate(state interfaces.IState) int {
 }
 
 func (m *EntryBlockResponse) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -119,18 +110,29 @@ func (m *EntryBlockResponse) LeaderExecute(state interfaces.IState) {
 }
 
 func (m *EntryBlockResponse) FollowerExecute(state interfaces.IState) {
-	if len(state.NetworkOutMsgQueue()) > 1000 {
+	if state.NetworkOutMsgQueue().Length() > 1000 {
 		return
 	}
 
 	db := state.GetAndLockDB()
 	defer state.UnlockDB()
 
+	db.StartMultiBatch()
 	for _, v := range m.EBlocks {
-		db.ProcessEBlockBatchWithoutHead(v, true)
+		err := db.ProcessEBlockMultiBatchWithoutHead(v, true)
+		if err != nil {
+			panic(err)
+		}
 	}
 	for _, v := range m.Entries {
-		db.InsertEntry(v)
+		err := db.InsertEntryMultiBatch(v)
+		if err != nil {
+			panic(err)
+		}
+	}
+	err := db.ExecuteMultiBatch()
+	if err != nil {
+		panic(err)
 	}
 
 	return
@@ -147,10 +149,6 @@ func (e *EntryBlockResponse) JSONByte() ([]byte, error) {
 
 func (e *EntryBlockResponse) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *EntryBlockResponse) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *EntryBlockResponse) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
@@ -240,6 +238,11 @@ func (m *EntryBlockResponse) MarshalForSignature() ([]byte, error) {
 
 func (m *EntryBlockResponse) MarshalBinary() ([]byte, error) {
 	return m.MarshalForSignature()
+}
+
+func (m *EntryBlockResponse) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "entryblockresponse",
+		"hash": m.GetMsgHash().String()[:6]}
 }
 
 func (m *EntryBlockResponse) String() string {

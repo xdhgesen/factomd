@@ -7,13 +7,18 @@ package messages
 //https://docs.google.com/spreadsheets/d/1wy9JDEqyM2uRYhZ6Y1e9C3hIDm2prIILebztQ5BGlr8/edit#gid=1997221100
 
 import (
-	"fmt"
-
 	"errors"
+	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+
+	log "github.com/FactomProject/logrus"
 )
+
+// packageLogger is the general logger for all message related logs. You can add additional fields,
+// or create more context loggers off of this
+var packageLogger = log.WithFields(log.Fields{"package": "messages"})
 
 func UnmarshalMessage(data []byte) (interfaces.IMsg, error) {
 	_, msg, err := UnmarshalMessageData(data)

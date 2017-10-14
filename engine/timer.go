@@ -15,7 +15,6 @@ import (
 var _ = (*s.State)(nil)
 
 func Timer(state interfaces.IState) {
-
 	time.Sleep(2 * time.Second)
 
 	billion := int64(1000000000)
@@ -35,7 +34,6 @@ func Timer(state interfaces.IState) {
 	time.Sleep(time.Duration(wait))
 
 	for {
-
 		for i := 0; i < 10; i++ {
 			// Don't stuff messages into the system if the
 			// Leader is behind.
@@ -55,7 +53,7 @@ func Timer(state interfaces.IState) {
 				next += tenthPeriod
 			}
 			time.Sleep(time.Duration(wait))
-			for len(state.InMsgQueue()) > 5000 {
+			for state.InMsgQueue().Length() > 5000 {
 				time.Sleep(100 * time.Millisecond)
 			}
 
@@ -72,7 +70,6 @@ func Timer(state interfaces.IState) {
 }
 
 func PrintBusy(state interfaces.IState, i int) {
-
 	s := state.(*s.State)
 
 	if len(s.ShutdownChan) == 0 {

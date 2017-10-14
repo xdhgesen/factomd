@@ -7,6 +7,7 @@ package primitives
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -24,6 +25,10 @@ func GetTime() uint64 {
 type Timestamp uint64 //in miliseconds
 var _ interfaces.BinaryMarshallable = (*Timestamp)(nil)
 var _ interfaces.Timestamp = (*Timestamp)(nil)
+
+func (a *Timestamp) IsSameAs(b interfaces.Timestamp) bool {
+	return a.GetTimeMilliUInt64() == b.GetTimeMilliUInt64()
+}
 
 func NewTimestampNow() *Timestamp {
 	t := new(Timestamp)
@@ -77,6 +82,9 @@ func (t *Timestamp) GetTime() time.Time {
 }
 
 func (t *Timestamp) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
+	if data == nil || len(data) < 6 {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	hd, data := binary.BigEndian.Uint32(data[:]), data[4:]
 	ld, data := binary.BigEndian.Uint16(data[:]), data[2:]
 	*t = Timestamp((uint64(hd) << 16) + uint64(ld))
@@ -119,4 +127,8 @@ func (t *Timestamp) MarshalBinary() ([]byte, error) {
 
 func (t *Timestamp) String() string {
 	return t.GetTime().Format("2006-01-02 15:04:05")
+}
+
+func (t *Timestamp) UTCString() string {
+	return t.GetTime().UTC().Format("2006-01-02 15:04:05")
 }

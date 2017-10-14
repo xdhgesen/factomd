@@ -5,12 +5,14 @@
 package messages
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -45,7 +47,6 @@ func (m *FactoidTransaction) GetRepeatHash() interfaces.IHash {
 }
 
 func (m *FactoidTransaction) GetHash() interfaces.IHash {
-
 	if m.hash == nil {
 		m.SetFullMsgHash(m.Transaction.GetFullHash())
 
@@ -141,14 +142,6 @@ func (m *FactoidTransaction) Process(dbheight uint32, state interfaces.IState) b
 
 }
 
-func (m *FactoidTransaction) Int() int {
-	return -1
-}
-
-func (m *FactoidTransaction) Bytes() []byte {
-	return nil
-}
-
 func (m *FactoidTransaction) UnmarshalTransData(datax []byte) (newData []byte, err error) {
 	newData = datax
 	defer func() {
@@ -165,7 +158,6 @@ func (m *FactoidTransaction) UnmarshalTransData(datax []byte) (newData []byte, e
 }
 
 func (m *FactoidTransaction) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-
 	newData = data
 
 	defer func() {
@@ -208,14 +200,17 @@ func (m *FactoidTransaction) String() string {
 		m.GetHash().Bytes()[:3])
 }
 
+func (m *FactoidTransaction) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "factoidtx",
+		"vm":      m.VMIndex,
+		"chainid": m.GetLeaderChainID().String()[4:12],
+		"hash":    m.GetHash().String()[:6]}
+}
+
 func (e *FactoidTransaction) JSONByte() ([]byte, error) {
 	return primitives.EncodeJSON(e)
 }
 
 func (e *FactoidTransaction) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *FactoidTransaction) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }

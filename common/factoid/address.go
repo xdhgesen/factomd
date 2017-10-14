@@ -13,28 +13,21 @@ package factoid
 
 import (
 	"encoding/hex"
-	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
-var _ = fmt.Println
-
 type Address struct {
-	primitives.Hash // Since Hash implements interfaces.IHash, and interfaces.IAddress is just a
-} // alais for interfaces.IHash, then I don't have to (nor can I) make
-// Address implement interfaces.IAddress... Weird, but that's the way it is.
+	primitives.Hash
+}
 
 var _ interfaces.IAddress = (*Address)(nil)
 
-/*
-func (b *Address) String() string {
-	txt, err := b.CustomMarshalText()
-	if err != nil {
-		return "<error>"
-	}
-	return string(txt)
-}*/
+func RandomAddress() interfaces.IAddress {
+	h := primitives.RandomHash()
+	return CreateAddress(h)
+}
 
 func (a *Address) CustomMarshalText() (text []byte, err error) {
 	var out primitives.Buffer
@@ -51,5 +44,8 @@ func NewAddress(b []byte) interfaces.IAddress {
 }
 
 func CreateAddress(hash interfaces.IHash) interfaces.IAddress {
+	if hash == nil {
+		return NewAddress(nil)
+	}
 	return NewAddress(hash.Bytes())
 }

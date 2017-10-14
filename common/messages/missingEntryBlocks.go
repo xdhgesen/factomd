@@ -5,14 +5,14 @@
 package messages
 
 import (
-	"bytes"
-	//	"encoding/binary"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //Requests entry blocks from a range of DBlocks
@@ -69,14 +69,6 @@ func (m *MissingEntryBlocks) Type() byte {
 	return constants.MISSING_ENTRY_BLOCKS
 }
 
-func (m *MissingEntryBlocks) Int() int {
-	return -1
-}
-
-func (m *MissingEntryBlocks) Bytes() []byte {
-	return nil
-}
-
 func (m *MissingEntryBlocks) GetTimestamp() interfaces.Timestamp {
 	return m.Timestamp
 }
@@ -93,7 +85,6 @@ func (m *MissingEntryBlocks) Validate(state interfaces.IState) int {
 }
 
 func (m *MissingEntryBlocks) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -102,7 +93,7 @@ func (m *MissingEntryBlocks) LeaderExecute(state interfaces.IState) {
 }
 
 func (m *MissingEntryBlocks) FollowerExecute(state interfaces.IState) {
-	if len(state.NetworkOutMsgQueue()) > 1000 {
+	if state.NetworkOutMsgQueue().Length() > 1000 {
 		return
 	}
 	start := m.DBHeightStart
@@ -163,10 +154,6 @@ func (e *MissingEntryBlocks) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *MissingEntryBlocks) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (m *MissingEntryBlocks) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -222,6 +209,12 @@ func (m *MissingEntryBlocks) MarshalBinary() ([]byte, error) {
 
 func (m *MissingEntryBlocks) String() string {
 	return fmt.Sprintf("MissingEntryBlocks: %d-%d", m.DBHeightStart, m.DBHeightEnd)
+}
+
+func (m *MissingEntryBlocks) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "missingentryblocks",
+		"dbheightstart": m.DBHeightStart,
+		"dbheightend":   m.DBHeightEnd}
 }
 
 func NewMissingEntryBlocks(state interfaces.IState, dbheightStart uint32, dbheightEnd uint32) interfaces.IMsg {

@@ -5,13 +5,15 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -30,7 +32,10 @@ var _ interfaces.IMsg = (*CommitChainMsg)(nil)
 var _ Signable = (*CommitChainMsg)(nil)
 
 func (a *CommitChainMsg) IsSameAs(b *CommitChainMsg) bool {
-	if b == nil {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
 		return false
 	}
 
@@ -94,14 +99,6 @@ func (m *CommitChainMsg) Type() byte {
 	return constants.COMMIT_CHAIN_MSG
 }
 
-func (m *CommitChainMsg) Int() int {
-	return -1
-}
-
-func (m *CommitChainMsg) Bytes() []byte {
-	return nil
-}
-
 // Validate the message, given the state.  Three possible results:
 //  < 0 -- Message is invalid.  Discard
 //  0   -- Cannot tell if message is Valid
@@ -115,7 +112,7 @@ func (m *CommitChainMsg) Validate(state interfaces.IState) int {
 	ebal := state.GetFactoidState().GetECBalance(*m.CommitChain.ECPubKey)
 	v := int(ebal) - int(m.CommitChain.Credits)
 	if v < 0 {
-		return -1
+		return 0
 	}
 
 	return 1
@@ -146,10 +143,6 @@ func (e *CommitChainMsg) JSONByte() ([]byte, error) {
 
 func (e *CommitChainMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *CommitChainMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *CommitChainMsg) Sign(key interfaces.Signer) error {
@@ -245,4 +238,11 @@ func (m *CommitChainMsg) String() string {
 		m.CommitChain.EntryHash.Bytes()[:3],
 		m.GetHash().Bytes()[:3])
 	return str
+}
+
+func (m *CommitChainMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "commitchain", "vmindex": m.VMIndex,
+		"server":      m.LeaderChainID.String()[4:12],
+		"commitchain": m.CommitChain.EntryHash.String()[:6],
+		"hash":        m.GetHash().String()[:6]}
 }

@@ -5,13 +5,14 @@
 package messages
 
 import (
-	"bytes"
+	"encoding/binary"
 	"fmt"
 
-	"encoding/binary"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -107,14 +108,6 @@ func (m *Heartbeat) GetTimestamp() interfaces.Timestamp {
 
 func (m *Heartbeat) Type() byte {
 	return constants.HEARTBEAT_MSG
-}
-
-func (m *Heartbeat) Int() int {
-	return -1
-}
-
-func (m *Heartbeat) Bytes() []byte {
-	return nil
 }
 
 func (m *Heartbeat) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
@@ -221,6 +214,14 @@ func (m *Heartbeat) String() string {
 	return fmt.Sprintf("HeartBeat ID[%x] dbht %d ts %d", m.IdentityChainID.Bytes()[3:5], m.DBHeight, m.Timestamp.GetTimeSeconds())
 }
 
+func (m *Heartbeat) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "heartbeat",
+		"vm":        m.VMIndex,
+		"dbheight":  m.DBHeight,
+		"server":    m.IdentityChainID.String()[4:10],
+		"timestamp": m.Timestamp.GetTimeSeconds()}
+}
+
 func (m *Heartbeat) ChainID() []byte {
 	return nil
 }
@@ -271,7 +272,6 @@ func (m *Heartbeat) Validate(state interfaces.IState) int {
 // Returns true if this is a message for this server to execute as
 // a leader.
 func (m *Heartbeat) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -298,10 +298,6 @@ func (e *Heartbeat) JSONByte() ([]byte, error) {
 
 func (e *Heartbeat) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *Heartbeat) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *Heartbeat) Sign(key interfaces.Signer) error {

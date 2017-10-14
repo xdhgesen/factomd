@@ -29,11 +29,13 @@ func (this *State) ProcessRecentFERChainEntries() {
 	//  Get the first eblock from the FERChain
 	entryBlock, err := this.DB.FetchEBlockHead(FERChainHash)
 	if err != nil {
-		this.Println("Couldn't find the FER chain for id ", this.FERChainId)
+		packageLogger.Debugf("FER Chain head found to be nil", this.FERChainId)
+		// this.Println("Couldn't find the FER chain for id ", this.FERChainId)
 		return
 	}
 	if entryBlock == nil {
-		this.Println("FER Chain head found to be nil")
+		packageLogger.Debug("FER Chain head found to be nil")
+		// this.Println("FER Chain head found to be nil")
 		return
 	}
 
@@ -64,7 +66,6 @@ func (this *State) ProcessRecentFERChainEntries() {
 
 	// Check last entry block method
 	if entryBlock.GetHeader().GetDBHeight() == this.GetDBHeightComplete()-1 {
-
 		entryHashes := entryBlock.GetEntryHashes()
 
 		// this.Println("Found FER entry hashes in a block as: ", entryHashes)

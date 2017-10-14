@@ -5,12 +5,13 @@
 package messages
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //Structure to request missing messages in a node's process list
@@ -76,14 +77,6 @@ func (m *MissingData) Type() byte {
 	return constants.MISSING_DATA
 }
 
-func (m *MissingData) Int() int {
-	return -1
-}
-
-func (m *MissingData) Bytes() []byte {
-	return nil
-}
-
 func (m *MissingData) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -110,7 +103,7 @@ func (m *MissingData) UnmarshalBinaryData(data []byte) (newData []byte, err erro
 
 	m.Peer2Peer = true // Always a peer2peer request.
 
-	return data, nil
+	return
 }
 
 func (m *MissingData) UnmarshalBinary(data []byte) error {
@@ -138,6 +131,11 @@ func (m *MissingData) MarshalBinary() ([]byte, error) {
 
 func (m *MissingData) String() string {
 	return fmt.Sprintf("MissingData: [%x]", m.RequestHash.Bytes()[:5])
+}
+
+func (m *MissingData) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "missingdata",
+		"hash": m.GetHash().String()[:6], "requesthash": m.RequestHash.String()}
 }
 
 // Validate the message, given the state.  Three possible results:
@@ -189,12 +187,7 @@ func (e *MissingData) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *MissingData) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func NewMissingData(state interfaces.IState, requestHash interfaces.IHash) interfaces.IMsg {
-
 	msg := new(MissingData)
 
 	msg.Peer2Peer = true // Always a peer2peer request.

@@ -13,12 +13,13 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	. "github.com/FactomProject/factomd/testHelper"
+	"github.com/FactomProject/factomd/testHelper"
 	"testing"
 )
 
 func TestSaveLoadDBlockHead(t *testing.T) {
-	b1 := CreateTestDirectoryBlock(nil)
+	blocks := testHelper.CreateTestBlockSet(nil)
+	b1 := blocks.DBlock
 
 	dbo := NewOverlay(new(mapdb.MapDB))
 	defer dbo.Close()
@@ -49,7 +50,8 @@ func TestSaveLoadDBlockHead(t *testing.T) {
 		t.Error("Blocks are not equal")
 	}
 
-	b2 := CreateTestDirectoryBlock(b1)
+	blocks = testHelper.CreateTestBlockSet(blocks)
+	b2 := blocks.DBlock
 
 	err = dbo.SaveDirectoryBlockHead(b2)
 	if err != nil {
@@ -80,14 +82,14 @@ func TestSaveLoadDBlockHead(t *testing.T) {
 func TestSaveLoadDBlockChain(t *testing.T) {
 	blocks := []*DirectoryBlock{}
 	max := 10
-	var prev *DirectoryBlock = nil
+	var prev *testHelper.BlockSet = nil
 	dbo := NewOverlay(new(mapdb.MapDB))
 	defer dbo.Close()
 
 	for i := 0; i < max; i++ {
-		prev = CreateTestDirectoryBlock(prev)
-		blocks = append(blocks, prev)
-		err := dbo.SaveDirectoryBlockHead(prev)
+		prev = testHelper.CreateTestBlockSet(prev)
+		blocks = append(blocks, prev.DBlock)
+		err := dbo.SaveDirectoryBlockHead(prev.DBlock)
 		if err != nil {
 			t.Error(err)
 		}
@@ -153,7 +155,7 @@ func TestLoadUnknownDBlocks(t *testing.T) {
 	dbo := NewOverlay(new(mapdb.MapDB))
 	defer dbo.Close()
 	for i := 0; i < 10; i++ {
-		b := IntToByteSlice(i)
+		b := testHelper.IntToByteSlice(i)
 		hash, err := primitives.NewShaHash(b)
 		if err != nil {
 			t.Error(err)

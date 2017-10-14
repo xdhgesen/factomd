@@ -5,17 +5,20 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/log"
+
+	log "github.com/FactomProject/logrus"
 )
 
 var _ = log.Printf
+
+// eLogger is for EOM Messages and extends packageLogger
+var eLogger = packageLogger.WithFields(log.Fields{"message": "EOM"})
 
 type EOM struct {
 	MessageBase
@@ -30,7 +33,6 @@ type EOM struct {
 	FactoidVM bool
 
 	//Not marshalled
-	Processed  bool
 	hash       interfaces.IHash
 	MarkerSent bool // If we have set EOM markers on blocks like Factoid blocks and such.
 }
@@ -79,7 +81,14 @@ func (e *EOM) Process(dbheight uint32, state interfaces.IState) bool {
 }
 
 func (m *EOM) GetRepeatHash() interfaces.IHash {
-	return m.GetMsgHash()
+	if m.RepeatHash == nil {
+		data, err := m.MarshalBinary()
+		if err != nil {
+			return nil
+		}
+		m.RepeatHash = primitives.Sha(data)
+	}
+	return m.RepeatHash
 }
 
 func (m *EOM) GetHash() interfaces.IHash {
@@ -102,15 +111,6 @@ func (m *EOM) GetTimestamp() interfaces.Timestamp {
 		m.Timestamp = new(primitives.Timestamp)
 	}
 	return m.Timestamp
-}
-
-func (m *EOM) Int() int {
-	return int(m.Minute)
-}
-
-func (m *EOM) Bytes() []byte {
-	var ret []byte
-	return append(ret, m.Minute)
 }
 
 func (m *EOM) Type() byte {
@@ -138,12 +138,23 @@ func (m *EOM) Validate(state interfaces.IState) int {
 
 	// Check signature
 	eomSigned, err := m.VerifySignature()
-	if err != nil {
+	if err != nil || !eomSigned {
+		vlog := func(format string, args ...interface{}) {
+			eLogger.WithFields(log.Fields{"func": "Validate", "lheight": state.GetLeaderHeight()}).WithFields(m.LogFields()).Errorf(format, args...)
+		}
+
+		if err != nil {
+			vlog("[1] Failed to verify signature. Err: %s -- Msg: %s", err.Error(), m.String())
+		}
+		if !eomSigned {
+			vlog("[1] Failed to verify, not signed. Msg: %s", m.String())
+		}
 		return -1
 	}
-	if !eomSigned {
-		return -1
-	}
+	// if !eomSigned {
+	// 	state.Logf("warning", "[EOM Validate (2)] Failed to verify signature. Msg: %s", err.Error(), m.String())
+	// 	return -1
+	// }
 	return 1
 }
 
@@ -167,10 +178,6 @@ func (e *EOM) JSONByte() ([]byte, error) {
 
 func (e *EOM) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *EOM) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *EOM) Sign(key interfaces.Signer) error {
@@ -240,7 +247,7 @@ func (m *EOM) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 		m.Signature = sig
 	}
 
-	return data, nil
+	return
 }
 
 func (m *EOM) UnmarshalBinary(data []byte) error {
@@ -323,4 +330,10 @@ func (m *EOM) String() string {
 		m.ChainID.Bytes()[:4],
 		m.GetMsgHash().Bytes()[:3],
 		local)
+}
+
+func (m *EOM) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "eom", "dbheight": m.DBHeight, "vm": m.VMIndex,
+		"minute": m.Minute, "chainid": m.ChainID.String()[4:12], "sysheight": m.SysHeight,
+		"hash": m.GetMsgHash().String()[:6]}
 }

@@ -5,11 +5,13 @@
 package messages
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -74,14 +76,6 @@ func (m *RequestBlock) Type() byte {
 	return constants.REQUEST_BLOCK_MSG
 }
 
-func (m *RequestBlock) Int() int {
-	return -1
-}
-
-func (m *RequestBlock) Bytes() []byte {
-	return nil
-}
-
 func (m *RequestBlock) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -133,6 +127,10 @@ func (m *RequestBlock) String() string {
 	return "Request Block"
 }
 
+func (m *RequestBlock) LogFields() log.Fields {
+	return log.Fields{}
+}
+
 func (m *RequestBlock) DBHeight() int {
 	return 0
 }
@@ -176,8 +174,4 @@ func (e *RequestBlock) JSONByte() ([]byte, error) {
 
 func (e *RequestBlock) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *RequestBlock) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }

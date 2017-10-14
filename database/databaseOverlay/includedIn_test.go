@@ -14,7 +14,7 @@ import (
 	. "github.com/FactomProject/factomd/common/entryBlock"
 	. "github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	. "github.com/FactomProject/factomd/testHelper"
+	"github.com/FactomProject/factomd/testHelper"
 
 	"testing"
 )
@@ -27,7 +27,7 @@ func TestIncludedIn(t *testing.T) {
 	defer dbo.Close()
 
 	for i := 0; i < max; i++ {
-		prev, _ = CreateTestEntryBlock(prev)
+		prev, _ = testHelper.CreateTestEntryBlock(prev)
 		blocks = append(blocks, prev)
 		err := dbo.SaveEBlockHead(prev, false)
 		if err != nil {
@@ -37,6 +37,9 @@ func TestIncludedIn(t *testing.T) {
 
 	for _, block := range blocks {
 		for _, entry := range block.GetEntryHashes() {
+			if entry.IsMinuteMarker() {
+				continue
+			}
 			blockHash, err := dbo.FetchIncludedIn(entry)
 			if err != nil {
 				t.Error(err)
@@ -56,7 +59,7 @@ func TestIncludedInOverwriting(t *testing.T) {
 	defer dbo.Close()
 
 	for i := 0; i < max; i++ {
-		prev, _ = CreateTestEntryBlockWithContentN(prev, 1)
+		prev, _ = testHelper.CreateTestEntryBlockWithContentN(prev, 1)
 		blocks = append(blocks, prev)
 		err := dbo.SaveEBlockHead(prev, true)
 		if err != nil {
@@ -66,6 +69,9 @@ func TestIncludedInOverwriting(t *testing.T) {
 
 	for i, block := range blocks {
 		for _, entry := range block.GetEntryHashes() {
+			if entry.IsMinuteMarker() {
+				continue
+			}
 			blockHash, err := dbo.FetchIncludedIn(entry)
 			if err != nil {
 				t.Error(err)
@@ -88,7 +94,7 @@ func TestIncludedInOverwriting(t *testing.T) {
 	dbo = NewOverlay(new(mapdb.MapDB))
 
 	for i := 0; i < max; i++ {
-		prev, _ = CreateTestEntryBlockWithContentN(prev, 1)
+		prev, _ = testHelper.CreateTestEntryBlockWithContentN(prev, 1)
 		blocks = append(blocks, prev)
 		err := dbo.SaveEBlockHead(prev, false)
 		if err != nil {
@@ -98,6 +104,9 @@ func TestIncludedInOverwriting(t *testing.T) {
 
 	for i, block := range blocks {
 		for _, entry := range block.GetEntryHashes() {
+			if entry.IsMinuteMarker() {
+				continue
+			}
 			blockHash, err := dbo.FetchIncludedIn(entry)
 			if err != nil {
 				t.Error(err)
@@ -116,7 +125,7 @@ func TestIncludedInOverwriting(t *testing.T) {
 }
 
 func TestIncludedInFromAllBlocks(t *testing.T) {
-	dbo := CreateAndPopulateTestDatabaseOverlay()
+	dbo := testHelper.CreateAndPopulateTestDatabaseOverlay()
 
 	dBlocks, err := dbo.FetchAllDBlocks()
 	if err != nil {
@@ -195,7 +204,7 @@ func TestIncludedInFromAllBlocks(t *testing.T) {
 		}
 	}
 
-	eBlocks, err := dbo.FetchAllEBlocksByChain(GetChainID())
+	eBlocks, err := dbo.FetchAllEBlocksByChain(testHelper.GetChainID())
 	if err != nil {
 		t.Error(err)
 	}
@@ -204,9 +213,15 @@ func TestIncludedInFromAllBlocks(t *testing.T) {
 		blockHash := block.DatabasePrimaryIndex()
 		entries := block.GetEntryHashes()
 		for _, entry := range entries {
+			if entry.IsMinuteMarker() {
+				continue
+			}
 			in, err := dbo.FetchIncludedIn(entry)
 			if err != nil {
 				t.Error(err)
+			}
+			if in == nil {
+				t.Errorf("IncludedIn not found for %v", entry.String())
 			}
 			if in.IsSameAs(blockHash) == false {
 				t.Errorf("Entry not found in eBlocks - %v vs %v for %v", in.String(), blockHash.String(), entry)
@@ -214,7 +229,7 @@ func TestIncludedInFromAllBlocks(t *testing.T) {
 		}
 	}
 
-	anchorBlocks, err := dbo.FetchAllEBlocksByChain(GetAnchorChainID())
+	anchorBlocks, err := dbo.FetchAllEBlocksByChain(testHelper.GetAnchorChainID())
 	if err != nil {
 		t.Error(err)
 	}
@@ -223,9 +238,15 @@ func TestIncludedInFromAllBlocks(t *testing.T) {
 		blockHash := block.DatabasePrimaryIndex()
 		entries := block.GetEntryHashes()
 		for _, entry := range entries {
+			if entry.IsMinuteMarker() {
+				continue
+			}
 			in, err := dbo.FetchIncludedIn(entry)
 			if err != nil {
 				t.Error(err)
+			}
+			if in == nil {
+				t.Errorf("IncludedIn not found for %v", entry.String())
 			}
 			if in.IsSameAs(blockHash) == false {
 				t.Errorf("Entry not found in anchorBlocks - %v vs %v for %v", in.String(), blockHash.String(), entry)

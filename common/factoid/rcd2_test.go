@@ -5,11 +5,31 @@
 package factoid_test
 
 import (
-	. "github.com/FactomProject/factomd/common/factoid"
-	"github.com/FactomProject/factomd/common/interfaces"
 	"math/rand"
 	"testing"
+
+	. "github.com/FactomProject/factomd/common/factoid"
+	"github.com/FactomProject/factomd/common/interfaces"
 )
+
+func TestUnmarshalNilRCD_2(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
+
+	a := new(RCD_2)
+	err := a.UnmarshalBinary(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	err = a.UnmarshalBinary([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
 
 func TestRCD2MarshalUnmarshal(t *testing.T) {
 	rcd := nextAuth2_rcd2()
@@ -41,7 +61,7 @@ func TestRCD2MarshalUnmarshal(t *testing.T) {
 		}
 	}
 
-	if len(rcd.IsEqual(rcd2)) != 0 {
+	if rcd.IsSameAs(rcd2) == false {
 		t.Error("RCDs are not equal")
 	}
 }
@@ -69,7 +89,7 @@ func TestRCD2Clone(t *testing.T) {
 		}
 	}
 
-	if len(rcd.IsEqual(rcd2)) != 0 {
+	if rcd.IsSameAs(rcd2) == false {
 		t.Error("RCDs are not equal")
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
+	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -45,9 +46,10 @@ type DisplayState struct {
 	PLEntry   []EntryTransaction
 
 	// DataDump
-	RawSummary  string
-	PrintMap    string
-	ProcessList string
+	RawSummary   string
+	PrintMap     string
+	ProcessList  string
+	ProcessList2 string
 }
 
 type FactoidTransaction struct {
@@ -133,7 +135,6 @@ func DeepStateDisplayCopy(s *State) (*DisplayState, error) {
 		ds.Authorities = append(ds.Authorities, auth)
 	}
 	if pubkey, err := s.GetServerPublicKey().Copy(); err != nil {
-
 	} else {
 		ds.PublicKey = pubkey
 	}
@@ -204,17 +205,39 @@ func DeepStateDisplayCopy(s *State) (*DisplayState, error) {
 
 	ds.RawSummary = prt
 
-	b := s.GetHighestSavedBlk()
-	pl := s.ProcessLists.Get(b + 1)
+	b := s.GetHighestCompletedBlk() + 1
+	pl := s.ProcessLists.Get(b)
 	if pl == nil {
+		b--
 		pl = s.ProcessLists.Get(b)
+		if pl == nil {
+			if b > 1 {
+				b--
+				pl = s.ProcessLists.Get(b)
+			}
+		}
 	}
+
+	var pl2 *ProcessList
+	if b > 3 {
+		b--
+		pl2 = s.ProcessLists.GetSafe(b)
+		if pl == nil {
+			b--
+			pl2 = s.ProcessLists.GetSafe(b)
+		}
+	}
+
 	if pl != nil && pl.FedServers != nil {
 		ds.PrintMap = pl.PrintMap()
 		ds.ProcessList = pl.String()
 	} else {
 		ds.PrintMap = ""
 		ds.ProcessList = ""
+	}
+
+	if pl2 != nil {
+		ds.ProcessList2 = pl2.String()
 	}
 
 	return ds, nil
@@ -243,7 +266,6 @@ func (d *DisplayState) Clone() *DisplayState {
 		ds.Authorities = append(ds.Authorities, auth)
 	}
 	if pubkey, err := d.PublicKey.Copy(); err != nil {
-
 	} else {
 		ds.PublicKey = pubkey
 	}
@@ -293,13 +315,13 @@ func messageLists(fnodes []*State) string {
 
 	list = ""
 	for _, f := range fnodes {
-		list = list + fmt.Sprintf(" %3d", len(f.InMsgQueue()))
+		list = list + fmt.Sprintf(" %3d", f.InMsgQueue().Length())
 	}
 	prt = prt + fmt.Sprintf(fmtstr, "InMsgQueue", list)
 
 	list = ""
 	for _, f := range fnodes {
-		list = list + fmt.Sprintf(" %3d", len(f.APIQueue()))
+		list = list + fmt.Sprintf(" %3d", f.APIQueue().Length())
 	}
 	prt = prt + fmt.Sprintf(fmtstr, "APIQueue", list)
 
@@ -319,7 +341,7 @@ func messageLists(fnodes []*State) string {
 
 	list = ""
 	for _, f := range fnodes {
-		list = list + fmt.Sprintf(" %3d", len(f.NetworkOutMsgQueue()))
+		list = list + fmt.Sprintf(" %3d", f.NetworkOutMsgQueue().Length())
 	}
 	prt = prt + fmt.Sprintf(fmtstr, "NetworkOutMsgQueue", list)
 

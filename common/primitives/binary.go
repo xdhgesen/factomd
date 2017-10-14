@@ -5,27 +5,13 @@
 package primitives
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 
 	"github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/primitives/random"
 )
-
-type Buffer struct {
-	bytes.Buffer
-}
-
-func (b *Buffer) DeepCopyBytes() []byte {
-	return b.Next(b.Len())
-}
-
-func NewBuffer(buf []byte) *Buffer {
-	tmp := new(Buffer)
-	tmp.Buffer = *bytes.NewBuffer(buf)
-	return tmp
-}
 
 func AreBytesEqual(b1, b2 []byte) bool {
 	if len(b1) != len(b2) {
@@ -96,6 +82,16 @@ func Byte32ToByteSlice32(b [32]byte) *ByteSlice32 {
 	return bs
 }
 
+func (a *ByteSlice32) IsSameAs(b *ByteSlice32) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	return AreBytesEqual(a[:], b[:])
+}
+
 func (bs *ByteSlice32) MarshalBinary() ([]byte, error) {
 	return bs[:], nil
 }
@@ -110,13 +106,16 @@ func (bs *ByteSlice32) UnmarshalBinaryData(data []byte) (newData []byte, err err
 			err = fmt.Errorf("Error unmarshalling: %v", r)
 		}
 	}()
+	if data == nil || len(data) < 32 {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	copy(bs[:], data[:32])
 	newData = data[32:]
 	return
 }
 
 func (bs *ByteSlice32) UnmarshalBinary(data []byte) (err error) {
-	copy(bs[:], data[:32])
+	_, err = bs.UnmarshalBinaryData(data)
 	return
 }
 
@@ -126,10 +125,6 @@ func (e *ByteSlice32) JSONByte() ([]byte, error) {
 
 func (e *ByteSlice32) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *ByteSlice32) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 func (bs *ByteSlice32) String() string {
@@ -145,6 +140,16 @@ type ByteSlice64 [64]byte
 var _ interfaces.Printable = (*ByteSlice64)(nil)
 var _ interfaces.BinaryMarshallable = (*ByteSlice64)(nil)
 
+func (a *ByteSlice64) IsSameAs(b *ByteSlice64) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	return AreBytesEqual(a[:], b[:])
+}
+
 func (bs *ByteSlice64) MarshalBinary() ([]byte, error) {
 	return bs[:], nil
 }
@@ -155,13 +160,16 @@ func (bs *ByteSlice64) UnmarshalBinaryData(data []byte) (newData []byte, err err
 			err = fmt.Errorf("Error unmarshalling: %v", r)
 		}
 	}()
+	if data == nil || len(data) < 64 {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	copy(bs[:], data[:64])
 	newData = data[64:]
 	return
 }
 
 func (bs *ByteSlice64) UnmarshalBinary(data []byte) (err error) {
-	copy(bs[:], data[:64])
+	_, err = bs.UnmarshalBinaryData(data)
 	return
 }
 
@@ -171,10 +179,6 @@ func (e *ByteSlice64) JSONByte() ([]byte, error) {
 
 func (e *ByteSlice64) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *ByteSlice64) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 func (bs *ByteSlice64) String() string {
@@ -190,6 +194,16 @@ type ByteSlice6 [6]byte
 var _ interfaces.Printable = (*ByteSlice6)(nil)
 var _ interfaces.BinaryMarshallable = (*ByteSlice6)(nil)
 
+func (a *ByteSlice6) IsSameAs(b *ByteSlice6) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	return AreBytesEqual(a[:], b[:])
+}
+
 func (bs *ByteSlice6) MarshalBinary() ([]byte, error) {
 	return bs[:], nil
 }
@@ -200,13 +214,16 @@ func (bs *ByteSlice6) UnmarshalBinaryData(data []byte) (newData []byte, err erro
 			err = fmt.Errorf("Error unmarshalling: %v", r)
 		}
 	}()
+	if data == nil || len(data) < 6 {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	copy(bs[:], data[:6])
 	newData = data[6:]
 	return
 }
 
 func (bs *ByteSlice6) UnmarshalBinary(data []byte) (err error) {
-	copy(bs[:], data[:6])
+	_, err = bs.UnmarshalBinaryData(data)
 	return
 }
 
@@ -216,10 +233,6 @@ func (e *ByteSlice6) JSONByte() ([]byte, error) {
 
 func (e *ByteSlice6) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *ByteSlice6) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 func (bs *ByteSlice6) String() string {
@@ -234,6 +247,16 @@ type ByteSliceSig [ed25519.SignatureSize]byte
 
 var _ interfaces.Printable = (*ByteSliceSig)(nil)
 var _ interfaces.BinaryMarshallable = (*ByteSliceSig)(nil)
+
+func (a *ByteSliceSig) IsSameAs(b *ByteSliceSig) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	return AreBytesEqual(a[:], b[:])
+}
 
 func (bs *ByteSliceSig) MarshalBinary() ([]byte, error) {
 	return bs[:], nil
@@ -252,6 +275,9 @@ func (bs *ByteSliceSig) UnmarshalBinaryData(data []byte) (newData []byte, err er
 			err = fmt.Errorf("Error unmarshalling: %v", r)
 		}
 	}()
+	if data == nil || len(data) < ed25519.SignatureSize {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	copy(bs[:], data[:ed25519.SignatureSize])
 	newData = data[ed25519.SignatureSize:]
 	return
@@ -271,10 +297,6 @@ func (e *ByteSliceSig) JSONByte() ([]byte, error) {
 
 func (e *ByteSliceSig) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *ByteSliceSig) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 func (bs *ByteSliceSig) String() string {
@@ -298,6 +320,16 @@ type ByteSlice20 [20]byte
 var _ interfaces.Printable = (*ByteSlice20)(nil)
 var _ interfaces.BinaryMarshallable = (*ByteSlice20)(nil)
 
+func (a *ByteSlice20) IsSameAs(b *ByteSlice20) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	return AreBytesEqual(a[:], b[:])
+}
+
 func (bs *ByteSlice20) MarshalBinary() ([]byte, error) {
 	return bs[:], nil
 }
@@ -315,13 +347,16 @@ func (bs *ByteSlice20) UnmarshalBinaryData(data []byte) (newData []byte, err err
 			err = fmt.Errorf("Error unmarshalling: %v", r)
 		}
 	}()
+	if data == nil || len(data) < 20 {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	copy(bs[:], data[:20])
 	newData = data[20:]
 	return
 }
 
 func (bs *ByteSlice20) UnmarshalBinary(data []byte) (err error) {
-	copy(bs[:], data[:20])
+	_, err = bs.UnmarshalBinaryData(data)
 	return
 }
 
@@ -331,10 +366,6 @@ func (e *ByteSlice20) JSONByte() ([]byte, error) {
 
 func (e *ByteSlice20) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *ByteSlice20) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 func (bs *ByteSlice20) String() string {
@@ -352,6 +383,23 @@ type ByteSlice struct {
 var _ interfaces.Printable = (*ByteSlice)(nil)
 var _ interfaces.BinaryMarshallable = (*ByteSlice)(nil)
 var _ interfaces.BinaryMarshallableAndCopyable = (*ByteSlice)(nil)
+
+func (a *ByteSlice) IsSameAs(b *ByteSlice) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	return AreBytesEqual(a.Bytes, b.Bytes)
+}
+
+func RandomByteSlice() *ByteSlice {
+	bs := new(ByteSlice)
+	x := random.RandNonEmptyByteSlice()
+	bs.UnmarshalBinary(x)
+	return bs
+}
 
 func StringToByteSlice(s string) *ByteSlice {
 	bin, err := DecodeBinary(s)
@@ -386,8 +434,7 @@ func (bs *ByteSlice) UnmarshalBinaryData(data []byte) (newData []byte, err error
 }
 
 func (bs *ByteSlice) UnmarshalBinary(data []byte) (err error) {
-	bs.Bytes = make([]byte, len(data))
-	copy(bs.Bytes[:], data)
+	_, err = bs.UnmarshalBinaryData(data)
 	return
 }
 
@@ -397,10 +444,6 @@ func (e *ByteSlice) JSONByte() ([]byte, error) {
 
 func (e *ByteSlice) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *ByteSlice) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 func (bs *ByteSlice) String() string {

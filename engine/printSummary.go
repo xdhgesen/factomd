@@ -118,7 +118,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 		list = ""
 		for _, f := range pnodes {
-			list = list + fmt.Sprintf(" %3d", len(f.State.Commits))
+			list = list + fmt.Sprintf(" %3d", f.State.Commits.Len())
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "Commits", list)
 
@@ -150,13 +150,13 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 		list = ""
 		for _, f := range pnodes {
-			list = list + fmt.Sprintf(" %3d", len(f.State.InMsgQueue()))
+			list = list + fmt.Sprintf(" %3d", f.State.InMsgQueue().Length())
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "InMsgQueue", list)
 
 		list = ""
 		for _, f := range pnodes {
-			list = list + fmt.Sprintf(" %3d", len(f.State.APIQueue()))
+			list = list + fmt.Sprintf(" %3d", f.State.APIQueue().Length())
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "APIQueue", list)
 
@@ -176,7 +176,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 		list = ""
 		for _, f := range pnodes {
-			list = list + fmt.Sprintf(" %3d", len(f.State.NetworkOutMsgQueue()))
+			list = list + fmt.Sprintf(" %3d", f.State.NetworkOutMsgQueue().Length())
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "NetworkOutMsgQueue", list)
 
@@ -185,6 +185,26 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 			list = list + fmt.Sprintf(" %3d", len(f.State.NetworkInvalidMsgQueue()))
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "NetworkInvalidMsgQueue", list)
+
+		prt = prt + "\n"
+
+		list = ""
+		for _, f := range pnodes {
+			list = list + fmt.Sprintf(" %3d", len(f.State.UpdateEntryHash))
+		}
+		prt = prt + fmt.Sprintf(fmtstr, "UpdateEntryHash", list)
+
+		list = ""
+		for _, f := range pnodes {
+			list = list + fmt.Sprintf(" %3d", len(f.State.MissingEntries))
+		}
+		prt = prt + fmt.Sprintf(fmtstr, "MissingEntries", list)
+
+		list = ""
+		for _, f := range pnodes {
+			list = list + fmt.Sprintf(" %3d", len(f.State.WriteEntry))
+		}
+		prt = prt + fmt.Sprintf(fmtstr, "WriteEntry", list)
 
 		if f.State.MessageTally {
 			prt = prt + "\nType:"
@@ -270,6 +290,9 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 func systemFaults(f *FactomNode) string {
 	dbheight := f.State.LLeaderHeight
 	pl := f.State.ProcessLists.Get(dbheight)
+	if pl == nil {
+		return ""
+	}
 	if len(pl.System.List) == 0 {
 		str := fmt.Sprintf("%5s %13s %6s Length: 0\n", "", "System List", f.State.FactomNodeName)
 		return str

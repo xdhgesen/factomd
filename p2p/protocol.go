@@ -17,14 +17,19 @@ import (
 
 // This file contains the global variables and utility functions for the p2p network operation.  The global variables and constants can be tweaked here.
 
-func BlockFreeChannelSend(channel chan interface{}, message interface{}) {
-	highWaterMark := int(float64(StandardChannelSize) * 0.90)
+// BlockFreeChannelSend will remove things from the queue to make room for new messages if the queue is full.
+// This prevents channel blocking on full.
+//		Returns: The number of elements cleared from the channel to make room
+func BlockFreeChannelSend(channel chan interface{}, message interface{}) int {
+	removed := 0
+	highWaterMark := int(float64(cap(channel)) * 0.95)
 	clen := len(channel)
 	switch {
 	case highWaterMark < clen:
 		str, _ := primitives.EncodeJSONString(message)
 		significant("protocol", "nonBlockingChanSend() - DROPPING MESSAGES. Channel is over 90 percent full! \n channel len: \n %d \n 90 percent: \n %d \n last message type: %v", len(channel), highWaterMark, str)
 		for highWaterMark <= len(channel) { // Clear out some messages
+			removed++
 			<-channel
 		}
 		fallthrough
@@ -34,6 +39,7 @@ func BlockFreeChannelSend(channel chan interface{}, message interface{}) {
 		default:
 		}
 	}
+	return removed
 }
 
 // Global variables for the p2p protocol
@@ -49,10 +55,11 @@ var (
 	MinumumSharingQualityScore    int32  = 20          // if a peer's score is less than this we don't share them.
 	OnlySpecialPeers                     = false
 	NetworkDeadline                      = time.Duration(30) * time.Second
-	NumberPeersToConnect                 = 8
+	NumberPeersToConnect                 = 32
+	NumberPeersToBroadcast               = 100
 	MaxNumberIncommingConnections        = 150
-	MaxNumberOfRedialAttempts            = 15
-	StandardChannelSize                  = 100000
+	MaxNumberOfRedialAttempts            = 5 // How many missing pings (and other) before we give up and close.
+	StandardChannelSize                  = 5000
 	NetworkStatusInterval                = time.Second * 9
 	ConnectionStatusInterval             = time.Second * 122
 	PingInterval                         = time.Second * 15
@@ -73,12 +80,9 @@ var (
 
 const (
 	// ProtocolVersion is the latest version this package supports
-	ProtocolVersion uint16 = 07
+	ProtocolVersion uint16 = 8
 	// ProtocolVersionMinimum is the earliest version this package supports
-	ProtocolVersionMinimum uint16 = 07
-	// Don't think we need this.
-	// ProtocolCookie         uint32 = uint32([]bytes("Fact"))
-	// Used in generating message CRC values
+	ProtocolVersionMinimum uint16 = 8
 )
 
 // NetworkIdentifier represents the P2P network we are participating in (eg: test, nmain, etc.)
@@ -142,29 +146,29 @@ func dot(dot string) {
 }
 
 func silence(component string, format string, v ...interface{}) {
-	log(Silence, component, format, v...)
+	logP(Silence, component, format, v...)
 }
 func significant(component string, format string, v ...interface{}) {
-	log(Significant, component, format, v...)
+	logP(Significant, component, format, v...)
 }
 func logfatal(component string, format string, v ...interface{}) {
-	log(Fatal, component, format, v...)
+	logP(Fatal, component, format, v...)
 }
 func logerror(component string, format string, v ...interface{}) {
-	log(Errors, component, format, v...)
+	logP(Errors, component, format, v...)
 }
 func note(component string, format string, v ...interface{}) {
-	log(Notes, component, format, v...)
+	logP(Notes, component, format, v...)
 }
 func debug(component string, format string, v ...interface{}) {
-	log(Debugging, component, format, v...)
+	logP(Debugging, component, format, v...)
 }
 func verbose(component string, format string, v ...interface{}) {
-	log(Verbose, component, format, v...)
+	logP(Verbose, component, format, v...)
 }
 
-// log is the base log function to produce parsable log output for mass metrics consumption
-func log(level uint8, component string, format string, v ...interface{}) {
+// logP is the base log function to produce parsable log output for mass metrics consumption
+func logP(level uint8, component string, format string, v ...interface{}) {
 	message := strings.Replace(fmt.Sprintf(format, v...), ",", "-", -1) // Make CSV parsable.
 	// levelStr := LoggingLevels[level]
 	// host, _ := os.Hostname()

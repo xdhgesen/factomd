@@ -1,7 +1,6 @@
 package adminBlock
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -10,15 +9,25 @@ import (
 )
 
 type AddReplaceMatryoshkaHash struct {
-	IdentityChainID interfaces.IHash
-	MHash           interfaces.IHash
+	IdentityChainID interfaces.IHash `json:"identitychainid"`
+	MHash           interfaces.IHash `json:"mhash"`
 }
 
 var _ interfaces.Printable = (*AddReplaceMatryoshkaHash)(nil)
 var _ interfaces.BinaryMarshallable = (*AddReplaceMatryoshkaHash)(nil)
 var _ interfaces.IABEntry = (*AddReplaceMatryoshkaHash)(nil)
 
+func (e *AddReplaceMatryoshkaHash) Init() {
+	if e.IdentityChainID == nil {
+		e.IdentityChainID = primitives.NewZeroHash()
+	}
+	if e.MHash == nil {
+		e.MHash = primitives.NewZeroHash()
+	}
+}
+
 func (e *AddReplaceMatryoshkaHash) String() string {
+	e.Init()
 	var out primitives.Buffer
 	out.WriteString(fmt.Sprintf("    E: %35s -- %17s %8x %12s %8s",
 		"AddReplaceMatryoshkaHash",
@@ -32,6 +41,7 @@ func (m *AddReplaceMatryoshkaHash) Type() byte {
 }
 
 func (c *AddReplaceMatryoshkaHash) UpdateState(state interfaces.IState) error {
+	c.Init()
 	state.UpdateAuthorityFromABEntry(c)
 	return nil
 }
@@ -43,40 +53,48 @@ func NewAddReplaceMatryoshkaHash(identityChainID interfaces.IHash, mHash interfa
 	return e
 }
 
-func (e *AddReplaceMatryoshkaHash) MarshalBinary() (data []byte, err error) {
+func (e *AddReplaceMatryoshkaHash) MarshalBinary() ([]byte, error) {
+	e.Init()
 	var buf primitives.Buffer
 
-	buf.Write([]byte{e.Type()})
-	buf.Write(e.IdentityChainID.Bytes())
-	buf.Write(e.MHash.Bytes())
+	err := buf.PushByte(e.Type())
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.IdentityChainID)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.MHash)
+	if err != nil {
+		return nil, err
+	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
 func (e *AddReplaceMatryoshkaHash) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling Add Replace Matryoshka Hash: %v", r)
-		}
-	}()
-	newData = data
-	if newData[0] != e.Type() {
+	buf := primitives.NewBuffer(data)
+	b, err := buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
+	if b != e.Type() {
 		return nil, fmt.Errorf("Invalid Entry type")
 	}
 
-	newData = newData[1:]
 	e.IdentityChainID = new(primitives.Hash)
-	newData, err = e.IdentityChainID.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(e.IdentityChainID)
 	if err != nil {
-		return
+		return nil, err
 	}
 	e.MHash = new(primitives.Hash)
-	newData, err = e.MHash.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(e.MHash)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (e *AddReplaceMatryoshkaHash) UnmarshalBinary(data []byte) (err error) {
@@ -90,10 +108,6 @@ func (e *AddReplaceMatryoshkaHash) JSONByte() ([]byte, error) {
 
 func (e *AddReplaceMatryoshkaHash) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *AddReplaceMatryoshkaHash) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *AddReplaceMatryoshkaHash) IsInterpretable() bool {

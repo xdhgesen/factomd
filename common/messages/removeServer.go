@@ -12,6 +12,8 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 // Communicate a Directory Block State
@@ -49,14 +51,6 @@ func (m *RemoveServerMsg) GetMsgHash() interfaces.IHash {
 
 func (m *RemoveServerMsg) Type() byte {
 	return constants.REMOVESERVER_MSG
-}
-
-func (m *RemoveServerMsg) Int() int {
-	return -1
-}
-
-func (m *RemoveServerMsg) Bytes() []byte {
-	return nil
 }
 
 func (m *RemoveServerMsg) GetTimestamp() interfaces.Timestamp {
@@ -114,10 +108,6 @@ func (e *RemoveServerMsg) JSONByte() ([]byte, error) {
 
 func (e *RemoveServerMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *RemoveServerMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *RemoveServerMsg) Sign(key interfaces.Signer) error {
@@ -236,6 +226,13 @@ func (m *RemoveServerMsg) String() string {
 		&m.Timestamp,
 		m.GetMsgHash().Bytes()[:3])
 
+}
+
+func (m *RemoveServerMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "removeserver",
+		"server":     m.ServerChainID.String()[4:10],
+		"servertype": m.ServerType,
+		"hash":       m.GetMsgHash().String()[:6]}
 }
 
 func (m *RemoveServerMsg) IsSameAs(b *RemoveServerMsg) bool {

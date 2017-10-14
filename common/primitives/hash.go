@@ -15,6 +15,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/primitives/random"
 )
 
 type Hash [constants.HASH_LENGTH]byte
@@ -23,6 +24,13 @@ var _ interfaces.Printable = (*Hash)(nil)
 var _ interfaces.IHash = (*Hash)(nil)
 var _ interfaces.BinaryMarshallableAndCopyable = (*Hash)(nil)
 var _ encoding.TextMarshaler = (*Hash)(nil)
+
+func RandomHash() interfaces.IHash {
+	h := random.RandByteSliceOfLen(constants.HASH_LENGTH)
+	answer := new(Hash)
+	answer.SetBytes(h)
+	return answer
+}
 
 func (c *Hash) Copy() interfaces.IHash {
 	h := new(Hash)
@@ -38,7 +46,8 @@ func (c *Hash) New() interfaces.BinaryMarshallableAndCopyable {
 }
 
 func (h *Hash) MarshalText() ([]byte, error) {
-	return []byte(hex.EncodeToString(h[:])), nil
+	v:= []byte(hex.EncodeToString(h[:]))
+	return v, nil
 }
 
 func (h *Hash) IsZero() bool {
@@ -66,9 +75,10 @@ func (h *Hash) UnmarshalText(b []byte) error {
 	return nil
 }
 
-func (h Hash) Fixed() [32]byte {
-	return h
+func (h *Hash) Fixed() [constants.HASH_LENGTH]byte {
+	return *h
 }
+
 func (h *Hash) Bytes() []byte {
 	return h.GetBytes()
 }
@@ -111,16 +121,6 @@ func (h *Hash) UnmarshalBinary(p []byte) (err error) {
 	return
 }
 
-func (t Hash) IsEqual(hash interfaces.IBlock) []interfaces.IBlock {
-	h, ok := hash.(interfaces.IHash)
-	if !ok || !h.IsSameAs(&t) {
-		r := make([]interfaces.IBlock, 0, 5)
-		return append(r, &t)
-	}
-
-	return nil
-}
-
 // Make a copy of the hash in this hash.  Changes to the return value WILL NOT be
 // reflected in the source hash.  You have to do a SetBytes to change the source
 // value.
@@ -159,7 +159,7 @@ func Sha512Half(p []byte) (h *Hash) {
 	sha.Write(p)
 
 	h = new(Hash)
-	copy(h[:], sha.Sum(nil)[:32])
+	copy(h[:], sha.Sum(nil)[:constants.HASH_LENGTH])
 	return h
 }
 
@@ -184,8 +184,11 @@ func HexToHash(hexStr string) (h interfaces.IHash, err error) {
 }
 
 // Compare two Hashes
-func (a Hash) IsSameAs(b interfaces.IHash) bool {
-	if b == nil {
+func (a *Hash) IsSameAs(b interfaces.IHash) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
 		return false
 	}
 
@@ -198,18 +201,15 @@ func (a Hash) IsSameAs(b interfaces.IHash) bool {
 
 // Is the hash a minute marker (the last byte indicates the minute number)
 func (h *Hash) IsMinuteMarker() bool {
-	if bytes.Equal(h[:31], constants.ZERO_HASH[:31]) {
+	if bytes.Equal(h[:constants.HASH_LENGTH-1], constants.ZERO_HASH[:constants.HASH_LENGTH-1]) {
 		return true
 	}
 
 	return false
 }
 
-func (a Hash) CustomMarshalText() (text []byte, err error) {
-	var out Buffer
-	hash := hex.EncodeToString(a[:])
-	out.WriteString(hash)
-	return out.DeepCopyBytes(), nil
+func (h *Hash) ToMinute() byte {
+	return h[constants.HASH_LENGTH-1]
 }
 
 func (e *Hash) JSONByte() ([]byte, error) {
@@ -218,10 +218,6 @@ func (e *Hash) JSONByte() ([]byte, error) {
 
 func (e *Hash) JSONString() (string, error) {
 	return EncodeJSONString(e)
-}
-
-func (e *Hash) JSONBuffer(b *bytes.Buffer) error {
-	return EncodeJSONToBuffer(e, b)
 }
 
 /**********************

@@ -28,6 +28,8 @@ type FactomdConfig struct {
 		DirectoryBlockInSeconds                int
 		ExportData                             bool
 		ExportDataSubpath                      string
+		FastBoot                               bool
+		FastBootLocation                       string
 		NodeMode                               string
 		IdentityChainID                        string
 		LocalServerPrivKey                     string
@@ -114,6 +116,8 @@ DataStorePath                         = "data/export"
 DirectoryBlockInSeconds               = 6
 ExportData                            = false
 ExportDataSubpath                     = "database/export/"
+FastBoot                              = true
+FastBootLocation                      = ""
 ; --------------- Network: MAIN | TEST | LOCAL
 Network                               = MAIN
 PeersFile            = "peers.json"
@@ -227,8 +231,8 @@ func (s *FactomdConfig) String() string {
 	out.WriteString(fmt.Sprintf("\n    FactomdTlsEnabled        %v", s.App.FactomdTlsEnabled))
 	out.WriteString(fmt.Sprintf("\n    FactomdTlsPrivateKey     %v", s.App.FactomdTlsPrivateKey))
 	out.WriteString(fmt.Sprintf("\n    FactomdTlsPublicCert     %v", s.App.FactomdTlsPublicCert))
-	out.WriteString(fmt.Sprintf("\n    FactomdRpcUser          %v", s.App.FactomdRpcUser))
-	out.WriteString(fmt.Sprintf("\n    FactomdRpcPass          %v", s.App.FactomdRpcPass))
+	out.WriteString(fmt.Sprintf("\n    FactomdRpcUser          	%v", s.App.FactomdRpcUser))
+	out.WriteString(fmt.Sprintf("\n    FactomdRpcPass          	%v", s.App.FactomdRpcPass))
 	out.WriteString(fmt.Sprintf("\n    ChangeAcksHeight         %v", s.App.ChangeAcksHeight))
 
 	out.WriteString(fmt.Sprintf("\n  Log"))
@@ -296,6 +300,10 @@ func ReadConfig(filename string) *FactomdConfig {
 		cfg.App.HomeDir = cfg.App.HomeDir + "/.factom/m2/"
 	}
 
+	if len(cfg.App.FastBootLocation) < 1 {
+		cfg.App.FastBootLocation = cfg.App.HomeDir
+	}
+
 	switch cfg.App.Network {
 	case "MAIN":
 		cfg.App.ExchangeRateAuthorityPublicKey = cfg.App.ExchangeRateAuthorityPublicKeyMainNet
@@ -312,6 +320,11 @@ func ReadConfig(filename string) *FactomdConfig {
 }
 
 func GetHomeDir() string {
+	factomhome := os.Getenv("FACTOM_HOME")
+	if factomhome != "" {
+		return factomhome
+	}
+
 	// Get the OS specific home directory via the Go standard lib.
 	var homeDir string
 	usr, err := user.Current()

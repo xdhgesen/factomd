@@ -165,7 +165,7 @@ func NegotiationCheck(pl *ProcessList) {
 			ff.SendOut(pl.State, ff)
 			ff.FollowerExecute(pl.State)
 		}
-		pl.State.AddStatus(fmt.Sprintf("Sending Negotiation message (because %d) at %d since LFA=%d: %s", prevVM.FaultFlag, now, pl.State.LastFaultAction, ff.String()))
+		//pl.State.AddStatus(fmt.Sprintf("Sending Negotiation message (because %d) at %d since LFA=%d: %s", prevVM.FaultFlag, now, pl.State.LastFaultAction, ff.String()))
 		pl.State.LastFaultAction = now
 	}
 
@@ -231,7 +231,7 @@ func precedingVMIndex(pl *ProcessList) int {
 
 func ToggleAuditOffline(pl *ProcessList, fc FaultCore) {
 	auditServerList := pl.State.GetAuditServers(fc.DBHeight)
-	var theAuditReplacement interfaces.IFctServer
+	var theAuditReplacement interfaces.IServer
 
 	for _, auditServer := range auditServerList {
 		if auditServer.GetChainID().IsSameAs(fc.AuditServerID) {
@@ -241,36 +241,6 @@ func ToggleAuditOffline(pl *ProcessList, fc FaultCore) {
 	if theAuditReplacement != nil {
 		theAuditReplacement.SetOnline(false)
 	}
-}
-
-// couldIFullFault is our check to see if there are any negotiations
-// ongoing for a particular VM (leader), and if so, have we gathered
-// enough ServerFaults (+the Audit Pledge) to issue a FullFault message
-// and conclude the faulting process ourselves
-func couldIFullFault(pl *ProcessList, vmIndex int) bool {
-	leaderMin := getLeaderMin(pl)
-	faultedFed := pl.ServerMap[leaderMin][vmIndex]
-	id := pl.FedServers[faultedFed].GetChainID()
-	stringid := id.String()
-
-	currentFault := pl.CurrentFault()
-
-	if currentFault.IsNil() {
-		return false
-	}
-
-	if !currentFault.AmINegotiator {
-		faultedServerFromFaultState := currentFault.ServerID.String()
-		if faultedServerFromFaultState == stringid {
-			if currentFault.PledgeDone && currentFault.HasEnoughSigs(pl.State) {
-				// if the above 2 conditions are satisfied, we could issue
-				// a FullFault message (if we were the negotiator for this fault)
-				return true
-			}
-		}
-	}
-
-	return false
 }
 
 func CraftFault(pl *ProcessList, vmIndex int, height int) *messages.ServerFault {
@@ -367,7 +337,7 @@ func (s *State) FollowerExecuteSFault(m interfaces.IMsg) {
 		// If no such ProcessList exists, or if we don't consider
 		// the VM in this ServerFault message to be at fault,
 		// do not proceed with regularFaultExecution
-		s.Holding[m.GetRepeatHash().Fixed()] = m
+		s.Holding[m.GetMsgHash().Fixed()] = m
 		return
 	}
 
@@ -448,7 +418,7 @@ func (s *State) matchFault(sf *messages.ServerFault) {
 	if sf != nil {
 		sf.Sign(s.serverPrivKey)
 		sf.SendOut(s, sf)
-		s.InMsgQueue() <- sf
+		s.InMsgQueue().Enqueue(sf)
 	}
 }
 
@@ -461,7 +431,7 @@ func (s *State) FollowerExecuteFullFault(m interfaces.IMsg) {
 	pl := s.ProcessLists.Get(fullFault.DBHeight)
 
 	if pl == nil {
-		s.Holding[m.GetHash().Fixed()] = m
+		s.Holding[m.GetMsgHash().Fixed()] = m
 		return
 	}
 
@@ -470,12 +440,12 @@ func (s *State) FollowerExecuteFullFault(m interfaces.IMsg) {
 		return
 	}
 
-	s.AddStatus(fmt.Sprintf("FULL FAULT FOLLOWER EXECUTE Execute Full Fault:  Replacing %x with %x at height %d leader height %d %s",
-		fullFault.ServerID.Bytes()[2:6],
-		fullFault.AuditServerID.Bytes()[2:6],
-		fullFault.DBHeight,
-		s.LLeaderHeight,
-		fullFault.String()))
+	//s.AddStatus(fmt.Sprintf("FULL FAULT FOLLOWER EXECUTE Execute Full Fault:  Replacing %x with %x at height %d leader height %d %s",
+	//	fullFault.ServerID.Bytes()[2:6],
+	//	fullFault.AuditServerID.Bytes()[2:6],
+	//	fullFault.DBHeight,
+	//	s.LLeaderHeight,
+	//	fullFault.String()))
 
 	pl.AddToSystemList(fullFault)
 }
@@ -507,17 +477,17 @@ func (s *State) Reset() {
 // Set to reprocess all messages and states
 func (s *State) DoReset() {
 	s.ResetTryCnt++
-	s.AddStatus(fmt.Sprintf("RESET: Trying to Reset for the %d time", s.ResetTryCnt))
+	//s.AddStatus(fmt.Sprintf("RESET: Trying to Reset for the %d time", s.ResetTryCnt))
 	index := len(s.DBStates.DBStates) - 1
 	if index < 2 {
-		s.AddStatus("RESET: Failed to Reset because not enough dbstates")
+		//s.AddStatus("RESET: Failed to Reset because not enough dbstates")
 		return
 	}
 
 	dbs := s.DBStates.DBStates[index]
 	for {
 		if dbs == nil || dbs.DirectoryBlock == nil || dbs.AdminBlock == nil || dbs.FactoidBlock == nil || dbs.EntryCreditBlock == nil {
-			s.AddStatus(fmt.Sprintf("RESET: Reset Failed, no dbstate at %d", index))
+			//s.AddStatus(fmt.Sprintf("RESET: Reset Failed, no dbstate at %d", index))
 			return
 		}
 		if dbs.Saved {
@@ -527,7 +497,7 @@ func (s *State) DoReset() {
 		dbs = s.DBStates.DBStates[index]
 	}
 	if index < 0 {
-		s.AddStatus("RESET: Can't reset far enough back")
+		//s.AddStatus("RESET: Can't reset far enough back")
 		return
 	}
 	s.ResetCnt++
@@ -547,5 +517,5 @@ func (s *State) DoReset() {
 	s.SetLeaderTimestamp(dbs.NextTimestamp)
 
 	s.DBStates.ProcessBlocks(dbs)
-	s.AddStatus("RESET: Complete")
+	//s.AddStatus("RESET: Complete")
 }

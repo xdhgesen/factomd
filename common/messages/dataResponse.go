@@ -5,7 +5,6 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -13,6 +12,8 @@ import (
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 // Communicate a Directory Block State
@@ -92,14 +93,6 @@ func (m *DataResponse) Type() byte {
 	return constants.DATA_RESPONSE
 }
 
-func (m *DataResponse) Int() int {
-	return -1
-}
-
-func (m *DataResponse) Bytes() []byte {
-	return nil
-}
-
 func (m *DataResponse) GetTimestamp() interfaces.Timestamp {
 	return m.Timestamp
 }
@@ -161,10 +154,6 @@ func (e *DataResponse) JSONByte() ([]byte, error) {
 
 func (e *DataResponse) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *DataResponse) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *DataResponse) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
@@ -280,16 +269,19 @@ func (m *DataResponse) MarshalBinary() ([]byte, error) {
 }
 
 func (m *DataResponse) String() string {
-	return fmt.Sprintf("DataResponse Type: %v\n Hash: %x\n Object: %v\n",
+	return fmt.Sprintf("DataResponse Type: %2d Hash: %x\n",
 		m.DataType,
-		m.DataHash.Bytes()[:5],
-		m.DataObject)
+		m.DataHash.Bytes())
+}
+
+func (m *DataResponse) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "dataresponse", "datatype": m.DataType,
+		"datahash": m.DataHash.String()[:6]}
 }
 
 func NewDataResponse(state interfaces.IState, dataObject interfaces.BinaryMarshallable,
 	dataType int,
 	dataHash interfaces.IHash) interfaces.IMsg {
-
 	msg := new(DataResponse)
 
 	msg.Peer2Peer = true

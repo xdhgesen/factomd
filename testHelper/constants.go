@@ -1,21 +1,21 @@
 package testHelper
 
 const (
-	DBlockHeadPrimaryIndex   = "eb222f3c8fc097edd39acce8a38f01580947a5e8e24e3a9a90a75f8eaafd4dc2"
-	DBlockHeadSecondaryIndex = "d852ca5c299b15ad155db7015377b70a1dca008d2192f3ba84f3669298c79f3d"
+	DBlockHeadPrimaryIndex   = "30060a6e8247e0ee085f29714a95d91f659c78ceea7ced49fd312c115e0440c3"
+	DBlockHeadSecondaryIndex = "376c6f28ffeaf08a61df390b4a9731f241d340d913564c3ca6eab32e113b5cd2"
 
-	ABlockHeadPrimaryIndex   = "956c41312070f58c628ca8027297e0af0aaaa7b8af7f84283fc5ad21a49cc00a"
-	ABlockHeadSecondaryIndex = "b07a252e7ff13ef3ae6b18356949af34f535eca0383a03f71f5f4c526c58b562"
+	ABlockHeadPrimaryIndex   = "073bd46185217fddbd6d422cc23f28fe8ea58bf63c2e7521b7de3623b52e3b41"
+	ABlockHeadSecondaryIndex = "4d4d40eff3c48e054226d7308ac6a8e2230dc489be7ca39631abac258f33902b"
 
-	ECBlockHeadPrimaryIndex   = "69bd749e7697642c218ac33ebb4283e477de540b6dfd00033a7301d8f4cc3ac6"
-	ECBlockHeadSecondaryIndex = "10ab25c2420ad107ec3056f964687ceece50a1d752cd13ac2fbf44241bae9d55"
+	ECBlockHeadPrimaryIndex   = "bdf70fe3bd42c74bb86668e10bff2c8c1c52c6c89f625d3d9b6e763081916a56"
+	ECBlockHeadSecondaryIndex = "c70b7f03068418741f6815f26560cbb2a11447c9b8717c4fe6ac2a0852750393"
 
-	FBlockHeadPrimaryIndex   = "c6cd2ab21d75af1e8589e1eb441411838a508d0674eb294bac4efdc591c3fef4"
-	FBlockHeadSecondaryIndex = "e6e8b0a9808bf9ffb53d04acff0dcafc2d5fc7139ef850ab1a5fc94dfd87931e"
+	FBlockHeadPrimaryIndex   = "84c8ac94c639117ef1b80d00c48f03c4a14bd74f17d86d56a8d8a4a73e6f91a8"
+	FBlockHeadSecondaryIndex = "5f4d14e8b4bf5d8545d7ccaccccc99d2757b6ef5eaf5ffac03705457bb9d65ac"
 
 	EBlockHeadPrimaryIndex   = "6e7e64ac45ff57edbf8537a0c99fba2e9ee351ef3d3f4abd93af9f01107e592c"
-	EBlockHeadSecondaryIndex = "1127ed78303976572f25dfba2a058e475234c079ea0d0f645280d03caff08347"
+	EBlockHeadSecondaryIndex = "e79fb46ad81f0b4fac7f1e66728b40b390f8fcc3806e93f94550eec041eecff2"
 
 	AnchorBlockHeadPrimaryIndex   = "df3ade9eec4b08d5379cc64270c30ea7315d8a8a1a69efe2b98a60ecdd69e604"
-	AnchorBlockHeadSecondaryIndex = "03897216bbdfb49f7fa17f6e86e9e1044499c94a49cfe1c3ddd02a2ca00521da"
+	AnchorBlockHeadSecondaryIndex = "7ab57fdb07ad75f35cb8f85bf435f60d5eab381c9da253780978cdb9d7ea5fae"
 )

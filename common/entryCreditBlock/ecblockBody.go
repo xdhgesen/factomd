@@ -5,19 +5,40 @@
 package entryCreditBlock
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
 type ECBlockBody struct {
-	Entries []interfaces.IECBlockEntry
+	Entries []interfaces.IECBlockEntry `json:"entries"`
 }
 
 var _ = fmt.Print
 var _ interfaces.Printable = (*ECBlockBody)(nil)
 var _ interfaces.IECBlockBody = (*ECBlockBody)(nil)
+
+func (a *ECBlockBody) IsSameAs(b interfaces.IECBlockBody) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+
+	bEntries := b.GetEntries()
+	if len(a.Entries) != len(bEntries) {
+		return false
+	}
+	for i := range a.Entries {
+		if a.Entries[i].IsSameAs(bEntries[i]) == false {
+			return false
+		}
+	}
+
+	return true
+}
 
 func (e *ECBlockBody) GetEntries() []interfaces.IECBlockEntry {
 	return e.Entries
@@ -37,10 +58,6 @@ func (e *ECBlockBody) JSONByte() ([]byte, error) {
 
 func (e *ECBlockBody) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *ECBlockBody) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *ECBlockBody) String() string {

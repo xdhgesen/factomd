@@ -5,12 +5,8 @@
 package entryCreditBlock
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
-	"io"
 
-	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
@@ -27,8 +23,8 @@ const (
 // of primarily Commits and Balance Increases with Minute Markers and Server
 // Markers distributed throughout.
 type ECBlock struct {
-	Header interfaces.IECBlockHeader
-	Body   interfaces.IECBlockBody
+	Header interfaces.IECBlockHeader `json:"header"`
+	Body   interfaces.IECBlockBody   `json:"body"`
 }
 
 var _ interfaces.Printable = (*ECBlock)(nil)
@@ -36,19 +32,53 @@ var _ interfaces.BinaryMarshallableAndCopyable = (*ECBlock)(nil)
 var _ interfaces.IEntryCreditBlock = (*ECBlock)(nil)
 var _ interfaces.DatabaseBlockWithEntries = (*ECBlock)(nil)
 
+func (c *ECBlock) Init() {
+	if c.Header == nil {
+		h := new(ECBlockHeader)
+		h.Init()
+		c.Header = h
+	}
+	if c.Body == nil {
+		c.Body = new(ECBlockBody)
+	}
+}
+
+func (a *ECBlock) IsSameAs(b interfaces.IEntryCreditBlock) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+
+	if a.Header.IsSameAs(b.GetHeader()) == false {
+		return false
+	}
+	if a.Body.IsSameAs(b.GetBody()) == false {
+		return false
+	}
+
+	return true
+}
+
 func (c *ECBlock) UpdateState(state interfaces.IState) error {
+	if state == nil {
+		return fmt.Errorf("No State provided")
+	}
+	c.Init()
 	state.UpdateECs(c)
 	return nil
 }
 
 func (c *ECBlock) String() string {
-	str := c.Header.String()
-	str = str + c.Body.String()
+	str := c.GetHeader().String()
+	str = str + c.GetBody().String()
 	return str
 }
 
 func (c *ECBlock) GetEntries() []interfaces.IECBlockEntry {
-	return c.Body.GetEntries()
+	c.Init()
+	return c.GetBody().GetEntries()
 }
 
 func (c *ECBlock) GetEntryByHash(hash interfaces.IHash) interfaces.IECBlockEntry {
@@ -69,7 +99,7 @@ func (c *ECBlock) GetEntryByHash(hash interfaces.IHash) interfaces.IECBlockEntry
 }
 
 func (c *ECBlock) GetEntryHashes() []interfaces.IHash {
-	entries := c.Body.GetEntries()
+	entries := c.GetBody().GetEntries()
 	answer := make([]interfaces.IHash, 0, len(entries))
 	for _, entry := range entries {
 		if entry.ECID() == ECIDBalanceIncrease || entry.ECID() == ECIDChainCommit || entry.ECID() == ECIDEntryCommit {
@@ -80,7 +110,7 @@ func (c *ECBlock) GetEntryHashes() []interfaces.IHash {
 }
 
 func (c *ECBlock) GetEntrySigHashes() []interfaces.IHash {
-	entries := c.Body.GetEntries()
+	entries := c.GetBody().GetEntries()
 	answer := make([]interfaces.IHash, 0, len(entries))
 	for _, entry := range entries {
 		if entry.ECID() == ECIDBalanceIncrease || entry.ECID() == ECIDChainCommit || entry.ECID() == ECIDEntryCommit {
@@ -94,10 +124,12 @@ func (c *ECBlock) GetEntrySigHashes() []interfaces.IHash {
 }
 
 func (c *ECBlock) GetBody() interfaces.IECBlockBody {
+	c.Init()
 	return c.Body
 }
 
 func (c *ECBlock) GetHeader() interfaces.IECBlockHeader {
+	c.Init()
 	return c.Header
 }
 
@@ -107,11 +139,11 @@ func (c *ECBlock) New() interfaces.BinaryMarshallableAndCopyable {
 }
 
 func (c *ECBlock) GetDatabaseHeight() uint32 {
-	return c.Header.GetDBHeight()
+	return c.GetHeader().GetDBHeight()
 }
 
 func (c *ECBlock) GetChainID() interfaces.IHash {
-	return c.Header.GetECChainID()
+	return c.GetHeader().GetECChainID()
 }
 
 func (c *ECBlock) DatabasePrimaryIndex() interfaces.IHash {
@@ -155,36 +187,44 @@ func (e *ECBlock) HeaderHash() (interfaces.IHash, error) {
 }
 
 func (e *ECBlock) MarshalBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
+	e.Init()
+	buf := primitives.NewBuffer(nil)
 
 	// Header
-	if err := e.BuildHeader(); err != nil {
+	err := e.BuildHeader()
+	if err != nil {
 		return nil, err
-	}
-	if p, err := e.GetHeader().MarshalBinary(); err != nil {
-		return nil, err
-	} else {
-		buf.Write(p)
 	}
 
-	// Body of ECBlockEntries
-	if p, err := e.marshalBodyBinary(); err != nil {
+	err = buf.PushBinaryMarshallable(e.GetHeader())
+	if err != nil {
 		return nil, err
-	} else {
-		buf.Write(p)
+	}
+	x := buf.DeepCopyBytes()
+	buf = primitives.NewBuffer(x)
+
+	// Body of ECBlockEntries
+	p, err := e.marshalBodyBinary()
+	if err != nil {
+		return nil, err
+	}
+	err = buf.Push(p)
+	if err != nil {
+		return nil, err
 	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
 func (e *ECBlock) BuildHeader() error {
+	e.Init()
 	// Marshal the Body
 	p, err := e.marshalBodyBinary()
 	if err != nil {
 		return err
 	}
 
-	header := e.Header.(*ECBlockHeader)
+	header := e.GetHeader().(*ECBlockHeader)
 	header.BodyHash = primitives.Sha(p)
 	header.ObjectCount = uint64(len(e.GetBody().GetEntries()))
 	header.BodySize = uint64(len(p))
@@ -203,29 +243,25 @@ func UnmarshalECBlock(data []byte) (interfaces.IEntryCreditBlock, error) {
 	return block, nil
 }
 
-func (e *ECBlock) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling: %v", r)
-		}
-	}()
+func (e *ECBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
 
 	// Unmarshal Header
 	if e.GetHeader() == nil {
 		e.Header = NewECBlockHeader()
 	}
-	newData, err = e.GetHeader().UnmarshalBinaryData(data)
+	err := buf.PopBinaryMarshallable(e.GetHeader())
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	// Unmarshal Body
-	newData, err = e.unmarshalBodyBinaryData(newData)
+	newData, err := e.unmarshalBodyBinaryData(buf.DeepCopyBytes())
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return newData, err
 }
 
 func (e *ECBlock) UnmarshalBinary(data []byte) (err error) {
@@ -234,130 +270,70 @@ func (e *ECBlock) UnmarshalBinary(data []byte) (err error) {
 }
 
 func (e *ECBlock) marshalBodyBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
+	e.Init()
+	buf := primitives.NewBuffer(nil)
+	entries := e.GetBody().GetEntries()
 
-	for _, v := range e.GetBody().GetEntries() {
-		p, err := v.MarshalBinary()
+	for _, v := range entries {
+		err := buf.PushByte(v.ECID())
 		if err != nil {
-			return buf.Bytes(), err
+			return nil, err
 		}
-		buf.WriteByte(v.ECID())
-		buf.Write(p)
-	}
-
-	return buf.DeepCopyBytes(), nil
-}
-
-func (e *ECBlock) marshalHeaderBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
-
-	// 32 byte ECChainID
-	buf.Write(e.GetHeader().GetECChainID().Bytes())
-
-	// 32 byte BodyHash
-	buf.Write(e.GetHeader().GetBodyHash().Bytes())
-
-	// 32 byte Previous Header Hash
-	buf.Write(e.GetHeader().GetPrevHeaderHash().Bytes())
-
-	// 32 byte Previous Full Hash
-	buf.Write(e.GetHeader().GetPrevFullHash().Bytes())
-
-	// 4 byte Directory Block Height
-	if err := binary.Write(buf, binary.BigEndian, e.GetHeader().GetDBHeight()); err != nil {
-		return buf.Bytes(), err
-	}
-
-	// variable Header Expansion Size
-	if err := primitives.EncodeVarInt(buf,
-		uint64(len(e.GetHeader().GetHeaderExpansionArea()))); err != nil {
-		return buf.Bytes(), err
-	}
-
-	// varable byte Header Expansion Area
-	buf.Write(e.Header.GetHeaderExpansionArea())
-
-	// 8 byte Object Count
-	if err := binary.Write(buf, binary.BigEndian, e.Header.GetObjectCount()); err != nil {
-		return nil, err
-	}
-
-	// 8 byte size of the Body
-	if err := binary.Write(buf, binary.BigEndian, e.Header.GetBodySize()); err != nil {
-		return nil, err
+		err = buf.PushBinaryMarshallable(v)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
 func (e *ECBlock) unmarshalBodyBinaryData(data []byte) ([]byte, error) {
+	e.Init()
 	buf := primitives.NewBuffer(data)
-	var err error
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling: %v", r)
-		}
-	}()
 
-	for i := uint64(0); i < e.Header.GetObjectCount(); i++ {
-		var id byte
-		id, err = buf.ReadByte()
+	for i := uint64(0); i < e.GetHeader().GetObjectCount(); i++ {
+		id, err := buf.PopByte()
 		if err != nil {
 			return nil, err
 		}
+
 		switch id {
 		case ECIDServerIndexNumber:
 			s := NewServerIndexNumber()
-			if buf.Len() < ServerIndexNumberSize {
-				err = io.EOF
-				return nil, err
-			}
-			_, err = s.UnmarshalBinaryData(buf.Next(ServerIndexNumberSize))
+			err = buf.PopBinaryMarshallable(s)
 			if err != nil {
 				return nil, err
 			}
-			e.Body.SetEntries(append(e.Body.GetEntries(), s))
+			e.GetBody().AddEntry(s)
 		case ECIDMinuteNumber:
 			m := NewMinuteNumber(0)
-			if buf.Len() < MinuteNumberSize {
-				err = io.EOF
-				return nil, err
-			}
-			_, err = m.UnmarshalBinaryData(buf.Next(MinuteNumberSize))
+			err = buf.PopBinaryMarshallable(m)
 			if err != nil {
 				return nil, err
 			}
-			e.Body.SetEntries(append(e.Body.GetEntries(), m))
+			e.GetBody().AddEntry(m)
 		case ECIDChainCommit:
-			if buf.Len() < CommitChainSize {
-				err = io.EOF
-				return nil, err
-			}
 			c := NewCommitChain()
-			_, err = c.UnmarshalBinaryData(buf.Next(CommitChainSize))
+			err = buf.PopBinaryMarshallable(c)
 			if err != nil {
 				return nil, err
 			}
-			e.Body.SetEntries(append(e.Body.GetEntries(), c))
+			e.GetBody().AddEntry(c)
 		case ECIDEntryCommit:
-			if buf.Len() < CommitEntrySize {
-				err = io.EOF
-				return nil, err
-			}
 			c := NewCommitEntry()
-			_, err = c.UnmarshalBinaryData(buf.Next(CommitEntrySize))
+			err = buf.PopBinaryMarshallable(c)
 			if err != nil {
 				return nil, err
 			}
-			e.Body.SetEntries(append(e.Body.GetEntries(), c))
+			e.GetBody().AddEntry(c)
 		case ECIDBalanceIncrease:
 			c := NewIncreaseBalance()
-			tmp, err := c.UnmarshalBinaryData(buf.DeepCopyBytes())
+			err = buf.PopBinaryMarshallable(c)
 			if err != nil {
 				return nil, err
 			}
-			e.Body.SetEntries(append(e.Body.GetEntries(), c))
-			buf = primitives.NewBuffer(tmp)
+			e.GetBody().AddEntry(c)
 		default:
 			err = fmt.Errorf("Unsupported ECID: %x\n", id)
 			return nil, err
@@ -372,76 +348,12 @@ func (b *ECBlock) unmarshalBodyBinary(data []byte) (err error) {
 	return
 }
 
-func (e *ECBlock) unmarshalHeaderBinaryData(data []byte) (newData []byte, err error) {
-	buf := primitives.NewBuffer(data)
-	hash := make([]byte, 32)
-
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.Header.GetECChainID().SetBytes(hash)
-	}
-
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.Header.GetBodyHash().SetBytes(hash)
-	}
-
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.Header.GetPrevHeaderHash().SetBytes(hash)
-	}
-
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.Header.GetPrevFullHash().SetBytes(hash)
-	}
-
-	h := e.Header.GetDBHeight()
-	if err = binary.Read(buf, binary.BigEndian, &h); err != nil {
-		return
-	}
-
-	// read the Header Expansion Area
-	hesize, tmp := primitives.DecodeVarInt(buf.DeepCopyBytes())
-	buf = primitives.NewBuffer(tmp)
-	e.Header.SetHeaderExpansionArea(make([]byte, hesize))
-	if _, err = buf.Read(e.Header.GetHeaderExpansionArea()); err != nil {
-		return
-	}
-
-	oc := e.Header.GetObjectCount()
-	if err = binary.Read(buf, binary.BigEndian, &oc); err != nil {
-		return
-	}
-
-	sz := e.Header.GetBodySize()
-	if err = binary.Read(buf, binary.BigEndian, &sz); err != nil {
-		return
-	}
-
-	newData = buf.DeepCopyBytes()
-	return
-}
-
-func (e *ECBlock) unmarshalHeaderBinary(data []byte) error {
-	_, err := e.unmarshalHeaderBinaryData(data)
-	return err
-}
-
 func (e *ECBlock) JSONByte() ([]byte, error) {
 	return primitives.EncodeJSON(e)
 }
 
 func (e *ECBlock) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *ECBlock) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 /********************************************************
@@ -460,8 +372,8 @@ func NextECBlock(prev interfaces.IEntryCreditBlock) (interfaces.IEntryCreditBloc
 
 	// Handle the really unusual case of the first block.
 	if prev == nil {
-		e.GetHeader().SetPrevHeaderHash(primitives.NewHash(constants.ZERO_HASH))
-		e.GetHeader().SetPrevFullHash(primitives.NewHash(constants.ZERO_HASH))
+		e.GetHeader().SetPrevHeaderHash(primitives.NewZeroHash())
+		e.GetHeader().SetPrevFullHash(primitives.NewZeroHash())
 		e.GetHeader().SetDBHeight(0)
 	} else {
 		v, err := prev.HeaderHash()

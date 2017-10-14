@@ -6,33 +6,48 @@ package factoid_test
 
 import (
 	"fmt"
+	"math/rand"
+	"testing"
+
 	"github.com/FactomProject/ed25519"
 	. "github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/common/primitives"
-	"math/rand"
-	"testing"
 )
 
 var _ = fmt.Printf
 var _ = ed25519.Sign
 var _ = rand.New
 
-func Test_Auth2_Equals(test *testing.T) {
+func TestUnmarshalNilBinaryAuth(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
 
+	_, _, err := UnmarshalBinaryAuth(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	_, _, err = UnmarshalBinaryAuth([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
+
+func TestAuth2_Equals(t *testing.T) {
 	a1 := nextAuth2_rcd()
 	a2 := a1
 
-	if a1.IsEqual(a2) != nil {
-		primitives.PrtStk()
-		test.Fail()
+	if a1.IsSameAs(a2) == false {
+		t.Errorf("Addresses are not equal")
 	}
 
 	a1 = nextAuth2_rcd()
 
-	if a1.IsEqual(a2) == nil {
-		primitives.PrtStk()
-		test.Fail()
+	if a1.IsSameAs(a2) == true {
+		t.Errorf("Addresses are equal")
 	}
 }
 

@@ -10,9 +10,29 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/testHelper"
 )
 
-func TestMarshalUnmarshalMissingDsg(t *testing.T) {
+func TestUnmarshalNilMissingMsg(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
+
+	a := new(MissingMsg)
+	err := a.UnmarshalBinary(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	err = a.UnmarshalBinary([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
+
+func TestMarshalUnmarshalMissingMsg(t *testing.T) {
 	msg := newMissingMsg()
 
 	hex, err := msg.MarshalBinary()
@@ -48,6 +68,30 @@ func TestMarshalUnmarshalMissingDsg(t *testing.T) {
 	if msg.IsSameAs(msg2.(*MissingMsg)) != true {
 		t.Error("MissingMsg messages are not identical")
 	}
+}
+
+func TestValidateMissingMsg(t *testing.T) {
+	msg := newMissingMsg()
+	s := testHelper.CreateEmptyTestState()
+
+	msg.Asking = nil
+	v := msg.Validate(s)
+	if v != -1 {
+		t.Errorf("Should be -1, found %d", v)
+	}
+
+	msg.Asking = primitives.NewZeroHash()
+	v = msg.Validate(s)
+	if v != -1 {
+		t.Errorf("Should be -1, found %d", v)
+	}
+
+	msg.Asking = primitives.RandomHash()
+	v = msg.Validate(s)
+	if v != 1 {
+		t.Errorf("Should be 1, found %d", v)
+	}
+
 }
 
 func newMissingMsg() *MissingMsg {

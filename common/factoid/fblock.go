@@ -5,7 +5,6 @@
 package factoid
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -43,6 +42,22 @@ var _ interfaces.IFBlock = (*FBlock)(nil)
 var _ interfaces.Printable = (*FBlock)(nil)
 var _ interfaces.BinaryMarshallableAndCopyable = (*FBlock)(nil)
 var _ interfaces.DatabaseBlockWithEntries = (*FBlock)(nil)
+
+func (a *FBlock) Init() {
+	if a.BodyMR == nil {
+		a.BodyMR = primitives.NewZeroHash()
+	}
+	if a.PrevKeyMR == nil {
+		a.PrevKeyMR = primitives.NewZeroHash()
+	}
+	if a.PrevLedgerKeyMR == nil {
+		a.PrevLedgerKeyMR = primitives.NewZeroHash()
+	}
+}
+
+func (a *FBlock) IsSameAs(b interfaces.IFBlock) bool {
+	return true
+}
 
 func (c *FBlock) GetEntryHashes() []interfaces.IHash {
 	entries := c.Transactions[:]
@@ -140,11 +155,9 @@ func (b *FBlock) MarshalTrans() ([]byte, error) {
 	// 	}
 
 	for i, trans = range b.Transactions {
-
 		for periodMark < len(b.endOfPeriod) &&
 			b.endOfPeriod[periodMark] > 0 && // Ignore if markers are not set
 			i == b.endOfPeriod[periodMark] {
-
 			out.WriteByte(constants.MARKER)
 			periodMark++
 		}
@@ -170,9 +183,7 @@ func (b *FBlock) MarshalHeader() ([]byte, error) {
 
 	out.Write(constants.FACTOID_CHAINID)
 
-	if b.BodyMR == nil {
-		b.BodyMR = new(primitives.Hash)
-	}
+	b.BodyMR = b.GetBodyMR()
 	data, err := b.BodyMR.MarshalBinary()
 	if err != nil {
 		return nil, err
@@ -212,11 +223,13 @@ func (b *FBlock) MarshalHeader() ([]byte, error) {
 
 	binary.Write(&out, binary.BigEndian, uint32(len(transdata))) // write out its length
 
-	return out.DeepCopyBytes(), nil
+	h := out.DeepCopyBytes()
+	return h, nil
 }
 
 // Write out the block
 func (b *FBlock) MarshalBinary() ([]byte, error) {
+	b.Init()
 	var out primitives.Buffer
 
 	data, err := b.MarshalHeader()
@@ -247,129 +260,111 @@ func UnmarshalFBlock(data []byte) (interfaces.IFBlock, error) {
 
 // UnmarshalBinary assumes that the Binary is all good.  We do error
 // out if there isn't enough data, or the transaction is too large.
-func (b *FBlock) UnmarshalBinaryData(data []byte) (newdata []byte, err error) {
-	// To catch memory errors, we capture the panic and turn it into
-	// a reported error.
-	defer func() {
-		return
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling transaction: %v", r)
-		}
-	}()
-
-	if bytes.Compare(data[:constants.ADDRESS_LENGTH], constants.FACTOID_CHAINID[:]) != 0 {
-		panic(fmt.Sprintf("error in: %x %x", data[:35], constants.FACTOID_CHAINID[:]))
+func (b *FBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	b.Init()
+	buf := primitives.NewBuffer(data)
+	h := primitives.NewZeroHash()
+	err := buf.PopBinaryMarshallable(h)
+	if err != nil {
+		return nil, err
+	}
+	if h.String() != "000000000000000000000000000000000000000000000000000000000000000f" {
 		return nil, fmt.Errorf("Block does not begin with the Factoid ChainID")
 	}
-	newdata = data[32:]
 
-	b.BodyMR = new(primitives.Hash)
-	newdata, err = b.BodyMR.UnmarshalBinaryData(newdata)
+	err = buf.PopBinaryMarshallable(b.BodyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PopBinaryMarshallable(b.PrevKeyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PopBinaryMarshallable(b.PrevLedgerKeyMR)
 	if err != nil {
 		return nil, err
 	}
 
-	b.PrevKeyMR = new(primitives.Hash)
-	newdata, err = b.PrevKeyMR.UnmarshalBinaryData(newdata)
+	b.ExchRate, err = buf.PopUInt64()
+	if err != nil {
+		return nil, err
+	}
+	b.DBHeight, err = buf.PopUInt32()
 	if err != nil {
 		return nil, err
 	}
 
-	b.PrevLedgerKeyMR = new(primitives.Hash)
-	newdata, err = b.PrevLedgerKeyMR.UnmarshalBinaryData(newdata)
+	// Skip the Expansion Header, if any, since
+	// we don't know what to do with it.
+	skip, err := buf.PopVarInt()
+	if err != nil {
+		return nil, err
+	}
+	_, err = buf.PopLen(int(skip))
 	if err != nil {
 		return nil, err
 	}
 
-	b.ExchRate, newdata = binary.BigEndian.Uint64(newdata[0:8]), newdata[8:]
-	b.DBHeight, newdata = binary.BigEndian.Uint32(newdata[0:4]), newdata[4:]
+	cnt, err := buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
+	// Just skip the size... We don't really need it.
+	_, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
 
-	skip, newdata := primitives.DecodeVarInt(newdata) // Skip the Expansion Header, if any, since
-	newdata = newdata[skip:]                          // we don't know what to do with it.
-
-	cnt, newdata := binary.BigEndian.Uint32(newdata[0:4]), newdata[4:]
-
-	newdata = newdata[4:] // Just skip the size... We don't really need it.
-
-	b.Transactions = make([]interfaces.ITransaction, cnt, cnt)
+	b.Transactions = make([]interfaces.ITransaction, int(cnt), int(cnt))
 	for i, _ := range b.endOfPeriod {
 		b.endOfPeriod[i] = 0
 	}
 	var periodMark = 0
 
 	for i := uint32(0); i < cnt; i++ {
-		for newdata[0] == constants.MARKER {
+		by, err := buf.PeekByte()
+		if err != nil {
+			return nil, err
+		}
+		for by == constants.MARKER {
+			_, err = buf.PopByte()
+			if err != nil {
+				return nil, err
+			}
 			b.endOfPeriod[periodMark] = int(i)
-			newdata = newdata[1:]
 			periodMark++
+
+			by, err = buf.PeekByte()
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		trans := new(Transaction)
-		newdata, err = trans.UnmarshalBinaryData(newdata)
+		err = buf.PopBinaryMarshallable(trans)
+		if err != nil {
+			return nil, err
+		}
 		if err != nil {
 			return nil, fmt.Errorf("Failed to unmarshal a transaction in block.\n" + err.Error())
 		}
 		b.Transactions[i] = trans
 	}
 	for periodMark < len(b.endOfPeriod) {
-		newdata = newdata[1:]
+		_, err = buf.PopByte()
+		if err != nil {
+			return nil, err
+		}
 		b.endOfPeriod[periodMark] = int(cnt)
 		periodMark++
 	}
 
-	return newdata, nil
+	return buf.DeepCopyBytes(), nil
 }
 
 func (b *FBlock) UnmarshalBinary(data []byte) (err error) {
 	_, err = b.UnmarshalBinaryData(data)
 	return err
-}
-
-// Tests if the transaction is equal in all of its structures, and
-// in order of the structures.  Largely used to test and debug, but
-// generally useful.
-func (b1 *FBlock) IsEqual(block interfaces.IBlock) []interfaces.IBlock {
-
-	b2, ok := block.(*FBlock)
-
-	if !ok || // Not the right kind of interfaces.IBlock
-		b1.ExchRate != b2.ExchRate ||
-		b1.DBHeight != b2.DBHeight {
-		r := make([]interfaces.IBlock, 0, 3)
-		return append(r, b1)
-	}
-
-	r := b1.BodyMR.IsEqual(b2.BodyMR)
-	if r != nil {
-		return append(r, b1)
-	}
-	r = b1.PrevKeyMR.IsEqual(b2.PrevKeyMR)
-	if r != nil {
-		return append(r, b1)
-	}
-	r = b1.PrevLedgerKeyMR.IsEqual(b2.PrevLedgerKeyMR)
-	if r != nil {
-		return append(r, b1)
-	}
-
-	if b1.endOfPeriod != b2.endOfPeriod {
-		return append(r, b1)
-	}
-
-	for i, mm := range b1.endOfPeriod {
-		if b2.endOfPeriod[i] != mm {
-			return append(r, b1)
-		}
-	}
-
-	for i, trans := range b1.Transactions {
-		r := trans.IsEqual(b2.Transactions[i])
-		if r != nil {
-			return append(r, b1)
-		}
-	}
-
-	return nil
 }
 
 func (b *FBlock) GetChainID() interfaces.IHash {
@@ -431,7 +426,6 @@ func (b *FBlock) GetLedgerMR() interfaces.IHash {
 }
 
 func (b *FBlock) GetBodyMR() interfaces.IHash {
-
 	hashes := make([]interfaces.IHash, 0, len(b.Transactions))
 	marker := 0
 	for i, trans := range b.Transactions {
@@ -687,10 +681,6 @@ func (e *FBlock) JSONByte() ([]byte, error) {
 
 func (e *FBlock) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *FBlock) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 type ExpandedFBlock FBlock

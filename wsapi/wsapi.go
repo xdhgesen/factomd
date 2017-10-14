@@ -17,9 +17,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/FactomProject/btcutil/certs"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -36,6 +35,7 @@ var Servers map[int]*web.Server
 var ServersMutex sync.Mutex
 
 func Start(state interfaces.IState) {
+	RegisterPrometheus()
 	var server *web.Server
 
 	ServersMutex.Lock()
@@ -53,6 +53,8 @@ func Start(state interfaces.IState) {
 
 	if Servers[state.GetPort()] == nil {
 		server = web.NewServer()
+
+		server.Logger.SetOutput(ioutil.Discard)
 
 		Servers[state.GetPort()] = server
 		server.Env["state"] = state
@@ -83,6 +85,12 @@ func Start(state interfaces.IState) {
 
 		server.Post("/v2", HandleV2)
 		server.Get("/v2", HandleV2)
+
+		// start the debugging api if we are not on the main network
+		if state.GetNetworkName() != "MAIN" {
+			server.Post("/debug", HandleDebug)
+			server.Get("/debug", HandleDebug)
+		}
 
 		tlsIsEnabled, tlsPrivate, tlsPublic := state.GetTlsInfo()
 		if tlsIsEnabled {
@@ -465,7 +473,6 @@ func HandleDirectoryBlock(ctx *web.Context, hashkey string) {
 	// conflict if I use local structs.  using a string replace on the structs that would be pointer handled (*DirectoryBlockResponse)
 	bResp, err := json.Marshal(d)
 	if err != nil {
-
 		returnMsg(ctx, d, true)
 	}
 	resp := string(bResp)
@@ -809,7 +816,6 @@ func returnMsg(ctx *web.Context, msg interface{}, success bool) {
 }
 
 func returnV1Msg(ctx *web.Context, msg string, success bool) {
-
 	/* V1 requires call specific case changes that can't be handled with
 	interfaces for example.  Block Height needs to return  height as the json item name
 	in golang, lower case names are private so won't be returned.
@@ -865,7 +871,6 @@ func checkAuthHeader(state interfaces.IState, r *http.Request) error {
 }
 
 func checkHttpPasswordOkV1(state interfaces.IState, ctx *web.Context) bool {
-
 	if err := checkAuthHeader(state, ctx.Request); err != nil {
 		remoteIP := ""
 		remoteIP += strings.Split(ctx.Request.RemoteAddr, ":")[0]

@@ -5,22 +5,23 @@
 package entryBlock
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/common/primitives/random"
 )
 
 // An Entry is the element which carries user data
 // https://github.com/FactomProject/FactomDocs/blob/master/factomDataStructureDetails.md#entry
 type Entry struct {
-	Version uint8
-	ChainID interfaces.IHash
-	ExtIDs  []primitives.ByteSlice
-	Content primitives.ByteSlice
+	Version uint8                  `json:"version"`
+	ChainID interfaces.IHash       `json:"chainid"`
+	ExtIDs  []primitives.ByteSlice `json:"extids"`
+	Content primitives.ByteSlice   `json:"content"`
 
 	// cache
 	hash interfaces.IHash
@@ -29,6 +30,47 @@ type Entry struct {
 var _ interfaces.IEBEntry = (*Entry)(nil)
 var _ interfaces.DatabaseBatchable = (*Entry)(nil)
 var _ interfaces.BinaryMarshallable = (*Entry)(nil)
+
+func RandomEntry() interfaces.IEBEntry {
+	e := NewEntry()
+	e.Version = random.RandUInt8()
+	e.ChainID = primitives.RandomHash()
+	l := random.RandIntBetween(0, 20)
+	for i := 0; i < l; i++ {
+		e.ExtIDs = append(e.ExtIDs, *primitives.RandomByteSlice())
+	}
+	e.Content = *primitives.RandomByteSlice()
+	return e
+}
+
+func (c *Entry) IsSameAs(b interfaces.IEBEntry) bool {
+	if b == nil {
+		if c != nil {
+			return false
+		} else {
+			return true
+		}
+	}
+	a := b.(*Entry)
+	if c.Version != a.Version {
+		return false
+	}
+	if len(c.ExtIDs) != len(a.ExtIDs) {
+		return false
+	}
+	for i := range c.ExtIDs {
+		if c.ExtIDs[i].IsSameAs(&a.ExtIDs[i]) == false {
+			return false
+		}
+	}
+	if c.ChainID.IsSameAs(a.ChainID) == false {
+		return false
+	}
+	if c.Content.IsSameAs(&a.Content) == false {
+		return false
+	}
+	return true
+}
 
 // Returns the size of the entry subject to payment in K.  So anything up
 // to 1K returns 1, everything up to and including 2K returns 2, etc.
@@ -74,9 +116,13 @@ func (c *Entry) DatabaseSecondaryIndex() interfaces.IHash {
 // NewChainID generates a ChainID from an entry. ChainID = primitives.Sha(Sha(ExtIDs[0]) +
 // Sha(ExtIDs[1] + ... + Sha(ExtIDs[n]))
 func NewChainID(e interfaces.IEBEntry) interfaces.IHash {
+	return ExternalIDsToChainID(e.ExternalIDs())
+}
+
+func ExternalIDsToChainID(extIDs [][]byte) interfaces.IHash {
 	id := new(primitives.Hash)
 	sum := sha256.New()
-	for _, v := range e.ExternalIDs() {
+	for _, v := range extIDs {
 		x := sha256.Sum256(v)
 		sum.Write(x[:])
 	}
@@ -102,9 +148,12 @@ func (e *Entry) ExternalIDs() [][]byte {
 }
 
 func (e *Entry) IsValid() bool {
-
 	//double check the version
 	if e.Version != 0 {
+		return false
+	}
+
+	if e.KSize() > 10 {
 		return false
 	}
 
@@ -128,15 +177,22 @@ func (e *Entry) GetHash() interfaces.IHash {
 }
 
 func (e *Entry) MarshalBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
+	buf := primitives.NewBuffer(nil)
 
 	// 1 byte Version
-	if err := binary.Write(buf, binary.BigEndian, e.Version); err != nil {
+	err := buf.PushByte(byte(e.Version))
+	if err != nil {
 		return nil, err
 	}
 
+	if e.ChainID == nil {
+		e.ChainID = primitives.NewZeroHash()
+	}
 	// 32 byte ChainID
-	buf.Write(e.ChainID.Bytes())
+	err = buf.PushBinaryMarshallable(e.ChainID)
+	if err != nil {
+		return nil, err
+	}
 
 	// ExtIDs
 	if ext, err := e.MarshalExtIDsBinary(); err != nil {
@@ -184,7 +240,8 @@ func UnmarshalEntry(data []byte) (interfaces.IEBEntry, error) {
 	return entry, nil
 }
 
-func (e *Entry) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
+func (e *Entry) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	var err error
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Error unmarshalling: %v", r)
@@ -192,21 +249,17 @@ func (e *Entry) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	}()
 
 	buf := primitives.NewBuffer(data)
-	hash := make([]byte, 32)
 
 	// 1 byte Version
-	b, err := buf.ReadByte()
+	e.Version, err = buf.PopByte()
 	if err != nil {
 		return nil, err
-	} else {
-		e.Version = b
 	}
 
 	// 32 byte ChainID
 	e.ChainID = primitives.NewZeroHash()
-	if _, err = buf.Read(hash); err != nil {
-		return nil, err
-	} else if err = e.ChainID.SetBytes(hash); err != nil {
+	err = buf.PopBinaryMarshallable(e.ChainID)
+	if err != nil {
 		return nil, err
 	}
 
@@ -254,7 +307,7 @@ func (e *Entry) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 		return nil, err
 	}
 
-	return
+	return nil, nil
 }
 
 func (e *Entry) UnmarshalBinary(data []byte) (err error) {
@@ -268,10 +321,6 @@ func (e *Entry) JSONByte() ([]byte, error) {
 
 func (e *Entry) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *Entry) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *Entry) String() string {
@@ -289,4 +338,45 @@ func NewEntry() *Entry {
 	e.ExtIDs = make([]primitives.ByteSlice, 0)
 	e.Content = primitives.ByteSlice{}
 	return e
+}
+
+func MarshalEntryList(list []interfaces.IEBEntry) ([]byte, error) {
+	b := primitives.NewBuffer(nil)
+	l := len(list)
+	b.PushVarInt(uint64(l))
+	for _, v := range list {
+		bin, err := v.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		err = b.PushBytes(bin)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return b.DeepCopyBytes(), nil
+}
+
+func UnmarshalEntryList(bin []byte) ([]interfaces.IEBEntry, []byte, error) {
+	b := primitives.NewBuffer(bin)
+
+	l, err := b.PopVarInt()
+	if err != nil {
+		return nil, nil, err
+	}
+	list := make([]interfaces.IEBEntry, int(l))
+	for i := range list {
+		e := NewEntry()
+		x, err := b.PopBytes()
+		if err != nil {
+			return nil, nil, err
+		}
+		err = e.UnmarshalBinary(x)
+		if err != nil {
+			return nil, nil, err
+		}
+		list[i] = e
+	}
+
+	return list, b.DeepCopyBytes(), nil
 }

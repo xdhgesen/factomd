@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
@@ -27,6 +28,8 @@ import (
 const API_VERSION string = "2.0"
 
 func HandleV2(ctx *web.Context) {
+	n := time.Now()
+	defer HandleV2APICallGeneral.Observe(float64(time.Since(n).Nanoseconds()))
 	ServersMutex.Lock()
 	state := ctx.Server.Env["state"].(interfaces.IState)
 	ServersMutex.Unlock()
@@ -77,6 +80,9 @@ func HandleV2Request(state interfaces.IState, j *primitives.JSON2Request) (*prim
 	case "commit-entry":
 		resp, jsonError = HandleV2CommitEntry(state, params)
 		break
+	case "current-minute":
+		resp, jsonError = HandleV2CurrentMinute(state, params)
+		break
 	case "directory-block":
 		resp, jsonError = HandleV2DirectoryBlock(state, params)
 		break
@@ -85,6 +91,15 @@ func HandleV2Request(state interfaces.IState, j *primitives.JSON2Request) (*prim
 		break
 	case "entry-block":
 		resp, jsonError = HandleV2EntryBlock(state, params)
+		break
+	case "admin-block":
+		resp, jsonError = HandleV2AdminBlock(state, params)
+		break
+	case "factoid-block":
+		resp, jsonError = HandleV2FactoidBlock(state, params)
+		break
+	case "entrycredit-block":
+		resp, jsonError = HandleV2EntryCreditBlock(state, params)
 		break
 	case "entry":
 		resp, jsonError = HandleV2Entry(state, params)
@@ -149,6 +164,12 @@ func HandleV2Request(state interfaces.IState, j *primitives.JSON2Request) (*prim
 	case "ablock-by-height":
 		resp, jsonError = HandleV2ABlockByHeight(state, params)
 		break
+	case "authorities":
+		resp, jsonError = HandleAuthorities(state, params)
+	case "tps-rate":
+		resp, jsonError = HandleV2TransactionRate(state, params)
+	case "ack":
+		resp, jsonError = HandleV2ACKWithChain(state, params)
 	default:
 		jsonError = NewMethodNotFoundError()
 		break
@@ -157,15 +178,17 @@ func HandleV2Request(state interfaces.IState, j *primitives.JSON2Request) (*prim
 		return nil, jsonError
 	}
 
-	fmt.Printf("API V2 method: <%v>  paramaters: %v\n", j.Method, params)
-
 	jsonResp := primitives.NewJSON2Response()
 	jsonResp.ID = j.ID
 	jsonResp.Result = resp
+
 	return jsonResp, nil
 }
 
 func HandleV2DBlockByHeight(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallDBlockByHeight.Observe(float64(time.Since(n).Nanoseconds()))
+
 	heightRequest := new(HeightRequest)
 	err := MapToObject(params, heightRequest)
 	if err != nil {
@@ -199,7 +222,39 @@ func HandleV2DBlockByHeight(state interfaces.IState, params interface{}) (interf
 	return resp, nil
 }
 
+func HandleV2EntryCreditBlock(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallEblock.Observe(float64(time.Since(n).Nanoseconds()))
+
+	keymr := new(KeyMRRequest)
+	err := MapToObject(params, keymr)
+	if err != nil {
+		return nil, NewInvalidParamsError()
+	}
+
+	h, err := primitives.HexToHash(keymr.KeyMR)
+	if err != nil {
+		return nil, NewInvalidHashError()
+	}
+
+	dbase := state.GetAndLockDB()
+	defer state.UnlockDB()
+
+	block, err := dbase.FetchECBlock(h)
+	if err != nil {
+		return nil, NewInvalidHashError()
+	}
+	if block == nil {
+		return nil, NewBlockNotFoundError()
+	}
+
+	return ECBlockToResp(block)
+}
+
 func HandleV2ECBlockByHeight(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallECBlockByHeight.Observe(float64(time.Since(n).Nanoseconds()))
+
 	heightRequest := new(HeightRequest)
 	err := MapToObject(params, heightRequest)
 	if err != nil {
@@ -217,27 +272,85 @@ func HandleV2ECBlockByHeight(state interfaces.IState, params interface{}) (inter
 		return nil, NewBlockNotFoundError()
 	}
 
+	return ECBlockToResp(block)
+}
+
+func ECBlockToResp(block interfaces.IEntryCreditBlock) (interface{}, *primitives.JSONError) {
 	raw, err := block.MarshalBinary()
 	if err != nil {
 		return nil, NewInternalError()
 	}
 
-	resp := new(BlockHeightResponse)
-	b, err := ObjectToJStruct(block)
+	resp := new(EntryCreditBlockResponse)
+
 	if err != nil {
 		return nil, NewInternalError()
 	}
-	resp.ECBlock = b
+	resp.ECBlock.Body = block.GetBody()
+	resp.ECBlock.Header = block.GetHeader()
 	resp.RawData = hex.EncodeToString(raw)
-
+	tmpHash, err := block.GetFullHash()
+	if err != nil {
+		return nil, NewInternalError()
+	}
+	resp.ECBlock.FullHash = tmpHash
+	tmpHash, err = block.HeaderHash()
+	if err != nil {
+		return nil, NewInternalError()
+	}
+	resp.ECBlock.HeaderHash = tmpHash
 	return resp, nil
 }
 
+func HandleV2FactoidBlock(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallEblock.Observe(float64(time.Since(n).Nanoseconds()))
+
+	keymr := new(KeyMRRequest)
+	err := MapToObject(params, keymr)
+	if err != nil {
+		return nil, NewInvalidParamsError()
+	}
+
+	h, err := primitives.HexToHash(keymr.KeyMR)
+	if err != nil {
+		return nil, NewInvalidHashError()
+	}
+
+	dbase := state.GetAndLockDB()
+	defer state.UnlockDB()
+
+	block, err := dbase.FetchFBlock(h)
+	if err != nil {
+		return nil, NewInvalidHashError()
+	}
+	if block == nil {
+		return nil, NewBlockNotFoundError()
+	}
+
+	return fBlockToResp(block)
+}
+
+// Cached response for genesis fblock
+var gensisFBlockCache interface{}
+
 func HandleV2FBlockByHeight(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallFblockByHeight.Observe(float64(time.Since(n).Nanoseconds()))
+
 	heightRequest := new(HeightRequest)
 	err := MapToObject(params, heightRequest)
 	if err != nil {
 		return nil, NewInvalidParamsError()
+	}
+
+	// The gensis FBlock is a very expensive call (>1s) because of the string manipulation
+	// To counter this, we will cache that response for quicker returns, only doing that manipulation one.
+	if heightRequest.Height == 0 {
+		if gensisFBlockCache != nil {
+			GensisFblockCall.Inc()
+			return gensisFBlockCache, nil
+		}
 	}
 
 	dbase := state.GetAndLockDB()
@@ -251,6 +364,20 @@ func HandleV2FBlockByHeight(state interfaces.IState, params interface{}) (interf
 		return nil, NewBlockNotFoundError()
 	}
 
+	resp, jerr := fBlockToResp(block)
+	if err != nil {
+		return nil, jerr
+	}
+
+	// Cache the gensis block if it is nil
+	if gensisFBlockCache == nil && heightRequest.Height == 0 {
+		gensisFBlockCache = resp
+	}
+
+	return resp, nil
+}
+
+func fBlockToResp(block interfaces.IFBlock) (interface{}, *primitives.JSONError) {
 	raw, err := block.MarshalBinary()
 	if err != nil {
 		return nil, NewInternalError()
@@ -261,13 +388,64 @@ func HandleV2FBlockByHeight(state interfaces.IState, params interface{}) (interf
 	if err != nil {
 		return nil, NewInternalError()
 	}
+
+	// Correct any addresses that get ToLowered()
+	for _, t := range block.GetTransactions() {
+		for _, a := range t.GetInputs() {
+			b.data = correctLowerCasedStringToOriginal(b.data, a.GetUserAddress())
+		}
+		for _, a := range t.GetOutputs() {
+			b.data = correctLowerCasedStringToOriginal(b.data, a.GetUserAddress())
+		}
+		for _, a := range t.GetECOutputs() {
+			b.data = correctLowerCasedStringToOriginal(b.data, a.GetUserAddress())
+		}
+	}
+
 	resp.FBlock = b
 	resp.RawData = hex.EncodeToString(raw)
 
 	return resp, nil
 }
 
+// correctLowerCasedStringToOriginal will replace the matching ToLowered(original) with the original
+func correctLowerCasedStringToOriginal(j []byte, original string) []byte {
+	return []byte(strings.Replace(string(j), strings.ToLower(original), original, -1))
+}
+
+func HandleV2AdminBlock(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallEblock.Observe(float64(time.Since(n).Nanoseconds()))
+
+	keymr := new(KeyMRRequest)
+	err := MapToObject(params, keymr)
+	if err != nil {
+		return nil, NewInvalidParamsError()
+	}
+
+	h, err := primitives.HexToHash(keymr.KeyMR)
+	if err != nil {
+		return nil, NewInvalidHashError()
+	}
+
+	dbase := state.GetAndLockDB()
+	defer state.UnlockDB()
+
+	block, err := dbase.FetchABlock(h)
+	if err != nil {
+		return nil, NewInvalidHashError()
+	}
+	if block == nil {
+		return nil, NewBlockNotFoundError()
+	}
+
+	return aBlockToResp(block)
+}
+
 func HandleV2ABlockByHeight(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallABlockByHeight.Observe(float64(time.Since(n).Nanoseconds()))
+
 	heightRequest := new(HeightRequest)
 	err := MapToObject(params, heightRequest)
 	if err != nil {
@@ -285,6 +463,10 @@ func HandleV2ABlockByHeight(state interfaces.IState, params interface{}) (interf
 		return nil, NewBlockNotFoundError()
 	}
 
+	return aBlockToResp(block)
+}
+
+func aBlockToResp(block interfaces.IAdminBlock) (interface{}, *primitives.JSONError) {
 	raw, err := block.MarshalBinary()
 	if err != nil {
 		return nil, NewInternalError()
@@ -341,11 +523,19 @@ func ObjectToJStruct(source interface{}) (*JStruct, error) {
 		return nil, err
 	}
 	dst := new(JStruct)
-	dst.data = []byte(strings.ToLower(string(b)))
+	dst.data = []byte(string(b))
 	return dst, nil
 }
 
+type RepeatedEntryMessage struct {
+	Information string `json:"info"`
+	EntryHash   string `json:"entryhash"`
+}
+
 func HandleV2CommitChain(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallCommitChain.Observe(float64(time.Since(n).Nanoseconds()))
+
 	commitChainMsg := new(MessageRequest)
 	err := MapToObject(params, commitChainMsg)
 	if err != nil {
@@ -362,14 +552,26 @@ func HandleV2CommitChain(state interfaces.IState, params interface{}) (interface
 		}
 	}
 
+	if !commit.IsValid() {
+		return nil, NewInvalidCommitChainError()
+	}
+
 	msg := new(messages.CommitChainMsg)
 	msg.CommitChain = commit
-	state.APIQueue() <- msg
+
+	// If this fails, a commit with greater payment already exists
+	if !state.IsHighestCommit(msg.CommitChain.GetEntryHash(), msg) {
+		return nil, NewRepeatCommitError(RepeatedEntryMessage{"A commit with equal or greater payment already exists", msg.CommitChain.GetEntryHash().String()})
+	}
+
+	state.APIQueue().Enqueue(msg)
 	state.IncECCommits()
 
 	resp := new(CommitChainResponse)
 	resp.Message = "Chain Commit Success"
 	resp.TxID = commit.GetSigHash().String()
+	resp.EntryHash = commit.GetEntryHash().String()
+	resp.ChainIDHash = commit.ChainIDHash.String()
 
 	return resp, nil
 }
@@ -379,6 +581,9 @@ func HandleV2RevealChain(state interfaces.IState, params interface{}) (interface
 }
 
 func HandleV2CommitEntry(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallCommitEntry.Observe(float64(time.Since(n).Nanoseconds()))
+
 	commitEntryMsg := new(MessageRequest)
 	err := MapToObject(params, commitEntryMsg)
 	if err != nil {
@@ -395,19 +600,33 @@ func HandleV2CommitEntry(state interfaces.IState, params interface{}) (interface
 		}
 	}
 
+	if !commit.IsValid() {
+		return nil, NewInvalidCommitEntryError()
+	}
+
 	msg := new(messages.CommitEntryMsg)
 	msg.CommitEntry = commit
-	state.APIQueue() <- msg
+
+	// If this fails, a commit with greater payment already exists
+	if !state.IsHighestCommit(msg.CommitEntry.GetEntryHash(), msg) {
+		return nil, NewRepeatCommitError(RepeatedEntryMessage{"A commit with equal or greater payment already exists", msg.CommitEntry.GetEntryHash().String()})
+	}
+
+	state.APIQueue().Enqueue(msg)
 	state.IncECommits()
 
 	resp := new(CommitEntryResponse)
 	resp.Message = "Entry Commit Success"
 	resp.TxID = commit.GetSigHash().String()
+	resp.EntryHash = commit.EntryHash.String()
 
 	return resp, nil
 }
 
 func HandleV2RevealEntry(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallRevealEntry.Observe(float64(time.Since(n).Nanoseconds()))
+
 	e := new(EntryRequest)
 	err := MapToObject(params, e)
 	if err != nil {
@@ -424,19 +643,27 @@ func HandleV2RevealEntry(state interfaces.IState, params interface{}) (interface
 		}
 	}
 
+	if !entry.IsValid() {
+		return nil, NewInvalidEntryError()
+	}
+
 	msg := new(messages.RevealEntryMsg)
 	msg.Entry = entry
 	msg.Timestamp = state.GetTimestamp()
-	state.APIQueue() <- msg
+	state.APIQueue().Enqueue(msg)
 
 	resp := new(RevealEntryResponse)
 	resp.Message = "Entry Reveal Success"
 	resp.EntryHash = entry.GetHash().String()
+	resp.ChainID = entry.ChainID.String()
 
 	return resp, nil
 }
 
 func HandleV2DirectoryBlockHead(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallDBlockHead.Observe(float64(time.Since(n).Nanoseconds()))
+
 	h := new(DirectoryBlockHeadResponse)
 	d := state.GetDirectoryBlockByHeight(state.GetHighestSavedBlk())
 	h.KeyMR = d.GetKeyMR().String()
@@ -444,6 +671,9 @@ func HandleV2DirectoryBlockHead(state interfaces.IState, params interface{}) (in
 }
 
 func HandleV2RawData(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallRawData.Observe(float64(time.Since(n).Nanoseconds()))
+
 	hashkey := new(HashRequest)
 	err := MapToObject(params, hashkey)
 	if err != nil {
@@ -497,6 +727,9 @@ func HandleV2RawData(state interfaces.IState, params interface{}) (interface{}, 
 }
 
 func HandleV2Receipt(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallReceipt.Observe(float64(time.Since(n).Nanoseconds()))
+
 	hashkey := new(HashRequest)
 	err := MapToObject(params, hashkey)
 	if err != nil {
@@ -522,6 +755,9 @@ func HandleV2Receipt(state interfaces.IState, params interface{}) (interface{}, 
 }
 
 func HandleV2DirectoryBlock(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallDBlock.Observe(float64(time.Since(n).Nanoseconds()))
+
 	keymr := new(KeyMRRequest)
 	err := MapToObject(params, keymr)
 	if err != nil {
@@ -559,6 +795,9 @@ func HandleV2DirectoryBlock(state interfaces.IState, params interface{}) (interf
 }
 
 func HandleV2EntryBlock(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallEblock.Observe(float64(time.Since(n).Nanoseconds()))
+
 	keymr := new(KeyMRRequest)
 	err := MapToObject(params, keymr)
 	if err != nil {
@@ -628,6 +867,9 @@ func HandleV2EntryBlock(state interfaces.IState, params interface{}) (interface{
 }
 
 func HandleV2Entry(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallEntry.Observe(float64(time.Since(n).Nanoseconds()))
+
 	hashkey := new(HashRequest)
 	err := MapToObject(params, hashkey)
 	if err != nil {
@@ -667,6 +909,9 @@ func HandleV2Entry(state interfaces.IState, params interface{}) (interface{}, *p
 }
 
 func HandleV2ChainHead(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallChainHead.Observe(float64(time.Since(n).Nanoseconds()))
+
 	chainid := new(ChainIDRequest)
 	err := MapToObject(params, chainid)
 	if err != nil {
@@ -685,9 +930,9 @@ func HandleV2ChainHead(state interfaces.IState, params interface{}) (interface{}
 	// get the pending chain head from the current or previous process list in
 	// the state
 	lh := state.GetLeaderHeight()
-	pend1 := state.GetNewEBlocks(lh, h)
-	pend2 := state.GetNewEBlocks(lh-1, h)
-	if pend1 != nil || pend2 != nil {
+	pend1 := state.IsNewOrPendingEBlocks(lh, h)
+	pend2 := state.IsNewOrPendingEBlocks(lh-1, h)
+	if pend1 || pend2 {
 		c.ChainInProcessList = true
 	}
 
@@ -707,7 +952,29 @@ func HandleV2ChainHead(state interfaces.IState, params interface{}) (interface{}
 	return c, nil
 }
 
+func HandleV2CurrentMinute(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallHeights.Observe(float64(time.Since(n).Nanoseconds()))
+
+	h := new(CurrentMinuteResponse)
+
+	h.LeaderHeight = int64(state.GetTrueLeaderHeight())
+	h.DirectoryBlockHeight = int64(state.GetHighestSavedBlk())
+	h.Minute = int64(state.GetCurrentMinute())
+	h.CurrentTime = n.UnixNano()
+	h.CurrentBlockStartTime = state.GetCurrentBlockStartTime()
+	h.CurrentMinuteStartTime = int64(state.GetCurrentMinuteStartTime())
+	h.DirectoryBlockInSeconds = int64(state.GetDirectoryBlockInSeconds())
+	h.StallDetected = state.IsStalled()
+
+	//h.LastBlockTime = state.GetTimestamp
+	return h, nil
+}
+
 func HandleV2EntryCreditBalance(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallECBal.Observe(float64(time.Since(n).Nanoseconds()))
+
 	ecadr := new(AddressRequest)
 	err := MapToObject(params, ecadr)
 	if err != nil {
@@ -742,6 +1009,9 @@ func HandleV2EntryCreditBalance(state interfaces.IState, params interface{}) (in
 }
 
 func HandleV2EntryCreditRate(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallECRate.Observe(float64(time.Since(n).Nanoseconds()))
+
 	resp := new(EntryCreditRateResponse)
 	resp.Rate = int64(state.GetPredictiveFER())
 
@@ -749,6 +1019,9 @@ func HandleV2EntryCreditRate(state interfaces.IState, params interface{}) (inter
 }
 
 func HandleV2FactoidSubmit(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallFctTx.Observe(float64(time.Since(n).Nanoseconds()))
+
 	t := new(TransactionRequest)
 	err := MapToObject(params, t)
 	if err != nil {
@@ -769,7 +1042,7 @@ func HandleV2FactoidSubmit(state interfaces.IState, params interface{}) (interfa
 
 	state.IncFCTSubmits()
 
-	state.APIQueue() <- msg
+	state.APIQueue().Enqueue(msg)
 
 	resp := new(FactoidSubmitResponse)
 	resp.Message = "Successfully submitted the transaction"
@@ -779,6 +1052,9 @@ func HandleV2FactoidSubmit(state interfaces.IState, params interface{}) (interfa
 }
 
 func HandleV2FactoidBalance(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallFABal.Observe(float64(time.Since(n).Nanoseconds()))
+
 	fadr := new(AddressRequest)
 	err := MapToObject(params, fadr)
 	if err != nil {
@@ -809,6 +1085,9 @@ func HandleV2FactoidBalance(state interfaces.IState, params interface{}) (interf
 }
 
 func HandleV2Heights(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallHeights.Observe(float64(time.Since(n).Nanoseconds()))
+
 	h := new(HeightsResponse)
 
 	h.DirectoryBlockHeight = int64(state.GetHighestSavedBlk())
@@ -823,6 +1102,9 @@ func HandleV2Heights(state interfaces.IState, params interface{}) (interface{}, 
 }
 
 func HandleV2GetPendingEntries(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallPendingEntries.Observe(float64(time.Since(n).Nanoseconds()))
+
 	chainid := new(ChainIDRequest)
 	err := MapToObject(params, chainid)
 	if err != nil {
@@ -834,6 +1116,9 @@ func HandleV2GetPendingEntries(state interfaces.IState, params interface{}) (int
 }
 
 func HandleV2GetPendingTransactions(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallPendingTxs.Observe(float64(time.Since(n).Nanoseconds()))
+
 	fadr := new(AddressRequest)
 	err := MapToObject(params, fadr)
 	if err != nil {
@@ -846,22 +1131,19 @@ func HandleV2GetPendingTransactions(state interfaces.IState, params interface{})
 }
 
 func HandleV2Properties(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
-	vtos := func(f int) string {
-		v0 := f / 1000000000
-		v1 := (f % 1000000000) / 1000000
-		v2 := (f % 1000000) / 1000
-		v3 := f % 1000
-
-		return fmt.Sprintf("%d.%d.%d.%d", v0, v1, v2, v3)
-	}
+	n := time.Now()
+	defer HandleV2APICallProp.Observe(float64(time.Since(n).Nanoseconds()))
 
 	p := new(PropertiesResponse)
-	p.FactomdVersion = vtos(state.GetFactomdVersion())
+	p.FactomdVersion = state.GetFactomdVersion()
 	p.ApiVersion = API_VERSION
 	return p, nil
 }
 
 func HandleV2SendRawMessage(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallSendRaw.Observe(float64(time.Since(n).Nanoseconds()))
+
 	r := new(SendRawMessageRequest)
 	err := MapToObject(params, r)
 	if err != nil {
@@ -877,7 +1159,7 @@ func HandleV2SendRawMessage(state interfaces.IState, params interface{}) (interf
 		return nil, NewInvalidParamsError()
 	}
 
-	state.APIQueue() <- msg
+	state.APIQueue().Enqueue(msg)
 
 	resp := new(SendRawMessageResponse)
 	resp.Message = "Successfully sent the message"
@@ -886,6 +1168,9 @@ func HandleV2SendRawMessage(state interfaces.IState, params interface{}) (interf
 }
 
 func HandleV2GetTranasction(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallTransaction.Observe(float64(time.Since(n).Nanoseconds()))
+
 	hashkey := new(HashRequest)
 	err := MapToObject(params, hashkey)
 	if err != nil {
@@ -975,4 +1260,18 @@ func HandleV2GetTranasction(state interfaces.IState, params interface{}) (interf
 	answer.IncludedInDirectoryBlockHeight = int64(dBlock.GetDatabaseHeight())
 
 	return answer, nil
+}
+
+func HandleV2TransactionRate(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	n := time.Now()
+	defer HandleV2APICallTpsRate.Observe(float64(time.Since(n).Nanoseconds()))
+
+	r := new(TransactionRateResponse)
+
+	// total	: Transaction rate over entire life of node
+	// instant	: Transaction rate weighted for last 3 seconds
+	total, instant := state.CalculateTransactionRate()
+	r.TotalTransactionRate = total
+	r.InstantTransactionRate = instant
+	return r, nil
 }

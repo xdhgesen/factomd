@@ -1,7 +1,6 @@
 package adminBlock
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -11,12 +10,19 @@ import (
 
 // DB Signature Entry -------------------------
 type DBSignatureEntry struct {
-	IdentityAdminChainID interfaces.IHash
-	PrevDBSig            primitives.Signature
+	IdentityAdminChainID interfaces.IHash     `json:"identityadminchainid"`
+	PrevDBSig            primitives.Signature `json:"prevdbsig"`
 }
 
 var _ interfaces.IABEntry = (*DBSignatureEntry)(nil)
 var _ interfaces.BinaryMarshallable = (*DBSignatureEntry)(nil)
+
+func (e *DBSignatureEntry) Init() {
+	if e.IdentityAdminChainID == nil {
+		e.IdentityAdminChainID = primitives.NewZeroHash()
+	}
+	e.PrevDBSig.Init()
+}
 
 func (c *DBSignatureEntry) UpdateState(state interfaces.IState) error {
 	return fmt.Errorf("Should not be called alone!")
@@ -25,6 +31,12 @@ func (c *DBSignatureEntry) UpdateState(state interfaces.IState) error {
 
 // Create a new DB Signature Entry
 func NewDBSignatureEntry(identityAdminChainID interfaces.IHash, sig interfaces.IFullSignature) (*DBSignatureEntry, error) {
+	if identityAdminChainID == nil {
+		return nil, fmt.Errorf("No identityAdminChainID provided")
+	}
+	if sig == nil {
+		return nil, fmt.Errorf("No sig provided")
+	}
 	e := new(DBSignatureEntry)
 	e.IdentityAdminChainID = identityAdminChainID
 	bytes, err := sig.MarshalBinary()
@@ -45,23 +57,19 @@ func (e *DBSignatureEntry) Type() byte {
 	return constants.TYPE_DB_SIGNATURE
 }
 
-func (e *DBSignatureEntry) MarshalBinary() (data []byte, err error) {
+func (e *DBSignatureEntry) MarshalBinary() ([]byte, error) {
+	e.Init()
 	var buf primitives.Buffer
 
-	buf.Write([]byte{e.Type()})
-
-	data, err = e.IdentityAdminChainID.MarshalBinary()
+	err := buf.PushByte(e.Type())
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
-
-	_, err = buf.Write(e.PrevDBSig.Pub[:])
+	err = buf.PushBinaryMarshallable(e.IdentityAdminChainID)
 	if err != nil {
 		return nil, err
 	}
-
-	_, err = buf.Write(e.PrevDBSig.Sig[:])
+	err = buf.PushBinaryMarshallable(&e.PrevDBSig)
 	if err != nil {
 		return nil, err
 	}
@@ -69,27 +77,23 @@ func (e *DBSignatureEntry) MarshalBinary() (data []byte, err error) {
 	return buf.DeepCopyBytes(), nil
 }
 
-func (e *DBSignatureEntry) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshallig DBSignature Entry: %v", r)
-		}
-	}()
-	newData = data
-	if newData[0] != e.Type() {
+func (e *DBSignatureEntry) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
+	b, err := buf.PopByte()
+	if b != e.Type() {
 		return nil, fmt.Errorf("Invalid Entry type")
 	}
-	newData = newData[1:]
-
 	e.IdentityAdminChainID = new(primitives.Hash)
-	newData, err = e.IdentityAdminChainID.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(e.IdentityAdminChainID)
 	if err != nil {
-		return
+		return nil, err
+	}
+	err = buf.PopBinaryMarshallable(&e.PrevDBSig)
+	if err != nil {
+		return nil, err
 	}
 
-	newData, err = e.PrevDBSig.UnmarshalBinaryData(newData)
-
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (e *DBSignatureEntry) UnmarshalBinary(data []byte) (err error) {
@@ -105,11 +109,8 @@ func (e *DBSignatureEntry) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *DBSignatureEntry) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (e *DBSignatureEntry) String() string {
+	e.Init()
 	var out primitives.Buffer
 	out.WriteString(fmt.Sprintf("    E: %20s -- %17s %8x %12s %8s %12s %8x",
 		"DB Signature",

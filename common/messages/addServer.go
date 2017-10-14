@@ -12,6 +12,8 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 // Communicate a Directory Block State
@@ -49,14 +51,6 @@ func (m *AddServerMsg) GetMsgHash() interfaces.IHash {
 
 func (m *AddServerMsg) Type() byte {
 	return constants.ADDSERVER_MSG
-}
-
-func (m *AddServerMsg) Int() int {
-	return -1
-}
-
-func (m *AddServerMsg) Bytes() []byte {
-	return nil
 }
 
 func (m *AddServerMsg) GetTimestamp() interfaces.Timestamp {
@@ -111,10 +105,6 @@ func (e *AddServerMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *AddServerMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (m *AddServerMsg) Sign(key interfaces.Signer) error {
 	signature, err := SignSignable(m, key)
 	if err != nil {
@@ -134,7 +124,6 @@ func (m *AddServerMsg) VerifySignature() (bool, error) {
 
 func (m *AddServerMsg) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
-		return
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Error unmarshalling Add Server Message: %v", r)
 		}
@@ -177,21 +166,18 @@ func (m *AddServerMsg) UnmarshalBinary(data []byte) error {
 
 func (m *AddServerMsg) MarshalForSignature() ([]byte, error) {
 	var buf primitives.Buffer
+	buf.Write([]byte{m.Type()})
+	if d, err := m.Timestamp.MarshalBinary(); err != nil {
+		return nil, err
+	} else {
+		buf.Write(d)
+	}
 
-	binary.Write(&buf, binary.BigEndian, m.Type())
-
-	t := m.GetTimestamp()
-	data, err := t.MarshalBinary()
+	d, err := m.ServerChainID.MarshalBinary()
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
-
-	data, err = m.ServerChainID.MarshalBinary()
-	if err != nil {
-		return nil, err
-	}
-	buf.Write(data)
+	buf.Write(d)
 
 	binary.Write(&buf, binary.BigEndian, uint8(m.ServerType))
 
@@ -231,6 +217,11 @@ func (m *AddServerMsg) String() string {
 		&m.Timestamp,
 		m.GetMsgHash().Bytes()[:3])
 
+}
+
+func (m *AddServerMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "addserver", "server": m.ServerChainID.String()[4:12],
+		"hash": m.GetHash().String()[:6]}
 }
 
 func (m *AddServerMsg) IsSameAs(b *AddServerMsg) bool {

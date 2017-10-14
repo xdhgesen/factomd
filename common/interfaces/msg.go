@@ -4,6 +4,10 @@
 
 package interfaces
 
+import (
+	log "github.com/FactomProject/logrus"
+)
+
 /**************************
  * IRCD  Interface for Redeem Condition Datastructures (RCD)
  *
@@ -13,6 +17,9 @@ package interfaces
 type IMsg interface {
 	Printable
 	BinaryMarshallable
+
+	GetAck() IMsg
+	PutAck(IMsg)
 
 	// Returns a byte indicating the type of message.
 	Type() byte
@@ -99,10 +106,13 @@ type IMsg interface {
 
 	// Stall handling
 	MarkSentInvalid(bool)
-	SentInvlaid() bool
+	SentInvalid() bool
 
 	IsStalled() bool
 	SetStall(bool)
 	Resend(IState) bool
 	Expire(IState) bool
+
+	// Equivalent to String() for logging
+	LogFields() log.Fields
 }

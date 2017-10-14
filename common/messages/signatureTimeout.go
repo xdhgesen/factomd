@@ -5,11 +5,13 @@
 package messages
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -81,14 +83,6 @@ func (m *SignatureTimeout) GetTimestamp() interfaces.Timestamp {
 
 func (m *SignatureTimeout) Type() byte {
 	return constants.SIGNATURE_TIMEOUT_MSG
-}
-
-func (m *SignatureTimeout) Int() int {
-	return -1
-}
-
-func (m *SignatureTimeout) Bytes() []byte {
-	return nil
 }
 
 func (m *SignatureTimeout) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
@@ -176,6 +170,10 @@ func (m *SignatureTimeout) String() string {
 	return "Signature Timeout"
 }
 
+func (m *SignatureTimeout) LogFields() log.Fields {
+	return log.Fields{}
+}
+
 func (m *SignatureTimeout) DBHeight() int {
 	return 0
 }
@@ -215,8 +213,4 @@ func (e *SignatureTimeout) JSONByte() ([]byte, error) {
 
 func (e *SignatureTimeout) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *SignatureTimeout) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }

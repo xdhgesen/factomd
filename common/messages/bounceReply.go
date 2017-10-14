@@ -4,17 +4,18 @@
 
 package messages
 
-import ()
 import (
-	"bytes"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"strings"
-	"time"
+
+	log "github.com/FactomProject/logrus"
 )
 
 type BounceReply struct {
@@ -77,7 +78,6 @@ func (m *BounceReply) Validate(state interfaces.IState) int {
 // Returns true if this is a message for this server to execute as
 // a leader.
 func (m *BounceReply) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -99,10 +99,6 @@ func (e *BounceReply) JSONByte() ([]byte, error) {
 
 func (e *BounceReply) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *BounceReply) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *BounceReply) Sign(key interfaces.Signer) error {
@@ -230,7 +226,10 @@ func (m *BounceReply) String() string {
 	return str
 }
 
-func (a *BounceReply) IsSameAs(b *BounceReply) bool {
+func (m *BounceReply) LogFields() log.Fields {
+	return log.Fields{}
+}
 
+func (a *BounceReply) IsSameAs(b *BounceReply) bool {
 	return true
 }

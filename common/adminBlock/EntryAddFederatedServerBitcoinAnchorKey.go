@@ -1,8 +1,8 @@
 package adminBlock
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -10,16 +10,23 @@ import (
 
 // DB Signature Entry -------------------------
 type AddFederatedServerBitcoinAnchorKey struct {
-	IdentityChainID interfaces.IHash
-	KeyPriority     byte
-	KeyType         byte //0=P2PKH 1=P2SH
-	ECDSAPublicKey  primitives.ByteSlice20
+	IdentityChainID interfaces.IHash       `json:"identitychainid"`
+	KeyPriority     byte                   `json:"keypriority"`
+	KeyType         byte                   `json:"keytype"` //0=P2PKH 1=P2SH
+	ECDSAPublicKey  primitives.ByteSlice20 `json:"ecdsapublickey"`
 }
 
 var _ interfaces.IABEntry = (*AddFederatedServerBitcoinAnchorKey)(nil)
 var _ interfaces.BinaryMarshallable = (*AddFederatedServerBitcoinAnchorKey)(nil)
 
+func (e *AddFederatedServerBitcoinAnchorKey) Init() {
+	if e.IdentityChainID == nil {
+		e.IdentityChainID = primitives.NewZeroHash()
+	}
+}
+
 func (e *AddFederatedServerBitcoinAnchorKey) String() string {
+	e.Init()
 	var out primitives.Buffer
 	out.WriteString(fmt.Sprintf("    E: %35s -- %17s %8x %12s %8x %12s %8x %12s %8s",
 		"AddFederatedServerBitcoinAnchorKey",
@@ -31,6 +38,7 @@ func (e *AddFederatedServerBitcoinAnchorKey) String() string {
 }
 
 func (c *AddFederatedServerBitcoinAnchorKey) UpdateState(state interfaces.IState) error {
+	c.Init()
 	state.UpdateAuthorityFromABEntry(c)
 	return nil
 }
@@ -50,59 +58,63 @@ func (e *AddFederatedServerBitcoinAnchorKey) Type() byte {
 }
 
 func (e *AddFederatedServerBitcoinAnchorKey) MarshalBinary() ([]byte, error) {
+	e.Init()
 	var buf primitives.Buffer
 
-	buf.Write([]byte{e.Type()})
-
-	data, err := e.IdentityChainID.MarshalBinary()
+	err := buf.PushByte(e.Type())
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
 
-	buf.Write([]byte{e.KeyPriority})
-	buf.Write([]byte{e.KeyType})
-
-	data, err = e.ECDSAPublicKey.MarshalBinary()
+	err = buf.PushBinaryMarshallable(e.IdentityChainID)
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(data)
+	err = buf.PushByte(e.KeyPriority)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushByte(e.KeyType)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(&e.ECDSAPublicKey)
+	if err != nil {
+		return nil, err
+	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
-func (e *AddFederatedServerBitcoinAnchorKey) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling Add Federated Server Bitcoin Anchor Key: %v", r)
-		}
-	}()
-
-	newData = data
-	if newData[0] != e.Type() {
+func (e *AddFederatedServerBitcoinAnchorKey) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
+	b, err := buf.PopByte()
+	if b != e.Type() {
 		return nil, fmt.Errorf("Invalid Entry type")
 	}
-	newData = newData[1:]
 
 	e.IdentityChainID = new(primitives.Hash)
-	newData, err = e.IdentityChainID.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(e.IdentityChainID)
 	if err != nil {
-		return
+		return nil, err
 	}
-
-	e.KeyPriority, newData = newData[0], newData[1:]
-	e.KeyType, newData = newData[0], newData[1:]
+	e.KeyPriority, err = buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
+	e.KeyType, err = buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
 	if e.KeyType != 0 && e.KeyType != 1 {
 		return nil, fmt.Errorf("Invalid KeyType")
 	}
-
-	newData, err = e.ECDSAPublicKey.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(&e.ECDSAPublicKey)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (e *AddFederatedServerBitcoinAnchorKey) UnmarshalBinary(data []byte) (err error) {
@@ -116,10 +128,6 @@ func (e *AddFederatedServerBitcoinAnchorKey) JSONByte() ([]byte, error) {
 
 func (e *AddFederatedServerBitcoinAnchorKey) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *AddFederatedServerBitcoinAnchorKey) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *AddFederatedServerBitcoinAnchorKey) IsInterpretable() bool {

@@ -7,6 +7,56 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 )
 
+func TestIncreaseServerCountGetHash(t *testing.T) {
+	a := new(IncreaseServerCount)
+	h := a.Hash()
+	expected := "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7"
+	if h.String() != expected {
+		t.Errorf("Wrong hash returned - %v vs %v", h.String(), expected)
+	}
+}
+
+func TestIncreaseServerCountTypeIDCheck(t *testing.T) {
+	a := new(IncreaseServerCount)
+	b, err := a.MarshalBinary()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if b[0] != a.Type() {
+		t.Errorf("Invalid byte marshalled")
+	}
+	a2 := new(IncreaseServerCount)
+	err = a2.UnmarshalBinary(b)
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+
+	b[0] = (b[0] + 1) % 255
+	err = a2.UnmarshalBinary(b)
+	if err == nil {
+		t.Errorf("No error caught")
+	}
+}
+
+func TestUnmarshalNilIncreaseServerCount(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
+
+	a := new(IncreaseServerCount)
+	err := a.UnmarshalBinary(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	err = a.UnmarshalBinary([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
+
 func TestIncreaseServerCountMarshalUnmarshal(t *testing.T) {
 	tmp := []byte{constants.TYPE_ADD_SERVER_COUNT, 0x01, 0x02}
 	isc := new(IncreaseServerCount)

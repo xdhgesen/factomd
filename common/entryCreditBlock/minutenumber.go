@@ -5,8 +5,8 @@
 package entryCreditBlock
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
@@ -16,13 +16,35 @@ const (
 )
 
 type MinuteNumber struct {
-	Number uint8
+	Number uint8 `json:"number"`
 }
 
 var _ interfaces.Printable = (*MinuteNumber)(nil)
 var _ interfaces.BinaryMarshallable = (*MinuteNumber)(nil)
 var _ interfaces.ShortInterpretable = (*MinuteNumber)(nil)
 var _ interfaces.IECBlockEntry = (*MinuteNumber)(nil)
+
+func (a *MinuteNumber) IsSameAs(b interfaces.IECBlockEntry) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	if a.ECID() != b.ECID() {
+		return false
+	}
+
+	bb, ok := b.(*MinuteNumber)
+	if ok == false {
+		return false
+	}
+	if a.Number != bb.Number {
+		return false
+	}
+
+	return true
+}
 
 func (e *MinuteNumber) Hash() interfaces.IHash {
 	bin, err := e.MarshalBinary()
@@ -63,27 +85,22 @@ func (m *MinuteNumber) ECID() byte {
 }
 
 func (m *MinuteNumber) MarshalBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
-	buf.WriteByte(m.Number)
+	buf := primitives.NewBuffer(nil)
+	err := buf.PushByte(m.Number)
+	if err != nil {
+		return nil, err
+	}
 	return buf.DeepCopyBytes(), nil
 }
 
-func (m *MinuteNumber) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling MinuteNumber: %v", r)
-		}
-	}()
-
+func (m *MinuteNumber) UnmarshalBinaryData(data []byte) ([]byte, error) {
 	buf := primitives.NewBuffer(data)
-	var c byte
-	if c, err = buf.ReadByte(); err != nil {
-		return
-	} else {
-		m.Number = c
+	var err error
+	m.Number, err = buf.PopByte()
+	if err != nil {
+		return nil, err
 	}
-	newData = buf.DeepCopyBytes()
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (m *MinuteNumber) UnmarshalBinary(data []byte) (err error) {
@@ -97,10 +114,6 @@ func (e *MinuteNumber) JSONByte() ([]byte, error) {
 
 func (e *MinuteNumber) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *MinuteNumber) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *MinuteNumber) String() string {

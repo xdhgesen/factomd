@@ -1,8 +1,6 @@
 package adminBlock
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -11,63 +9,85 @@ import (
 )
 
 type ServerFault struct {
-	Timestamp interfaces.Timestamp
+	Timestamp interfaces.Timestamp `json:"timestamp"`
 	// The following 4 fields represent the "Core" of the message
 	// This should match the Core of ServerFault messages
-	ServerID      interfaces.IHash
-	AuditServerID interfaces.IHash
-	VMIndex       byte
-	DBHeight      uint32
-	Height        uint32
+	ServerID      interfaces.IHash `json:"serverid"`
+	AuditServerID interfaces.IHash `json:"auditserverid"`
+	VMIndex       byte             `json:"vmindex"`
+	DBHeight      uint32           `json:"dbheight"`
+	Height        uint32           `json:"height"`
 
-	SignatureList SigList
+	SignatureList SigList `json:"signaturelist"`
 }
+
+func (e *ServerFault) Init() {
+	if e.Timestamp == nil {
+		e.Timestamp = primitives.NewTimestampFromMilliseconds(0)
+	}
+	if e.ServerID == nil {
+		e.ServerID = primitives.NewZeroHash()
+	}
+	if e.AuditServerID == nil {
+		e.AuditServerID = primitives.NewZeroHash()
+	}
+}
+
+var _ interfaces.IABEntry = (*ServerFault)(nil)
+var _ interfaces.BinaryMarshallable = (*ServerFault)(nil)
 
 type SigList struct {
 	Length uint32
 	List   []interfaces.IFullSignature
 }
 
-var _ interfaces.IABEntry = (*ServerFault)(nil)
-var _ interfaces.BinaryMarshallable = (*ServerFault)(nil)
+var _ interfaces.BinaryMarshallable = (*SigList)(nil)
 
 func (sl *SigList) MarshalBinary() (data []byte, err error) {
 	var buf primitives.Buffer
 
-	binary.Write(&buf, binary.BigEndian, uint32(sl.Length))
+	buf.PushUInt32(sl.Length)
 
 	for _, individualSig := range sl.List {
-		if d, err := individualSig.MarshalBinary(); err != nil {
+		if individualSig == nil {
+			return nil, fmt.Errorf("Nil signature present")
+		}
+		err := buf.PushBinaryMarshallable(individualSig)
+		if err != nil {
 			return nil, err
-		} else {
-			buf.Write(d)
 		}
 	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
-func (sl *SigList) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling SigList in Full Server Fault: %v", r)
-		}
-	}()
-	newData = data
-	sl.Length, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
+func (sl *SigList) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
 
-	for i := sl.Length; i > 0; i-- {
+	var err error
+	sl.Length, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
+
+	for i := 0; i < int(sl.Length); i++ {
 		tempSig := new(primitives.Signature)
-		newData, err = tempSig.UnmarshalBinaryData(newData)
+		err = buf.PopBinaryMarshallable(tempSig)
 		if err != nil {
 			return nil, err
 		}
 		sl.List = append(sl.List, tempSig)
 	}
-	return newData, nil
+	return buf.DeepCopyBytes(), nil
+}
+
+func (m *SigList) UnmarshalBinary(data []byte) error {
+	_, err := m.UnmarshalBinaryData(data)
+	return err
 }
 
 func (e *ServerFault) UpdateState(state interfaces.IState) error {
+	e.Init()
 	core, err := e.MarshalCore()
 	if err != nil {
 		return err
@@ -102,82 +122,91 @@ func (e *ServerFault) UpdateState(state interfaces.IState) error {
 	return nil
 }
 
-func (m *ServerFault) MarshalCore() (data []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error marshalling Server Fault Core: %v", r)
-		}
-	}()
-
+func (m *ServerFault) MarshalCore() ([]byte, error) {
+	m.Init()
 	var buf primitives.Buffer
 
-	if d, err := m.ServerID.MarshalBinary(); err != nil {
+	err := buf.PushBinaryMarshallable(m.ServerID)
+	if err != nil {
 		return nil, err
-	} else {
-		buf.Write(d)
-	}
-	if d, err := m.AuditServerID.MarshalBinary(); err != nil {
-		return nil, err
-	} else {
-		buf.Write(d)
 	}
 
-	buf.WriteByte(m.VMIndex)
-	binary.Write(&buf, binary.BigEndian, uint32(m.DBHeight))
-	binary.Write(&buf, binary.BigEndian, uint32(m.Height))
-
-	return buf.DeepCopyBytes(), nil
-}
-
-func (m *ServerFault) MarshalBinary() (data []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error marshalling Invalid Server Fault: %v", r)
-		}
-	}()
-
-	var buf primitives.Buffer
-
-	if d, err := m.Timestamp.MarshalBinary(); err != nil {
+	err = buf.PushBinaryMarshallable(m.AuditServerID)
+	if err != nil {
 		return nil, err
-	} else {
-		buf.Write(d)
 	}
 
-	if d, err := m.ServerID.MarshalBinary(); err != nil {
+	err = buf.PushByte(m.VMIndex)
+	if err != nil {
 		return nil, err
-	} else {
-		buf.Write(d)
 	}
-	if d, err := m.AuditServerID.MarshalBinary(); err != nil {
+	err = buf.PushUInt32(m.DBHeight)
+	if err != nil {
 		return nil, err
-	} else {
-		buf.Write(d)
 	}
-
-	buf.WriteByte(m.VMIndex)
-	binary.Write(&buf, binary.BigEndian, uint32(m.DBHeight))
-	binary.Write(&buf, binary.BigEndian, uint32(m.Height))
-
-	if d, err := m.SignatureList.MarshalBinary(); err != nil {
+	err = buf.PushUInt32(m.Height)
+	if err != nil {
 		return nil, err
-	} else {
-		buf.Write(d)
 	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
-func (m *ServerFault) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling With Signatures Invalid Server Fault: %v", r)
-		}
-	}()
-	newData = data
+func (m *ServerFault) MarshalBinary() ([]byte, error) {
+	m.Init()
+	var buf primitives.Buffer
+
+	err := buf.PushByte(m.Type())
+	if err != nil {
+		return nil, err
+	}
+
+	err = buf.PushBinaryMarshallable(m.Timestamp)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(m.ServerID)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(m.AuditServerID)
+	if err != nil {
+		return nil, err
+	}
+
+	err = buf.PushByte(m.VMIndex)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushUInt32(m.DBHeight)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushUInt32(m.Height)
+	if err != nil {
+		return nil, err
+	}
+
+	err = buf.PushBinaryMarshallable(&m.SignatureList)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.DeepCopyBytes(), nil
+}
+
+func (m *ServerFault) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
+	b, err := buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
+	if b != m.Type() {
+		return nil, fmt.Errorf("Invalid Entry type")
+	}
 
 	m.Timestamp = new(primitives.Timestamp)
-	newData, err = m.Timestamp.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(m.Timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +214,7 @@ func (m *ServerFault) UnmarshalBinaryData(data []byte) (newData []byte, err erro
 	if m.ServerID == nil {
 		m.ServerID = primitives.NewZeroHash()
 	}
-	newData, err = m.ServerID.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(m.ServerID)
 	if err != nil {
 		return nil, err
 	}
@@ -193,21 +222,21 @@ func (m *ServerFault) UnmarshalBinaryData(data []byte) (newData []byte, err erro
 	if m.AuditServerID == nil {
 		m.AuditServerID = primitives.NewZeroHash()
 	}
-	newData, err = m.AuditServerID.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(m.AuditServerID)
 	if err != nil {
 		return nil, err
 	}
 
-	m.VMIndex, newData = newData[0], newData[1:]
-	m.DBHeight, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
-	m.Height, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
+	m.VMIndex, err = buf.PopByte()
+	m.DBHeight, err = buf.PopUInt32()
+	m.Height, err = buf.PopUInt32()
 
-	newData, err = m.SignatureList.UnmarshalBinaryData(newData)
+	err = buf.PopBinaryMarshallable(&m.SignatureList)
 	if err != nil {
 		return nil, err
 	}
 
-	return newData, nil
+	return buf.DeepCopyBytes(), nil
 }
 
 func (m *ServerFault) UnmarshalBinary(data []byte) error {
@@ -221,10 +250,6 @@ func (e *ServerFault) JSONByte() ([]byte, error) {
 
 func (e *ServerFault) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *ServerFault) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *ServerFault) IsInterpretable() bool {
@@ -244,6 +269,7 @@ func (e *ServerFault) Hash() interfaces.IHash {
 }
 
 func (e *ServerFault) String() string {
+	e.Init()
 	str := fmt.Sprintf("    E: %35s -- DBheight %ds ServerID %8x AuditServer %8x, #sigs %d, VMIndex %d",
 		"EntryServerFault",
 		e.DBHeight,

@@ -5,13 +5,15 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -34,7 +36,10 @@ var _ interfaces.IMsg = (*CommitEntryMsg)(nil)
 var _ Signable = (*CommitEntryMsg)(nil)
 
 func (a *CommitEntryMsg) IsSameAs(b *CommitEntryMsg) bool {
-	if b == nil {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
 		return false
 	}
 
@@ -96,14 +101,6 @@ func (m *CommitEntryMsg) GetTimestamp() interfaces.Timestamp {
 
 func (m *CommitEntryMsg) Type() byte {
 	return constants.COMMIT_ENTRY_MSG
-}
-
-func (m *CommitEntryMsg) Int() int {
-	return -1
-}
-
-func (m *CommitEntryMsg) Bytes() []byte {
-	return nil
 }
 
 func (m *CommitEntryMsg) Sign(key interfaces.Signer) error {
@@ -201,6 +198,13 @@ func (m *CommitEntryMsg) String() string {
 	return str
 }
 
+func (m *CommitEntryMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "commitentry", "vmindex": m.VMIndex,
+		"server":      m.LeaderChainID.String()[4:12],
+		"commitchain": m.CommitEntry.GetEntryHash().String()[:6],
+		"hash":        m.GetHash().String()[:6]}
+}
+
 // Validate the message, given the state.  Three possible results:
 //  < 0 -- Message is invalid.  Discard
 //  0   -- Cannot tell if message is Valid
@@ -243,10 +247,6 @@ func (e *CommitEntryMsg) JSONByte() ([]byte, error) {
 
 func (e *CommitEntryMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *CommitEntryMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func NewCommitEntryMsg() *CommitEntryMsg {

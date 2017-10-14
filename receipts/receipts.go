@@ -5,9 +5,9 @@
 package receipts
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/directoryBlock/dbInfo"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -26,7 +26,7 @@ func (e *Receipt) TrimReceipt() {
 	if e == nil {
 		return
 	}
-	entry, _ := primitives.NewShaHashFromStr(e.Entry.Key)
+	entry, _ := primitives.NewShaHashFromStr(e.Entry.EntryHash)
 	for i := range e.MerkleBranch {
 		if entry.IsSameAs(e.MerkleBranch[i].Left) {
 			e.MerkleBranch[i].Left = nil
@@ -56,7 +56,7 @@ func (e *Receipt) Validate() error {
 	if e.DirectoryBlockKeyMR == nil {
 		return fmt.Errorf("Receipt has no DirectoryBlockKeyMR")
 	}
-	entryHash, err := primitives.NewShaHashFromStr(e.Entry.Key)
+	entryHash, err := primitives.NewShaHashFromStr(e.Entry.EntryHash)
 	//TODO: validate entry hashes into EntryHash
 
 	if err != nil {
@@ -213,10 +213,6 @@ func (e *Receipt) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *Receipt) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (e *Receipt) CustomMarshalString() string {
 	str, _ := e.JSONString()
 	return str
@@ -241,9 +237,9 @@ func DecodeReceiptString(str string) (*Receipt, error) {
 }
 
 type JSON struct {
-	Raw  string `json:"raw,omitempty"`
-	Key  string `json:"key,omitempty"`
-	Json string `json:"json,omitempty"`
+	Raw       string `json:"raw,omitempty"`
+	EntryHash string `json:"entryhash,omitempty"`
+	Json      string `json:"json,omitempty"`
 }
 
 func (e *JSON) JSONByte() ([]byte, error) {
@@ -252,10 +248,6 @@ func (e *JSON) JSONByte() ([]byte, error) {
 
 func (e *JSON) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *JSON) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *JSON) String() string {
@@ -270,7 +262,7 @@ func (e *JSON) IsSameAs(r *JSON) bool {
 	if e.Raw != r.Raw {
 		return false
 	}
-	if e.Key != r.Key {
+	if e.EntryHash != r.EntryHash {
 		return false
 	}
 	if e.Json != r.Json {
@@ -279,11 +271,11 @@ func (e *JSON) IsSameAs(r *JSON) bool {
 	return true
 }
 
-func CreateFullReceipt(dbo interfaces.DBOverlay, entryID interfaces.IHash) (*Receipt, error) {
+func CreateFullReceipt(dbo interfaces.DBOverlaySimple, entryID interfaces.IHash) (*Receipt, error) {
 	return CreateReceipt(dbo, entryID)
 }
 
-func CreateMinimalReceipt(dbo interfaces.DBOverlay, entryID interfaces.IHash) (*Receipt, error) {
+func CreateMinimalReceipt(dbo interfaces.DBOverlaySimple, entryID interfaces.IHash) (*Receipt, error) {
 	receipt, err := CreateReceipt(dbo, entryID)
 	if err != nil {
 		return nil, err
@@ -294,10 +286,10 @@ func CreateMinimalReceipt(dbo interfaces.DBOverlay, entryID interfaces.IHash) (*
 	return receipt, nil
 }
 
-func CreateReceipt(dbo interfaces.DBOverlay, entryID interfaces.IHash) (*Receipt, error) {
+func CreateReceipt(dbo interfaces.DBOverlaySimple, entryID interfaces.IHash) (*Receipt, error) {
 	receipt := new(Receipt)
 	receipt.Entry = new(JSON)
-	receipt.Entry.Key = entryID.String()
+	receipt.Entry.EntryHash = entryID.String()
 
 	//EBlock
 
@@ -402,7 +394,7 @@ func CreateReceipt(dbo interfaces.DBOverlay, entryID interfaces.IHash) (*Receipt
 	return receipt, nil
 }
 
-func VerifyFullReceipt(dbo interfaces.DBOverlay, receiptStr string) error {
+func VerifyFullReceipt(dbo interfaces.DBOverlaySimple, receiptStr string) error {
 	receipt, err := DecodeReceiptString(receiptStr)
 	if err != nil {
 		return err
@@ -427,7 +419,7 @@ func VerifyFullReceipt(dbo interfaces.DBOverlay, receiptStr string) error {
 	return nil
 }
 
-func VerifyMinimalReceipt(dbo interfaces.DBOverlay, receiptStr string) error {
+func VerifyMinimalReceipt(dbo interfaces.DBOverlaySimple, receiptStr string) error {
 	receipt, err := DecodeReceiptString(receiptStr)
 	if err != nil {
 		return err

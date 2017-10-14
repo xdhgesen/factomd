@@ -6,10 +6,15 @@ package boltdb_test
 
 import (
 	"fmt"
-	"github.com/FactomProject/factomd/common/interfaces"
-	. "github.com/FactomProject/factomd/database/boltdb"
 	"os"
 	"testing"
+
+	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/common/primitives/random"
+	. "github.com/FactomProject/factomd/database/boltdb"
+	"github.com/FactomProject/factomd/database/databaseOverlay"
+	"github.com/FactomProject/factomd/testHelper"
 )
 
 type TestData struct {
@@ -149,5 +154,70 @@ func CleanupTest(t *testing.T, b *BoltDB) {
 	err = os.Remove(dbFilename)
 	if err != nil {
 		t.Errorf("%v", err)
+	}
+}
+
+func TestDoesKeyExist(t *testing.T) {
+	m := NewBoltDB(nil, dbFilename)
+	defer CleanupTest(t, m)
+
+	for i := 0; i < 1000; i++ {
+		key := random.RandNonEmptyByteSlice()
+		bucket := random.RandNonEmptyByteSlice()
+
+		test := new(TestData)
+		test.Str = "testtest"
+
+		err := m.Put(bucket, key, test)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+
+		exists, err := m.DoesKeyExist(bucket, key)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+
+		if exists == false {
+			t.Errorf("Key does not exist")
+		}
+
+		key = random.RandNonEmptyByteSlice()
+		bucket = random.RandNonEmptyByteSlice()
+
+		exists, err = m.DoesKeyExist(bucket, key)
+		if err != nil {
+			t.Errorf("%v", err)
+		}
+
+		if exists == true {
+			t.Errorf("Key does exist while it shouldn't")
+		}
+	}
+}
+
+func TestGetAll(t *testing.T) {
+	m := NewBoltDB(nil, dbFilename)
+	defer CleanupTest(t, m)
+
+	dbo := databaseOverlay.NewOverlay(m)
+	testHelper.PopulateTestDatabaseOverlay(dbo)
+
+	_, keys, err := dbo.GetAll(databaseOverlay.INCLUDED_IN, primitives.NewZeroHash())
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if len(keys) != 150 {
+		t.Errorf("Invalid amount of keys returned - expected 150, got %v", len(keys))
+	}
+	for i := range keys {
+		for j := i + 1; j < len(keys); j++ {
+			if primitives.AreBytesEqual(keys[i], keys[j]) {
+				t.Errorf("Key %v is equal to key %v - %x", i, j, keys[i])
+			}
+		}
+		if len(keys[i]) != 32 {
+			t.Errorf("Wrong key length at index %v - %v", i, len(keys[i]))
+		}
 	}
 }

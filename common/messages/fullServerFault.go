@@ -5,16 +5,16 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
-
 	"math"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -320,7 +320,6 @@ func (sl *SigList) MarshalBinary() (data []byte, err error) {
 }
 
 func (sl *SigList) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Error unmarshalling SigList in Full Server Fault: %v", r)
@@ -494,6 +493,18 @@ func (m *FullServerFault) StringWithSigCnt(s interfaces.IState) string {
 		m.Timestamp.GetTimeSeconds())
 }
 
+func (m *FullServerFault) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "fullserverfault",
+		"vm":         m.VMIndex,
+		"dbheight":   m.DBHeight,
+		"leaderid":   m.ServerID.String()[4:10],
+		"auditid":    m.AuditServerID.String()[4:10],
+		"sysheight":  m.SystemHeight,
+		"clearfault": m.ClearFault,
+		"sigcount":   m.SignatureList.Length,
+		"hash":       m.GetHash().String()[:6]}
+}
+
 func (m *FullServerFault) GetDBHeight() uint32 {
 	return m.DBHeight
 }
@@ -503,7 +514,6 @@ func (m *FullServerFault) GetDBHeight() uint32 {
 //  0   -- Cannot tell if message is Valid
 //  1   -- Message is valid
 func (m *FullServerFault) Validate(state interfaces.IState) int {
-
 	// Ignore old faults
 	if m.DBHeight <= state.GetHighestSavedBlk() {
 		return -1
@@ -592,7 +602,6 @@ func (m *FullServerFault) SigTally(state interfaces.IState) int {
 }
 
 func (m *FullServerFault) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -610,10 +619,6 @@ func (e *FullServerFault) JSONByte() ([]byte, error) {
 
 func (e *FullServerFault) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *FullServerFault) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (a *FullServerFault) IsSameAs(b *FullServerFault) bool {

@@ -1,8 +1,8 @@
 package adminBlock
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -10,7 +10,7 @@ import (
 
 // DB Signature Entry -------------------------
 type IncreaseServerCount struct {
-	Amount byte
+	Amount byte `json:"amount"`
 }
 
 var _ interfaces.IABEntry = (*IncreaseServerCount)(nil)
@@ -24,7 +24,6 @@ func NewIncreaseSererCount(num byte) (e *IncreaseServerCount) {
 }
 
 func (c *IncreaseServerCount) UpdateState(state interfaces.IState) error {
-
 	return nil
 }
 
@@ -32,27 +31,37 @@ func (e *IncreaseServerCount) Type() byte {
 	return constants.TYPE_ADD_SERVER_COUNT
 }
 
-func (e *IncreaseServerCount) MarshalBinary() (data []byte, err error) {
+func (e *IncreaseServerCount) MarshalBinary() ([]byte, error) {
 	var buf primitives.Buffer
 
-	buf.Write([]byte{e.Type()})
-	buf.Write([]byte{e.Amount})
+	err := buf.PushByte(e.Type())
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushByte(e.Amount)
+	if err != nil {
+		return nil, err
+	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
-func (e *IncreaseServerCount) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling Entry Increase Server Count: %v", r)
-		}
-	}()
+func (e *IncreaseServerCount) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
+	b, err := buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
+	if b != e.Type() {
+		return nil, fmt.Errorf("Invalid Entry type")
+	}
 
-	newData = data
-	newData = newData[1:]
-	e.Amount, newData = newData[0], newData[1:]
+	e.Amount, err = buf.PopByte()
+	if err != nil {
+		return nil, err
+	}
 
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (e *IncreaseServerCount) UnmarshalBinary(data []byte) (err error) {
@@ -66,10 +75,6 @@ func (e *IncreaseServerCount) JSONByte() ([]byte, error) {
 
 func (e *IncreaseServerCount) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *IncreaseServerCount) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *IncreaseServerCount) String() string {

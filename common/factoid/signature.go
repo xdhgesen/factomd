@@ -5,9 +5,9 @@
 package factoid
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -16,10 +16,14 @@ import (
 // The default FactoidSignature doesn't care about indexing.  We will extend this
 // FactoidSignature for multisig
 type FactoidSignature struct {
-	Signature [constants.SIGNATURE_LENGTH]byte // The FactoidSignature
+	Signature [constants.SIGNATURE_LENGTH]byte `json:"signature"` // The FactoidSignature
 }
 
 var _ interfaces.ISignature = (*FactoidSignature)(nil)
+
+func (s *FactoidSignature) IsSameAs(sig interfaces.ISignature) bool {
+	return primitives.AreBytesEqual(s.Bytes(), sig.Bytes())
+}
 
 func (s *FactoidSignature) Verify([]byte) bool {
 	fmt.Println("Verify is Broken")
@@ -34,10 +38,6 @@ func (s *FactoidSignature) GetKey() []byte {
 	return s.Signature[32:]
 }
 
-func (s *FactoidSignature) GetHash() interfaces.IHash {
-	return nil
-}
-
 func (h *FactoidSignature) MarshalText() ([]byte, error) {
 	return []byte(hex.EncodeToString(h.Signature[:])), nil
 }
@@ -50,27 +50,12 @@ func (s *FactoidSignature) JSONString() (string, error) {
 	return primitives.EncodeJSONString(s)
 }
 
-func (s *FactoidSignature) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(s, b)
-}
-
 func (s FactoidSignature) String() string {
 	txt, err := s.CustomMarshalText()
 	if err != nil {
 		return "<error>"
 	}
 	return string(txt)
-}
-
-// Checks that the FactoidSignatures are the same.
-func (s1 *FactoidSignature) IsEqual(sig interfaces.IBlock) []interfaces.IBlock {
-	s2, ok := sig.(*FactoidSignature)
-	if !ok || // Not the right kind of interfaces.IBlock
-		s1.Signature != s2.Signature { // Not the right rcd
-		r := make([]interfaces.IBlock, 0, 5)
-		return append(r, s1)
-	}
-	return nil
 }
 
 // Index is ignored.  We only have one FactoidSignature
@@ -87,11 +72,8 @@ func (s *FactoidSignature) GetSignature() *[constants.SIGNATURE_LENGTH]byte {
 }
 
 func (s FactoidSignature) MarshalBinary() ([]byte, error) {
-	var out primitives.Buffer
-
-	out.Write(s.Signature[:])
-
-	return out.DeepCopyBytes(), nil
+	buf := primitives.NewBuffer(s.Signature[:])
+	return buf.DeepCopyBytes(), nil
 }
 
 func (s FactoidSignature) CustomMarshalText() ([]byte, error) {
@@ -105,6 +87,9 @@ func (s FactoidSignature) CustomMarshalText() ([]byte, error) {
 }
 
 func (s *FactoidSignature) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	if data == nil || len(data) < constants.SIGNATURE_LENGTH {
+		return nil, fmt.Errorf("Not enough data to unmarshal")
+	}
 	copy(s.Signature[:], data[:constants.SIGNATURE_LENGTH])
 	return data[constants.SIGNATURE_LENGTH:], nil
 }

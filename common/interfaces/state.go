@@ -9,13 +9,22 @@ type DBStateSent struct {
 	Sent     Timestamp
 }
 
+// IQueue is the interface returned by returning queue functions
+type IQueue interface {
+	Length() int
+	Cap() int
+	Enqueue(msg IMsg)
+	Dequeue() IMsg
+	BlockingDequeue() IMsg
+}
+
 // Holds the state information for factomd.  This does imply that we will be
 // using accessors to access state information in the consensus algorithm.
 // This is a bit tedious, but does provide single choke points where information
 // can be logged about the execution of Factom.  Also ensures that we do not
 // accidentally
 type IState interface {
-
+	Running() bool // Returns true as long as this Factomd instance is running.
 	// Server
 	GetFactomNodeName() string
 	GetSalt(Timestamp) uint32 // A secret number computed from a TS that tests if a message was issued from this server or not
@@ -27,13 +36,15 @@ type IState interface {
 	GetIdentityChainID() IHash
 	SetIdentityChainID(IHash)
 	Sign([]byte) IFullSignature
+	Log(level string, message string)
+	Logf(level string, format string, args ...interface{})
 
 	GetDBStatesSent() []*DBStateSent
 	SetDBStatesSent([]*DBStateSent)
 
 	GetDirectoryBlockInSeconds() int
 	SetDirectoryBlockInSeconds(int)
-	GetFactomdVersion() int
+	GetFactomdVersion() string
 	GetDBHeightComplete() uint32
 	DatabaseContains(hash IHash) bool
 	SetOut(bool)  // Output is turned on if set to true
@@ -50,11 +61,11 @@ type IState interface {
 	AddDBSig(dbheight uint32, chainID IHash, sig IFullSignature)
 	AddPrefix(string)
 	AddFedServer(uint32, IHash) int
-	GetFedServers(uint32) []IFctServer
+	GetFedServers(uint32) []IServer
 	RemoveFedServer(uint32, IHash)
 	AddAuditServer(uint32, IHash) int
-	GetAuditServers(uint32) []IFctServer
-	GetOnlineAuditServers(uint32) []IFctServer
+	GetAuditServers(uint32) []IServer
+	GetOnlineAuditServers(uint32) []IServer
 
 	//RPC
 	GetRpcUser() string
@@ -92,17 +103,18 @@ type IState interface {
 	// Network Processor
 	TickerQueue() chan int
 	TimerMsgQueue() chan IMsg
-	NetworkOutMsgQueue() chan IMsg
+	NetworkOutMsgQueue() IQueue
 	NetworkInvalidMsgQueue() chan IMsg
 
 	// Journalling
 	JournalMessage(IMsg)
+	GetJournalMessages() [][]byte
 
 	// Consensus
-	APIQueue() chan IMsg   // Input Queue from the API
-	InMsgQueue() chan IMsg // Read by Validate
-	AckQueue() chan IMsg   // Leader Queue
-	MsgQueue() chan IMsg   // Follower Queue
+	APIQueue() IQueue    // Input Queue from the API
+	InMsgQueue() IQueue  // Read by Validate
+	AckQueue() chan IMsg // Leader Queue
+	MsgQueue() chan IMsg // Follower Queue
 
 	// Lists and Maps
 	// =====
@@ -139,6 +151,9 @@ type IState interface {
 	GetNetworkSkeletonKey() IHash
 	IntiateNetworkSkeletonIdentity() error
 
+	// Getting info about an identity
+	GetSigningKey(id IHash) (IHash, int)
+
 	GetMatryoshka(dbheight uint32) IHash // Reverse Hash
 
 	// These are methods run by the consensus algorithm to track what servers are the leaders
@@ -158,7 +173,7 @@ type IState interface {
 	GetAnchor() IAnchor
 
 	// Database
-	GetAndLockDB() DBOverlay
+	GetAndLockDB() DBOverlaySimple
 	UnlockDB()
 
 	// Web Services
@@ -235,8 +250,25 @@ type IState interface {
 	// Returns false if we have seen an Entry Replay in the current period.
 	NoEntryYet(IHash, Timestamp) bool
 
+	// Calculates the transaction rate this node is seeing.
+	//		totalTPS	: Total transactions / total time node running
+	//		instantTPS	: Weighted transactions per second to get a better value for
+	//					  current transaction rate.
+	CalculateTransactionRate() (totalTPS float64, instantTPS float64)
+
 	//For ACK
 	GetACKStatus(hash IHash) (int, IHash, Timestamp, Timestamp, error)
+	GetSpecificACKStatus(hash IHash) (int, IHash, Timestamp, Timestamp, error)
+
+	// Acks with ChainIDs so you can select which hash type
+	GetEntryCommitAckByEntryHash(hash IHash) (status int, commit IMsg)
+	GetEntryRevealAckByEntryHash(hash IHash) (status int, blktime Timestamp, commit IMsg)
+	GetEntryCommitAckByTXID(hash IHash) (status int, blktime Timestamp, commit IMsg, entryhash IHash)
+	IsNewOrPendingEBlocks(dbheight uint32, hash IHash) bool
+
+	// Used in API to reject commits properly and inform user
+	IsHighestCommit(hash IHash, msg IMsg) bool
+
 	FetchPaidFor(hash IHash) (IHash, error)
 	FetchFactoidTransactionByHash(hash IHash) (ITransaction, error)
 	FetchECTransactionByHash(hash IHash) (IECBlockEntry, error)
@@ -258,14 +290,29 @@ type IState interface {
 
 	AddAuthorityDelta(changeString string)
 
+	GetAuthorities() []IAuthority
+	GetLeaderPL() IProcessList
 	GetLLeaderHeight() uint32
 	GetEntryDBHeightComplete() uint32
 	GetMissingEntryCount() uint32
 	GetEntryBlockDBHeightProcessing() uint32
 	GetEntryBlockDBHeightComplete() uint32
+	GetCurrentBlockStartTime() int64
 	GetCurrentMinute() int
+	GetCurrentMinuteStartTime() int64
+	GetCurrentTime() int64
+	IsStalled() bool
+	GetDelay() int64
+	SetDelay(int64)
+	GetDropRate() int
+	SetDropRate(int)
+	GetBootTime() int64
 
 	// Access to Holding Queue
 	LoadHoldingMap() map[[32]byte]IMsg
 	LoadAcksMap() map[[32]byte]IMsg
+
+	// Plugins
+	UsingTorrent() bool
+	GetMissingDBState(height uint32) error
 }

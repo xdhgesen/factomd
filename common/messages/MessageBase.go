@@ -19,15 +19,19 @@ type MessageBase struct {
 	Peer2Peer     bool   // The nature of this message type, not marshaled with the message
 	LocalOnly     bool   // This message is only a local message, is not broadcasted and may skip verification
 
-	NoResend bool // Don't resend this message if true.
+	NoResend  bool // Don't resend this message if true.
+	ResendCnt int  // Put a limit on resends
 
 	LeaderChainID interfaces.IHash
 	MsgHash       interfaces.IHash // Cache of the hash of a message
+	RepeatHash    interfaces.IHash // Cache of the hash of a message
 	VMIndex       int              // The Index of the VM responsible for this message.
 	VMHash        []byte           // Basis for selecting a VMIndex
 	Minute        byte
 	resend        int64 // Time to resend (milliseconds)
 	expire        int64 // Time to expire (milliseconds)
+
+	Ack interfaces.IMsg
 
 	Stalled     bool // This message is currently stalled
 	MarkInvalid bool
@@ -36,30 +40,42 @@ type MessageBase struct {
 
 func resend(state interfaces.IState, msg interfaces.IMsg, cnt int, delay int) {
 	for i := 0; i < cnt; i++ {
-		state.NetworkOutMsgQueue() <- msg
+		state.NetworkOutMsgQueue().Enqueue(msg)
 		time.Sleep(time.Duration(delay) * time.Second)
 	}
 }
 
-func (m *MessageBase) SendOut(state interfaces.IState, msg interfaces.IMsg) {
+func (m *MessageBase) GetAck() interfaces.IMsg {
+	return m.Ack
+}
 
+func (m *MessageBase) PutAck(ack interfaces.IMsg) {
+	m.Ack = ack
+}
+
+func (m *MessageBase) SendOut(state interfaces.IState, msg interfaces.IMsg) {
+	// Dont' resend if we are behind
+	if m.ResendCnt > 1 && state.GetHighestKnownBlock()-state.GetHighestSavedBlk() > 4 {
+		return
+	}
 	if m.NoResend {
 		return
 	}
+
+	if m.ResendCnt > 4 {
+		return
+	}
+	m.ResendCnt++
 
 	switch msg.(interface{}).(type) {
 	//case ServerFault:
 	//	go resend(state, msg, 20, 1)
 	case FullServerFault:
-		go resend(state, msg, 10, 2)
+		go resend(state, msg, 2, 5)
 	case ServerFault:
-		go resend(state, msg, 10, 2)
-	case MissingMsg:
-		go resend(state, msg, 1, 1)
-	case DBStateMissing:
-		go resend(state, msg, 1, 1)
+		go resend(state, msg, 2, 5)
 	default:
-		go resend(state, msg, 1, 1)
+		go resend(state, msg, 1, 0)
 	}
 }
 
@@ -85,7 +101,7 @@ func (m *MessageBase) MarkSentInvalid(b bool) {
 	m.MarkInvalid = b
 }
 
-func (m *MessageBase) SentInvlaid() bool {
+func (m *MessageBase) SentInvalid() bool {
 	return m.MarkInvalid
 }
 
@@ -96,7 +112,7 @@ func (m *MessageBase) Resend(s interfaces.IState) (rtn bool) {
 		m.resend = now
 		return false
 	}
-	if now-m.resend > 20000 && len(s.NetworkOutMsgQueue()) < 1000 {
+	if now-m.resend > 20000 && s.NetworkOutMsgQueue().Length() < 1000 {
 		m.resend = now
 		return true
 	}

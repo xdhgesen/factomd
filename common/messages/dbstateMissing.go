@@ -5,14 +5,14 @@
 package messages
 
 import (
-	"bytes"
-	//	"encoding/binary"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 // Communicate a Directory Block State
@@ -69,14 +69,6 @@ func (m *DBStateMissing) Type() byte {
 	return constants.DBSTATE_MISSING_MSG
 }
 
-func (m *DBStateMissing) Int() int {
-	return -1
-}
-
-func (m *DBStateMissing) Bytes() []byte {
-	return nil
-}
-
 func (m *DBStateMissing) GetTimestamp() interfaces.Timestamp {
 	return m.Timestamp
 }
@@ -93,7 +85,6 @@ func (m *DBStateMissing) Validate(state interfaces.IState) int {
 }
 
 func (m *DBStateMissing) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 // Execute the leader functions of the given message
@@ -102,8 +93,7 @@ func (m *DBStateMissing) LeaderExecute(state interfaces.IState) {
 }
 
 // Only send the same block again after 15 seconds.
-func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) {
-
+func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) (msglen int) {
 	send := true
 
 	now := state.GetTimestamp()
@@ -111,7 +101,7 @@ func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) {
 	var keeps []*interfaces.DBStateSent
 
 	for _, v := range sents {
-		if now.GetTimeSeconds()-v.Sent.GetTimeSeconds() < 15 {
+		if now.GetTimeSeconds()-v.Sent.GetTimeSeconds() < 10 {
 			if v.DBHeight == dbheight {
 				send = false
 			}
@@ -121,6 +111,11 @@ func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) {
 	if send {
 		msg, err := state.LoadDBState(dbheight)
 		if msg != nil && err == nil {
+			b, err := msg.MarshalBinary()
+			if err != nil {
+				return
+			}
+			msglen = len(b)
 			msg.SetOrigin(m.GetOrigin())
 			msg.SetNetworkOrigin(m.GetNetworkOrigin())
 			msg.SetNoResend(false)
@@ -133,22 +128,42 @@ func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) {
 		}
 		state.SetDBStatesSent(keeps)
 	}
+	return
+}
+
+func NewEnd(inLen int, start uint32, end uint32) (s uint32, e uint32) {
+	switch {
+	case inLen > constants.INMSGQUEUE_HIGH:
+		return 0, 0
+	case inLen > constants.INMSGQUEUE_MED && end-start > constants.DBSTATE_REQUEST_LIM_MED:
+		end = start + constants.DBSTATE_REQUEST_LIM_MED
+	case end-start > constants.DBSTATE_REQUEST_LIM_HIGH:
+		end = start + constants.DBSTATE_REQUEST_LIM_HIGH
+	}
+	return start, end
 }
 
 func (m *DBStateMissing) FollowerExecute(state interfaces.IState) {
-	if len(state.NetworkOutMsgQueue()) > 100 {
+	if state.NetworkOutMsgQueue().Length() > 100 {
 		return
 	}
-
 	// TODO: Likely need to consider a limit on how many blocks we reply with.  For now,
 	// just give them what they ask for.
 	start := m.DBHeightStart
 	end := m.DBHeightEnd
-	if end-start > 200 {
-		end = start + 200
+
+	if end == 0 {
+		return
 	}
-	for dbs := start; dbs <= end; dbs++ {
-		m.send(dbs, state)
+
+	// Look at our backlog of messages from the network.  If we are really behind, ignore completely.
+	// Otherwise, dial back our response, or give them as  much as we can.  In any event, limit to
+	// just a bit over 1 MB
+	start, end = NewEnd(state.InMsgQueue().Length(), start, end)
+
+	sent := 0
+	for dbs := start; dbs <= end && sent < 1024*1024; dbs++ {
+		sent += m.send(dbs, state)
 	}
 
 	return
@@ -165,10 +180,6 @@ func (e *DBStateMissing) JSONByte() ([]byte, error) {
 
 func (e *DBStateMissing) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *DBStateMissing) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (m *DBStateMissing) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
@@ -226,6 +237,12 @@ func (m *DBStateMissing) MarshalBinary() ([]byte, error) {
 
 func (m *DBStateMissing) String() string {
 	return fmt.Sprintf("DBStateMissing: %d-%d", m.DBHeightStart, m.DBHeightEnd)
+}
+
+func (m *DBStateMissing) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "dbstatemissing",
+		"dbheightstart": m.DBHeightStart,
+		"dbheightend":   m.DBHeightEnd}
 }
 
 func NewDBStateMissing(state interfaces.IState, dbheightStart uint32, dbheightEnd uint32) interfaces.IMsg {

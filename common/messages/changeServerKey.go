@@ -5,13 +5,14 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 // Communicate a Admin Block Change
@@ -52,14 +53,6 @@ func (m *ChangeServerKeyMsg) GetMsgHash() interfaces.IHash {
 
 func (m *ChangeServerKeyMsg) Type() byte {
 	return constants.CHANGESERVER_KEY_MSG
-}
-
-func (m *ChangeServerKeyMsg) Int() int {
-	return -1
-}
-
-func (m *ChangeServerKeyMsg) Bytes() []byte {
-	return nil
 }
 
 func (m *ChangeServerKeyMsg) GetTimestamp() interfaces.Timestamp {
@@ -133,10 +126,6 @@ func (e *ChangeServerKeyMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *ChangeServerKeyMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (m *ChangeServerKeyMsg) Sign(key interfaces.Signer) error {
 	signature, err := SignSignable(m, key)
 	if err != nil {
@@ -156,7 +145,6 @@ func (m *ChangeServerKeyMsg) VerifySignature() (bool, error) {
 
 func (m *ChangeServerKeyMsg) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
-		return
 		if r := recover(); r != nil {
 			err = fmt.Errorf("Error unmarshalling Add Server Message: %v", r)
 		}
@@ -278,6 +266,11 @@ func (m *ChangeServerKeyMsg) String() string {
 		m.Key.Bytes()[:3],
 		m.GetMsgHash().Bytes()[:3])
 
+}
+
+func (m *ChangeServerKeyMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "changeserverkey",
+		"server": m.IdentityChainID.String()[4:12], "hash": m.GetHash().String()[:6]}
 }
 
 func (m *ChangeServerKeyMsg) IsSameAs(b *ChangeServerKeyMsg) bool {

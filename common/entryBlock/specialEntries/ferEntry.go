@@ -1,7 +1,10 @@
+// Copyright 2017 Factom Foundation
+// Use of this source code is governed by the MIT
+// license that can be found in the LICENSE file.
+
 package specialEntries
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -96,10 +99,6 @@ func (e *FEREntry) JSONByte() ([]byte, error) {
 
 func (e *FEREntry) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *FEREntry) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *FEREntry) String() string {

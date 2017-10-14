@@ -7,42 +7,68 @@ package messages_test
 import (
 	"testing"
 
+	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/messages"
-
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
+func TestUnmarshalNilAck(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
+
+	a := new(Ack)
+	err := a.UnmarshalBinary(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	err = a.UnmarshalBinary([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
+
 func TestMarshalUnmarshalAck(t *testing.T) {
+	test := func(ack *Ack, num string) {
+		_, err := ack.JSONString()
+		if err != nil {
+			t.Error(err)
+		}
+		hex, err := ack.MarshalBinary()
+		if err != nil {
+			t.Error(err)
+		}
+
+		ack2, err := UnmarshalMessage(hex)
+		if err != nil {
+			t.Error(err)
+		}
+		_, err = ack2.JSONString()
+		if err != nil {
+			t.Error(err)
+		}
+
+		if ack2.Type() != constants.ACK_MSG {
+			t.Error(num + " Invalid message type unmarshalled")
+		}
+
+		if ack.IsSameAs(ack2.(*Ack)) == false {
+			t.Error(num + " Acks are not the same")
+			fmt.Println(ack.String())
+			fmt.Println(ack2.String())
+		}
+	}
 	ack := newSignedAck()
-	str, err := ack.JSONString()
-	if err != nil {
-		t.Error(err)
-	}
-	t.Logf("str1 - %v", str)
-	hex, err := ack.MarshalBinary()
-	if err != nil {
-		t.Error(err)
-	}
-	t.Logf("Marshalled - %x", hex)
-
-	ack2, err := UnmarshalMessage(hex)
-	if err != nil {
-		t.Error(err)
-	}
-	str, err = ack2.JSONString()
-	if err != nil {
-		t.Error(err)
-	}
-	t.Logf("str2 - %v", str)
-
-	if ack2.Type() != constants.ACK_MSG {
-		t.Error("Invalid message type unmarshalled")
-	}
-
-	if ack.IsSameAs(ack2.(*Ack)) == false {
-		t.Error("Acks are not the same")
-	}
+	test(ack, "1")
+	ack2 := newSignedAck()
+	ack2.BalanceHash = primitives.Sha([]byte("balanceHash"))
+	fmt.Println("ack2", ack2.BalanceHash.String())
+	test(ack2, "2")
 }
 
 func TestSignAndVerifyAck(t *testing.T) {

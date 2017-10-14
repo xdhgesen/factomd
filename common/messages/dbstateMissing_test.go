@@ -12,6 +12,25 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
+func TestUnmarshalNilDBStateMissing(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Errorf("Panic caught during the test - %v", r)
+		}
+	}()
+
+	a := new(DBStateMissing)
+	err := a.UnmarshalBinary(nil)
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+
+	err = a.UnmarshalBinary([]byte{})
+	if err == nil {
+		t.Errorf("Error is nil when it shouldn't be")
+	}
+}
+
 func TestMarshalUnmarshalDBStateMissing(t *testing.T) {
 	msg := newDBStateMissing()
 
@@ -58,4 +77,35 @@ func newDBStateMissing() *DBStateMissing {
 	msg.DBHeightEnd = 0x89012345
 
 	return msg
+}
+
+func Testlimits(t *testing.T) {
+
+	for s := uint32(0); s < 100; s++ {
+		for e := s; e < s+1000; e++ {
+			for in := 0; in < 1000; in++ {
+				ns, ne := NewEnd(in, s, e)
+
+				if s != ns {
+					t.Errorf(" Failed with e %d s %d and in %d", e, s, in)
+				}
+
+				if ne > e {
+					t.Errorf(" Failed with e %d s %d and in %d", e, s, in)
+				}
+
+				if in > 500 && ne != 0 {
+					t.Errorf(" Failed with e %d s %d and in %d", e, s, in)
+				}
+
+				if in <= 500 && in > 200 && ne-ns > 50 {
+					t.Errorf(" Failed with e %d s %d and in %d", e, s, in)
+				}
+
+				if in <= 200 && ne-ns > 200 {
+					t.Errorf(" Failed with e %d s %d and in %d", e, s, in)
+				}
+			}
+		}
+	}
 }

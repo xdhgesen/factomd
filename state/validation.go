@@ -6,21 +6,23 @@ package state
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
-	"time"
 )
 
 func (state *State) ValidatorLoop() {
 	timeStruct := new(Timer)
 	for {
-
 		// Check if we should shut down.
 		select {
 		case <-state.ShutdownChan:
 			fmt.Println("Closing the Database on", state.GetFactomNodeName())
 			state.DB.Close()
+			state.StateSaverStruct.StopSaving()
 			fmt.Println(state.GetFactomNodeName(), "closed")
+			state.IsRunning = false
 			return
 		default:
 		}
@@ -29,7 +31,6 @@ func (state *State) ValidatorLoop() {
 		var msg interfaces.IMsg
 	loop:
 		for i := 0; i < 10; i++ {
-
 			// Process any messages we might have queued up.
 			for i = 0; i < 10; i++ {
 				p, b := state.Process(), state.UpdateState()
@@ -39,25 +40,30 @@ func (state *State) ValidatorLoop() {
 				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
 			}
 
-			select {
-			case min := <-state.tickerQueue:
-				timeStruct.timer(state, min)
-			default:
-			}
+			for i := 0; i < 10; i++ {
+				select {
+				case min := <-state.tickerQueue:
+					timeStruct.timer(state, min)
+				default:
+				}
 
-			select {
-			case msg = <-state.TimerMsgQueue():
-				state.JournalMessage(msg)
-				break loop
-			default:
-			}
+				select {
+				case msg = <-state.TimerMsgQueue():
+					state.JournalMessage(msg)
+					break loop
+				default:
+				}
 
-			select {
-			case msg = <-state.InMsgQueue(): // Get message from the timer or input queue
-				state.JournalMessage(msg)
-				break loop
-			default: // No messages? Sleep for a bit
-				time.Sleep(10 * time.Millisecond)
+				msg = state.InMsgQueue().Dequeue()
+				if msg != nil {
+					state.JournalMessage(msg)
+					break loop
+				} else {
+					// No messages? Sleep for a bit
+					for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
+						time.Sleep(10 * time.Millisecond)
+					}
+				}
 			}
 		}
 
@@ -81,7 +87,6 @@ type Timer struct {
 }
 
 func (t *Timer) timer(state *State, min int) {
-
 	t.lastMin = min
 
 	eom := new(messages.EOM)

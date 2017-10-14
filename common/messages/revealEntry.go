@@ -5,13 +5,15 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -82,20 +84,19 @@ func (m *RevealEntryMsg) Type() byte {
 //  0   -- Cannot tell if message is Valid
 //  1   -- Message is valid
 // Also return the matching commit, if 1 (Don't put it back into the Commit List)
-func (m *RevealEntryMsg) ValidateRTN(state interfaces.IState) (interfaces.IMsg, int) {
+func (m *RevealEntryMsg) Validate(state interfaces.IState) int {
 	commit := state.NextCommit(m.Entry.GetHash())
 
 	if commit == nil {
-		return nil, 0
+		return 0
 	}
 	//
 	// Make sure one of the two proper commits got us here.
 	var okChain, okEntry bool
 	m.commitChain, okChain = commit.(*CommitChainMsg)
 	m.commitEntry, okEntry = commit.(*CommitEntryMsg)
-	if !okChain && !okEntry { // Discard any invalid entries in the map.  Should never happen.
-		fmt.Println("dddd Bad EB Commit", state.GetFactomNodeName())
-		return m.ValidateRTN(state)
+	if !okChain && !okEntry { // What is this trash doing here?  Not a commit at all!
+		return -1
 	}
 
 	// Now make sure the proper amount of credits were paid to record the entry.
@@ -103,43 +104,45 @@ func (m *RevealEntryMsg) ValidateRTN(state interfaces.IState) (interfaces.IMsg, 
 	if okEntry {
 		m.IsEntry = true
 		ECs := int(m.commitEntry.CommitEntry.Credits)
+		// Any entry over 10240 bytes will be rejected
+		if m.Entry.KSize() > 10 {
+			return -1
+		}
+
 		if m.Entry.KSize() > ECs {
-			fmt.Println("dddd EB Commit is short", state.GetFactomNodeName())
-			return m.ValidateRTN(state) // Discard commits that are not funded properly.
+			return 0 // not enough payments on the EC to reveal this entry.  Return 0 to wait on another commit
 		}
 
 		// Make sure we have a chain.  If we don't, then bad things happen.
 		db := state.GetAndLockDB()
 		dbheight := state.GetLeaderHeight()
 		eb := state.GetNewEBlocks(dbheight, m.Entry.GetChainID())
-		eb_db := state.GetNewEBlocks(dbheight-1, m.Entry.GetChainID())
-		if eb_db == nil {
-			eb_db, _ = db.FetchEBlockHead(m.Entry.GetChainID())
+		if eb == nil {
+			eb_db := state.GetNewEBlocks(dbheight-1, m.Entry.GetChainID())
+			eb = eb_db
+		}
+		if eb == nil {
+			eb_db2 := state.GetNewEBlocks(dbheight-2, m.Entry.GetChainID())
+			eb = eb_db2
+		}
+		if eb == nil {
+			eb, _ = db.FetchEBlockHead(m.Entry.GetChainID())
 		}
 
-		if eb_db == nil && eb == nil {
-			// If we don't have a chain, put the commit back.  Don't want to lose it.
-			state.PutCommit(m.Entry.GetHash(), commit)
-			return nil, 0
+		if eb == nil {
+			// No chain, we have to leave it be and maybe one will be made.
+			return 0
 		}
-	} else {
-		m.IsEntry = false
-		ECs := int(m.commitChain.CommitChain.Credits)
-		if m.Entry.KSize()+10 > ECs { // Discard commits that are not funded properly
-			return m.ValidateRTN(state)
-		}
+		return 1
 	}
 
-	return commit, 1
-}
-
-func (m *RevealEntryMsg) Validate(state interfaces.IState) int {
-	commit, rtn := m.ValidateRTN(state)
-	if rtn == 1 {
-		// Don't lose the commit that validates the entry
-		state.PutCommit(m.Entry.GetHash(), commit)
+	m.IsEntry = false
+	ECs := int(m.commitChain.CommitChain.Credits)
+	if m.Entry.KSize()+10 > ECs {
+		return 0 // Wait for a commit that might fund us properly
 	}
-	return rtn
+
+	return 1
 }
 
 // Returns true if this is a message for this server to execute as
@@ -163,10 +166,6 @@ func (e *RevealEntryMsg) JSONByte() ([]byte, error) {
 
 func (e *RevealEntryMsg) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *RevealEntryMsg) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func NewRevealEntryMsg() *RevealEntryMsg {
@@ -242,4 +241,14 @@ func (m *RevealEntryMsg) String() string {
 		m.GetHash().Bytes()[:3])
 
 	return str
+}
+
+func (m *RevealEntryMsg) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "revealentry",
+		"vm":         m.VMIndex,
+		"minute":     m.Minute,
+		"leaderid":   m.GetLeaderChainID().String()[4:10],
+		"entryhash":  m.Entry.GetHash().String()[:6],
+		"entrychain": m.Entry.GetChainID().String()[:6],
+		"hash":       m.GetHash().String()[:6]}
 }

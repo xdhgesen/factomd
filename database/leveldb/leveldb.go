@@ -14,6 +14,7 @@ import (
 	"github.com/FactomProject/goleveldb/leveldb"
 	"github.com/FactomProject/goleveldb/leveldb/opt"
 	"github.com/FactomProject/goleveldb/leveldb/util"
+	"strconv"
 )
 
 type LevelDB struct {
@@ -54,7 +55,11 @@ func (db *LevelDB) ListAllBuckets() ([][]byte, error) {
 
 // Can't trim a real database
 func (db *LevelDB) Trim() {
-
+	cache, _ := db.lDB.GetProperty("leveldb.cachedblock")
+	v, err := strconv.Atoi(cache)
+	if err == nil {
+		LevelDBCacheblock.Set(float64(v))
+	}
 }
 
 func (db *LevelDB) Delete(bucket []byte, key []byte) error {
@@ -87,6 +92,8 @@ func (db *LevelDB) Get(bucket []byte, key []byte, destination interfaces.BinaryM
 	db.dbLock.RLock()
 	defer db.dbLock.RUnlock()
 
+	LevelDBGets.Inc()
+
 	ldbKey := CombineBucketAndKey(bucket, key)
 	data, err := db.lDB.Get(ldbKey, db.ro)
 	if err != nil {
@@ -105,11 +112,16 @@ func (db *LevelDB) Get(bucket []byte, key []byte, destination interfaces.BinaryM
 }
 
 func (db *LevelDB) Put(bucket []byte, key []byte, data interfaces.BinaryMarshallable) error {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
 	if db.lbatch == nil {
 		db.lbatch = new(leveldb.Batch)
 	}
 
 	defer db.lbatch.Reset()
+
+	LevelDBPuts.Inc()
 
 	ldbKey := CombineBucketAndKey(bucket, key)
 	hex, err := data.MarshalBinary()
@@ -126,6 +138,9 @@ func (db *LevelDB) Put(bucket []byte, key []byte, data interfaces.BinaryMarshall
 }
 
 func (db *LevelDB) PutInBatch(records []interfaces.Record) error {
+	db.dbLock.Lock()
+	defer db.dbLock.Unlock()
+
 	if db.lbatch == nil {
 		db.lbatch = new(leveldb.Batch)
 	}
@@ -139,6 +154,7 @@ func (db *LevelDB) PutInBatch(records []interfaces.Record) error {
 			return err
 		}
 		db.lbatch.Put(ldbKey, hex)
+		LevelDBPuts.Inc()
 	}
 
 	err := db.lDB.Write(db.lbatch, db.wo)
@@ -227,7 +243,9 @@ func (db *LevelDB) GetAll(bucket []byte, sample interfaces.BinaryMarshallableAnd
 		if err != nil {
 			return nil, nil, err
 		}
-		keys = append(keys, iter.Key()[len(ldbKey):])
+		k := make([]byte, len(iter.Key())-len(ldbKey))
+		copy(k, iter.Key()[len(ldbKey):])
+		keys = append(keys, k)
 		answer = append(answer, tmp)
 	}
 	iter.Release()
@@ -258,7 +276,8 @@ func NewLevelDB(filename string, create bool) (interfaces.IDatabase, error) {
 	}
 
 	opts := &opt.Options{
-		Compression: opt.NoCompression,
+		OpenFilesCacheCapacity: 50, //this solves the "too many files open problem.  macs have a default of 250 max open files.
+		// setting this lower lessens contention with other programs for the scarce open file limit.
 	}
 
 	tlDB, err = leveldb.OpenFile(filename, opts)
@@ -284,4 +303,9 @@ func addOneToByteArray(input []byte) (output []byte) {
 		}
 	}
 	return output
+}
+
+func (db *LevelDB) DoesKeyExist(bucket, key []byte) (bool, error) {
+	ldbKey := CombineBucketAndKey(bucket, key)
+	return db.lDB.Has(ldbKey, db.ro)
 }

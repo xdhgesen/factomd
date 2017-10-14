@@ -5,8 +5,8 @@
 package entryCreditBlock
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
@@ -16,13 +16,35 @@ const (
 )
 
 type ServerIndexNumber struct {
-	ServerIndexNumber uint8
+	ServerIndexNumber uint8 `json:"serverindexnumber"`
 }
 
 var _ interfaces.Printable = (*ServerIndexNumber)(nil)
 var _ interfaces.BinaryMarshallable = (*ServerIndexNumber)(nil)
 var _ interfaces.ShortInterpretable = (*ServerIndexNumber)(nil)
 var _ interfaces.IECBlockEntry = (*ServerIndexNumber)(nil)
+
+func (a *ServerIndexNumber) IsSameAs(b interfaces.IECBlockEntry) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	if a.ECID() != b.ECID() {
+		return false
+	}
+
+	bb, ok := b.(*ServerIndexNumber)
+	if ok == false {
+		return false
+	}
+	if a.ServerIndexNumber != bb.ServerIndexNumber {
+		return false
+	}
+
+	return true
+}
 
 func (e *ServerIndexNumber) String() string {
 	var out primitives.Buffer
@@ -74,27 +96,22 @@ func (s *ServerIndexNumber) ECID() byte {
 }
 
 func (s *ServerIndexNumber) MarshalBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
-	buf.WriteByte(s.ServerIndexNumber)
+	buf := primitives.NewBuffer(nil)
+	err := buf.PushByte(s.ServerIndexNumber)
+	if err != nil {
+		return nil, err
+	}
 	return buf.DeepCopyBytes(), nil
 }
 
-func (s *ServerIndexNumber) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling ServerIndexNumber: %v", r)
-		}
-	}()
-
+func (s *ServerIndexNumber) UnmarshalBinaryData(data []byte) ([]byte, error) {
 	buf := primitives.NewBuffer(data)
-	var c byte
-	if c, err = buf.ReadByte(); err != nil {
-		return
-	} else {
-		s.ServerIndexNumber = c
+	var err error
+	s.ServerIndexNumber, err = buf.PopByte()
+	if err != nil {
+		return nil, err
 	}
-	newData = buf.DeepCopyBytes()
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (s *ServerIndexNumber) UnmarshalBinary(data []byte) (err error) {
@@ -108,10 +125,6 @@ func (e *ServerIndexNumber) JSONByte() ([]byte, error) {
 
 func (e *ServerIndexNumber) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *ServerIndexNumber) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *ServerIndexNumber) GetTimestamp() interfaces.Timestamp {

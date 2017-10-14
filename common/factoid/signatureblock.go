@@ -5,8 +5,6 @@
 package factoid
 
 import (
-	"bytes"
-	"fmt"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
@@ -22,13 +20,28 @@ import (
  **************************************/
 
 type SignatureBlock struct {
-	Signatures []interfaces.ISignature
+	Signatures []interfaces.ISignature `json:"signatures"`
 }
 
 var _ interfaces.ISignatureBlock = (*SignatureBlock)(nil)
-var _ interfaces.IBlock = (*SignatureBlock)(nil)
 
-func (b SignatureBlock) GetHash() interfaces.IHash { return nil }
+func (b *SignatureBlock) IsSameAs(s interfaces.ISignatureBlock) bool {
+	if s == nil {
+		return b == nil
+	}
+
+	sigs := s.GetSignatures()
+	if len(b.Signatures) != len(sigs) {
+		return false
+	}
+	for i := range b.Signatures {
+		if b.Signatures[i].IsSameAs(sigs[i]) == false {
+			return false
+		}
+	}
+
+	return true
+}
 
 func (b SignatureBlock) UnmarshalBinary(data []byte) error {
 	_, err := b.UnmarshalBinaryData(data)
@@ -43,43 +56,12 @@ func (e *SignatureBlock) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *SignatureBlock) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (b SignatureBlock) String() string {
 	txt, err := b.CustomMarshalText()
 	if err != nil {
 		return "<error>"
 	}
 	return string(txt)
-}
-
-func (s *SignatureBlock) IsEqual(signatureBlock interfaces.IBlock) []interfaces.IBlock {
-
-	sb, ok := signatureBlock.(interfaces.ISignatureBlock)
-
-	if !ok {
-		r := make([]interfaces.IBlock, 0, 5)
-		return append(r, s)
-	}
-
-	sigs1 := s.GetSignatures()
-	sigs2 := sb.GetSignatures()
-	if len(sigs1) != len(sigs2) {
-		r := make([]interfaces.IBlock, 0, 5)
-		return append(r, s)
-	}
-	for i, sig := range sigs1 {
-		a, err1 := sig.MarshalBinary()
-		b, err2 := sigs2[i].MarshalBinary()
-		if err1 != nil || err2 != nil || !bytes.Equal(a, b) {
-			r := make([]interfaces.IBlock, 0, 5)
-			return append(r, s)
-		}
-	}
-
-	return nil
 }
 
 func (s *SignatureBlock) AddSignature(sig interfaces.ISignature) {
@@ -106,18 +88,14 @@ func (s SignatureBlock) GetSignatures() []interfaces.ISignature {
 }
 
 func (a SignatureBlock) MarshalBinary() ([]byte, error) {
-	var out primitives.Buffer
-
+	buf := primitives.NewBuffer(nil)
 	for _, sig := range a.GetSignatures() {
-
-		data, err := sig.MarshalBinary()
+		err := buf.PushBinaryMarshallable(sig)
 		if err != nil {
-			return nil, fmt.Errorf("Signature failed to Marshal in RCD_1")
+			return nil, err
 		}
-		out.Write(data)
 	}
-
-	return out.DeepCopyBytes(), nil
+	return buf.DeepCopyBytes(), nil
 }
 
 func (s SignatureBlock) CustomMarshalText() ([]byte, error) {
@@ -125,7 +103,6 @@ func (s SignatureBlock) CustomMarshalText() ([]byte, error) {
 
 	out.WriteString("Signature Block: \n")
 	for _, sig := range s.Signatures {
-
 		out.WriteString(" signature: ")
 		txt, err := sig.CustomMarshalText()
 		if err != nil {
@@ -139,16 +116,15 @@ func (s SignatureBlock) CustomMarshalText() ([]byte, error) {
 	return out.DeepCopyBytes(), nil
 }
 
-func (s *SignatureBlock) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
+func (s *SignatureBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	buf := primitives.NewBuffer(data)
 	s.Signatures = make([]interfaces.ISignature, 1)
 	s.Signatures[0] = new(FactoidSignature)
-	data, err = s.Signatures[0].UnmarshalBinaryData(data)
+	err := buf.PopBinaryMarshallable(s.Signatures[0])
 	if err != nil {
-		fmt.Println("error")
-		return nil, fmt.Errorf("Failure to unmarshal Signature")
+		return nil, err
 	}
-
-	return data, nil
+	return buf.DeepCopyBytes(), nil
 }
 
 func NewSingleSignatureBlock(priv, data []byte) *SignatureBlock {

@@ -5,11 +5,13 @@
 package messages
 
 import (
-	"bytes"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //A placeholder structure for messages
@@ -93,14 +95,6 @@ func (m *EOMTimeout) Type() byte {
 	return constants.EOM_TIMEOUT_MSG
 }
 
-func (m *EOMTimeout) Int() int {
-	return -1
-}
-
-func (m *EOMTimeout) Bytes() []byte {
-	return nil
-}
-
 func (m *EOMTimeout) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -172,6 +166,10 @@ func (m *EOMTimeout) String() string {
 	return ""
 }
 
+func (m *EOMTimeout) LogFields() log.Fields {
+	return log.Fields{}
+}
+
 func (m *EOMTimeout) DBHeight() int {
 	return 0
 }
@@ -212,8 +210,4 @@ func (e *EOMTimeout) JSONByte() ([]byte, error) {
 
 func (e *EOMTimeout) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *EOMTimeout) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }

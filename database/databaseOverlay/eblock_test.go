@@ -13,12 +13,12 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	. "github.com/FactomProject/factomd/testHelper"
+	"github.com/FactomProject/factomd/testHelper"
 	"testing"
 )
 
 func TestSaveLoadEBlockHead(t *testing.T) {
-	b1, _ := CreateTestEntryBlock(nil)
+	b1, _ := testHelper.CreateTestEntryBlock(nil)
 
 	chain, err := primitives.NewShaHash(b1.GetChainID().Bytes())
 	if err != nil {
@@ -38,7 +38,7 @@ func TestSaveLoadEBlockHead(t *testing.T) {
 		t.Error(err)
 	}
 	if head == nil {
-		t.Error("DBlock head is nil")
+		t.Error("EBlock head is nil")
 	}
 
 	m1, err := b1.MarshalBinary()
@@ -54,7 +54,7 @@ func TestSaveLoadEBlockHead(t *testing.T) {
 		t.Error("Blocks are not equal")
 	}
 
-	b2, _ := CreateTestEntryBlock(b1)
+	b2, _ := testHelper.CreateTestEntryBlock(b1)
 
 	err = dbo.SaveEBlockHead(b2, false)
 	if err != nil {
@@ -90,7 +90,7 @@ func TestSaveLoadEBlockChain(t *testing.T) {
 	defer dbo.Close()
 
 	for i := 0; i < max; i++ {
-		prev, _ = CreateTestEntryBlock(prev)
+		prev, _ = testHelper.CreateTestEntryBlock(prev)
 		blocks = append(blocks, prev)
 		err := dbo.SaveEBlockHead(prev, false)
 		if err != nil {
@@ -163,7 +163,7 @@ func TestLoadUnknownEBlocks(t *testing.T) {
 	dbo := NewOverlay(new(mapdb.MapDB))
 	defer dbo.Close()
 	for i := 0; i < 10; i++ {
-		b := IntToByteSlice(i)
+		b := testHelper.IntToByteSlice(i)
 		hash, err := primitives.NewShaHash(b)
 		if err != nil {
 			t.Error(err)
@@ -196,5 +196,18 @@ func TestLoadUnknownEBlocks(t *testing.T) {
 		if len(all) != 0 {
 			t.Error("Fetched entries while we expected nil - %v", all)
 		}
+	}
+}
+
+func TestFetchAllEBlockChainIDs(t *testing.T) {
+	dbo := testHelper.CreateAndPopulateTestDatabaseOverlay()
+	defer dbo.Close()
+
+	chains, err := dbo.FetchAllEBlockChainIDs()
+	if err != nil {
+		t.Errorf("%v", err)
+	}
+	if len(chains) != 2 {
+		t.Errorf("Got wrong number of chains - %v", len(chains))
 	}
 }

@@ -5,7 +5,6 @@
 package entryCreditBlock
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -13,10 +12,10 @@ import (
 )
 
 type IncreaseBalance struct {
-	ECPubKey *primitives.ByteSlice32
-	TXID     interfaces.IHash
-	Index    uint64
-	NumEC    uint64
+	ECPubKey *primitives.ByteSlice32 `json:"ecpubkey"`
+	TXID     interfaces.IHash        `json:"txid"`
+	Index    uint64                  `json:"index"`
+	NumEC    uint64                  `json:"numec"`
 }
 
 var _ interfaces.Printable = (*IncreaseBalance)(nil)
@@ -25,7 +24,49 @@ var _ interfaces.BinaryMarshallable = (*IncreaseBalance)(nil)
 var _ interfaces.ShortInterpretable = (*IncreaseBalance)(nil)
 var _ interfaces.IECBlockEntry = (*IncreaseBalance)(nil)
 
+func (e *IncreaseBalance) Init() {
+	if e.ECPubKey == nil {
+		e.ECPubKey = new(primitives.ByteSlice32)
+	}
+	if e.TXID == nil {
+		e.TXID = primitives.NewZeroHash()
+	}
+}
+
+func (a *IncreaseBalance) IsSameAs(b interfaces.IECBlockEntry) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+	if a.ECID() != b.ECID() {
+		return false
+	}
+
+	bb, ok := b.(*IncreaseBalance)
+	if ok == false {
+		return false
+	}
+
+	if a.ECPubKey.IsSameAs(bb.ECPubKey) == false {
+		return false
+	}
+	if a.TXID.IsSameAs(bb.TXID) == false {
+		return false
+	}
+	if a.Index != bb.Index {
+		return false
+	}
+	if a.NumEC != bb.NumEC {
+		return false
+	}
+
+	return true
+}
+
 func (e *IncreaseBalance) String() string {
+	e.Init()
 	var out primitives.Buffer
 	out.WriteString(fmt.Sprintf(" %-20s\n", "IncreaseBalance"))
 	out.WriteString(fmt.Sprintf("   %-20s %x\n", "ECPubKey", e.ECPubKey[:3]))
@@ -38,7 +79,7 @@ func (e *IncreaseBalance) String() string {
 
 func NewIncreaseBalance() *IncreaseBalance {
 	r := new(IncreaseBalance)
-	r.TXID = primitives.NewZeroHash()
+	r.Init()
 	return r
 }
 
@@ -75,52 +116,51 @@ func (b *IncreaseBalance) Interpret() string {
 }
 
 func (b *IncreaseBalance) MarshalBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
+	b.Init()
+	buf := primitives.NewBuffer(nil)
 
-	buf.Write(b.ECPubKey[:])
-
-	buf.Write(b.TXID.Bytes())
-
-	primitives.EncodeVarInt(buf, b.Index)
-
-	primitives.EncodeVarInt(buf, b.NumEC)
+	err := buf.PushBinaryMarshallable(b.ECPubKey)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(b.TXID)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushVarInt(b.Index)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushVarInt(b.NumEC)
+	if err != nil {
+		return nil, err
+	}
 
 	return buf.DeepCopyBytes(), nil
 }
 
-func (b *IncreaseBalance) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("Error unmarshalling IncreaseBalance: %v", r)
-		}
-	}()
-
+func (b *IncreaseBalance) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	b.Init()
 	buf := primitives.NewBuffer(data)
-	hash := make([]byte, 32)
 
-	_, err = buf.Read(hash)
+	err := buf.PopBinaryMarshallable(b.ECPubKey)
 	if err != nil {
-		return
+		return nil, err
 	}
-	b.ECPubKey = new(primitives.ByteSlice32)
-	copy(b.ECPubKey[:], hash)
-
-	_, err = buf.Read(hash)
+	err = buf.PopBinaryMarshallable(b.TXID)
 	if err != nil {
-		return
+		return nil, err
 	}
-	if b.TXID == nil {
-		b.TXID = primitives.NewZeroHash()
+	b.Index, err = buf.PopVarInt()
+	if err != nil {
+		return nil, err
 	}
-	b.TXID.SetBytes(hash)
+	b.NumEC, err = buf.PopVarInt()
+	if err != nil {
+		return nil, err
+	}
 
-	tmp := make([]byte, 0)
-	b.Index, tmp = primitives.DecodeVarInt(buf.DeepCopyBytes())
-
-	b.NumEC, tmp = primitives.DecodeVarInt(tmp)
-
-	newData = tmp
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (b *IncreaseBalance) UnmarshalBinary(data []byte) (err error) {
@@ -134,10 +174,6 @@ func (e *IncreaseBalance) JSONByte() ([]byte, error) {
 
 func (e *IncreaseBalance) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
-}
-
-func (e *IncreaseBalance) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
 }
 
 func (e *IncreaseBalance) GetTimestamp() interfaces.Timestamp {

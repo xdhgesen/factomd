@@ -5,13 +5,14 @@
 package messages
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+
+	log "github.com/FactomProject/logrus"
 )
 
 //Structure to request missing messages in a node's process list
@@ -38,12 +39,12 @@ func (a *MissingMsgResponse) IsSameAs(b *MissingMsgResponse) bool {
 		return false
 	}
 
-	if a.MsgResponse.GetHash() != b.MsgResponse.GetHash() {
-		fmt.Println("MissingMsgResponse IsNotSameAs because GetHash mismatch")
+	if !a.MsgResponse.GetHash().IsSameAs(b.MsgResponse.GetHash()) {
+		fmt.Println("MissingMsgResponse IsNotSameAs because MsgResp GetHash mismatch")
 		return false
 	}
 
-	if a.AckResponse.GetHash() != b.AckResponse.GetHash() {
+	if !a.AckResponse.GetHash().IsSameAs(b.AckResponse.GetHash()) {
 		fmt.Println("MissingMsgResponse IsNotSameAs because Ack GetHash mismatch")
 		return false
 	}
@@ -89,14 +90,6 @@ func (m *MissingMsgResponse) Type() byte {
 	return constants.MISSING_MSG_RESPONSE
 }
 
-func (m *MissingMsgResponse) Int() int {
-	return -1
-}
-
-func (m *MissingMsgResponse) Bytes() []byte {
-	return nil
-}
-
 func (m *MissingMsgResponse) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -126,7 +119,7 @@ func (m *MissingMsgResponse) UnmarshalBinaryData(data []byte) (newData []byte, e
 		}
 	}
 
-	mr, err := UnmarshalMessage(newData)
+	newData, mr, err := UnmarshalMessageData(newData)
 
 	if err != nil {
 		return nil, err
@@ -135,7 +128,7 @@ func (m *MissingMsgResponse) UnmarshalBinaryData(data []byte) (newData []byte, e
 
 	m.Peer2Peer = true // Always a peer2peer request.
 
-	return data, nil
+	return
 }
 
 func (m *MissingMsgResponse) UnmarshalBinary(data []byte) error {
@@ -194,6 +187,12 @@ func (m *MissingMsgResponse) String() string {
 	return fmt.Sprintf("MissingMsgResponse <-- DBHeight:%3d vm=%3d PL Height:%3d msgHash[%x]", ack.DBHeight, ack.VMIndex, ack.Height, m.GetMsgHash().Bytes()[:3])
 }
 
+func (m *MissingMsgResponse) LogFields() log.Fields {
+	return log.Fields{"category": "message", "messagetype": "missingmsgresponse",
+		"ackhash": m.Ack.GetMsgHash().String()[:10],
+		"msghash": m.MsgResponse.GetMsgHash().String()[:10]}
+}
+
 func (m *MissingMsgResponse) ChainID() []byte {
 	return nil
 }
@@ -217,7 +216,6 @@ func (m *MissingMsgResponse) Validate(state interfaces.IState) int {
 }
 
 func (m *MissingMsgResponse) ComputeVMIndex(state interfaces.IState) {
-
 }
 
 func (m *MissingMsgResponse) LeaderExecute(state interfaces.IState) {
@@ -225,7 +223,6 @@ func (m *MissingMsgResponse) LeaderExecute(state interfaces.IState) {
 }
 
 func (m *MissingMsgResponse) FollowerExecute(state interfaces.IState) {
-
 	state.FollowerExecuteMMR(m)
 
 	return
@@ -239,12 +236,7 @@ func (e *MissingMsgResponse) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *MissingMsgResponse) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func NewMissingMsgResponse(state interfaces.IState, msgResponse interfaces.IMsg, ackResponse interfaces.IMsg) interfaces.IMsg {
-
 	msg := new(MissingMsgResponse)
 
 	msg.Peer2Peer = true // Always a peer2peer request.

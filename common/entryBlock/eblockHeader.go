@@ -1,9 +1,8 @@
 package entryBlock
 
 import (
-	"bytes"
-	"encoding/binary"
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
@@ -11,25 +10,75 @@ import (
 // EBlockHeader holds relevent metadata about the Entry Block and the data
 // nessisary to verify the previous block in the Entry Block Chain.
 type EBlockHeader struct {
-	ChainID      interfaces.IHash
-	BodyMR       interfaces.IHash
-	PrevKeyMR    interfaces.IHash
-	PrevFullHash interfaces.IHash
-	EBSequence   uint32
-	DBHeight     uint32
-	EntryCount   uint32
+	ChainID      interfaces.IHash `json:"chainid"`
+	BodyMR       interfaces.IHash `json:"bodymr"`
+	PrevKeyMR    interfaces.IHash `json:"prevkeymr"`
+	PrevFullHash interfaces.IHash `json:"prevfullhash"`
+	EBSequence   uint32           `json:"ebsequence"`
+	DBHeight     uint32           `json:"dbheight"`
+	EntryCount   uint32           `json:"entrycount"`
 }
 
 var _ interfaces.Printable = (*EBlockHeader)(nil)
 var _ interfaces.IEntryBlockHeader = (*EBlockHeader)(nil)
 
+func (e *EBlockHeader) Init() {
+	if e.ChainID == nil {
+		e.ChainID = primitives.NewZeroHash()
+	}
+	if e.BodyMR == nil {
+		e.BodyMR = primitives.NewZeroHash()
+	}
+	if e.PrevKeyMR == nil {
+		e.PrevKeyMR = primitives.NewZeroHash()
+	}
+	if e.PrevFullHash == nil {
+		e.PrevFullHash = primitives.NewZeroHash()
+	}
+}
+
+func (a *EBlockHeader) IsSameAs(b interfaces.IEntryBlockHeader) bool {
+	if a == nil || b == nil {
+		if a == nil && b == nil {
+			return true
+		}
+		return false
+	}
+
+	bb, ok := b.(*EBlockHeader)
+	if ok == false {
+		return false
+	}
+
+	if a.ChainID.IsSameAs(bb.ChainID) == false {
+		return false
+	}
+	if a.BodyMR.IsSameAs(bb.BodyMR) == false {
+		return false
+	}
+	if a.PrevKeyMR.IsSameAs(bb.PrevKeyMR) == false {
+		return false
+	}
+	if a.PrevFullHash.IsSameAs(bb.PrevFullHash) == false {
+		return false
+	}
+	if a.EBSequence != bb.EBSequence {
+		return false
+	}
+	if a.DBHeight != bb.DBHeight {
+		return false
+	}
+	if a.EntryCount != bb.EntryCount {
+		return false
+	}
+
+	return true
+}
+
 // NewEBlockHeader initializes a new empty Entry Block Header.
 func NewEBlockHeader() *EBlockHeader {
 	e := new(EBlockHeader)
-	e.ChainID = primitives.NewZeroHash()
-	e.BodyMR = primitives.NewZeroHash()
-	e.PrevKeyMR = primitives.NewZeroHash()
-	e.PrevFullHash = primitives.NewZeroHash()
+	e.Init()
 	return e
 }
 
@@ -41,11 +90,8 @@ func (e *EBlockHeader) JSONString() (string, error) {
 	return primitives.EncodeJSONString(e)
 }
 
-func (e *EBlockHeader) JSONBuffer(b *bytes.Buffer) error {
-	return primitives.EncodeJSONToBuffer(e, b)
-}
-
 func (e *EBlockHeader) String() string {
+	e.Init()
 	var out primitives.Buffer
 	out.WriteString("  Entry Block Header\n")
 	out.WriteString(fmt.Sprintf("    %20s: %x\n", "ChainID", e.ChainID.Bytes()[:3]))
@@ -116,29 +162,36 @@ func (c *EBlockHeader) SetEntryCount(entryCount uint32) {
 
 // marshalHeaderBinary returns a serialized binary Entry Block Header
 func (e *EBlockHeader) MarshalBinary() ([]byte, error) {
-	buf := new(primitives.Buffer)
+	e.Init()
+	buf := primitives.NewBuffer(nil)
 
-	// 32 byte ChainID
-	buf.Write(e.ChainID.Bytes())
-
-	// 32 byte Body MR
-	buf.Write(e.BodyMR.Bytes())
-
-	// 32 byte Previous Key MR
-	buf.Write(e.PrevKeyMR.Bytes())
-
-	// 32 byte Previous Full Hash
-	buf.Write(e.PrevFullHash.Bytes())
-
-	if err := binary.Write(buf, binary.BigEndian, e.EBSequence); err != nil {
+	err := buf.PushBinaryMarshallable(e.ChainID)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.BodyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.PrevKeyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushBinaryMarshallable(e.PrevFullHash)
+	if err != nil {
 		return nil, err
 	}
 
-	if err := binary.Write(buf, binary.BigEndian, e.DBHeight); err != nil {
+	err = buf.PushUInt32(e.EBSequence)
+	if err != nil {
 		return nil, err
 	}
-
-	if err := binary.Write(buf, binary.BigEndian, e.EntryCount); err != nil {
+	err = buf.PushUInt32(e.DBHeight)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PushUInt32(e.EntryCount)
+	if err != nil {
 		return nil, err
 	}
 
@@ -146,50 +199,41 @@ func (e *EBlockHeader) MarshalBinary() ([]byte, error) {
 }
 
 // unmarshalHeaderBinary builds the Entry Block Header from the serialized binary.
-func (e *EBlockHeader) UnmarshalBinaryData(data []byte) (newData []byte, err error) {
+func (e *EBlockHeader) UnmarshalBinaryData(data []byte) ([]byte, error) {
+	e.Init()
 	buf := primitives.NewBuffer(data)
-	hash := make([]byte, 32)
-	newData = data
 
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.ChainID.SetBytes(hash)
+	err := buf.PopBinaryMarshallable(e.ChainID)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PopBinaryMarshallable(e.BodyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PopBinaryMarshallable(e.PrevKeyMR)
+	if err != nil {
+		return nil, err
+	}
+	err = buf.PopBinaryMarshallable(e.PrevFullHash)
+	if err != nil {
+		return nil, err
 	}
 
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.BodyMR.SetBytes(hash)
+	e.EBSequence, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
+	e.DBHeight, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
+	}
+	e.EntryCount, err = buf.PopUInt32()
+	if err != nil {
+		return nil, err
 	}
 
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.PrevKeyMR.SetBytes(hash)
-	}
-
-	if _, err = buf.Read(hash); err != nil {
-		return
-	} else {
-		e.PrevFullHash.SetBytes(hash)
-	}
-
-	if err = binary.Read(buf, binary.BigEndian, &e.EBSequence); err != nil {
-		return
-	}
-
-	if err = binary.Read(buf, binary.BigEndian, &e.DBHeight); err != nil {
-		return
-	}
-
-	if err = binary.Read(buf, binary.BigEndian, &e.EntryCount); err != nil {
-		return
-	}
-
-	newData = buf.DeepCopyBytes()
-
-	return
+	return buf.DeepCopyBytes(), nil
 }
 
 func (e *EBlockHeader) UnmarshalBinary(data []byte) (err error) {
