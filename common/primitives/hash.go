@@ -46,8 +46,7 @@ func (c *Hash) New() interfaces.BinaryMarshallableAndCopyable {
 }
 
 func (h *Hash) MarshalText() ([]byte, error) {
-	v:= []byte(hex.EncodeToString(h[:]))
-	return v, nil
+	return []byte(hex.EncodeToString(h[:])), nil
 }
 
 func (h *Hash) IsZero() bool {
