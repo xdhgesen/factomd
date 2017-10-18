@@ -352,6 +352,7 @@ func (ss *SystemState) ProcessInvalidDirectoryBlockMessage(msg interfaces.IMsg) 
 	if msg.Type() != constants.INVALID_DIRECTORY_BLOCK_MSG {
 		return fmt.Errorf("Invalid message type forwarded for processing")
 	}
+	//This message is DEPRECATED.
 	return nil
 }
 
@@ -394,6 +395,7 @@ func (ss *SystemState) ProcessRequestBlockMessage(msg interfaces.IMsg) error {
 	if msg.Type() != constants.REQUEST_BLOCK_MSG {
 		return fmt.Errorf("Invalid message type forwarded for processing")
 	}
+	//This message is DEPRECATED.
 	return nil
 }
 
@@ -420,5 +422,6 @@ func (ss *SystemState) ProcessSignatureTimeoutMessage(msg interfaces.IMsg) error
 	if msg.Type() != constants.SIGNATURE_TIMEOUT_MSG {
 		return fmt.Errorf("Invalid message type forwarded for processing")
 	}
+	//This message is DEPRECATED.
 	return nil
 }
