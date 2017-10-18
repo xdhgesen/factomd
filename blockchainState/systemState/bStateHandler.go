@@ -38,6 +38,20 @@ type BStateHandler struct {
 	//FullySynched bool
 }
 
+func (bh *BStateHandler) EnsureBlockMakerIsUpToDate() {
+	//We have to make sure BlockMaker is up-to-date before we can use it
+	if bh.BlockMaker == nil {
+		//No BlockMaker set up yet, time to initialise it
+		bh.CopyMainBStateToBlockMaker()
+	}
+	fmt.Printf("EnsureBlockMakerIsUpToDate - %v vs %v\n", bh.BlockMaker.GetHeight(), bh.MainBState.DBlockHeight+1)
+
+	if bh.BlockMaker.GetHeight() < bh.MainBState.DBlockHeight+1 {
+		//BlockMaker out of date, overwrite it
+		bh.CopyMainBStateToBlockMaker()
+	}
+}
+
 func (bh *BStateHandler) ProcessPendingDBStateMsgs() error {
 	bh.DBStatesSemaphore.Lock()
 	defer bh.DBStatesSemaphore.Unlock()
@@ -164,6 +178,9 @@ func (bh *BStateHandler) CopyMainBStateToBlockMaker() error {
 	}
 	bh.BlockMaker = blockMaker.NewBlockMaker()
 	bh.BlockMaker.BState = s
+
+	bh.BlockMaker.NumberOfLeaders = s.IdentityManager.FedServerCount()
+
 	return nil
 }
 

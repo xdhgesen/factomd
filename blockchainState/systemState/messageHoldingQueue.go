@@ -25,6 +25,22 @@ type MessageHoldingQueue struct {
 	Semaphore sync.RWMutex
 }
 
+func (mhq *MessageHoldingQueue) GetMissingAckedMessages() []interfaces.IHash {
+	answer := []interfaces.IHash{}
+
+	mhq.Semaphore.RLock()
+	defer mhq.Semaphore.RUnlock()
+
+	for _, v := range mhq.Acks {
+		h := v.GetHash()
+		if mhq.Messages[h.String()] == nil {
+			answer = append(answer, h)
+		}
+	}
+
+	return answer
+}
+
 func (mhq *MessageHoldingQueue) Init() {
 	mhq.Semaphore.Lock()
 	defer mhq.Semaphore.Unlock()

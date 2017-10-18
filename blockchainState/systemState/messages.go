@@ -17,6 +17,7 @@ func (ss *SystemState) ProcessMessage(msg interfaces.IMsg) error {
 	if msg == nil {
 		return fmt.Errorf("Nil message passed")
 	}
+	//fmt.Printf("Message type = %v\n", msg.Type())
 	switch msg.Type() {
 	case constants.EOM_MSG:
 		err = ss.ProcessEOMMessage(msg)
@@ -76,7 +77,7 @@ func (ss *SystemState) ProcessMessage(msg interfaces.IMsg) error {
 		err = ss.ProcessDataResponseMessage(msg)
 		break
 	case constants.MISSING_MSG_RESPONSE:
-		err = ss.ProcessMissingMessage(msg)
+		err = ss.ProcessMissingMessageResponseMessage(msg)
 		break
 	case constants.DBSTATE_MSG:
 		err = ss.ProcessDBStateMessage(msg)
@@ -381,6 +382,22 @@ func (ss *SystemState) ProcessMissingMessageResponseMessage(msg interfaces.IMsg)
 	if msg.Type() != constants.MISSING_MSG_RESPONSE {
 		return fmt.Errorf("Invalid message type forwarded for processing")
 	}
+	fmt.Printf("ProcessMissingMessageResponseMessage\n")
+
+	missingMessageResponse := msg.(*messages.MissingMsgResponse)
+	if missingMessageResponse.Ack != nil {
+		err := ss.ProcessMessage(missingMessageResponse.Ack)
+		if err != nil {
+			return err
+		}
+	}
+	if missingMessageResponse.MsgResponse != nil {
+		err := ss.ProcessMessage(missingMessageResponse.MsgResponse)
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

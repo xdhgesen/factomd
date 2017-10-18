@@ -41,6 +41,23 @@ func NewBlockMaker() *BlockMaker {
 	return bm
 }
 
+func (bm *BlockMaker) GetVMHeights() []uint32 {
+	answer := []uint32{}
+	for i := 0; i < bm.NumberOfLeaders; i++ {
+		vm := bm.VMs[i]
+		if vm == nil {
+			answer = append(answer, 0)
+		} else {
+			answer = append(answer, vm.LatestHeight)
+		}
+	}
+	return answer
+}
+
+func (bm *BlockMaker) GetHeight() uint32 {
+	return bm.BState.DBlockHeight + 1
+}
+
 type MsgAckPair struct {
 	Message interfaces.IMessageWithEntry
 	Ack     *messages.Ack

@@ -133,6 +133,8 @@ func (ss *SystemState) KeepDBStatesUpToDate() {
 		}
 
 		if ss.BStateHandler.MainBState.DBlockHeight+1 >= ss.BStateHandler.HighestKnownDBlock {
+			//We're up-to-speed, time to synch the VMs up
+			ss.KeepVMsUpToDate()
 			//Nothing to do here, wait for new information
 			continue
 		}
@@ -146,6 +148,49 @@ func (ss *SystemState) KeepDBStatesUpToDate() {
 		dbstate.SetDestinationPeer(p2p.RandomPeerFlag)
 		ss.OutMsgQueue <- dbstate
 	}
+}
+
+func (ss *SystemState) PairACKs() {
+	//Used for requesting messages that have been acked but are not present in our memory
+	ss.BStateHandler.EnsureBlockMakerIsUpToDate()
+
+	list := ss.MessageHoldingQueue.GetMissingAckedMessages()
+	if len(list) == 0 {
+		return
+	}
+	fmt.Printf("Requesting %v missing acked messages.\n", len(list))
+	dbHeight := ss.BStateHandler.BlockMaker.GetHeight()
+
+	for _, v := range list {
+		msg := new(messages.MissingMsg)
+		msg.Timestamp = primitives.NewTimestampNow()
+		msg.Asking = v
+		msg.DBHeight = dbHeight
+		msg.SystemHeight = 0 //TODO: set properly?
+		msg.ProcessListHeight = nil
+
+		ss.OutMsgQueue <- msg
+	}
+
+	//////////////////
+}
+
+func (ss *SystemState) KeepVMsUpToDate() {
+	//Used for getting ACKs we might be missing
+	ss.BStateHandler.EnsureBlockMakerIsUpToDate()
+
+	dbHeight := ss.BStateHandler.BlockMaker.GetHeight()
+	vmHeights := ss.BStateHandler.BlockMaker.GetVMHeights()
+	fmt.Printf("VMs: %v\n", vmHeights)
+
+	msg := new(messages.MissingMsg)
+	msg.Timestamp = primitives.NewTimestampNow()
+	msg.Asking = primitives.NewZeroHash()
+	msg.DBHeight = dbHeight
+	msg.SystemHeight = 0 //TODO: set properly?
+	msg.ProcessListHeight = vmHeights
+
+	ss.OutMsgQueue <- msg
 }
 
 func (ss *SystemState) HandleOutQueue() {
