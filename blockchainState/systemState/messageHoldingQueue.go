@@ -58,6 +58,10 @@ func (mhq *MessageHoldingQueue) AddAck(ack interfaces.IMsg) {
 	mhq.Semaphore.Lock()
 	defer mhq.Semaphore.Unlock()
 
+	if mhq.Acks[ack.GetHash().String()] != nil {
+		return
+	}
+
 	if ack.GetExpireTime().GetTimeMilli() == 0 {
 		ack.SetExpireTime(primitives.NewTimestampNow())
 	}

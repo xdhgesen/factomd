@@ -112,8 +112,13 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 	vm.Mutex.Lock()
 	defer vm.Mutex.Unlock()
 
+	if ack.Height < 2 {
+		fmt.Printf("ProcessAckedMessage height %v\n", ack.Height)
+	}
+
 	if ack.Height < vm.LatestHeight {
 		//We already processed this message, nothing to do
+		fmt.Printf("Already processed this message!\n")
 		return nil
 	}
 	if ack.Height == vm.LatestHeight {
@@ -121,6 +126,9 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 			//We already processed this message as well
 			//AND it's not the first message!
 			//Nothing to do
+			if ack.Height < 2 {
+				fmt.Printf("Nothing to do.\n")
+			}
 			return nil
 		}
 	}
@@ -130,6 +138,9 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 	pair := new(MsgAckPair)
 	pair.Ack = ack
 	pair.Message = msg
+	if ack.Height < 2 {
+		fmt.Printf("Processing...\n")
+	}
 
 	inserted := false
 	for i := 0; i < len(vm.PendingPairs); i++ {
@@ -189,6 +200,7 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 		//Actually processing the message
 		//TODO: do
 		msgType := pair.Message.Type()
+		fmt.Printf("Actually processing message @height %v\n", pair.Ack.Height)
 
 		switch chainID.String() {
 		case "000000000000000000000000000000000000000000000000000000000000000a":

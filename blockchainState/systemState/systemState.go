@@ -134,6 +134,7 @@ func (ss *SystemState) KeepDBStatesUpToDate() {
 
 		if ss.BStateHandler.MainBState.DBlockHeight+1 >= ss.BStateHandler.HighestKnownDBlock {
 			//We're up-to-speed, time to synch the VMs up
+			ss.PairACKs()
 			ss.KeepVMsUpToDate()
 			//Nothing to do here, wait for new information
 			continue

@@ -179,7 +179,7 @@ func (bh *BStateHandler) CopyMainBStateToBlockMaker() error {
 	bh.BlockMaker = blockMaker.NewBlockMaker()
 	bh.BlockMaker.BState = s
 
-	bh.BlockMaker.NumberOfLeaders = s.IdentityManager.FedServerCount()
+	bh.BlockMaker.NumberOfLeaders = bh.BlockMaker.BState.IdentityManager.FedServerCount()
 
 	return nil
 }

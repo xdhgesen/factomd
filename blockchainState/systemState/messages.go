@@ -17,7 +17,7 @@ func (ss *SystemState) ProcessMessage(msg interfaces.IMsg) error {
 	if msg == nil {
 		return fmt.Errorf("Nil message passed")
 	}
-	//fmt.Printf("Message type = %v\n", msg.Type())
+	fmt.Printf("Message type = %v\n", msg.Type())
 	switch msg.Type() {
 	case constants.EOM_MSG:
 		err = ss.ProcessEOMMessage(msg)
@@ -125,17 +125,21 @@ func (ss *SystemState) ProcessAckMessage(msg interfaces.IMsg) error {
 		go ss.SetHighestKnownDBlockHeight(height)
 	}
 
-	if ss.MessageHoldingQueue.IsAcked(msg.GetHash()) == true {
-		//Nothing to do, the message is already acked
-		//TODO: double-check
-		return nil
+	ss.MessageHoldingQueue.AddAck(msg)
+	if msg.(*messages.Ack).Height < 2 {
+		fmt.Printf("GOT ACK HEIGHT <2! %v\n", msg.(*messages.Ack).Height)
 	}
 
-	ss.MessageHoldingQueue.AddAck(msg)
 	msg2 := ss.MessageHoldingQueue.GetMessage(msg.GetHash())
 	if msg2 != nil {
 		//If we have acked a message we know about, time to process it
-		return ss.ProcessMessage(msg2)
+		if msg.(*messages.Ack).Height < 2 {
+			fmt.Printf("Sending paired message to be processed\n")
+		}
+		err := ss.BStateHandler.ProcessAckedMessage(msg2.(interfaces.IMessageWithEntry), msg.(*messages.Ack))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
