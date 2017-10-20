@@ -41,14 +41,14 @@ func NewBlockMaker() *BlockMaker {
 	return bm
 }
 
-func (bm *BlockMaker) GetVMHeights() []uint32 {
-	answer := []uint32{}
+func (bm *BlockMaker) GetVMHeights() [][]uint32 {
+	answer := [][]uint32{}
 	for i := 0; i < bm.NumberOfLeaders; i++ {
 		vm := bm.VMs[i]
 		if vm == nil {
-			answer = append(answer, 0)
+			answer = append(answer, []uint32{0})
 		} else {
-			answer = append(answer, vm.LatestHeight)
+			answer = append(answer, vm.GetMissingHeights())
 		}
 	}
 	return answer
@@ -89,6 +89,32 @@ type VM struct {
 	LatestAck    *messages.Ack
 
 	PendingPairs []*MsgAckPair
+}
+
+func (vm *VM) GetMissingHeights() []uint32 {
+	vm.Mutex.RLock()
+	defer vm.Mutex.RUnlock()
+
+	answer := []uint32{}
+	if vm.LatestAck == nil {
+		answer = append(answer, 0)
+	}
+	answer = append(answer, vm.LatestHeight+1)
+	lastHeight := vm.LatestHeight + 2
+
+	for _, v := range vm.PendingPairs {
+		if v.Ack.Height > lastHeight {
+			for i := lastHeight; i < v.Ack.Height; i++ {
+				answer = append(answer, lastHeight)
+			}
+		}
+		lastHeight = v.Ack.Height + 1
+	}
+	if len(vm.PendingPairs) > 0 {
+		answer = append(answer, lastHeight)
+	}
+
+	return answer
 }
 
 func (bm *BlockMaker) GetVM(chainID interfaces.IHash) *VM {

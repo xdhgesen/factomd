@@ -183,15 +183,16 @@ func (ss *SystemState) KeepVMsUpToDate() {
 	dbHeight := ss.BStateHandler.BlockMaker.GetHeight()
 	vmHeights := ss.BStateHandler.BlockMaker.GetVMHeights()
 	fmt.Printf("VMs: %v\n", vmHeights)
+	for _, vmh := range vmHeights {
+		msg := new(messages.MissingMsg)
+		msg.Timestamp = primitives.NewTimestampNow()
+		msg.Asking = primitives.NewZeroHash()
+		msg.DBHeight = dbHeight
+		msg.SystemHeight = 0 //TODO: set properly?
+		msg.ProcessListHeight = vmh
 
-	msg := new(messages.MissingMsg)
-	msg.Timestamp = primitives.NewTimestampNow()
-	msg.Asking = primitives.NewZeroHash()
-	msg.DBHeight = dbHeight
-	msg.SystemHeight = 0 //TODO: set properly?
-	msg.ProcessListHeight = vmHeights
-
-	ss.OutMsgQueue <- msg
+		ss.OutMsgQueue <- msg
+	}
 }
 
 func (ss *SystemState) HandleOutQueue() {
