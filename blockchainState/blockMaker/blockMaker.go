@@ -105,7 +105,7 @@ func (vm *VM) GetMissingHeights() []uint32 {
 	for _, v := range vm.PendingPairs {
 		if v.Ack.Height > lastHeight {
 			for i := lastHeight; i < v.Ack.Height; i++ {
-				answer = append(answer, lastHeight)
+				answer = append(answer, i)
 			}
 		}
 		lastHeight = v.Ack.Height + 1
@@ -170,6 +170,11 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 
 	inserted := false
 	for i := 0; i < len(vm.PendingPairs); i++ {
+		if vm.PendingPairs[i].Ack.Height == pair.Ack.Height {
+			//We already have this pending pair, ignore
+			inserted = true
+			break
+		}
 		//Looking for first pair that is higher than the current Height, so we can insert our pair before the other one
 		if vm.PendingPairs[i].Ack.Height > pair.Ack.Height {
 			index := i - 1
@@ -182,11 +187,6 @@ func (bm *BlockMaker) ProcessAckedMessage(msg interfaces.IMessageWithEntry, ack 
 			}
 			inserted = true
 			break
-		}
-		if vm.PendingPairs[i].Ack.Height == pair.Ack.Height {
-			//TODO: figure out what to do when an ACK has the same height
-			//If it's not the same or something?
-			return nil
 		}
 	}
 	if inserted == false {

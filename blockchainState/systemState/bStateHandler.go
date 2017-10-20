@@ -180,6 +180,10 @@ func (bh *BStateHandler) CopyMainBStateToBlockMaker() error {
 	bh.BlockMaker.BState = s
 
 	bh.BlockMaker.NumberOfLeaders = bh.BlockMaker.BState.IdentityManager.FedServerCount()
+	fmt.Printf("\t\tbh.BlockMaker.NumberOfLeaders == %v\n", bh.BlockMaker.NumberOfLeaders)
+	if bh.BlockMaker.NumberOfLeaders == 1 {
+		panic("bh.BlockMaker.NumberOfLeaders == 1")
+	}
 
 	return nil
 }
