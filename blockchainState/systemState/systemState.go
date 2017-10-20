@@ -193,6 +193,10 @@ func (ss *SystemState) KeepVMsUpToDate() {
 		msg.ProcessListHeight = vmh
 
 		ss.OutMsgQueue <- msg
+		if i == 0 {
+			s, _ := msg.JSONString()
+			fmt.Printf("%v\n", s)
+		}
 	}
 }
 

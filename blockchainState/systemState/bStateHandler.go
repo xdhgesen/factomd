@@ -263,14 +263,7 @@ func (bh *BStateHandler) ApplyDBStateMsg(msg interfaces.IMsg) error {
 	if err != nil {
 		return err
 	}
-
-	//TODO: overwrite BlockMaker if appropriate
-	s, err := bh.MainBState.Clone()
-	if err != nil {
-		return err
-	}
-	bh.BlockMaker = blockMaker.NewBlockMaker()
-	bh.BlockMaker.BState = s
+	bh.EnsureBlockMakerIsUpToDate()
 
 	fmt.Printf("ApplyDBStateMsg %v completed!\n", dbStateMsg.DirectoryBlock.GetDatabaseHeight())
 
