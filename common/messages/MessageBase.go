@@ -162,8 +162,8 @@ func (m *MessageBase) Expire(t interfaces.Timestamp) bool {
 	if m.expire == 0 {
 		m.expire = now
 	}
-	if now-m.expire > 5*60*1000 { // Keep messages for some length before giving up.
-		return true
+	if now-m.expire > 60*60*1000 { // Keep messages for some length before giving up.
+		rtn = true
 	}
 	return false
 }
