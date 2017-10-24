@@ -44,7 +44,6 @@ func (bh *BStateHandler) EnsureBlockMakerIsUpToDate() {
 		//No BlockMaker set up yet, time to initialise it
 		bh.CopyMainBStateToBlockMaker()
 	}
-	fmt.Printf("EnsureBlockMakerIsUpToDate - %v vs %v\n", bh.BlockMaker.GetHeight(), bh.MainBState.DBlockHeight+1)
 
 	if bh.BlockMaker.GetHeight() < bh.MainBState.DBlockHeight+1 {
 		//BlockMaker out of date, overwrite it
@@ -180,10 +179,6 @@ func (bh *BStateHandler) CopyMainBStateToBlockMaker() error {
 	bh.BlockMaker.BState = s
 
 	bh.BlockMaker.NumberOfLeaders = bh.BlockMaker.BState.IdentityManager.FedServerCount()
-	fmt.Printf("\t\tbh.BlockMaker.NumberOfLeaders == %v\n", bh.BlockMaker.NumberOfLeaders)
-	if bh.BlockMaker.NumberOfLeaders == 1 {
-		panic("bh.BlockMaker.NumberOfLeaders == 1")
-	}
 
 	return nil
 }
