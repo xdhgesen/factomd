@@ -16,11 +16,6 @@ func (bs *BlockchainState) HasFreeCommit(h interfaces.IHash) bool {
 	if ok == false {
 		return false
 	}
-	switch h.String() {
-	case "":
-		fmt.Printf("Missing commit - %v\n", pc.String())
-		break
-	}
 
 	return pc.HasFreeCommit()
 }

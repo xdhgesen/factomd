@@ -120,7 +120,7 @@ func CheckDatabase(db interfaces.IDatabase) {
 			}
 			fmt.Printf("Successfully saved and loaded BS\n")
 			//if true {
-			if i <= 85000 {
+			if i <= 110000 {
 				err = SaveBS(bs)
 				if err != nil {
 					panic(err)

@@ -154,6 +154,11 @@ func (bs *BlockchainState) HandlePreBlockErrors(dBlockHash interfaces.IHash) err
 		ecHash, _ = primitives.NewShaHashFromStr("6f466cf17186f02418ffdcab4d319d1297e6ed44605e9eef59510f8229fb936e")
 		bs.PushCommit(eHash, ecHash)
 		break
+	case "d30fdc3590184bf51bfdce43adec44ad7482bdd090124057cf6f367da242c3bc": //111749
+		eHash, _ := primitives.NewShaHashFromStr("042a3b9cdfb6ff4c8a3d899f8df5e77fdfa60227ee3de894dd9dca1c721d1eb4")
+		ecHash, _ := primitives.NewShaHashFromStr("1d6f5eb71c7b6b1460ebd1023b5c1c77b8e590801463bfd1c94260947c97f93d")
+		bs.PushCommit(eHash, ecHash)
+		break
 	}
 
 	//Pre-revealed entries
