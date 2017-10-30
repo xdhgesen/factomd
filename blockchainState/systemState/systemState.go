@@ -191,6 +191,7 @@ func (ss *SystemState) KeepVMsUpToDate() {
 		msg.DBHeight = dbHeight
 		msg.SystemHeight = 0 //TODO: set properly?
 		msg.ProcessListHeight = vmh
+		msg.SetDestinationPeer(p2p.RandomPeerFlag)
 
 		ss.OutMsgQueue <- msg
 		if i == 0 {
