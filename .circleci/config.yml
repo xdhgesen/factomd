@@ -123,7 +123,7 @@ jobs:
       - run:
           name: Coveralls!
           no_output_timeout: 2400
-          command: goveralls -v -timeout 1200s -ignore=$(paste -sd, .coverignore) -service=circle-ci -repotoken=$COVERALLS_TOKEN
+          command: goveralls -v -flags "-timeout 1200s" -ignore=$(paste -sd, .coverignore) -service=circle-ci -repotoken=$COVERALLS_TOKEN
 
 
       - save_cache:
