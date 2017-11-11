@@ -96,7 +96,7 @@ jobs:
 
       - restore_cache:
           keys:
-            - v1-factomd-go-build-cache-{{ checksum "glide.lock" }}
+            - v2-factomd-go-build-cache-{{ checksum "glide.lock" }}
 
       - run:
           name: Get glide
@@ -123,11 +123,11 @@ jobs:
       - run:
           name: Coveralls!
           no_output_timeout: 15m
-          command: goveralls -v -flags "-timeout 600s" -ignore=$(paste -sd, .coverignore) -service=circle-ci -repotoken=$COVERALLS_TOKEN
+          command: goveralls -v -flags "-timeout 15m" -ignore=$(paste -sd, .coverignore) -service=circle-ci -repotoken=$COVERALLS_TOKEN
 
 
       - save_cache:
-          key: v1-factomd-go-build-cache-{{ checksum "glide.lock" }}
+          key: v2-factomd-go-build-cache-{{ checksum "glide.lock" }}
           paths:
             - vendor
 
