@@ -122,7 +122,7 @@ jobs:
 
       - run:
           name: Coveralls!
-          no_output_timeout: 2400
+          no_output_timeout: 15m
           command: goveralls -v -flags "-timeout 1200s" -ignore=$(paste -sd, .coverignore) -service=circle-ci -repotoken=$COVERALLS_TOKEN
 
 
