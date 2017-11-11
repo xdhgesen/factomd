@@ -116,6 +116,28 @@ func SimControl(listenTo int, listenStdin bool) {
 			go controlPanel.ServeControlPanel(fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build)
 		} else {
 			switch {
+
+			// Add an offset to the clock used to create EOM events for
+			case '[' == b[0]:
+				nn, err := strconv.Atoi(string(b[1:]))
+				nnn := int64(nn)
+				if err != nil || nnn < 0 || nnn > 120 {
+					os.Stderr.WriteString("Specifiy a maximum clock error in 0 to 120 seconds to be applied to all nodes\n")
+					break
+				}
+				for _, fn := range fnodes {
+					if nn == 0 {
+						fn.State.SetTimeOffset(primitives.NewTimestampFromMilliseconds(0))
+					} else {
+						rn := rand.Int63() % (nnn * 1000) // Pick a random number of milliseconds <= nn
+						fn.State.SetTimeOffset(primitives.NewTimestampFromMilliseconds(uint64(rn)))
+					}
+					os.Stderr.WriteString(
+						fmt.Sprintf("Set the TimeOffset of %10s to %6d ms\n",
+							fn.State.FactomNodeName,
+							fn.State.TimeOffset.GetTimeMilli()))
+				}
+
 			case '!' == b[0]:
 				if ListenTo < 0 || ListenTo > len(fnodes) {
 					break

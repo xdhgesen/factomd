@@ -144,8 +144,8 @@ type State struct {
 
 	tickerQueue            chan int
 	timerMsgQueue          chan interfaces.IMsg
-	TimeOffset             interfaces.Timestamp
-	MaxTimeOffset          interfaces.Timestamp
+	LeaderTimestamp        interfaces.Timestamp // Timestamp of VM 0 for the current block. Set from the DBSig of VM 0
+	TimeOffset             interfaces.Timestamp // Testing value.  Modifies the clock by this amount.
 	networkOutMsgQueue     NetOutMsgQueue
 	networkInvalidMsgQueue chan interfaces.IMsg
 	inMsgQueue             InMsgMSGQueue
@@ -197,6 +197,11 @@ type State struct {
 	CurrentMinuteStartTime int64
 	CurrentBlockStartTime  int64
 
+	//
+	// Syncronization support.  We sync all the leaders on EOM and DBSig messages.
+	//
+
+	Syncing    bool // Looking for messages from leaders to sync
 	EOMsyncing bool
 
 	EOM          bool // Set to true when the first EOM is encountered
@@ -212,24 +217,31 @@ type State struct {
 	DBSigDone      bool
 	DBSigSys       bool // At least one DBSig has covered the System List
 
+	Saving bool // True if we are in the process of saving to the database
+
+	//
+	// Debugging values.  Not used in consensus.
+	//
+
 	// By default, this is false, which means DBstates are discarded
 	// when a majority of leaders disagree with the hash we have via DBSigs
-	KeepMismatch bool
+	KeepMismatch bool // This is a legacy value.
 
-	DBSigFails int // Keep track of how many blockhash mismatches we've had to correct
+	NetStateOff    bool // Disable if true, Enable if false
+	DebugConsensus bool // If true, dump consensus trace
 
-	Saving  bool // True if we are in the process of saving to the database
-	Syncing bool // Looking for messages from leaders to sync
+	//
+	// Counters and statistics. High level stuff, but mostly vestigial given Prometheus
+	//
 
-	NetStateOff     bool // Disable if true, Enable if false
-	DebugConsensus  bool // If true, dump consensus trace
-	FactoidTrans    int
-	ECCommits       int
-	ECommits        int
-	FCTSubmits      int
-	NewEntryChains  int
-	NewEntries      int
-	LeaderTimestamp interfaces.Timestamp
+	DBSigFails     int // Keep track of how many blockhash mismatches we've had to correct
+	FactoidTrans   int
+	ECCommits      int
+	ECommits       int
+	FCTSubmits     int
+	NewEntryChains int
+	NewEntries     int
+
 	// Maps
 	// ====
 	// For Follower
@@ -1941,6 +1953,10 @@ func (s *State) GetTimestamp() interfaces.Timestamp {
 
 func (s *State) GetTimeOffset() interfaces.Timestamp {
 	return s.TimeOffset
+}
+
+func (s *State) SetTimeOffset(t interfaces.Timestamp) {
+	s.TimeOffset = t
 }
 
 func (s *State) Sign(b []byte) interfaces.IFullSignature {

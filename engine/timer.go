@@ -27,10 +27,6 @@ func Timer(state interfaces.IState) {
 
 	next := now + wait + tenthPeriod
 
-	if state.GetOut() {
-		state.Print(fmt.Sprintf("Time: %v\r\n", time.Now()))
-	}
-
 	time.Sleep(time.Duration(wait))
 
 	for {

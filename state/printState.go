@@ -89,7 +89,6 @@ func PrintState(state *State) {
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "tickerQueue", state.tickerQueue)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "timerMsgQueue", state.timerMsgQueue)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "TimeOffset", state.TimeOffset)
-	str = fmt.Sprintf("%s %35s = %+v\n", str, "MaxTimeOffset", state.MaxTimeOffset)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "networkOutMsgQueue", state.networkOutMsgQueue)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "networkInvalidMsgQueue", state.networkInvalidMsgQueue)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "inMsgQueue", state.inMsgQueue)

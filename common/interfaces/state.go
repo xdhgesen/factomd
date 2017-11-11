@@ -236,6 +236,7 @@ type IState interface {
 
 	GetTimestamp() Timestamp
 	GetTimeOffset() Timestamp
+	SetTimeOffset(Timestamp)
 
 	GetTrueLeaderHeight() uint32
 	Print(a ...interface{}) (n int, err error)
