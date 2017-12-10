@@ -1,7 +1,7 @@
 #!/bin/bash
 
 nchains=10   # number of chains to create
-nentries=15    # number of entries to add to each chain
+nentries=16    # number of entries to add to each chain
 
 #factomd=10.41.0.16:8088
 factomd=localhost:8088
@@ -12,7 +12,7 @@ fa1=$(factom-cli -s=$factomd importaddress Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5Xb
 # This address is for a network with a production Genesis block
 #fa1=FA3RrKWJLQeDuzC9YzxcSwenU1qDzzwjR1uHMpp1SQbs8wH9Qbbr
 
-maxsleep=15
+maxsleep=12
 
 ec1=$(factom-cli -s=$factomd importaddress Es3LB2YW9bpdWmMnNQYb31kyPzqnecsNqmg5W4K7FKp4UP6omRTa)
 
@@ -51,12 +51,12 @@ for ((i=0; i<nchains; i++)); do
 	echo "create chain" $i
 	chainid=$(echo test $i $RANDOM | factom-cli -s=$factomd addchain -f  -n test -n $i -n $RANDOM $ec1 | awk '/ChainID/{print $2}')
 	addentries $chainid $i &
-	sleep $(( ( RANDOM % $maxsleep )  + 1 ))
+	sleep $(( ( RANDOM % $maxsleep ) ))
 done
 
 
 echo SLEEP "90 seconds before doing another set of chains."
-sleep $(( ( RANDOM % ($maxsleep*2) )  + 1 ))
+sleep $(( $maxsleep + ( RANDOM % ($maxsleep) )  + 1 ))
 echo About ready ...
 sleep $maxsleep
 sleep $maxsleep
