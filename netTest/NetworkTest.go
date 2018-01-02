@@ -41,7 +41,6 @@ var size int
 var logPort string
 
 func InitNetwork() {
-	go http.ListenAndServe(fmt.Sprintf("localhost:%s", logPort), nil)
 
 	namePtr := flag.String("name", fmt.Sprintf("%d", rand.Int()), "Name for this node")
 	networkPortOverridePtr := flag.String("networkPort", "8108", "Address for p2p network to listen on.")
@@ -57,6 +56,7 @@ func InitNetwork() {
 
 	flag.Parse()
 
+
 	numReplies = *numReplysPtr
 	numStamps = *numStampsPtr
 	name = *namePtr
@@ -65,6 +65,9 @@ func InitNetwork() {
 	netdebug := *netdebugPtr
 	exclusive := *exclusivePtr
 	logPort = *logportPtr
+
+	go http.ListenAndServe(fmt.Sprintf("localhost:%s", logPort), nil)
+
 	p2p.NetworkDeadline = time.Duration(*deadlinePtr) * time.Millisecond
 	isp2p = *p2pPtr
 	size = *sizePtr * 1024

@@ -22,35 +22,35 @@ import (
 var conLogger = packageLogger.WithFields(log.Fields{"subpack": "connection"})
 
 // Connection represents a single connection to another peer over the network. It communicates with the application
-// via two channels, send and recieve.  These channels take structs of type ConnectionCommand or ConnectionParcel
+// via two channels, send and receive.  These channels take structs of type ConnectionCommand or ConnectionParcel
 // (defined below).
 type Connection struct {
 	conn           net.Conn
 	Errors         chan error              // handle errors from connections.
 	Commands       chan *ConnectionCommand // handle connection commands
 	SendChannel    chan interface{}        // Send means "towards the network" Channel sends Parcels and ConnectionCommands
-	ReceiveChannel chan interface{}        // Recieve means "from the network" Channel recieves Parcels and ConnectionCommands
+	ReceiveChannel chan interface{}        // Receive means "from the network" Channel receives Parcels and ConnectionCommands
 	ReceiveParcel  chan *Parcel            // Parcels to be handled.
 	// and as "address" for sending messages to specific nodes.
 	encoder         *gob.Encoder      // Wire format is gobs in this version, may switch to binary
 	decoder         *gob.Decoder      // Wire format is gobs in this version, may switch to binary
-	peer            Peer              // the datastructure representing the peer we are talking to. defined in peer.go
+	peer            Peer              // the data structure representing the peer we are talking to. defined in peer.go
 	attempts        int               // reconnection attempts
-	TimeLastpacket  time.Time         // Time we last successfully recieved a packet or command.
+	TimeLastpacket  time.Time         // Time we last successfully received a packet or command.
 	timeLastAttempt time.Time         // time of last attempt to connect via dial
 	timeLastPing    time.Time         // time of last ping sent
 	timeLastUpdate  time.Time         // time of last peer update sent
 	timeLastStatus  time.Time         // last time we printed our status for debugging.
 	timeLastMetrics time.Time         // last time we updated metrics
 	state           uint8             // Current state of the connection. Private. Only communication
-	isOutGoing      bool              // We keep track of outgoing dial() vs incomming accept() connections
+	isOutGoing      bool              // We keep track of outgoing dial() vs incoming accept() connections
 	isPersistent    bool              // Persistent connections we always redail.
 	notes           string            // Notes about the connection, for debugging (eg: error)
 	metrics         ConnectionMetrics // Metrics about this connection
 	Logger          *log.Entry
 }
 
-// Each connection is a simple state machine.  The state is managed by a single goroutine which also does netowrking.
+// Each connection is a simple state machine.  The state is managed by a single goroutine which also does networking.
 // The flow is this:  Connection gets initialized, and either has a peer or a net connection (From an accept())
 // If no network connection, the Connection dials.  If the dial is successful, it moves to the Online state
 // If not, it moves to the Shutdown state-- we only dial out once when initialized with a peer.
@@ -62,7 +62,7 @@ const (
 	ConnectionInitialized  uint8 = iota //Structure created, have peer info. Dial command moves us to Online or Shutdown (depending)
 	ConnectionOnline                    // We're connected to the other side.  Normal state
 	ConnectionOffline                   // We've been disconnected for whatever reason.  Attempt to reconnect some number of times. Moves to Online if successful, Shutdown if not.
-	ConnectionShuttingDown              // We're shutting down, the recieves loop exits.
+	ConnectionShuttingDown              // We're shutting down, the receives loop exits.
 	ConnectionClosed                    // We're shut down, the runloop sets this state right before exiting. Controller can clean us up.
 )
 
@@ -75,7 +75,7 @@ var connectionStateStrings = map[uint8]string{
 	ConnectionClosed:       "Closed",
 }
 
-// ConnectionParcel is sent to convey an appication message destined for the network.
+// ConnectionParcel is sent to convey an application message destined for the network.
 type ConnectionParcel struct {
 	Parcel Parcel
 }
@@ -96,10 +96,10 @@ func (e *ConnectionParcel) String() string {
 // ConnectionMetrics is used to encapsulate various metrics about the connection.
 type ConnectionMetrics struct {
 	MomentConnected  time.Time // when the connection started.
-	BytesSent        uint32    // Keeping track of the data sent/recieved for console
-	BytesReceived    uint32    // Keeping track of the data sent/recieved for console
-	MessagesSent     uint32    // Keeping track of the data sent/recieved for console
-	MessagesReceived uint32    // Keeping track of the data sent/recieved for console
+	BytesSent        uint32    // Keeping track of the data sent/received for console
+	BytesReceived    uint32    // Keeping track of the data sent/received for console
+	MessagesSent     uint32    // Keeping track of the data sent/received for console
+	MessagesReceived uint32    // Keeping track of the data sent/received for console
 	PeerAddress      string    // Peer IP Address
 	PeerQuality      int32     // Quality of the connection.
 	// Red: Below -50
@@ -130,14 +130,14 @@ func (e *ConnectionCommand) String() string {
 	return str
 }
 
-// These are the commands that connections can send/recieve
+// These are the commands that connections can send/receive
 const (
-	ConnectionIsClosed uint8 = iota // Notifies the controller that we are shut down and can be released
+	ConnectionIsClosed          uint8 = iota // Notifies the controller that we are shut down and can be released
 	ConnectionShutdownNow
 	ConnectionUpdatingPeer
 	ConnectionAdjustPeerQuality
 	ConnectionUpdateMetrics
-	ConnectionGoOffline // Notifies the connection it should go offinline (eg from another goroutine)
+	ConnectionGoOffline          // Notifies the connection it should go offinline (eg from another goroutine)
 )
 
 //////////////////////////////
@@ -212,7 +212,7 @@ func (c *Connection) Start() {
 	go c.runLoop()
 }
 
-// runloop OWNs the connection.  It is the only goroutine that can change values in the connection struct
+// runLoop OWNs the connection.  It is the only goroutine that can change values in the connection struct
 // runLoop operates the state machine and routes messages out to network (messages from network are routed in processReceives)
 func (c *Connection) runLoop() {
 	go c.processSends()
@@ -303,6 +303,8 @@ func (c *Connection) dialLoop() {
 		}
 		switch {
 		case c.isPersistent:
+			// Never give up on persistent connection
+
 		case ConnectionOffline == c.state: // We were online with the peer at one point.
 			c.attempts++
 			if MaxNumberOfRedialAttempts < c.attempts {
@@ -310,6 +312,8 @@ func (c *Connection) dialLoop() {
 				return
 			}
 		default:
+			c.Logger.WithField("func", "dialLoop").Errorf("Saw c.state %s", c.state)
+
 			c.goShutdown()
 			return
 		}
@@ -390,7 +394,7 @@ func (c *Connection) processSends() {
 	conloop:
 		for ConnectionOnline == c.state && len(c.SendChannel) > 0 {
 			// This was blocking. By checking the length of the channel before entering, this does not block.
-			// The problem was this routine was blocked on a closed connection. Idealling we do want to block
+			// The problem was this routine was blocked on a closed connection. Ideally we do want to block
 			// on a 0 length channel, and this is still possible if use a select and close the channel when we
 			// close the connection.
 			message := <-c.SendChannel
@@ -436,7 +440,7 @@ func (c *Connection) handleCommand() {
 				c.goShutdown()
 			}
 		case ConnectionGoOffline:
-			debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s goOffline command recieved", c.peer.PeerIdent())
+			debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s goOffline command received", c.peer.PeerIdent())
 			c.goOffline()
 		default:
 			logfatal(c.peer.PeerIdent(), "handleCommand() unknown command?: %+v ", command)
@@ -464,6 +468,10 @@ func (c *Connection) sendParcel(parcel Parcel) {
 		c.metrics.MessagesSent += 1
 	default:
 		c.Errors <- err
+		c.Logger.WithFields(
+			log.Fields{"func": "sendParcel",
+				"connId": c.conn.LocalAddr().String() + "->" + c.conn.RemoteAddr().String(),
+			}).Errorf("Saw error %s", err.Error())
 	}
 }
 
@@ -498,9 +506,15 @@ func (c *Connection) processReceives() {
 				c.TimeLastpacket = time.Now()
 			default:
 				c.Errors <- err
+				c.Logger.WithFields(
+					log.Fields {
+					"func": "processReceives",
+					"connId": c.conn.LocalAddr().String() + "<-" + c.conn.RemoteAddr().String(),
+				}).Errorf("Saw error %s", err.Error())
+
 			}
 		}
-		// If not online, give some time up to handle states that are not online, closed, or shuttingdown.
+		// If not online, give some time up to handle states that are not online, e.g.  closed, or shuttingdown.
 		time.Sleep(1 * time.Second)
 	}
 }
@@ -561,7 +575,7 @@ func (c *Connection) handleParcel(parcel Parcel) {
 		return
 	case ParcelValid:
 		parcel.Trace("Connection.handleParcel()-ParcelValid", "I")
-		c.peer.LastContact = time.Now() // We only update for valid messages (incluidng pings and heartbeats)
+		c.peer.LastContact = time.Now() // We only update for valid messages (including pings and heartbeats)
 		c.attempts = 0                  // reset since we are clearly in touch now.
 		c.peer.merit()                  // Increase peer quality score.
 		debug(c.peer.PeerIdent(), "Connection.handleParcel() got ParcelValid %s", parcel.MessageType())
@@ -580,8 +594,8 @@ func (c *Connection) handleParcel(parcel Parcel) {
 // These constants support the multiple penalties and responses for Parcel validation
 const (
 	ParcelValid           uint8 = iota
-	InvalidPeerDemerit          // The peer sent an invalid message
-	InvalidDisconnectPeer       // Eg they are on the wrong network or wrong version of the software
+	InvalidPeerDemerit     // The peer sent an invalid message
+	InvalidDisconnectPeer  // Eg they are on the wrong network or wrong version of the software
 )
 
 func (c *Connection) parcelValidity(parcel Parcel) uint8 {

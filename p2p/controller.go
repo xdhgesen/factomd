@@ -21,6 +21,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	log "github.com/sirupsen/logrus"
+
 )
 
 // packageLogger is the general logger for all p2p related logs. You can add additional fields,
@@ -49,8 +50,8 @@ type Controller struct {
 
 	discovery Discovery // Our discovery structure
 
-	numberOutgoingConnections  int       // In PeerManagmeent we track this to know whent to dial out.
-	numberIncommingConnections int       // In PeerManagmeent we track this and refuse incomming connections when we have too many.
+	numberOutgoingConnections  int       // In PeerManagement we track this to know when to dial out.
+	numberIncommingConnections int       // In PeerManagement we track this and refuse incoming connections when we have too many.
 	lastPeerManagement         time.Time // Last time we ran peer management.
 	lastDiscoveryRequest       time.Time
 	NodeID                     uint64
@@ -84,7 +85,7 @@ type CommandAddPeer struct {
 	conn net.Conn
 }
 
-// CommandShutdown is used to instruct the Controller to takve various actions.
+// CommandShutdown is used to instruct the Controller to take various actions.
 type CommandShutdown struct {
 	_ uint8
 }
@@ -309,7 +310,7 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 				c.AddPeer(conn) // Sends command to add the peer to the peers list
 				note("ctrlr", "Controller.acceptLoop() new peer: %+v", conn)
 			default:
-				note("ctrlr", "Controller.acceptLoop() new peer, but too many incomming connections. %d", c.numberIncommingConnections)
+				note("ctrlr", "Controller.acceptLoop() new peer, but too many incoming connections. %d", c.numberIncommingConnections)
 				conn.Close()
 			}
 		default:
@@ -390,12 +391,12 @@ func (c *Controller) runloop() {
 		c.updateMetrics()
 		dot("@@11\n")
 	}
-	significant("ctrlr", "runloop() - Final network statistics: TotalMessagesRecieved: %d TotalMessagesSent: %d", TotalMessagesRecieved, TotalMessagesSent)
+	significant("ctrlr", "runloop() - Final network statistics: TotalMessagesReceived: %d TotalMessagesSent: %d", TotalMessagesRecieved, TotalMessagesSent)
 }
 
 // Route pulls all of the messages from the application and sends them to the appropriate
 // peer. Broadcast messages go to everyone, directed messages go to the named peer.
-// route also passes incomming messages on to the application.
+// route also passes incoming messages on to the application.
 func (c *Controller) route() {
 	// Recieve messages from the peers & forward to application.
 	for peerHash, connection := range c.connections {
