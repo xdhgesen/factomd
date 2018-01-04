@@ -15,7 +15,9 @@ import (
 func main() {
 	// uncomment StartProfiler() to run the pprof tool (for testing)
 	params := engine.ParseCmdLine(os.Args[1:])
+
 	sim_Stdin := params.Sim_Stdin
+
 	state := engine.Factomd(params, sim_Stdin)
 	for state.Running() {
 		time.Sleep(time.Second)
