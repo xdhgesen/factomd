@@ -21,7 +21,8 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	log "github.com/sirupsen/logrus"
-
+	rtDebug "runtime/debug"
+	"regexp"
 )
 
 // packageLogger is the general logger for all p2p related logs. You can add additional fields,
@@ -30,8 +31,7 @@ var packageLogger = log.WithFields(log.Fields{"package": "p2p"})
 
 // Controller manages the peer to peer network.
 type Controller struct {
-	keepRunning bool // Indicates its time to shut down when false.
-
+	keepRunning          bool                   // Indicates its time to shut down when false.
 	listenPort           string                 // port we listen on for new connections
 	connections          map[string]*Connection // map of the connections indexed by peer hash
 	connectionsByAddress map[string]*Connection // map of the connections indexed by peer address
@@ -50,15 +50,15 @@ type Controller struct {
 
 	discovery Discovery // Our discovery structure
 
-	numberOutgoingConnections  int       // In PeerManagement we track this to know when to dial out.
-	numberIncommingConnections int       // In PeerManagement we track this and refuse incoming connections when we have too many.
-	lastPeerManagement         time.Time // Last time we ran peer management.
-	lastDiscoveryRequest       time.Time
-	NodeID                     uint64
-	lastStatusReport           time.Time
-	lastPeerRequest            time.Time       // Last time we asked peers about the peers they know about.
-	specialPeersString         string          // configuration set special peers
-	partsAssembler             *PartsAssembler // a data structure that assembles full messages from received message parts
+	numberOutgoingConnections int       // In PeerManagement we track this to know when to dial out.
+	numberIncomingConnections int       // In PeerManagement we track this and refuse incoming connections when we have too many.
+	lastPeerManagement        time.Time // Last time we ran peer management.
+	lastDiscoveryRequest      time.Time
+	NodeID                    uint64
+	lastStatusReport          time.Time
+	lastPeerRequest           time.Time       // Last time we asked peers about the peers they know about.
+	specialPeersString        string          // configuration set special peers
+	partsAssembler            *PartsAssembler // a data structure that assembles full messages from received message parts
 }
 
 type ControllerInit struct {
@@ -166,12 +166,89 @@ func (e *CommandChangeLogging) String() string {
 //////////////////////////////////////////////////////////////////////
 // Public (exported) methods.
 //
-// The surface for interfacting with this is very minimal to avoid deadlocks
+// The surface for interfacing with this is very minimal to avoid deadlocks
 // and allow maximum concurrency.
 // Other than setup, these API communicate with the controller via the
 // command channel.
 //////////////////////////////////////////////////////////////////////
+// Get preferred outbound ip of this machine
 
+var gotLocalIP bool
+var localIP map[string]string
+
+func getOutboundIP() (map[string]string) {
+	/*
+		// worth noting this is UDP so no network traffic is generated
+		// because UDP has no handshake
+		conn, err := net.Dial("udp", "8.8.8.8:80")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer conn.Close()
+
+		localAddr := conn.LocalAddr().(*net.UDPAddr)
+	// in apiplus_ansible there are three interfaces and this is not always the right one
+	*/
+
+	if (!gotLocalIP) {
+		localIP = make(map[string]string)
+		ifaces, err := net.Interfaces()
+		if err != nil {
+			log.Fatal(err)
+		}
+		// for all the interfaces
+		for _, i := range ifaces {
+			addrs, err := i.Addrs()
+			if err != nil {
+				log.Fatal(err)
+			}
+			// for all the address on that interface
+			for _, addr := range addrs {
+				var ip net.IP
+				switch v := addr.(type) {
+				case *net.IPNet:
+					ip = v.IP
+				case *net.IPAddr:
+					ip = v.IP
+				}
+				// process IP address
+				fmt.Printf(" Interface %10v %20v\n", i.Name, ip.String())
+				localIP[ip.String()] = i.Name
+			}
+		}
+		gotLocalIP = true
+	}
+	return localIP
+}
+
+var matchIPAddress = regexp.MustCompile("[0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}[.][0-9]{1,3}")
+
+
+func IsHostIP(ip string) bool {
+	myIP := getOutboundIP()
+
+	trimmedIPs := matchIPAddress.FindStringSubmatch(ip) // Match the first (only) address
+
+	if(len(trimmedIPs)==0) {
+		logerror("IsHostIP","FindStringSubmatch(%v) failed\n",ip)
+		return false
+	}
+
+	trimmedIP := trimmedIPs[0]
+
+	_, match := myIP[trimmedIP]
+
+	debug("IsHostIP","checkIP: %v\tcheck %v\tagainst %v\n",match, trimmedIP, myIP)
+
+
+	if (match) {
+		logerror("IsHostIP", "Connection to myself")
+		rtDebug.SetTraceback("all")
+		rtDebug.PrintStack()
+
+	}
+	return match
+}
 func (c *Controller) Init(ci ControllerInit) *Controller {
 	note("ctrlr", "\n\n\n\n\nController.Init(%s) %#x", ci.Port, ci.Network)
 	note("ctrlr", "\n\n\n\n\nController.Init(%s) ci: %+v\n\n", ci.Port, ci)
@@ -221,13 +298,13 @@ func (c *Controller) DialSpecialPeersString(peersString string) {
 	}
 	peerAddresses := strings.FieldsFunc(peersString, parseFunc)
 	for _, peerAddress := range peerAddresses {
-		ipPort := strings.Split(peerAddress, ":")
-		if len(ipPort) == 2 {
-			peer := new(Peer).Init(ipPort[0], ipPort[1], 0, SpecialPeer, 0)
+		address, port, err := net.SplitHostPort(peerAddress)
+		if err != nil{
+			logerror("Controller", "DialSpecialPeersString: %s is not a valid peer (%v), use format: 127.0.0.1:8999", peersString, err)
+		} else {
+			peer := new(Peer).Init(address, port, 0, SpecialPeer, 0)
 			peer.Source["Local-Configuration"] = time.Now()
 			c.DialPeer(*peer, true) // these are persistent connections
-		} else {
-			logfatal("Controller", "Error: %s is not a valid peer, use format: 127.0.0.1:8999", peerAddress)
 		}
 	}
 }
@@ -289,6 +366,7 @@ func (c *Controller) GetNumberConnections() int {
 func (c *Controller) listen() {
 	address := fmt.Sprintf(":%s", c.listenPort)
 	debug("ctrlr", "Controller.listen(%s) got address %s", c.listenPort, address)
+
 	listener, err := net.Listen("tcp", address)
 	if nil != err {
 		logfatal("ctrlr", "Controller.listen() Error: %+v", err)
@@ -303,18 +381,24 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 	note("ctrlr", "Controller.acceptLoop() starting up")
 	for {
 		conn, err := listener.Accept()
+
 		switch err {
 		case nil:
+			if (IsHostIP(conn.RemoteAddr().String())) {
+				conn.Close()
+				logerror("acceptLoop", "attempt to dial myself ignored.")
+				continue
+			}
 			switch {
-			case c.numberIncommingConnections < MaxNumberIncommingConnections:
+			case c.numberIncomingConnections < MaxNumberIncomingConnections:
 				c.AddPeer(conn) // Sends command to add the peer to the peers list
-				note("ctrlr", "Controller.acceptLoop() new peer: %+v", conn)
+				note("ctrlr", "Controller.acceptLoop() new peer: %+v %v->%v", conn, conn.LocalAddr(), conn.RemoteAddr())
 			default:
-				note("ctrlr", "Controller.acceptLoop() new peer, but too many incoming connections. %d", c.numberIncommingConnections)
+				note("ctrlr", "Controller.acceptLoop() new peer, but too many incoming connections. %d", c.numberIncomingConnections)
 				conn.Close()
 			}
 		default:
-			logerror("ctrlr", "Controller.acceptLoop() Error: %+v", err)
+			logerror("ctrlr", "Controller.acceptLoop() Error: %v", err)
 		}
 	}
 }
@@ -339,8 +423,8 @@ func (c *Controller) runloop() {
 		significant("ctrlr", "     Command Queue: %d", len(c.commandChannel))
 		significant("ctrlr", "         ToNetwork: %d", len(c.ToNetwork))
 		significant("ctrlr", "       FromNetwork: %d", len(c.FromNetwork))
-		significant("ctrlr", "        Total RECV: %d", TotalMessagesRecieved)
-		significant("ctrlr", "  Application RECV: %d", ApplicationMessagesRecieved)
+		significant("ctrlr", "        Total RECV: %d", TotalMessagesReceived)
+		significant("ctrlr", "  Application RECV: %d", ApplicationMessagesReceived)
 		significant("ctrlr", "        Total XMIT: %d", TotalMessagesSent)
 		significant("ctrlr", "###################################")
 		significant("ctrlr", "@@@@@@@@@@ Controller.runloop() is terminated!")
@@ -391,16 +475,16 @@ func (c *Controller) runloop() {
 		c.updateMetrics()
 		dot("@@11\n")
 	}
-	significant("ctrlr", "runloop() - Final network statistics: TotalMessagesReceived: %d TotalMessagesSent: %d", TotalMessagesRecieved, TotalMessagesSent)
+	significant("ctrlr", "runloop() - Final network statistics: TotalMessagesReceived: %d TotalMessagesSent: %d", TotalMessagesReceived, TotalMessagesSent)
 }
 
 // Route pulls all of the messages from the application and sends them to the appropriate
 // peer. Broadcast messages go to everyone, directed messages go to the named peer.
 // route also passes incoming messages on to the application.
 func (c *Controller) route() {
-	// Recieve messages from the peers & forward to application.
+	// Receive messages from the peers & forward to application.
 	for peerHash, connection := range c.connections {
-		// Empty the recieve channel, stuff the application channel.
+		// Empty the receive channel, stuff the application channel.
 		for 0 < len(connection.ReceiveChannel) { // effectively "While there are messages"
 			message := <-connection.ReceiveChannel
 			switch message.(type) {
@@ -437,7 +521,7 @@ func (c *Controller) route() {
 				num = quarter
 			}
 
-			// So at this point num <= clen, and we are going to send num sequentinial connections our message.
+			// So at this point num <= clen, and we are going to send num sequential connections our message.
 			// Note that if we run over the end of the connections, we wrap back to the start.  We don't assume
 			// an order of connections, but we do assume that if we range over a map twice, we get the keys in
 			// the same order both times.  (We do not modify the map)
@@ -501,18 +585,18 @@ func (c *Controller) doDirectedSend(parcel Parcel) {
 
 // handleParcelReceive takes a parcel from the network and annotates it for the application then routes it.
 func (c *Controller) handleParcelReceive(message interface{}, peerHash string, connection Connection) {
-	TotalMessagesRecieved++
+	TotalMessagesReceived++
 	parameters := message.(ConnectionParcel)
 	parcel := parameters.Parcel
 	parcel.Header.TargetPeer = peerHash // Set the connection ID so the application knows which peer the message is from.
 	switch parcel.Header.Type {
 	case TypeMessage: // Application message, send it on.
-		ApplicationMessagesRecieved++
+		ApplicationMessagesReceived++
 		BlockFreeChannelSend(c.FromNetwork, parcel)
 	case TypeMessagePart: // A part of the application message, handle by assembler and if we have the full message, send it on.
 		assembled := c.partsAssembler.handlePart(parcel)
 		if assembled != nil {
-			ApplicationMessagesRecieved++
+			ApplicationMessagesReceived++
 			BlockFreeChannelSend(c.FromNetwork, *assembled)
 		}
 	case TypePeerRequest: // send a response to the connection over its connection.SendChannel
@@ -550,6 +634,14 @@ func (c *Controller) handleCommand(command interface{}) {
 	switch commandType := command.(type) {
 	case CommandDialPeer: // parameter is the peer address
 		parameters := command.(CommandDialPeer)
+
+		// How do I get my Hash to check if it's an attempt to connect to myself...
+		logerror("handleCommand", "DialPeer(%v) %v", parameters.peer.AddressPort(), map[bool]string{true:"persistent",false:""}[parameters.persistent])
+
+		if IsHostIP(parameters.peer.AddressPort()) {
+			logerror("handleCommand", "CommandDialPeer attempt to dial myself(%v) ignored.", parameters.peer.AddressPort())
+			break
+		}
 		conn := new(Connection).Init(parameters.peer, parameters.persistent)
 		conn.Start()
 
@@ -561,13 +653,19 @@ func (c *Controller) handleCommand(command interface{}) {
 		conn := parameters.conn // net.Conn
 		addPort := strings.Split(conn.RemoteAddr().String(), ":")
 		// Port initially stored will be the connection port (not the listen port), but peer will update it on first message.
-		peer := new(Peer).Init(addPort[0], addPort[1], 0, RegularPeer, 0)
-		peer.Source["Accept()"] = time.Now()
-		connection := new(Connection).InitWithConn(conn, *peer)
-		connection.Start()
+		if IsHostIP(addPort[0]) {
+			logerror("handleCommand", "CommandAddPeer attempt to connect to myself(%v) ignored.", addPort[0])
+			conn.Close();
+		} else {
 
-		c.connections[connection.peer.Hash] = connection
-		c.connectionsByAddress[connection.peer.Address] = connection
+			peer := new(Peer).Init(addPort[0], addPort[1], 0, RegularPeer, 0)
+			peer.Source["Accept()"] = time.Now()
+			connection := new(Connection).InitWithConn(conn, *peer)
+			connection.Start()
+
+			c.connections[connection.peer.Hash] = connection
+			c.connectionsByAddress[connection.peer.Address] = connection
+		}
 	case CommandShutdown:
 		c.shutdown()
 	case CommandChangeLogging:
@@ -589,7 +687,7 @@ func (c *Controller) handleCommand(command interface{}) {
 			BlockFreeChannelSend(connection.SendChannel, ConnectionCommand{Command: ConnectionShutdownNow})
 		}
 	default:
-		logfatal("ctrlr", "Unkown p2p.Controller command recieved: %+v", commandType)
+		logfatal("ctrlr", "Unkown p2p.Controller command received: %+v", commandType)
 	}
 }
 
@@ -642,16 +740,16 @@ func (c *Controller) managePeers() {
 }
 
 func (c *Controller) updateConnectionCounts() {
-	// If we are low on outgoing onnections, attempt to connect to some more.
+	// If we are low on outgoing connections, attempt to connect to some more.
 	// If the connection is not online, we don't count it as connected.
 	c.numberOutgoingConnections = 0
-	c.numberIncommingConnections = 0
+	c.numberIncomingConnections = 0
 	for _, connection := range c.connections {
 		switch {
 		case connection.IsOutGoing() && connection.IsOnline():
 			c.numberOutgoingConnections++
 		case !connection.IsOutGoing() && connection.IsOnline():
-			c.numberIncommingConnections++
+			c.numberIncomingConnections++
 		default: // we don't count offline connections for these purposes.
 		}
 	}
@@ -729,8 +827,9 @@ func (c *Controller) shutdown() {
 
 func (c *Controller) networkStatusReport() {
 	durationSinceLastReport := time.Since(c.lastStatusReport)
-	note("ctrlr", "networkStatusReport() NetworkStatusInterval: %s durationSinceLastReport: %s c.lastStatusReport: %s", NetworkStatusInterval.String(), durationSinceLastReport.String(), c.lastStatusReport.String())
+//	note("ctrlr", "networkStatusReport() NetworkStatusInterval: %s durationSinceLastReport: %s c.lastStatusReport: %s", NetworkStatusInterval.String(), durationSinceLastReport.String(), c.lastStatusReport.String())
 	if durationSinceLastReport > NetworkStatusInterval {
+		note("ctrlr", "networkStatusReport() NetworkStatusInterval: %s durationSinceLastReport: %s c.lastStatusReport: %s", NetworkStatusInterval.String(), durationSinceLastReport.String(), c.lastStatusReport.String())
 		c.lastStatusReport = time.Now()
 		c.updateConnectionCounts()
 		silence("ctrlr", "\n\n\n\n")
@@ -740,10 +839,10 @@ func (c *Controller) networkStatusReport() {
 		c.updateConnectionAddressMap()
 		silence("ctrlr", "     # Connections: %d", len(c.connections))
 		silence("ctrlr", "Unique Connections: %d", len(c.connectionsByAddress))
-		silence("ctrlr", "    In Connections: %d", c.numberIncommingConnections)
+		silence("ctrlr", "    In Connections: %d", c.numberIncomingConnections)
 		silence("ctrlr", "   Out Connections: %d (only online are counted)", c.numberOutgoingConnections)
-		silence("ctrlr", "        Total RECV: %d", TotalMessagesRecieved)
-		silence("ctrlr", "  Application RECV: %d", ApplicationMessagesRecieved)
+		silence("ctrlr", "        Total RECV: %d", TotalMessagesReceived)
+		silence("ctrlr", "  Application RECV: %d", ApplicationMessagesReceived)
 		silence("ctrlr", "        Total XMIT: %d", TotalMessagesSent)
 		silence("ctrlr", " ")
 		silence("ctrlr", "\tPeer\t\t\t\tDuration\tStatus\t\tNotes")

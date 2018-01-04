@@ -91,7 +91,7 @@ func (d *Discovery) LoadPeers() {
 		d.knownPeers[peer.Address] = peer
 	}
 	UpdateKnownPeers.Unlock()
-	note("discovery", "LoadPeers() found %d peers in peers.josn", len(d.knownPeers))
+	note("discovery", "LoadPeers() found %d peers in peers.json", len(d.knownPeers))
 	file.Close()
 }
 
@@ -128,10 +128,10 @@ func (d *Discovery) SavePeers() {
 	UpdateKnownPeers.Unlock()
 	encoder.Encode(qualityPeers)
 	writer.Flush()
-	note("discovery", "SavePeers() saved %d peers in peers.json. \n They were: %+v", len(qualityPeers), qualityPeers)
+	note("discovery", "SavePeers() saved %d peers in peers.json.\n They were: %+v", len(qualityPeers), qualityPeers)
 }
 
-// LearnPeers recieves a set of peers from other hosts
+// LearnPeers receives a set of peers from other hosts
 // The unique peers are added to our peer list.
 // The peers are in a json encoded string as a byte slice
 func (d *Discovery) LearnPeers(parcel Parcel) {
@@ -152,7 +152,7 @@ func (d *Discovery) LearnPeers(parcel Parcel) {
 		default:
 			value.Source = map[string]time.Time{parcel.Header.PeerAddress: time.Now()}
 			d.updatePeer(value)
-			note("discovery", "Discovery.LearnPeers !!!!!!!!!!!!! Discoverd new PEER!   %+v ", value)
+			note("discovery", "Discovery.LearnPeers !!!!!!!!!!!!! Discovered new PEER!   %+v ", value)
 		}
 	}
 	d.SavePeers()
@@ -172,14 +172,14 @@ func (d *Discovery) updatePeerSource(peer Peer, source string) Peer {
 
 func (d *Discovery) filterPeersFromOtherNetworks(peers []Peer) (filtered []Peer) {
 	for _, peer := range peers {
-		if CurrentNetwork == peer.Network {
+		if CurrentNetwork == peer.Network && ! IsHostIP(peer.Address){  // Remove myself from the lists
 			filtered = append(filtered, peer)
 		}
 	}
 	return
 }
 
-func (d *Discovery) filterForUniqueIPAdresses(peers []Peer) (filtered []Peer) {
+func (d *Discovery) filterForUniqueIPAddresses(peers []Peer) (filtered []Peer) {
 	unique := map[string]Peer{}
 	for _, peer := range peers {
 		_, present := unique[peer.Address]
@@ -196,7 +196,7 @@ func (d *Discovery) filterForUniqueIPAdresses(peers []Peer) (filtered []Peer) {
 // We want peers from diverse networks.  So,method is this:
 //	-- generate list of candidates (if exclusive, only special peers)
 //	-- sort candidates by distance
-//  -- if num canddiates is less than desired set, return all candidates
+//  -- if num candidates is less than desired set, return all candidates
 //  -- Otherwise,repeatedly take candidates at the 0%, %25, %50, %75, %100 points in the list
 //  -- remove each candidate from the list.
 //  -- continue until there are no candidates left, or we have our set.
@@ -215,7 +215,7 @@ func (d *Discovery) GetOutgoingPeers() []Peer {
 	}
 	UpdateKnownPeers.Unlock()
 	secondPass := d.filterPeersFromOtherNetworks(firstPassPeers)
-	peerPool := d.filterForUniqueIPAdresses(secondPass)
+	peerPool := d.filterForUniqueIPAddresses(secondPass)
 	sort.Sort(PeerDistanceSort(peerPool))
 	// Get four times as many as who knows how many will be online
 	desiredQuantity := NumberPeersToConnect * 4
@@ -266,7 +266,7 @@ func (d *Discovery) getPeerSelection() []byte {
 	specialPeersByLocation := map[uint32]Peer{}
 	UpdateKnownPeers.Lock()
 	for _, peer := range d.knownPeers {
-		if peer.QualityScore > MinumumSharingQualityScore { // Only share peers that have earned positive reputation
+		if peer.QualityScore > MinimumSharingQualityScore { // Only share peers that have earned positive reputation
 			firstPassPeers = append(firstPassPeers, peer)
 		}
 	}

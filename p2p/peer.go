@@ -6,10 +6,10 @@ package p2p
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"strings"
 	"time"
+	"net"
 )
 
 // Data structures and functions related to peers (eg other nodes in the network)
@@ -18,7 +18,7 @@ type Peer struct {
 	QualityScore int32     // 0 is neutral quality, negative is a bad peer.
 	Address      string    // Must be in form of x.x.x.x
 	Port         string    // Must be in form of xxxx
-	NodeID       uint64    // a nonce to distinguish multiple nodes behind one IP address
+//	NodeID       uint64    // a nonce to distinguish multiple nodes behind one IP address -- not used.
 	Hash         string    // This is more of a connection ID than hash right now.
 	Location     uint32    // IP address as an int.
 	Network      NetworkID // The network this peer reference lives on.
@@ -34,6 +34,15 @@ const ( // iota is reset to 0
 )
 
 func (p *Peer) Init(address string, port string, quality int32, peerType uint8, connections int) *Peer {
+
+	if net.ParseIP(address) == nil {
+		ipAddress, err := net.LookupHost(address)
+		if err != nil {
+			verbose("peer", "Init: LookupHost(%v) failed. %v ", address, err)
+		}
+		address = ipAddress[0]
+	}
+
 	p.Address = address
 	p.Port = port
 	p.QualityScore = quality
@@ -46,7 +55,13 @@ func (p *Peer) Init(address string, port string, quality int32, peerType uint8, 
 }
 
 func (p *Peer) generatePeerHash() {
-	p.Hash = fmt.Sprintf("%s:%s %x", p.Address, p.Port, rand.Int63())
+//	p.Hash = fmt.Sprintf("%s:%s %x", p.Address, p.Port, rand.Int63())
+
+// The random number at the end allowed the system to have a server in the list multiple times as a peer.
+// "right" answer in my opinion is to have the server send an identity when a connection is started
+// and stamp the peer and all connection with that identity. That deals with multiple servers behind a NAT.
+// but that is more restructuring than I'm inclined to do today -- clay
+	p.Hash = p.AddressPort()
 }
 
 func (p *Peer) AddressPort() string {
@@ -54,12 +69,15 @@ func (p *Peer) AddressPort() string {
 }
 
 func (p *Peer) PeerIdent() string {
-	return p.Hash[0:12] + "-" + p.Address + ":" + p.Port
+//	return p.Hash[0:12] + "-" + p.Address + ":" + p.Port
+	return p.AddressPort()
 }
 
 func (p *Peer) PeerFixedIdent() string {
-	address := fmt.Sprintf("%16s", p.Address)
-	return p.Hash[0:12] + "-" + address + ":" + p.Port
+//	address := fmt.Sprintf("%16s", p.Address)
+//	return p.Hash[0:12] + "-" + address + ":" + p.Port
+	address := fmt.Sprintf("%16s", p.AddressPort())
+	return address
 }
 
 // TODO Hadn't considered IPV6 address support.

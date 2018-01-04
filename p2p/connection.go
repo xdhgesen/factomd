@@ -11,10 +11,11 @@ import (
 	"net"
 	"os"
 	"time"
-
+	"math/rand"
 	"github.com/FactomProject/factomd/common/primitives"
 
 	log "github.com/sirupsen/logrus"
+	"runtime"
 )
 
 // conLogger is the general logger for all connection related logs. You can add additional fields,
@@ -73,6 +74,15 @@ var connectionStateStrings = map[uint8]string{
 	ConnectionOffline:      "Offline",
 	ConnectionShuttingDown: "Shutting Down",
 	ConnectionClosed:       "Closed",
+}
+
+func connectionStateString(state uint8) (rval string) {
+	if int(state) < len(connectionStateStrings) {
+		rval = connectionStateStrings[state]
+	} else {
+		rval = fmt.Sprintf("Unknown connection state 0x%X", state)
+	}
+	return
 }
 
 // ConnectionParcel is sent to convey an application message destined for the network.
@@ -146,8 +156,14 @@ const (
 //
 //////////////////////////////
 
+
 // InitWithConn is called from our accept loop when a peer dials into us and we already have a network conn
 func (c *Connection) InitWithConn(conn net.Conn, peer Peer) *Connection {
+
+	if IsHostIP(conn.RemoteAddr().String()) {
+		conn.Close()
+		debug("InitWithConn", "attempt to dial myself, closing conn.")
+	}
 	c.conn = conn
 	c.isOutGoing = false // InitWithConn is called by controller's accept() loop
 	c.commonInit(peer)
@@ -158,6 +174,9 @@ func (c *Connection) InitWithConn(conn net.Conn, peer Peer) *Connection {
 
 // Init is called when we have peer info and need to dial into the peer
 func (c *Connection) Init(peer Peer, persistent bool) *Connection {
+	if IsHostIP(peer.Address) {
+			logerror("Connection", "Init saw  myself as a peer (%v).", peer.Address)
+	}
 	c.conn = nil
 	c.isOutGoing = true
 	c.commonInit(peer)
@@ -174,7 +193,7 @@ func (c *Connection) IsOnline() bool {
 }
 
 func (c *Connection) StatusString() string {
-	return connectionStateStrings[c.state]
+	return connectionStateString(c.state)
 }
 
 func (c *Connection) IsPersistent() bool {
@@ -226,7 +245,7 @@ func (c *Connection) runLoop() {
 		c.updateStats() // Update controller with metrics
 		c.connectionStatusReport()
 		// if 2 == rand.Intn(100) {
-		debug(c.peer.PeerFixedIdent(), "Connection.runloop() STATE IS: %s", connectionStateStrings[c.state])
+		debug(c.peer.PeerIdent(), "Connection.runloop() STATE IS: %s", connectionStateString(c.state))
 		// }
 		c.handleNetErrors(false)
 		c.handleCommand()
@@ -278,7 +297,7 @@ func (c *Connection) runLoop() {
 			BlockFreeChannelSend(c.ReceiveChannel, ConnectionCommand{Command: ConnectionIsClosed})
 			return // ending runloop() goroutine
 		default:
-			logfatal(c.peer.PeerIdent(), "runLoop() unknown state?: %s ", connectionStateStrings[c.state])
+			logfatal(c.peer.PeerIdent(), "runLoop() unknown or unexpected state : %x ", c.state) //
 		}
 	}
 	significant(c.peer.PeerIdent(), "runLoop() Connection runloop() exiting %+v", c)
@@ -312,7 +331,7 @@ func (c *Connection) dialLoop() {
 				return
 			}
 		default:
-			c.Logger.WithField("func", "dialLoop").Errorf("Saw c.state %s", c.state)
+			c.Logger.WithField("func", "dialLoop").Errorf("Saw c.state %v", connectionStateString(c.state))
 
 			c.goShutdown()
 			return
@@ -325,12 +344,21 @@ func (c *Connection) dialLoop() {
 // dial() handles connection logic and shifts states based on results.
 func (c *Connection) dial() bool {
 	address := c.peer.AddressPort()
+
+	if IsHostIP(address) {
+		callerFile, callerLine := "Unknown", 0
+		_ /*callerPC*/ , callerFile, callerLine, _ /*ok*/ = runtime.Caller(1)
+		c.Logger.WithField("func", "dial").Errorf("Attempted to dial myself")
+		c.Logger.WithField("func", "dial").Errorf("Called by %v:%v to dial %v", callerFile, callerLine, address)
+		return false
+	}
 	// conn, err := net.Dial("tcp", c.peer.Address)
 	conn, err := net.DialTimeout("tcp", address, time.Second*10)
 	if nil == err {
 		c.conn = conn
 		return true
 	}
+	c.Logger.WithField("func", "dial").Errorf("Saw error %v", err)
 	return false
 }
 
@@ -451,8 +479,8 @@ func (c *Connection) handleCommand() {
 
 func (c *Connection) sendParcel(parcel Parcel) {
 
-	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
-	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline * 500))
+	parcel.Header.NodeID = NodeID                            // Send it out with our ID for loopback.
+	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline)) // removed 500x multiplier that made it very patient
 
 	//deadline := time.Now().Add(NetworkDeadline)
 	//if len(parcel.Payload) > 1000*10 {
@@ -495,7 +523,30 @@ func (c *Connection) processReceives() {
 		for c.state == ConnectionOnline {
 			var message Parcel
 
-			// c.conn.SetReadDeadline(time.Now().Add(NetworkDeadline))
+			// debugging code start ...
+			if false && rand.Intn(3000) == 2999 { // randomly kill connections
+				switch 1 {
+				case 0: // kill the connection now ...
+					c.Logger.WithFields(log.Fields{
+						"func":   "processReceives",
+						"connId": c.conn.LocalAddr().String() + "<-" + c.conn.RemoteAddr().String(),
+					}).Errorf("Randomly closing connection %s\n", "connId:"+c.conn.LocalAddr().String()+"<-"+c.conn.RemoteAddr().String())
+					c.conn.Close()
+
+				case 1: // kill the connection after a small delay
+					go func(delay time.Duration, c *Connection) {
+						time.Sleep(delay)
+						c.Logger.WithFields(log.Fields{
+							"func":   "processReceives",
+							"connId": c.conn.LocalAddr().String() + "<-" + c.conn.RemoteAddr().String(),
+						}).Errorf("Randomly closing connection %s\n", "connId:"+c.conn.LocalAddr().String()+"<-"+c.conn.RemoteAddr().String())
+						c.conn.Close()
+					}(time.Millisecond*time.Duration(rand.Intn(500)), c)
+				}
+			}
+			// debugging code end ...
+
+			c.conn.SetReadDeadline(time.Now().Add(NetworkDeadline)) // enable timeout on receive
 			err := c.decoder.Decode(&message)
 			switch {
 			case nil == err:
@@ -507,40 +558,44 @@ func (c *Connection) processReceives() {
 			default:
 				c.Errors <- err
 				c.Logger.WithFields(
-					log.Fields {
-					"func": "processReceives",
-					"connId": c.conn.LocalAddr().String() + "<-" + c.conn.RemoteAddr().String(),
-				}).Errorf("Saw error %s", err.Error())
+					log.Fields{
+						"func":   "processReceives",
+						"connId": c.conn.LocalAddr().String() + "<-" + c.conn.RemoteAddr().String(),
+					}).Errorf("Saw error %s", err.Error())
+				// If we get an error give some time for error handling to make us closed, or shutting down.
+				time.Sleep(1 * time.Second)
 
 			}
 		}
-		// If not online, give some time up to handle states that are not online, e.g.  closed, or shuttingdown.
+		// If not online, give some time up to handle states that are not online, e.g.  closed, or shutting down.
 		time.Sleep(1 * time.Second)
 	}
 }
 
 //handleNetErrors Reacts to errors we get from encoder or decoder
 func (c *Connection) handleNetErrors(toss bool) {
-	done := false
+	//done := false
 	for {
 		select {
-		case err := <-c.Errors:
+		case err := <-c.Errors: // get the next error
 			nerr, isNetError := err.(net.Error)
 			switch {
+			case toss:
+				continue // if we are tossing error just loop back around.
+			case err == nil:
+				c.Logger.WithField("func", "HandleNetErrors").Errorf("Asked to handle a nil error -- should never happen")
+				continue
 			case isNetError && nerr.Timeout(): /// buffer empty
 				return
 			default:
-				// Only go offline once per handleNetErrors call
-				if !toss && !done {
-					if err != nil {
-						c.Logger.WithField("func", "HandleNetErrors").Errorf("Going offline due to -- %s", err.Error())
-					}
+				if c.state != ConnectionOffline { // Only go offline once per handleNetErrors call
+					c.Logger.WithField("func", "HandleNetErrors").Errorf("Going offline due to -- %s", err.Error())
 					c.goOffline()
 				}
 
-				done = true
+	//			done = true
 			}
-		default:
+		default: // c.Errors is now empty so we are done here ...
 			return
 		}
 	}
@@ -687,7 +742,7 @@ func (c *Connection) updateStats() {
 		c.timeLastMetrics = time.Now()
 		c.metrics.PeerAddress = c.peer.Address
 		c.metrics.PeerQuality = c.peer.QualityScore
-		c.metrics.ConnectionState = connectionStateStrings[c.state]
+		c.metrics.ConnectionState = connectionStateString(c.state)
 		c.metrics.ConnectionNotes = c.notes
 		verbose(c.peer.PeerIdent(), "updatePeer() SENDING ConnectionUpdateMetrics - Bytes Sent: %d Bytes Received: %d", c.metrics.BytesSent, c.metrics.BytesReceived)
 		BlockFreeChannelSend(c.ReceiveChannel, ConnectionCommand{Command: ConnectionUpdateMetrics, Metrics: c.metrics})
@@ -695,7 +750,7 @@ func (c *Connection) updateStats() {
 }
 
 func (c *Connection) ConnectionState() string {
-	return connectionStateStrings[c.state]
+	return connectionStateString(c.state)
 }
 
 func (c *Connection) connectionStatusReport() {
