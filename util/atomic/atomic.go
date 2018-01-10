@@ -2,7 +2,6 @@ package atomic
 
 import (
 	"sync/atomic"
-	"unsafe"
 	"sync"
 )
 
