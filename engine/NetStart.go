@@ -541,7 +541,6 @@ func startServers(load bool) {
 		var wg sync.WaitGroup
 
 		NetworkProcessorNet(fnode)
-		os.Stderr.WriteString(fmt.Sprintf("%3d\r", i))
 		go fnode.State.ValidatorLoop()
 
 		wg.Add(1)

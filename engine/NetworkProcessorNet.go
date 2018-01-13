@@ -30,7 +30,7 @@ func NetworkProcessorNet(fnode *FactomNode) {
 
 func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 	cnt := 0
-	done := false
+	done := 10
 	// ackHeight is used in ignoreMsg to determine if we should ignore an ackowledgment
 	ackHeight := uint32(0)
 	// When syncing from disk/network we want to selectivly ignore certain msgs to allow
@@ -190,9 +190,9 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 			time.Sleep(50 * time.Millisecond)
 		}
 		cnt = 0
-		if !done {
+		done--
+		if done == 0 {
 			wg.Done()
-			done = true
 		}
 	}
 }

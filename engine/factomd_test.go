@@ -67,24 +67,27 @@ func TestSetupANetwork(t *testing.T) {
 		"-enablenet=true",
 		"-blktime=15",
 		"-count=10",
-		"-logPort=37000",
-		"-port=37001",
-		"-ControlPanelPort=37002",
-		"-networkPort=37003",
+		"-logPort=32000",
+		"-port=32001",
+		"-ControlPanelPort=32002",
+		"-networkPort=32003",
 		"-startdelay=1",
 		"faulttimeout=15")
 
 	params := ParseCmdLine(args)
 	state0 := Factomd(params, false).(*state.State)
+
 	state0.MessageTally = true
-	time.Sleep(3 * time.Second)
+	time.Sleep(10 * time.Second)
 
 	t.Log("Allocated 10 nodes")
 	if len(GetFnodes()) != 10 {
-		t.Fatal("Should have allocated 10 nodes")
+		t.Error("Should have allocated 10 nodes")
 		t.Fail()
 	}
+	state1 := GetFnodes()[1].State
 
+	os.Stderr.WriteString("Ha Ha! We hate you!")
 	runCmd("s")
 	runCmd("9")
 	runCmd("x")
@@ -92,9 +95,9 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("10")
 	runCmd("8")
 	runCmd("w")
-	WaitBlocks(state0, 1)
+	WaitBlocks(state1, 1)
 	runCmd("g10")
-	WaitBlocks(state0, 3)
+	WaitBlocks(state1, 3)
 	// Allocate 4 leaders
 	WaitMinutes(state0, 3)
 
