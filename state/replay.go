@@ -174,6 +174,8 @@ func (r *Replay) Valid(mask int, hash [32]byte, timestamp interfaces.Timestamp, 
 	now := Minutes(systemtime.GetTimeSeconds())
 	t := Minutes(timestamp.GetTimeSeconds())
 
+	defer func(){fmt.Printf(">%v Replay.Valid(%x,[%x]) = %v, %v\n", atomic.Goid(), mask, hash, index, valid)}()
+
 	diff := now - t
 	// Check the timestamp to see if within 12 hours of the system time.  That not valid, we are
 	// just done without any added concerns.

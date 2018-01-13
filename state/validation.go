@@ -14,7 +14,9 @@ import (
 )
 
 func (state *State) ValidatorLoop() {
+//	time.Sleep(10*time.Second)
 	timeStruct := new(Timer)
+
 	for {
 		// Check if we should shut down.
 		select {

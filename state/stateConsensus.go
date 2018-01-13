@@ -18,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/util"
+	"github.com/FactomProject/factomd/util/atomic"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -36,8 +37,13 @@ var _ = (*hash.Hash32)(nil)
 //***************************************************************
 
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
+	fmt.Printf(">%s:%s executeMsg( %+v, %v:msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), vm, vm, msg, msg, msg.GetRepeatHash().Fixed())
 	preExecuteMsgTime := time.Now()
-	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
+	hash := msg.GetRepeatHash().Fixed()
+	index, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, hash, msg.GetTimestamp(), s.GetTimestamp())
+
+	_ = index
+
 	if !ok {
 		consenLogger.WithFields(msg.LogFields()).Debug("ExecuteMsg (Replay Invalid)")
 		return
@@ -51,8 +57,16 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			return
 		}
 	}
+    valid := msg.Validate(s)
+	fmt.Printf(">%s:%s executeMsg() start case %v :msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), valid, msg, msg, hash)
+    fmt.Printf("s.RunLeader=%v && s.Leader=%v &&	!s.Saving=%v && (vm != nil)==%v && int(vm.Height)=%v == len(vm.List)=%v && " +
+    	"(!s.Syncing=%v || !vm.Synced =%v) && 	(msg.IsLocal()=%v || (msg.GetVMIndex()=%v) == (s.LeaderVMIndex=%v) && 	(s.LeaderPL.DBHeight=%v+1) " +
+    		">= (s.GetHighestKnownBlock()=%v) && (len(vm.List)=%v) == 0\n",
+		s.RunLeader, s.Leader, 		!s.Saving, 	vm != nil, int(vm.Height), len(vm.List), !s.Syncing, !vm.Synced, msg.IsLocal(), msg.GetVMIndex(),
+			s.LeaderVMIndex, s.LeaderPL.DBHeight, s.GetHighestKnownBlock(), len(vm.List))
 
-	switch msg.Validate(s) {
+	
+	switch valid {
 	case 1:
 		if s.RunLeader &&
 			s.Leader &&
@@ -62,15 +76,21 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			(msg.IsLocal() || msg.GetVMIndex() == s.LeaderVMIndex) &&
 			s.LeaderPL.DBHeight+1 >= s.GetHighestKnownBlock() {
 			if len(vm.List) == 0 {
+				fmt.Printf(">%s:%s executeMsg() Review msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
 				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex)
 				TotalXReviewQueueInputs.Inc()
-				s.XReview = append(s.XReview, msg)
+				s.XReviewMutex.Lock()
+				s.XReview = append(s.XReview, msg) //L
+				s.XReviewMutex.Unlock()
 			} else {
+				fmt.Printf(">%s:%s executeMsg() LeaderExecute msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
 				msg.LeaderExecute(s)
 			}
 		} else {
+			fmt.Printf(">%s:%s executeMsg() FollowerExecute msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
 			msg.FollowerExecute(s)
 		}
+		fmt.Printf(">%s:%s executeMsg() Done case 1 msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
 		ret = true
 	case 0:
 		TotalHoldingQueueInputs.Inc()
@@ -209,9 +229,10 @@ emptyLoop:
 	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
 	// Process last first
+	s.XReviewMutex.Lock()
 skipreview:
 	for {
-		for _, msg := range s.XReview {
+		for _, msg := range s.XReview { //L
 			if !room() {
 				break skipreview
 			}
@@ -219,11 +240,15 @@ skipreview:
 				continue
 			}
 			process <- msg
-			progress = s.executeMsg(vm, msg) || progress
+			s.XReviewMutex.Unlock()
+			progress = s.executeMsg(vm, msg) || progress //U
+			s.XReviewMutex.Lock()
 		}
-		s.XReview = s.XReview[:0]
+		s.XReview = s.XReview[:0] //L
 		break
 	}
+	s.XReviewMutex.Unlock()
+
 	processXReviewTime := time.Since(preProcessXReviewTime)
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
@@ -264,7 +289,10 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // responsibility
 func (s *State) ReviewHolding() {
 	preReviewHoldingTime := time.Now()
-	if len(s.XReview) > 0 {
+	s.XReviewMutex.Lock()
+	l := len(s.XReview)//L
+	defer s.XReviewMutex.Unlock()
+	if l > 0 {
 		return
 	}
 
@@ -284,7 +312,8 @@ func (s *State) ReviewHolding() {
 
 	s.ResendHolding = now
 	// Anything we are holding, we need to reprocess.
-	s.XReview = make([]interfaces.IMsg, 0)
+	s.XReview = make([]interfaces.IMsg, 0) //L
+//	s.XReviewMutex.Unlock()
 
 	highest := s.GetHighestKnownBlock()
 	saved := s.GetHighestSavedBlk()
@@ -370,7 +399,9 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 		TotalXReviewQueueInputs.Inc()
-		s.XReview = append(s.XReview, v)
+//		s.XReviewMutex.Lock()
+		s.XReview = append(s.XReview, v)//L
+//		s.XReviewMutex.Unlock()
 		TotalHoldingQueueOutputs.Inc()
 	}
 	reviewHoldingTime := time.Since(preReviewHoldingTime)
@@ -739,14 +770,18 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 				if okff {
 					TotalXReviewQueueInputs.Inc()
-					s.XReview = append(s.XReview, fullFault)
+					s.XReviewMutex.Lock()
+					s.XReview = append(s.XReview, fullFault)//L
+					s.XReviewMutex.Unlock()
 				} else {
 					pl.AddToSystemList(fullFault)
 				}
 				s.MissingResponseAppliedCnt++
 			} else if pl != nil && int(fullFault.Height) >= pl.System.Height {
 				TotalXReviewQueueInputs.Inc()
-				s.XReview = append(s.XReview, fullFault)
+				s.XReviewMutex.Lock()
+				s.XReview = append(s.XReview, fullFault)//L
+				s.XReviewMutex.Unlock()
 				s.MissingResponseAppliedCnt++
 			}
 
@@ -1081,7 +1116,9 @@ func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
 	re := s.Holding[cc.CommitChain.EntryHash.Fixed()]
 	if re != nil {
 		TotalXReviewQueueInputs.Inc()
-		s.XReview = append(s.XReview, re)
+		s.XReviewMutex.Lock()
+		s.XReview = append(s.XReview, re)//L
+		s.XReviewMutex.Unlock()
 		re.SendOut(s, re)
 	}
 }
@@ -1091,7 +1128,9 @@ func (s *State) LeaderExecuteCommitEntry(m interfaces.IMsg) {
 	ce := m.(*messages.CommitEntryMsg)
 	re := s.Holding[ce.CommitEntry.EntryHash.Fixed()]
 	if re != nil {
-		s.XReview = append(s.XReview, re)
+		s.XReviewMutex.Lock()
+		s.XReview = append(s.XReview, re)//L
+		s.XReviewMutex.Unlock()
 		re.SendOut(s, re)
 	}
 }
@@ -1210,7 +1249,9 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 			entry.FollowerExecute(s)
 			entry.SendOut(s, entry)
 			TotalXReviewQueueInputs.Inc()
-			s.XReview = append(s.XReview, entry)
+			s.XReviewMutex.Lock()
+			s.XReview = append(s.XReview, entry)//L
+			s.XReviewMutex.Unlock()
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())
 		}
@@ -1227,7 +1268,7 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 	pl := s.ProcessLists.Get(dbheight)
 	pl.EntryCreditBlock.GetBody().AddEntry(c.CommitEntry)
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitEntry); e == nil {
-		// save the Commit to match agains the Reveal later
+		// save the Commit to match against the Reveal later
 		h := c.CommitEntry.EntryHash
 		s.PutCommit(h, c)
 		entry := s.Holding[h.Fixed()]
@@ -1235,7 +1276,9 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 			entry.FollowerExecute(s)
 			entry.SendOut(s, entry)
 			TotalXReviewQueueInputs.Inc()
-			s.XReview = append(s.XReview, entry)
+			s.XReviewMutex.Lock()
+			s.XReview = append(s.XReview, entry)//L
+			s.XReviewMutex.Unlock()
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())
 		}
@@ -1529,9 +1572,9 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.DBSigProcessed = 0
 
 			// Note about dbsigs.... If we processed the previous minute, then we generate the DBSig for the next block.
-			// But if we didn't process the preivious block, like we start from scratch, or we had to reset the entire
+			// But if we didn't process the previous block, like we start from scratch, or we had to reset the entire
 			// network, then no dbsig exists.  This code doesn't execute, and so we have no dbsig.  In that case, on
-			// the next EOM, we see the block hasn't been signed, and we sign the block (Thats the call to SendDBSig()
+			// the next EOM, we see the block hasn't been signed, and we sign the block (That is the call to SendDBSig()
 			// above).
 			pldbs := s.ProcessLists.Get(s.LLeaderHeight)
 			if s.Leader && !pldbs.DBSigAlreadySent {

@@ -289,7 +289,9 @@ func messageLists(fnodes []*State) string {
 
 	list = ""
 	for _, f := range fnodes {
-		list = list + fmt.Sprintf(" %3d", len(f.XReview))
+		f.XReviewMutex.Lock()
+		list = list + fmt.Sprintf(" %3d", len(f.XReview))//L
+		f.XReviewMutex.Unlock()
 	}
 	prt = prt + fmt.Sprintf(fmtstr, "Review", list)
 

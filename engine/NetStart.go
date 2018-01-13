@@ -222,7 +222,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	go StartProfiler(p.memProfileRate, p.exposeProfiling)
 
 	s.AddPrefix(p.prefix)
-	s.SetOut(false)
+	s.SetOut(true)
 	s.Init()
 	s.SetDropRate(p.DropRate)
 
@@ -365,7 +365,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		p2pProxy.SetDebugMode(p.Netdebug)
 		if 0 < p.Netdebug {
 			go p2pProxy.PeriodicStatusReport(fnodes)
-			p2pNetwork.StartLogging(uint32(p.Netdebug))
+			p2pNetwork.StartLogging(uint8(p.Netdebug))
 		} else {
 			p2pNetwork.StartLogging(0)
 		}

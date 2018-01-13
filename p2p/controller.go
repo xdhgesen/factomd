@@ -147,7 +147,7 @@ func (e *CommandDisconnect) String() string {
 
 // CommandChangeLogging is used to instruct the Controller to takve various actions.
 type CommandChangeLogging struct {
-	Level uint32
+	Level uint8
 }
 
 func (e *CommandChangeLogging) JSONByte() ([]byte, error) {
@@ -232,14 +232,14 @@ func (c *Controller) DialSpecialPeersString(peersString string) {
 	}
 }
 
-func (c *Controller) StartLogging(level uint32) {
+func (c *Controller) StartLogging(level uint8) {
 	BlockFreeChannelSend(c.commandChannel, CommandChangeLogging{Level: level})
 }
 func (c *Controller) StopLogging() {
 	level := Silence
 	BlockFreeChannelSend(c.commandChannel, CommandChangeLogging{Level: level})
 }
-func (c *Controller) ChangeLogLevel(level uint32) {
+func (c *Controller) ChangeLogLevel(level uint8) {
 	BlockFreeChannelSend(c.commandChannel, CommandChangeLogging{Level: level})
 }
 
@@ -577,7 +577,7 @@ func (c *Controller) handleCommand(command interface{}) {
 		c.shutdown()
 	case CommandChangeLogging:
 		parameters := command.(CommandChangeLogging)
-		atomic.StoreUint32(&CurrentLoggingLevelVar, uint32(parameters.Level)) // really a uint8 but still got reported as a race...
+		CurrentLoggingLevelVar.Store(parameters.Level) // really a uint8 but still got reported as a race...
 	case CommandAdjustPeerQuality:
 		parameters := command.(CommandAdjustPeerQuality)
 		peerHash := parameters.PeerHash
@@ -734,7 +734,7 @@ func (c *Controller) shutdown() {
 
 func (c *Controller) networkStatusReport() {
 	durationSinceLastReport := time.Since(c.lastStatusReport)
-	note("ctrlr", "networkStatusReport() NetworkStatusInterval: %s durationSinceLastReport: %s c.lastStatusReport: %s", NetworkStatusInterval.String(), durationSinceLastReport.String(), c.lastStatusReport.String())
+	//note("ctrlr", "networkStatusReport() NetworkStatusInterval: %s durationSinceLastReport: %s c.lastStatusReport: %s", NetworkStatusInterval.String(), durationSinceLastReport.String(), c.lastStatusReport.String())
 	if durationSinceLastReport > NetworkStatusInterval {
 		c.lastStatusReport = time.Now()
 		c.updateConnectionCounts()

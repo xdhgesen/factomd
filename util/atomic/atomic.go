@@ -71,13 +71,13 @@ type AtomicString struct {
 	mu sync.Mutex
 }
 
-func (a AtomicString) Store(x string) {
+func (a *AtomicString) Store(x string) {
 	a.mu.Lock()
 	a.s = x
 	a.mu.Unlock()
 }
 
-func (a AtomicString) Load() string {
+func (a *AtomicString) Load() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.s
@@ -96,8 +96,6 @@ func main() {
 }
 */
 
-// Hacky debugging stuff... probably not a great home for it
-
 func Goid() string {
 	var buf [64]byte
 	n := runtime.Stack(buf[:], false)
@@ -108,7 +106,7 @@ func Goid() string {
 
 func WhereAmIString(msg string, depth int) string {
 	_, fn, line, _ := runtime.Caller(depth)
-	return fmt.Sprintf("%10v [%s] %s:%d", Goid(), msg, fn, line)
+	return fmt.Sprintf("[%s]%v-%s:%d", msg, Goid(),  fn, line)
 }
 
 func WhereAmI(msg string, depth int) {
@@ -124,12 +122,12 @@ type DebugMutex struct {
 
 var yeaOfLittleFaith1 AtomicBool = AtomicBool(1) // true means mutex lock instead of CAS lock
 var yeaOfLittleFaith2 AtomicBool = AtomicBool(0) //  true mean mutex lock inside of CAS lock
-var enableStarvationDetection AtomicBool = AtomicBool(0)
+var enableStarvationDetection AtomicBool = AtomicBool(1)
 
 func (c *DebugMutex) lockCAS() {
 	b := atomic.CompareAndSwapInt32(&c.lock, 0, 1) // set lock to 1 iff it is 0
 	if (!b) {
-		WhereAmI("\n"+c.name.Load()+":Already Locked", 4)
+		WhereAmI(c.name.Load()+":Already Locked", 3)
 		if enableStarvationDetection.Load() {
 			// Make a timer to whine if I am starving!
 			done := make(chan struct{})
@@ -144,7 +142,7 @@ func (c *DebugMutex) lockCAS() {
 							//						fmt.Printf("+")
 						}
 					}
-					WhereAmI("\n"+c.name.Load()+":Lock starving!\n", 4)
+					WhereAmI(c.name.Load()+":Lock starving!\n", 3)
 				}
 			}()
 			defer func() { done <- struct{}{} }() // End the timer when I get the lock
@@ -164,7 +162,7 @@ func (c *DebugMutex) lockCAS() {
 	}
 	// set the name of the lockBool the first time it is acquired
 	if (c.name.Load() == "") {
-		c.name.Store(WhereAmIString("DebugMutex ", 2))
+		c.name.Store(WhereAmIString("DebugMutex ", 3))
 	}
 }
 
@@ -174,7 +172,7 @@ func (c *DebugMutex) unlockCAS() {
 	}
 	b := atomic.CompareAndSwapInt32(&c.lock, 1, 0) // set lock to 0 iff it is 1
 	if (!b) {
-		WhereAmI("\n"+c.name.Load()+"Already Unlocked:", 4)
+		WhereAmI(c.name.Load()+":Already Unlocked", 3)
 		panic("Double Unlock")
 	}
 }
@@ -182,8 +180,8 @@ func (c *DebugMutex) unlockCAS() {
 // try and detect bad behaviors using a traditional lock
 func (c *DebugMutex) lockMutex() {
 	if (c.lockBool.Load()) {
-		WhereAmI("\n"+c.name.Load()+":Already Locked", 4)
-		if enableStarvationDetection.Load() {
+		WhereAmI(c.name.Load()+":Already Locked", 3)
+		if enableStarvationDetection.Load() || true {
 			// Make a timer to whine if I am starving!
 			done := make(chan struct{})
 			go func() {
@@ -196,7 +194,8 @@ func (c *DebugMutex) lockMutex() {
 							time.Sleep(100 * time.Millisecond)
 						}
 					}
-					WhereAmI("\n"+c.name.Load()+" Lock starving!\n", 2)
+					time.Sleep(100 * time.Millisecond)
+					WhereAmI(c.name.Load()+":Lock starving!\n", 3)
 				}
 			}()
 			defer func() { done <- struct{}{} }() // End the timer when I get the lockBool
@@ -213,7 +212,7 @@ func (c *DebugMutex) lockMutex() {
 }
 func (c *DebugMutex) unlockMutex() {
 	if (c.lockBool.Load() == false) {
-		WhereAmI("\n"+c.name.Load()+"Already Unlocked:", 4)
+		WhereAmI(c.name.Load()+":Already Unlocked", 3)
 		panic("Double Unlock")
 	}
 	c.lockBool.Store(false)
@@ -276,3 +275,4 @@ func main() {
 		fmt.Println("\nMain loop done")
 	}
 }
+

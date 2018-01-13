@@ -140,6 +140,7 @@ func (m *DBStateMsg) GetTimestamp() interfaces.Timestamp {
 // NOTE! Do no return 0, that sticks this message in the holding map, vs the DBStateList
 // 			ValidateSignatures is called when actually applying the DBState.
 func (m *DBStateMsg) Validate(state interfaces.IState) int {
+
 	// No matter what, a block has to have what a block has to have.
 	if m.DirectoryBlock == nil || m.AdminBlock == nil || m.FactoidBlock == nil || m.EntryCreditBlock == nil {
 		state.AddStatus(fmt.Sprintf("DBStateMsg.Validate() Fail  Doesn't have all the blocks"))

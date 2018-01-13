@@ -10,6 +10,11 @@ import (
 
 func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 	out := ""
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Printf("printSummary:Panic caught: %v\n", r)
+		}
+	}()
 
 	if *listenTo < 0 || *listenTo >= len(fnodes) {
 		return
@@ -106,7 +111,9 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 		list = ""
 		for _, f := range pnodes {
-			list = list + fmt.Sprintf(" %3d", len(f.State.XReview))
+			f.State.XReviewMutex.Lock()
+			list = list + fmt.Sprintf(" %3d", len(f.State.XReview))//L
+			f.State.XReviewMutex.Unlock()
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "Review", list)
 

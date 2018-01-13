@@ -96,7 +96,7 @@ func TestSetupANetwork(t *testing.T) {
 			}
 		}
 		endTimeout := func() { done <- struct{}{} }
-		go timeout(30, 10)
+		go timeout(630, 10)
 		defer endTimeout()
 	}
 	nodeCount := 10
@@ -123,7 +123,7 @@ func TestSetupANetwork(t *testing.T) {
 	params := ParseCmdLine(args)
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
-	time.Sleep(3 * time.Second)
+	time.Sleep(15 * time.Second)
 
 	t.Logf("Allocated %d nodes", nodeCount)
 	if len(GetFnodes()) != nodeCount {
