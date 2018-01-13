@@ -35,13 +35,15 @@ var _ = (*hash.Hash32)(nil)
 //
 // Returns true if some message was processed.
 //***************************************************************
+var executeMsg_debug bool = false
 
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
-	fmt.Printf(">%s:%s executeMsg( %+v, %v:msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), vm, vm, msg, msg, msg.GetRepeatHash().Fixed())
 	preExecuteMsgTime := time.Now()
 	hash := msg.GetRepeatHash().Fixed()
 	index, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, hash, msg.GetTimestamp(), s.GetTimestamp())
-
+	if executeMsg_debug {
+		fmt.Printf(">%7s:%14s executeMsg( vm=%12p, msg:%T:%p) valid=%v, index=%v [%x]\n", s.FactomNodeName, atomic.Goid(), vm, msg, msg, ok, index, hash)
+	}
 	_ = index
 
 	if !ok {
@@ -57,46 +59,68 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			return
 		}
 	}
-    valid := msg.Validate(s)
-	fmt.Printf(">%s:%s executeMsg() start case %v :msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), valid, msg, msg, hash)
-    fmt.Printf("s.RunLeader=%v && s.Leader=%v &&	!s.Saving=%v && (vm != nil)==%v && int(vm.Height)=%v == len(vm.List)=%v && " +
-    	"(!s.Syncing=%v || !vm.Synced =%v) && 	(msg.IsLocal()=%v || (msg.GetVMIndex()=%v) == (s.LeaderVMIndex=%v) && 	(s.LeaderPL.DBHeight=%v+1) " +
-    		">= (s.GetHighestKnownBlock()=%v) && (len(vm.List)=%v) == 0\n",
-		s.RunLeader, s.Leader, 		!s.Saving, 	vm != nil, int(vm.Height), len(vm.List), !s.Syncing, !vm.Synced, msg.IsLocal(), msg.GetVMIndex(),
-			s.LeaderVMIndex, s.LeaderPL.DBHeight, s.GetHighestKnownBlock(), len(vm.List))
+	valid := msg.Validate(s)
+	if executeMsg_debug && false {
+		fmt.Printf("> s.RunLeader=%v &&", s.RunLeader)
+		fmt.Printf("s.Leader=%v && ", s.Leader)
+		fmt.Printf("!s.Saving=%v && ", !s.Saving)
+		fmt.Printf("(vm != nil)==%v && ", vm != nil)
+		if (vm != nil) {
+			fmt.Printf("(int(vm.Height)=%v == ", int(vm.Height))
+			fmt.Printf("len(vm.List)=%v && )", len(vm.List))
+			fmt.Printf("!s.Syncing=%v || ", !s.Syncing)
+			fmt.Printf("(!vm.Synced=%v) &&  ", !vm.Synced)
+			fmt.Printf("(msg.IsLocal()=%v || ", msg.IsLocal())
+			fmt.Printf("(msg.GetVMIndex()=%v) == ", msg.GetVMIndex())
+			fmt.Printf("(s.LeaderVMIndex=%v) && ", s.LeaderVMIndex)
+			fmt.Printf("(s.LeaderPL.DBHeight=%v+1) >= ", s.LeaderPL.DBHeight)
+			fmt.Printf("(s.GetHighestKnownBlock()=%v)\n", s.GetHighestKnownBlock())
+		} else {
+			fmt.Printf((" NIL!!!\n"))
+		}
+	}
 
-	
 	switch valid {
 	case 1:
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving &&
-			vm != nil && int(vm.Height) == len(vm.List) &&
-			(!s.Syncing || !vm.Synced) &&
-			(msg.IsLocal() || msg.GetVMIndex() == s.LeaderVMIndex) &&
-			s.LeaderPL.DBHeight+1 >= s.GetHighestKnownBlock() {
+		if executeMsg_debug {
+			fmt.Printf(">%7s:%14s executeMsg() case 1:        msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, hash)
+		}
+		// Should comment this as to why each consideration is interesting-- clay
+		if s.RunLeader && s.Leader && !s.Saving && vm != nil && int(vm.Height) == len(vm.List) && (!s.Syncing || !vm.Synced) &&
+			(msg.IsLocal() || msg.GetVMIndex() == s.LeaderVMIndex) && s.LeaderPL.DBHeight+1 >= s.GetHighestKnownBlock() {
 			if len(vm.List) == 0 {
-				fmt.Printf(">%s:%s executeMsg() Review msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
+				if executeMsg_debug {
+					fmt.Printf(">%7s:%14s executeMsg() Review:        msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, hash)
+				}
 				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex)
 				TotalXReviewQueueInputs.Inc()
 				s.XReviewMutex.Lock()
 				s.XReview = append(s.XReview, msg) //L
 				s.XReviewMutex.Unlock()
 			} else {
-				fmt.Printf(">%s:%s executeMsg() LeaderExecute msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
+				if executeMsg_debug {
+					fmt.Printf(">%7s:%14s executeMsg() LeaderExec:    msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, hash)
+				}
 				msg.LeaderExecute(s)
 			}
 		} else {
-			fmt.Printf(">%s:%s executeMsg() FollowerExecute msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
+			if executeMsg_debug {
+				fmt.Printf(">%7s:%14s executeMsg() FollowerExec:  msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, hash)
+			}
 			msg.FollowerExecute(s)
 		}
-		fmt.Printf(">%s:%s executeMsg() Done case 1 msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, msg.GetRepeatHash().Fixed())
 		ret = true
 	case 0:
+		if executeMsg_debug {
+			fmt.Printf(">%7s:%14s executeMsg() Case 0:        msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, hash)
+		}
 		TotalHoldingQueueInputs.Inc()
 		TotalHoldingQueueRecycles.Inc()
 		s.Holding[msg.GetMsgHash().Fixed()] = msg
 	default:
+		if executeMsg_debug {
+			fmt.Printf(">%7s:%14s executeMsg() default:       msg:%T:%p [%x]\n", s.FactomNodeName, atomic.Goid(), msg, msg, hash)
+		}
 		TotalHoldingQueueInputs.Inc()
 		TotalHoldingQueueRecycles.Inc()
 		s.Holding[msg.GetMsgHash().Fixed()] = msg
@@ -290,7 +314,7 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 	preReviewHoldingTime := time.Now()
 	s.XReviewMutex.Lock()
-	l := len(s.XReview)//L
+	l := len(s.XReview) //L
 	defer s.XReviewMutex.Unlock()
 	if l > 0 {
 		return
@@ -313,7 +337,7 @@ func (s *State) ReviewHolding() {
 	s.ResendHolding = now
 	// Anything we are holding, we need to reprocess.
 	s.XReview = make([]interfaces.IMsg, 0) //L
-//	s.XReviewMutex.Unlock()
+	//	s.XReviewMutex.Unlock()
 
 	highest := s.GetHighestKnownBlock()
 	saved := s.GetHighestSavedBlk()
@@ -399,9 +423,9 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 		TotalXReviewQueueInputs.Inc()
-//		s.XReviewMutex.Lock()
-		s.XReview = append(s.XReview, v)//L
-//		s.XReviewMutex.Unlock()
+		//		s.XReviewMutex.Lock()
+		s.XReview = append(s.XReview, v) //L
+		//		s.XReviewMutex.Unlock()
 		TotalHoldingQueueOutputs.Inc()
 	}
 	reviewHoldingTime := time.Since(preReviewHoldingTime)
@@ -771,7 +795,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 				if okff {
 					TotalXReviewQueueInputs.Inc()
 					s.XReviewMutex.Lock()
-					s.XReview = append(s.XReview, fullFault)//L
+					s.XReview = append(s.XReview, fullFault) //L
 					s.XReviewMutex.Unlock()
 				} else {
 					pl.AddToSystemList(fullFault)
@@ -780,7 +804,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 			} else if pl != nil && int(fullFault.Height) >= pl.System.Height {
 				TotalXReviewQueueInputs.Inc()
 				s.XReviewMutex.Lock()
-				s.XReview = append(s.XReview, fullFault)//L
+				s.XReview = append(s.XReview, fullFault) //L
 				s.XReviewMutex.Unlock()
 				s.MissingResponseAppliedCnt++
 			}
@@ -1117,7 +1141,7 @@ func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
 	if re != nil {
 		TotalXReviewQueueInputs.Inc()
 		s.XReviewMutex.Lock()
-		s.XReview = append(s.XReview, re)//L
+		s.XReview = append(s.XReview, re) //L
 		s.XReviewMutex.Unlock()
 		re.SendOut(s, re)
 	}
@@ -1129,7 +1153,7 @@ func (s *State) LeaderExecuteCommitEntry(m interfaces.IMsg) {
 	re := s.Holding[ce.CommitEntry.EntryHash.Fixed()]
 	if re != nil {
 		s.XReviewMutex.Lock()
-		s.XReview = append(s.XReview, re)//L
+		s.XReview = append(s.XReview, re) //L
 		s.XReviewMutex.Unlock()
 		re.SendOut(s, re)
 	}
@@ -1250,7 +1274,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 			entry.SendOut(s, entry)
 			TotalXReviewQueueInputs.Inc()
 			s.XReviewMutex.Lock()
-			s.XReview = append(s.XReview, entry)//L
+			s.XReview = append(s.XReview, entry) //L
 			s.XReviewMutex.Unlock()
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())
@@ -1277,7 +1301,7 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 			entry.SendOut(s, entry)
 			TotalXReviewQueueInputs.Inc()
 			s.XReviewMutex.Lock()
-			s.XReview = append(s.XReview, entry)//L
+			s.XReview = append(s.XReview, entry) //L
 			s.XReviewMutex.Unlock()
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())

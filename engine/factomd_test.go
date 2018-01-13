@@ -300,7 +300,7 @@ func TestBasicSetup(t *testing.T) {
 	}
 	endTimeout := func() { done <- struct{}{} }
 
-	nodeCount := 3
+	nodeCount := 1
 	expectedLeaderCount := nodeCount / 2
 	expectedAuditCount := expectedLeaderCount + 1
 
