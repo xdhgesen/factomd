@@ -9,13 +9,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"math"
 	"os"
-	"time"
 	"sync"
-	log "github.com/sirupsen/logrus"
+	"time"
 
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -25,9 +26,8 @@ import (
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
-	"github.com/FactomProject/factomd/wsapi"
 	"github.com/FactomProject/factomd/util/atomic"
-	"github.com/FactomProject/factomd/common/constants"
+	"github.com/FactomProject/factomd/wsapi"
 )
 
 var _ = fmt.Print
@@ -49,7 +49,7 @@ var logPort string
 func GetFnodes() []*FactomNode {
 	fnodesMu.Lock()
 	defer fnodesMu.Unlock()
-	for (fnodes == nil) { // wait for it to be allocated
+	for fnodes == nil { // wait for it to be allocated
 		fnodesMu.Unlock()
 		time.Sleep(50 * time.Millisecond)
 		fnodesMu.Lock()
@@ -367,7 +367,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		p2pProxy.SetDebugMode(p.Netdebug)
 		if 0 < p.Netdebug {
 			go p2pProxy.PeriodicStatusReport(fnodes)
-			p2pNetwork.StartLogging(uint32(p.Netdebug))
+			p2pNetwork.StartLogging(uint8(p.Netdebug))
 		} else {
 			p2pNetwork.StartLogging(0)
 		}
@@ -536,7 +536,7 @@ func makeServer(s *state.State) *FactomNode {
 	// fnodesMu is already locked...
 	if len(fnodes) > 0 {
 		newState = s.Clone(len(fnodes)).(*state.State)
-		time.Sleep(10 * time.Millisecond)
+//		time.Sleep(10 * time.Millisecond)
 		newState.Init()
 	}
 
@@ -557,7 +557,7 @@ func startServers(load bool) {
 		var wg sync.WaitGroup
 
 		NetworkProcessorNet(fnode)
-		
+
 		go fnode.State.ValidatorLoop()
 
 		wg.Add(1)
@@ -570,7 +570,7 @@ func startServers(load bool) {
 		wg.Wait()
 
 		if load {
-			go state.LoadDatabase(fnode.State, &wg)
+			go state.LoadDatabase(fnode.State)
 		}
 	}
 }

@@ -82,10 +82,9 @@ func (state *State) ValidatorLoop() {
 			}
 		}
 
-		// Update the part of state used by EntrySync TODO: Make this a channel
-		state.HighestKnownBlock     = state.GetHighestKnownBlock()
-		state.LLeaderHeight         = state.GetLeaderHeight()
-
+		// Update the part of state used by EntrySync
+		state.HighestKnownBlock = state.GetHighestKnownBlock()
+		state.HighestSavedBlk = state.GetHighestSavedBlk()
 	}
 }
 

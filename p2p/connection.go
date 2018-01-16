@@ -8,15 +8,16 @@ package p2p
 import (
 	"encoding/gob"
 	"fmt"
+	"github.com/FactomProject/factomd/common/primitives"
 	"hash/crc32"
 	"net"
 	"os"
 	"time"
-	"github.com/FactomProject/factomd/common/primitives"
 
 	atomic2 "github.com/FactomProject/factomd/util/atomic"
 	log "github.com/sirupsen/logrus"
 )
+
 // conLogger is the general logger for all connection related logs. You can add additional fields,
 // or create more context loggers off of this
 var conLogger = packageLogger.WithFields(log.Fields{"subpack": "connection"})
@@ -134,12 +135,12 @@ func (e *ConnectionCommand) String() string {
 
 // These are the commands that connections can send/receive
 const (
-	ConnectionIsClosed          uint8 = iota // Notifies the controller that we are shut down and can be released
+	ConnectionIsClosed uint8 = iota // Notifies the controller that we are shut down and can be released
 	ConnectionShutdownNow
 	ConnectionUpdatingPeer
 	ConnectionAdjustPeerQuality
 	ConnectionUpdateMetrics
-	ConnectionGoOffline          // Notifies the connection it should go offinline (eg from another goroutine)
+	ConnectionGoOffline // Notifies the connection it should go offinline (eg from another goroutine)
 )
 
 //////////////////////////////
@@ -275,7 +276,7 @@ func (c *Connection) runLoop() {
 		switch c.state {
 		case ConnectionInitialized:
 			p2pConnectionRunLoopInitalized.Inc()
-			if MinumumQualityScore > c.peer.QualityScore && !c.isPersistent {
+			if MinimumQualityScore > c.peer.QualityScore && !c.isPersistent {
 				c.updatePeer() // every PeerSaveInterval * 0.90 we send an update peer to the controller.
 				c.goShutdown()
 			} else {
@@ -288,7 +289,7 @@ func (c *Connection) runLoop() {
 				c.updatePeer() // every PeerSaveInterval * 0.90 we send an update peer to the controller.
 			}
 
-			if MinumumQualityScore > c.peer.QualityScore && !c.isPersistent {
+			if MinimumQualityScore > c.peer.QualityScore && !c.isPersistent {
 				c.updatePeer() // every PeerSaveInterval * 0.90 we send an update peer to the controller.
 				c.goShutdown()
 			}
@@ -471,10 +472,10 @@ func (c *Connection) handleCommand() {
 			delta := command.Delta
 			note(c.peer.PeerIdent(), "handleCommand() ConnectionAdjustPeerQuality: Current Score: %d Delta: %d", c.peer.QualityScore, delta)
 			c.peer.QualityScore = c.peer.QualityScore + delta
-			if MinumumQualityScore > c.peer.QualityScore {
+			if MinimumQualityScore > c.peer.QualityScore {
 				debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s for quality score: %d", c.peer.PeerIdent(), c.peer.QualityScore)
 				c.updatePeer()
-				c.setNotes(fmt.Sprintf("Connection(%s) shutting down due to QualityScore %d being below MinumumQualityScore: %d.", c.peer.AddressPort(), c.peer.QualityScore, MinumumQualityScore))
+				c.setNotes(fmt.Sprintf("Connection(%s) shutting down due to QualityScore %d being below MinimumQualityScore: %d.", c.peer.AddressPort(), c.peer.QualityScore, MinimumQualityScore))
 				c.goShutdown()
 			}
 		case ConnectionGoOffline:
@@ -537,7 +538,7 @@ func (c *Connection) processReceives() {
 
 			// c.conn.SetReadDeadline(time.Now().Add(NetworkDeadline))
 			decoder := c.decoder
-			if (decoder != nil) {
+			if decoder != nil {
 				c.unlock()
 				err := decoder.Decode(&message)
 				c.lock()
@@ -638,8 +639,8 @@ func (c *Connection) handleParcel(parcel Parcel) {
 // These constants support the multiple penalties and responses for Parcel validation
 const (
 	ParcelValid           uint8 = iota
-	InvalidPeerDemerit     // The peer sent an invalid message
-	InvalidDisconnectPeer  // Eg they are on the wrong network or wrong version of the software
+	InvalidPeerDemerit          // The peer sent an invalid message
+	InvalidDisconnectPeer       // Eg they are on the wrong network or wrong version of the software
 )
 
 func (c *Connection) parcelValidity(parcel Parcel) uint8 {
@@ -649,7 +650,7 @@ func (c *Connection) parcelValidity(parcel Parcel) uint8 {
 	case parcel.Header.NodeID == NodeID: // We are talking to ourselves!
 		parcel.Trace("Connection.isValidParcel()-loopback", "H")
 		c.setNotes(fmt.Sprintf("Connection.isValidParcel(), failed due to loopback!: %+v", parcel.Header))
-		c.peer.QualityScore = MinumumQualityScore - 50 // Ban ourselves for a week
+		c.peer.QualityScore = MinimumQualityScore - 50 // Ban ourselves for a week
 		return InvalidDisconnectPeer
 	case parcel.Header.Network != CurrentNetwork:
 		parcel.Trace("Connection.isValidParcel()-network", "H")

@@ -46,6 +46,12 @@ var _ interfaces.IState = (*State)(nil)
 var packageLogger = log.WithFields(log.Fields{"package": "state"})
 
 type State struct {
+    StateOnly // Keeep all the names on the same level so the compiler will kick us if there s a conflict
+	ShareWithEntrySyncStatic // All the info needed by entrySync() thread that is static
+	ShareWithEntrySync       // All the info needed by entrySync() thread
+} // struct State {...}
+
+type StateOnly struct {
 	Logger            *log.Entry
 	IsRunning         bool
 	filename          string
@@ -184,7 +190,6 @@ type State struct {
 	IgnoreDone    bool
 	IgnoreMissing bool
 
-	LLeaderHeight   uint32
 	Leader          bool
 	LeaderVMIndex   int
 	LeaderPL        *ProcessList
@@ -347,10 +352,7 @@ type State struct {
 	HighestCompletedTorrent uint32
 	FastBoot                bool
 	FastBootLocation        string
-
-	ShareWithEntrySyncStatic // All the info needed by entrySync() thread that is static
-	ShareWithEntrySync       // All the info needed by entrySync() thread
-} // struct State {...}
+}
 
 type ShareWithEntrySyncStatic struct {
 

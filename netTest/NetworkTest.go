@@ -6,17 +6,18 @@ package main
 import (
 	"flag"
 	"fmt"
+	"math/rand"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/p2p"
-	"math/rand"
-	"net/http"
-	"os"
-	"strings"
-	"sync"
-	"time"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var p2pProxy *engine.P2PProxy
@@ -62,7 +63,7 @@ func InitNetwork() {
 	name = *namePtr
 	port := *networkPortOverridePtr
 	peers := *peersPtr
-	netdebug := *netdebugPtr
+	netdebug := uint8(*netdebugPtr)
 	exclusive := *exclusivePtr
 	logPort = *logportPtr
 	p2p.NetworkDeadline = time.Duration(*deadlinePtr) * time.Millisecond
@@ -100,12 +101,12 @@ func InitNetwork() {
 	p2pProxy = new(engine.P2PProxy).Init("testnode", "P2P Network").(*engine.P2PProxy)
 	p2pProxy.FromNetwork = p2pNetwork.FromNetwork
 	p2pProxy.ToNetwork = p2pNetwork.ToNetwork
-	p2pProxy.SetDebugMode(netdebug)
+	p2pProxy.SetDebugMode(int(netdebug))
 
 	if netdebug > 0 {
-		p2pNetwork.StartLogging(uint32(netdebug))
+		p2pNetwork.StartLogging(netdebug)
 	} else {
-		p2pNetwork.StartLogging(uint32(0))
+		p2pNetwork.StartLogging(0)
 	}
 	p2pProxy.StartProxy()
 	// Command line peers lets us manually set special peers
@@ -148,7 +149,7 @@ func SetMsg(msg interfaces.IMsg) {
 
 func listen() {
 	for {
-		msg, err := p2pProxy.Recieve()
+		msg, err := p2pProxy.Receive()
 		if err != nil || msg == nil {
 			time.Sleep(1 * time.Millisecond)
 			continue

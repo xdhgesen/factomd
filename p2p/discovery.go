@@ -8,6 +8,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"github.com/FactomProject/factomd/util/atomic"
 	"math/rand"
 	"net/http"
 	"os"
@@ -15,7 +16,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"github.com/FactomProject/factomd/util/atomic"
 )
 
 type Discovery struct {
@@ -118,8 +118,8 @@ func (d *Discovery) SavePeers() {
 		case time.Since(peer.LastContact) > time.Hour*168:
 			note("discovery", "SavePeers() DID NOT SAVE peer in peers.json. Last Contact greater than 168 hours. Peer: %+v", peer)
 			break
-		case MinumumQualityScore > peer.QualityScore:
-			note("discovery", "SavePeers() DID NOT SAVE peer in peers.json. MinimumQualityScore: %d > Peer quality score.  Peer: %+v", MinumumQualityScore, peer)
+		case MinimumQualityScore > peer.QualityScore:
+			note("discovery", "SavePeers() DID NOT SAVE peer in peers.json. MinimumQualityScore: %d > Peer quality score.  Peer: %+v", MinimumQualityScore, peer)
 			break
 		default:
 			qualityPeers[peer.AddressPort()] = peer
@@ -266,7 +266,7 @@ func (d *Discovery) getPeerSelection() []byte {
 	specialPeersByLocation := map[uint32]Peer{}
 	UpdateKnownPeers.Lock()
 	for _, peer := range d.knownPeers {
-		if peer.QualityScore > MinumumSharingQualityScore { // Only share peers that have earned positive reputation
+		if peer.QualityScore > MinimumSharingQualityScore { // Only share peers that have earned positive reputation
 			firstPassPeers = append(firstPassPeers, peer)
 		}
 	}

@@ -251,7 +251,10 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 				}
 			}
 
-			db := ss.GetDirectoryBlockByHeight(scan)
+			db, err := ss.DB.FetchDBlockByHeight(scan) // Get the directory block
+			if err != nil {
+				fmt.Printf("ERROR: %v\n", err)
+			}
 
 			// Wait for the database if we have to
 			for db == nil {
