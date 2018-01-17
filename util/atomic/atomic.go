@@ -95,7 +95,7 @@ func Goid() string {
 }
 
 func WhereAmIString(msg string, depth int) string {
-	_, fn, line, _ := runtime.Caller(depth)
+	_, fn, line, _ := runtime.Caller(depth+1)
 	return fmt.Sprintf("[%s]%v-%s:%d", msg, Goid(),  fn, line)
 }
 
@@ -118,7 +118,7 @@ var enableAlreadyLockedDetection AtomicBool = AtomicBool(0)
 func (c *DebugMutex) lockCAS() {
 	b := atomic.CompareAndSwapInt32(&c.lock, 0, 1) // set lock to 1 iff it is 0
 	if (!b) {
-		if enableAlreadyLockedDetection.Load(){WhereAmI(c.name.Load()+":Already Locked", 3)}
+		if enableAlreadyLockedDetection.Load(){WhereAmI(c.name.Load()+":Already Locked", 2)}
 		if enableStarvationDetection.Load() {
 			// Make a timer to whine if I am starving!
 			done := make(chan struct{})
@@ -133,7 +133,7 @@ func (c *DebugMutex) lockCAS() {
 							//						fmt.Printf("+")
 						}
 					}
-					WhereAmI(c.name.Load()+":Lock starving!\n", 3)
+					WhereAmI(c.name.Load()+":Lock starving!\n", 2)
 					// should set a flag if I starve and report when I get the lock
 				}
 			}()
@@ -154,7 +154,7 @@ func (c *DebugMutex) lockCAS() {
 	}
 	// set the name of the lockBool the first time it is acquired
 	if c.name.Load() == "" {
-		c.name.Store(WhereAmIString("DebugMutex ", 3))
+		c.name.Store(WhereAmIString("DebugMutex ", 2))
 	}
 }
 
@@ -164,7 +164,7 @@ func (c *DebugMutex) unlockCAS() {
 	}
 	b := atomic.CompareAndSwapInt32(&c.lock, 1, 0) // set lock to 0 iff it is 1
 	if !b {
-		WhereAmI(c.name.Load()+":Already Unlocked", 3)
+		WhereAmI(c.name.Load()+":Already Unlocked", 2)
 		panic("Double Unlock")
 	}
 }
@@ -173,7 +173,7 @@ func (c *DebugMutex) unlockCAS() {
 func (c *DebugMutex) lockMutex() {
 	if c.lockBool.Load() {
 		if enableAlreadyLockedDetection.Load() {
-			WhereAmI(c.name.Load()+":Already Locked", 3)
+			WhereAmI(c.name.Load()+":Already Locked", 2)
 		}
 		if enableStarvationDetection.Load() {
 			// Make a timer to whine if I am starving!
@@ -188,7 +188,7 @@ func (c *DebugMutex) lockMutex() {
 							time.Sleep(3 * time.Millisecond)
 						}
 					}
-					WhereAmI(c.name.Load()+":Lock starving!\n", 3)
+					WhereAmI(c.name.Load()+":Lock starving!\n", 2)
 				}
 			}()
 			defer func() { done <- struct{}{} }() // End the timer when I get the lockBool
@@ -205,7 +205,7 @@ func (c *DebugMutex) lockMutex() {
 }
 func (c *DebugMutex) unlockMutex() {
 	if c.lockBool.Load() == false {
-		WhereAmI(c.name.Load()+":Already Unlocked", 3)
+		WhereAmI(c.name.Load()+":Already Unlocked", 2)
 		panic("Double Unlock")
 	}
 	c.lockBool.Store(false)

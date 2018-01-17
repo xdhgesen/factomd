@@ -11,11 +11,21 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 func (state *State) ValidatorLoop() {
 	timeStruct := new(Timer)
+
+	var entrySyncInfo ShareWithEntrySyncInfo
+	entrySyncInfo = state.ShareWithEntrySyncInfo         // Get initial state for EntrySync() thread
+	fmt.Printf("%13s Feed %40s %+v\n", entrySyncInfo.FactomNodeName,"Initial EntrySyncInfo", entrySyncInfo.MakeMissingEntryRequestsInfo)
+	state.ShareWithEntrySyncInfoChannel <- entrySyncInfo // Send initial state
+
 	for {
+		atomic.WhereAmI("",2)
+		entrySyncInfo = state.ShareWithEntrySyncInfo // Save the state EntrySync() cares about
+
 		// Check if we should shut down.
 		select {
 		case <-state.ShutdownChan:
@@ -67,6 +77,7 @@ func (state *State) ValidatorLoop() {
 				}
 			}
 		}
+		atomic.WhereAmI("",2)
 
 		// Sort the messages.
 		if msg != nil {
@@ -81,10 +92,19 @@ func (state *State) ValidatorLoop() {
 				state.msgQueue <- msg
 			}
 		}
+		atomic.WhereAmI("",2)
 
 		// Update the part of state used by EntrySync
 		state.HighestKnownBlock = state.GetHighestKnownBlock()
 		state.HighestSavedBlk = state.GetHighestSavedBlk()
+
+		// Keep the EntrySync thread up-to-date
+		if entrySyncInfo != state.ShareWithEntrySyncInfo {
+			entrySyncInfo = state.ShareWithEntrySyncInfo
+			fmt.Printf("%13s Feed %40s %+v\n", entrySyncInfo.FactomNodeName,"EntrySyncInfo", entrySyncInfo.MakeMissingEntryRequestsInfo)
+			state.ShareWithEntrySyncInfoChannel <- entrySyncInfo // if there is now info share it
+			fmt.Printf("%13s Feed %d\n",entrySyncInfo.FactomNodeName,len(state.ShareWithEntrySyncInfoChannel))
+		}
 	}
 }
 

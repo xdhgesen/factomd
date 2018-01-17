@@ -18,13 +18,16 @@ import (
 )
 
 func (s *MakeMissingEntryRequestsInfo) has(DB interfaces.DBOverlaySimple, entry interfaces.IHash) bool {
+
+	// if we are way behind, let the Torrents catch up the database
 	if s.HighestKnownBlock-s.HighestSavedBlk > 100 {
 		if s.useTorrents {
 			// Torrents complete second pass
 		} else {
-			time.Sleep(30 * time.Millisecond)
+			time.Sleep(30 * time.Millisecond) // really this short?
 		}
 	}
+
 	exists, err := DB.DoesKeyExist(databaseOverlay.ENTRY, entry.Bytes())
 	if exists {
 		if err != nil {
@@ -53,16 +56,22 @@ type MakeMissingEntryRequestsInfo struct {
 
 // This go routine checks every so often to see if we have any missing entries or entry blocks.  It then requests
 // them if it finds entries in the missing lists.
-func (s *ShareWithEntrySync) MakeMissingEntryRequests(MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo, ss *MakeMissingEntryRequestsStatic) {
-
-	var info MakeMissingEntryRequestsInfo
+func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo) {
 
 	missing := 0
 	found := 0
-
 	MissingEntryMap := make(map[[32]byte]*MissingEntry)
+	var info MakeMissingEntryRequestsInfo
+
+	info = <-MakeMissingEntryRequestsInfoChannel // block if no update available
+	fmt.Printf("%13s Got  %40s %+v\n", info.FactomNodeName, "initial MakeMissingEntryRequestsInfo", info)
 
 	for {
+		// get info check if we need to make missing entries
+		if (len(MakeMissingEntryRequestsInfoChannel) > 0) {
+			info = <-MakeMissingEntryRequestsInfoChannel // block if no update available
+			fmt.Printf("%13s Got  %40s %+v\n", info.FactomNodeName, "MakeMissingEntryRequestsInfo", info)
+		}
 		now := time.Now()
 		newrequest := 0
 		cnt := 0
@@ -72,7 +81,7 @@ func (s *ShareWithEntrySync) MakeMissingEntryRequests(MakeMissingEntryRequestsIn
 
 		// Look through our map, and remove any entries we now have in our database.
 		for k := range MissingEntryMap {
-			if s.has(ss.DB, MissingEntryMap[k].EntryHash) {
+			if info.has(ss.DB, MissingEntryMap[k].EntryHash) {
 				found++
 				delete(MissingEntryMap, k)
 			} else {
@@ -166,9 +175,6 @@ func (s *ShareWithEntrySync) MakeMissingEntryRequests(MakeMissingEntryRequestsIn
 			}
 		}
 
-		// get info check if we need to make missing entries
-		info := <-MakeMissingEntryRequestsInfoChannel // block if no update available
-
 		if sent == 0 {
 			if info.HighestKnownBlock-info.HighestSavedBlk > 100 {
 				time.Sleep(10 * time.Second)
@@ -182,22 +188,13 @@ func (s *ShareWithEntrySync) MakeMissingEntryRequests(MakeMissingEntryRequestsIn
 	}
 }
 
-
-
-func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic) {
+func GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo) {
 
 	// Feeds for worker threads
-	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo) // Info needed by MakeMissingEntries()
+	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo, 3) // Info needed by MakeMissingEntries()
 
 	// Map to track what I know is missing
 	missingMap := make(map[[32]byte]interfaces.IHash)
-
-	// Once I have found all the entries, we quit searching so much for missing entries.
-	start := uint32(1)
-
-	if s.EntryDBHeightComplete > 0 {
-		start = s.EntryDBHeightComplete
-	}
 
 	entryMissing := 0
 
@@ -211,11 +208,26 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 	wg.Done()
 
 	// start a thread to make requests for missing entries (rely on GoSync being started late enough for the necessary init to be done.
-	go s.MakeMissingEntryRequests(MakeMissingEntryRequestsInfoChannel, &ss.MakeMissingEntryRequestsStatic) // Start the MakeMissingEntryRequests() thread ..
+	go MakeMissingEntryRequests(&ss.MakeMissingEntryRequestsStatic, MakeMissingEntryRequestsInfoChannel) // Start the MakeMissingEntryRequests() thread ..
 
+	var start uint32 = 0xFFFFFFFF // Assume no block are in the database yet.
 
+	// Get the update from the ValidatorLoop() thread
+	var s ShareWithEntrySyncInfo = <-ShareWithEntrySyncInfoChannel // get the next update from validatorLoop()
+	// print just the MakeMissingEntryRequestsInfo because there is no other content
+	fmt.Printf("%13s Got  %40s %+v\n", s.FactomNodeName, "Initial EntrySyncInfo", s.MakeMissingEntryRequestsInfo)
+
+	var m MakeMissingEntryRequestsInfo = s.MakeMissingEntryRequestsInfo // set initial MakeMissingEntryRequestsInfo
 
 	for {
+
+		// feed the MakeMissingEntryRequests() thread
+		if m != s.MakeMissingEntryRequestsInfo {
+			fmt.Printf("%13s Feed %40s %+v\n", s.FactomNodeName, "MakeMissingEntryRequestsInfo", s.MakeMissingEntryRequestsInfo)
+			// Send all the fields MakeMissingEntryRequests cares about
+			MakeMissingEntryRequestsInfoChannel <- s.MakeMissingEntryRequestsInfo
+		}
+
 		// Update Prometheus Stats
 		ESMissing.Set(float64(len(missingMap)))
 		ESMissingQueue.Set(float64(len(ss.MissingEntries)))
@@ -223,9 +235,13 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 		ESFirstMissing.Set(float64(lastfirstmissing))
 		ESHighestMissing.Set(float64(s.HighestSavedBlk))
 
-		// feed the MakeMissingEntryRequests() thread
-		// Send all the fields MakeMissingEntryRequests cares about
-		MakeMissingEntryRequestsInfoChannel <- s.MakeMissingEntryRequestsInfo
+		if start == 0xFFFFFFFF { // special flag that means we haven't set it yet
+			if s.EntryDBHeightComplete > 0 {
+				start = s.EntryDBHeightComplete // Start at top of database
+			} else {
+				start = 1 // else start at the beginning
+			}
+		}
 
 		entryMissing = 0
 		for k := range missingMap {
@@ -241,6 +257,8 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 		// First reset first Missing back to -1 every time.
 		firstMissing = -1
 
+		// Once I have found all the entries, we quit searching so much for missing entries.
+		// start tracks where we were last search.
 	dirblkSearch:
 		for scan := start; scan <= s.HighestSavedBlk; scan++ {
 
@@ -256,6 +274,7 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 				fmt.Printf("ERROR: %v\n", err)
 			}
 
+			// CAn this be moved before the loop? -- clay
 			// Wait for the database if we have to
 			for db == nil {
 				time.Sleep(1 * time.Second)
@@ -269,6 +288,7 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 
 				eBlock, _ := ss.DB.FetchEBlock(ebKeyMR)
 
+				// Clay this be moved before we enter the loop -- clay
 				// Don't have an eBlock?  Huh. We can go on, but we can't advance.  We just wait until it
 				// does show up.
 				for eBlock == nil {
@@ -334,6 +354,7 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 			}
 		}
 		lastfirstmissing = firstMissing
+
 		if firstMissing < 0 {
 			s.EntryDBHeightComplete = s.HighestSavedBlk
 			time.Sleep(5 * time.Second)
@@ -341,5 +362,14 @@ func (s *ShareWithEntrySync) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntr
 
 		time.Sleep(100 * time.Millisecond)
 
+		// Get an update from the ValidatorLoop() thread
+		l := len(ShareWithEntrySyncInfoChannel)
+		fmt.Printf("%13s Get %d\n",s.FactomNodeName,len(ShareWithEntrySyncInfoChannel))
+
+		if l > 0 {
+			s = <-ShareWithEntrySyncInfoChannel // get the next update from validatorLoop()
+			// print just the MakeMissingEntryRequestsInfo because there is no other content
+			fmt.Printf("%13s Got  %40s %+v\n", s.FactomNodeName, "EntrySyncInfo", s.MakeMissingEntryRequestsInfo)
+		}
 	}
 }

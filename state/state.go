@@ -46,9 +46,9 @@ var _ interfaces.IState = (*State)(nil)
 var packageLogger = log.WithFields(log.Fields{"package": "state"})
 
 type State struct {
-    StateOnly // Keeep all the names on the same level so the compiler will kick us if there s a conflict
+	StateOnly                // Keeep all the names on the same level so the compiler will kick us if there s a conflict
 	ShareWithEntrySyncStatic // All the info needed by entrySync() thread that is static
-	ShareWithEntrySync       // All the info needed by entrySync() thread
+	ShareWithEntrySyncInfo   // All the info needed by entrySync() thread
 } // struct State {...}
 
 type StateOnly struct {
@@ -60,7 +60,6 @@ type StateOnly struct {
 	Cfg               interfaces.IFactomConfig
 
 	Prefix            string
-	FactomNodeName    string
 	FactomdVersion    string
 	LogPath           string
 	LdbPath           string
@@ -352,10 +351,11 @@ type StateOnly struct {
 	HighestCompletedTorrent uint32
 	FastBoot                bool
 	FastBootLocation        string
+
+	ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo // Send updates to EntrySync() thread
 }
 
 type ShareWithEntrySyncStatic struct {
-
 	MakeMissingEntryRequestsStatic
 
 	// synchronized accessed via the IFace ... so sort of static
@@ -384,11 +384,12 @@ type MakeMissingEntryRequestsStatic struct {
 }
 
 // the things that have to be updated for entrySync() thread
-type ShareWithEntrySync struct {
+type ShareWithEntrySyncInfo struct {
 	MakeMissingEntryRequestsInfo // Get all the info needed MakeMissingEntryRequests() thread too
 }
 
 type MakeMissingEntryRequestsInfo struct {
+	FactomNodeName    string
 	useTorrents       bool
 	HighestSavedBlk   uint32
 	HighestKnownBlock uint32
@@ -401,8 +402,10 @@ type MakeMissingEntryRequestsInfo struct {
 func (s *MakeMissingEntryRequestsStatic) GetDirectoryBlockByHeight(height uint32) interfaces.IDirectoryBlock { return s.state.GetDirectoryBlockByHeight(height) }
 
 // Returns a millisecond timestamp
-func (s *MakeMissingEntryRequestsStatic) GetTimestamp() interfaces.Timestamp {return s.state.GetTimestamp()
+func (s *MakeMissingEntryRequestsStatic) GetTimestamp() interfaces.Timestamp {
+	return s.state.GetTimestamp()
 }
+
 // Info needed by MakeMissingEntryRequests thread
 
 type EntryUpdate struct {
@@ -979,6 +982,8 @@ func (s *State) Init() {
 			log.Fatal(err)
 		}
 	}
+	// Feeds for worker threads
+	s.ShareWithEntrySyncInfoChannel = make(chan ShareWithEntrySyncInfo) // Info needed by GoSyncEntries()
 
 }
 
@@ -2262,7 +2267,7 @@ func (s *State) ShortString() string {
 }
 
 func (s *State) SetString() {
-	switch s.Status {
+	switch s.Status.Load() {
 	case 0:
 		return
 	case 1:

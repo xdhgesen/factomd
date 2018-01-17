@@ -1222,7 +1222,7 @@ func (p *ProcessList) Reset() bool {
 	}*/
 
 	s := p.State
-	s.LLeaderHeight--
+	s.LLeaderHeight-- // this is change a few lines downs What's up? -- Clay
 	s.Saving = true
 	s.Syncing = false
 	s.EOM = false
