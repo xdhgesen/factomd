@@ -195,7 +195,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 	}
 }
 
-func GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo) {
+func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic/*, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo*/) {
 
 	// Feeds for worker threads
 	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo, 3) // Info needed by MakeMissingEntries()
@@ -218,12 +218,12 @@ func GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEn
 	go MakeMissingEntryRequests(&ss.MakeMissingEntryRequestsStatic, MakeMissingEntryRequestsInfoChannel) // Start the MakeMissingEntryRequests() thread ..
 
 	var start uint32 = 0xFFFFFFFF // Assume no block are in the database yet.
-
+/*
 	// Get the update from the ValidatorLoop() thread
 	var s ShareWithEntrySyncInfo = <-ShareWithEntrySyncInfoChannel // get the next update from validatorLoop()
 	// print just the MakeMissingEntryRequestsInfo because there is no other content
 	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "Initial EntrySyncInfo", s.MakeMissingEntryRequestsInfo)
-
+*/
 	var m MakeMissingEntryRequestsInfo = s.MakeMissingEntryRequestsInfo // set initial MakeMissingEntryRequestsInfo
 
 	for {
@@ -372,7 +372,7 @@ func GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEn
 		}
 
 		time.Sleep(100 * time.Millisecond)
-
+/*
 		// Get an update from the ValidatorLoop() thread
 		l := len(ShareWithEntrySyncInfoChannel)
 		fmt.Printf("%13s Get length %d %p\n",ss.FactomNodeName,len(ShareWithEntrySyncInfoChannel),ShareWithEntrySyncInfoChannel)
@@ -383,6 +383,7 @@ func GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEn
 			// print just the MakeMissingEntryRequestsInfo because there is no other content
 			fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "EntrySyncInfo", s.MakeMissingEntryRequestsInfo)
 		}
+*/
 		atomic.WhereAmI(ss.FactomNodeName, 1)
 	}
 }

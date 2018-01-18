@@ -371,17 +371,18 @@ type ShareWithEntrySyncStatic struct {
 
 type MakeMissingEntryRequestsStatic struct {
 	// Safe shared structures
+	FactomNodeName    string
 	inMsgQueue InMsgMSGQueue
-	// Entrys we don't have that we are asking our neighbors for
-	MissingEntries  chan *MissingEntry
-	UpdateEntryHash chan *EntryUpdate // Channel for updating entry Hashes tracking (repeats and such)
+
+	MissingEntries  chan *MissingEntry // Entrys we don't have that we are asking our neighbors for
+	UpdateEntryHash chan *EntryUpdate  // Channel for updating entry Hashes tracking (repeats and such)
 
 	// Database
 	DB         interfaces.DBOverlaySimple
 	WriteEntry chan interfaces.IEBEntry
 	// unsafe zone -- to be dealt with
 	state interfaces.IState  // debug -- clay
-	FactomNodeName    string
+
  }
 
 // the things that have to be updated for GoEntrySync() thread

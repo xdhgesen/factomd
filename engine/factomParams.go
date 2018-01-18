@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/FactomProject/factomd/common/primitives"
+	"fmt"
 )
 
 type FactomParams struct {
@@ -178,9 +179,19 @@ func ParseCmdLine(args []string) *FactomParams {
 
 	sync2Ptr := flag.Int("sync2", -1, "Set the initial blockheight for the second Sync pass. Used to force a total sync, or skip unnecessary syncing of entries.")
 
-	DebugConsolePtr :=flag.Bool("DebugConsole",false,"Enable DebugConsole")
+	DebugConsolePtr :=flag.Bool("debugconsole",false,"Enable DebugConsole")
 
-	flag.CommandLine.Parse(args)
+
+	err:= flag.CommandLine.Parse(args)
+	if(err!=nil){
+		panic(err)
+	}
+	leftover:=flag.Args()
+	if len(leftover)!=0 {
+		fmt.Printf("Not all arguments were valid arguments [%v]\n", leftover)
+		panic("Bad Command line")
+	}
+
 
 	p.AckbalanceHash = *ackBalanceHashPtr
 	p.EnableNet = *enablenetPtr
