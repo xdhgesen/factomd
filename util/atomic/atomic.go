@@ -95,12 +95,16 @@ func Goid() string {
 }
 
 func WhereAmIString(msg string, depth int) string {
-	_, fn, line, _ := runtime.Caller(depth+1)
+	_, fn, line, ok := runtime.Caller(depth+1)
+	if !ok {
+		fn = "unable to locate"
+		line = 0
+	}
 	return fmt.Sprintf("[%s]%v-%s:%d", msg, Goid(),  fn, line)
 }
 
 func WhereAmI(msg string, depth int) {
-	fmt.Println("\n" + WhereAmIString(msg, depth+1))
+	fmt.Println("\n" + WhereAmIString(msg, depth))
 }
 
 type DebugMutex struct {

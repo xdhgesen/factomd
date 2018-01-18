@@ -6,4 +6,4 @@ file=$1
 fi
 
 reset
-tail -f $file | gawk -f scripts/status.awk
+tail -n +0 -f $file | gawk -f $GOPATH/src/github.com/FactomProject/factomd/scripts/status.awk

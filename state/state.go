@@ -46,7 +46,7 @@ var _ interfaces.IState = (*State)(nil)
 var packageLogger = log.WithFields(log.Fields{"package": "state"})
 
 type State struct {
-	StateOnly                // Keeep all the names on the same level so the compiler will kick us if there s a conflict
+	StateOnly                // Keep all the names on the same level so the compiler will kick us if there s a conflict
 	ShareWithEntrySyncStatic // All the info needed by entrySync() thread that is static
 	ShareWithEntrySyncInfo   // All the info needed by entrySync() thread
 } // struct State {...}
@@ -366,7 +366,7 @@ type ShareWithEntrySyncStatic struct {
 	getTimestampMutex sync.Mutex
 
 	// unsafe zone -- to be dealt with
-	state interfaces.IState
+	state interfaces.IState // debug -- clay
 }
 
 type MakeMissingEntryRequestsStatic struct {
@@ -380,22 +380,23 @@ type MakeMissingEntryRequestsStatic struct {
 	DB         interfaces.DBOverlaySimple
 	WriteEntry chan interfaces.IEBEntry
 	// unsafe zone -- to be dealt with
-	state interfaces.IState
-}
+	state interfaces.IState  // debug -- clay
+	FactomNodeName    string
+ }
 
-// the things that have to be updated for entrySync() thread
+// the things that have to be updated for GoEntrySync() thread
 type ShareWithEntrySyncInfo struct {
 	MakeMissingEntryRequestsInfo // Get all the info needed MakeMissingEntryRequests() thread too
 }
 
 type MakeMissingEntryRequestsInfo struct {
-	FactomNodeName    string
 	useTorrents       bool
 	HighestSavedBlk   uint32
 	HighestKnownBlock uint32
 	LLeaderHeight     uint32
 	// DBlock Height at which node has a complete set of eblocks+entries
-	EntryDBHeightComplete uint32
+	EntryDBHeightComplete uint32 // debug -- clay
+	randomId int  // debug -- clay
 }
 
 // this is not atomic and needs to go
@@ -983,8 +984,9 @@ func (s *State) Init() {
 		}
 	}
 	// Feeds for worker threads
-	s.ShareWithEntrySyncInfoChannel = make(chan ShareWithEntrySyncInfo) // Info needed by GoSyncEntries()
-
+	// TODO: Should have length >0 so things run in parallel
+	s.ShareWithEntrySyncInfoChannel = make(chan ShareWithEntrySyncInfo,1) // Info needed by GoSyncEntries()
+    fmt.Printf("%s Make ShareWithEntrySyncInfo", s.FactomNodeName)
 }
 
 func (s *State) HookLogstash() error {
