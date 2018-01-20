@@ -119,8 +119,8 @@ type DebugMutex struct {
 	done     chan struct{} // Channel to signal success to starvation detector
 }
 
-var yeaOfLittleFaith AtomicBool = AtomicBool(0) // true means mutex lock instead of CAS lock
-var enableStarvationDetection AtomicBool = AtomicBool(1)
+var yeaOfLittleFaith AtomicBool = AtomicBool(1) // true means mutex lock instead of CAS lock
+var enableStarvationDetection AtomicBool = AtomicBool(0)
 var enableAlreadyLockedDetection AtomicBool = AtomicBool(0)
 var enableOwnerTracking AtomicBool = AtomicBool(1 & enableStarvationDetection) // no point in tracking owners if not detecting starvation
 

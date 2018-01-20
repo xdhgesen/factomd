@@ -813,8 +813,8 @@ func (s *State) Init() {
 		s.Salt = primitives.Sha(b)
 	}
 
-	salt := fmt.Sprintf("The Instance ID of this node is %s\n", s.Salt.String()[:16])
-	fmt.Print(salt)
+	saltx := fmt.Sprintf("The Instance ID of this node is %s\n", s.Salt.String()[:16])
+	fmt.Print(saltx)
 
 	s.StartDelay = s.GetTimestamp().GetTimeMilli() // We can't start as a leader until we know we are up to date
 	s.RunLeader = false
@@ -987,7 +987,7 @@ func (s *State) Init() {
 	// Feeds for worker threads
 	// TODO: Should have length >0 so things run in parallel
 	s.ShareWithEntrySyncInfoChannel = make(chan ShareWithEntrySyncInfo,1) // Info needed by GoSyncEntries()
-    fmt.Printf("%s Make ShareWithEntrySyncInfo", s.FactomNodeName)
+    fmt.Printf("%s Make ShareWithEntrySyncInfo\n", s.FactomNodeName)
 }
 
 func (s *State) HookLogstash() error {
@@ -1687,6 +1687,8 @@ func (s *State) JournalMessage(msg interfaces.IMsg) {
 	}
 
 	if s.Journaling && len(s.JournalFile) != 0 {
+		//atomic.WhereAmIMsg(s.FactomNodeName)
+
 		f, err := os.OpenFile(s.JournalFile, os.O_APPEND+os.O_WRONLY, 0666)
 		if err != nil {
 			s.JournalFile = ""

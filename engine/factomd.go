@@ -62,7 +62,9 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	}
 
 	//  Go Optimizations...
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	t:=runtime.NumCPU()
+	runtime.GOMAXPROCS(t)
+	fmt.Printf("Using %d threads\n", t)
 
 	state0 := new(state.State)
 	state0.IsRunning = true

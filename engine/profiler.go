@@ -24,8 +24,13 @@ func StartProfiler(mpr int, expose bool) {
 	if expose {
 		pre = ""
 	}
-	log.Println(http.ListenAndServe(fmt.Sprintf("%s:%s", pre, logPort), nil))
-	//runtime.SetBlockProfileRate(100000)
+	runtime.SetBlockProfileRate(100000)
+	p := fmt.Sprintf("%s:%s", pre, logPort)
+	log.Printf("Enable profile on %s\n", p)
+	err:=http.ListenAndServe(p, nil)
+	if(err!=nil) {
+		panic(err)
+	}
 }
 
 func launchPrometheus(port int) {

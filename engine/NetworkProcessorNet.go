@@ -31,9 +31,9 @@ func NetworkProcessorNet(fnode *FactomNode) {
 func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 	cnt := 0
 	done := false
-	// ackHeight is used in ignoreMsg to determine if we should ignore an ackowledgment
+	// ackHeight is used in ignoreMsg to determine if we should ignore an acknowledgment
 	ackHeight := uint32(0)
-	// When syncing from disk/network we want to selectivly ignore certain msgs to allow
+	// When syncing from disk/network we want to selectively ignore certain msgs to allow
 	// factom to focus on syncing. The following msgs will be ignored:
 	//		Acks:
 	//				Ignore acks below the ackheight, which is set if we get an ack at a height higher than
@@ -50,7 +50,7 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 	//				Only helpful at the latest height
 	//
 	//		MissingData:
-	//				We should fufill some of these requests, but we should also focus on ourselves while we are syncing.
+	//				We should fulfill some of these requests, but we should also focus on ourselves while we are syncing.
 	//				If our inmsg queue has too many msgs, then don't help others.
 	ignoreMsg := func(amsg interfaces.IMsg) bool {
 		// Stop uint32 underflow

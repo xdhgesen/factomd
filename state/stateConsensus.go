@@ -35,7 +35,7 @@ var _ = (*hash.Hash32)(nil)
 //
 // Returns true if some message was processed.
 //***************************************************************
-var executeMsg_debug bool = true
+var executeMsg_debug bool = false
 
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	preExecuteMsgTime := time.Now()
@@ -754,7 +754,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	s.Saving = true
 	s.Syncing = false
 
-	// Hurry up our next ask.  When we get to where we have the data we aksed for, then go ahead and ask for the next set.
+	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.
 	if s.DBStates.LastEnd < int(dbheight) {
 		s.DBStates.Catchup(true)
 	}

@@ -13,8 +13,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
-	"github.com/FactomProject/factomd/util/atomic"
-
 	"sync"
 )
 
@@ -68,7 +66,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "initial MakeMissingEntryRequestsInfo", info)
 
 	for {
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+		
 		now := time.Now()
 		newrequest := 0
 		cnt := 0
@@ -89,7 +87,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 				}
 			}
 		}
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+		
 		if cnt > 0 {
 			avg = (1000 * sum) / cnt
 		}
@@ -111,7 +109,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 				break fillMap
 			}
 		}
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+		
 
 		sent := 0
 		if ss.inMsgQueue.Length() < constants.INMSGQUEUE_MED {
@@ -146,7 +144,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 		} else {
 			time.Sleep(20 * time.Second)
 		}
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+		
 
 		// Insert the entries we have found into the database.
 	InsertLoop:
@@ -174,7 +172,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 				break InsertLoop
 			}
 		}
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+		
 
 		if sent == 0 {
 			if info.HighestKnownBlock-info.HighestSavedBlk > 100 {
@@ -186,16 +184,17 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 				time.Sleep(20 * time.Second)
 			}
 		}
+
 		// get info check if we need to make missing entries
 		if (len(MakeMissingEntryRequestsInfoChannel) > 0) {
-			atomic.WhereAmI(ss.FactomNodeName, 1)
+			
 			info = <-MakeMissingEntryRequestsInfoChannel // block if no update available
 			fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "MakeMissingEntryRequestsInfo", info)
 		}
 	}
 }
 
-func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic/*, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo*/) {
+func GoSyncEntries (wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo) {
 
 	// Feeds for worker threads
 	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo, 3) // Info needed by MakeMissingEntries()
@@ -218,22 +217,21 @@ func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWith
 	go MakeMissingEntryRequests(&ss.MakeMissingEntryRequestsStatic, MakeMissingEntryRequestsInfoChannel) // Start the MakeMissingEntryRequests() thread ..
 
 	var start uint32 = 0xFFFFFFFF // Assume no block are in the database yet.
-/*
+
 	// Get the update from the ValidatorLoop() thread
 	var s ShareWithEntrySyncInfo = <-ShareWithEntrySyncInfoChannel // get the next update from validatorLoop()
 	// print just the MakeMissingEntryRequestsInfo because there is no other content
-	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "Initial EntrySyncInfo", s.MakeMissingEntryRequestsInfo)
-*/
+//	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "Initial EntrySyncInfo", q.MakeMissingEntryRequestsInfo)
+
 	var m MakeMissingEntryRequestsInfo = s.MakeMissingEntryRequestsInfo // set initial MakeMissingEntryRequestsInfo
 
 	for {
-		atomic.WhereAmI(ss.FactomNodeName, 1)
-
 		// feed the MakeMissingEntryRequests() thread
 		if m != s.MakeMissingEntryRequestsInfo {
-			fmt.Printf("%13s Feed %40s %+v\n", ss.FactomNodeName, "MakeMissingEntryRequestsInfo", s.MakeMissingEntryRequestsInfo)
+			m = s.MakeMissingEntryRequestsInfo
+//			fmt.Printf("%13s Feed %40s %+v\n", ss.FactomNodeName, "MakeMissingEntryRequestsInfo", m)
 			// Send all the fields MakeMissingEntryRequests cares about
-			MakeMissingEntryRequestsInfoChannel <- s.MakeMissingEntryRequestsInfo
+			MakeMissingEntryRequestsInfoChannel <- m
 		}
 
 		// Update Prometheus Stats
@@ -258,7 +256,7 @@ func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWith
 				delete(missingMap, k)
 			}
 		}
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+		
 
 		// Scan all the directory blocks, from start to the highest saved.  Once we catch up,
 		// start will be the last block saved.
@@ -307,7 +305,7 @@ func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWith
 
 				// Go through all the entry hashes.
 				for _, entryhash := range eBlock.GetEntryHashes() {
-					atomic.WhereAmI(ss.FactomNodeName, 1)
+					
 					if entryhash.IsMinuteMarker() {
 						continue
 					}
@@ -352,7 +350,7 @@ func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWith
 					}
 				}
 			}
-			atomic.WhereAmI(ss.FactomNodeName, 1)
+			
 
 			if s.EntryDBHeightComplete%1000 == 0 {
 				if firstMissing < 0 {
@@ -372,18 +370,14 @@ func (s *ShareWithEntrySyncInfo) GoSyncEntries(wg *sync.WaitGroup, ss *ShareWith
 		}
 
 		time.Sleep(100 * time.Millisecond)
-/*
+
 		// Get an update from the ValidatorLoop() thread
 		l := len(ShareWithEntrySyncInfoChannel)
-		fmt.Printf("%13s Get length %d %p\n",ss.FactomNodeName,len(ShareWithEntrySyncInfoChannel),ShareWithEntrySyncInfoChannel)
-
 		if l > 0 {
-			atomic.WhereAmI(ss.FactomNodeName, 1)
 			s = <-ShareWithEntrySyncInfoChannel // get the next update from validatorLoop()
 			// print just the MakeMissingEntryRequestsInfo because there is no other content
-			fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "EntrySyncInfo", s.MakeMissingEntryRequestsInfo)
+//			fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "EntrySyncInfo", q.MakeMissingEntryRequestsInfo)
 		}
-*/
-		atomic.WhereAmI(ss.FactomNodeName, 1)
+
 	}
 }

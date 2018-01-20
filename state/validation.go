@@ -11,7 +11,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
-	"github.com/FactomProject/factomd/util/atomic"
+	"github.com/FactomProject/factomd/common/primitives/random"
 )
 
 func (state *State) ValidatorLoop() {
@@ -19,18 +19,22 @@ func (state *State) ValidatorLoop() {
 
 	s := state // for debugging
 	_ = s
-	/*
-		var entrySyncInfo ShareWithEntrySyncInfo
-		entrySyncInfo = state.ShareWithEntrySyncInfo // Get initial state for EntrySync() thread
-		entrySyncInfo.randomId = random.RandInt()    // debug -- clay
-		fmt.Printf("%13s Initial Feed %p\n", state.FactomNodeName, s.ShareWithEntrySyncInfoChannel)
-		fmt.Printf("%13s Feed %40s %+v\n", state.FactomNodeName, "Initial EntrySyncInfo", entrySyncInfo.MakeMissingEntryRequestsInfo)
-		state.ShareWithEntrySyncInfoChannel <- entrySyncInfo // Send initial state
-	*/
-	QQQ := 0
 
+	var entrySyncInfo ShareWithEntrySyncInfo
+	entrySyncInfo = state.ShareWithEntrySyncInfo // Get initial state for EntrySync() thread
+	entrySyncInfo.randomId = random.RandInt()    // debug -- clay
+	//		fmt.Printf("%13s Initial Feed %p\n", state.FactomNodeName, s.ShareWithEntrySyncInfoChannel)
+	//		fmt.Printf("%13s Feed %40s %+v\n", state.FactomNodeName, "Initial EntrySyncInfo", entrySyncInfo.MakeMissingEntryRequestsInfo)
+	state.ShareWithEntrySyncInfoChannel <- entrySyncInfo // Send initial state
+
+	QQQ := 0
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("ValidatorLoop caught a panic", r)
+		}
+	}()
 	for {
-		atomic.WhereAmI(s.FactomNodeName, 1)
+		//atomic.WhereAmIMsg(s.FactomNodeName)
 		QQQ++
 		_ = QQQ
 
@@ -58,6 +62,7 @@ func (state *State) ValidatorLoop() {
 				}
 				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
 			}
+			//atomic.WhereAmIMsg(s.FactomNodeName)
 
 			for i := 0; i < 10; i++ {
 				select {
@@ -72,55 +77,81 @@ func (state *State) ValidatorLoop() {
 					break loop
 				default:
 				}
-
+				//atomic.WhereAmIMsg(s.FactomNodeName)
 				msg = state.InMsgQueue().Dequeue()
+				//atomic.WhereAmIMsg(s.FactomNodeName)
 				if msg != nil {
+					//atomic.WhereAmIMsg(s.FactomNodeName)
 					state.JournalMessage(msg)
+					//atomic.WhereAmIMsg(s.FactomNodeName)
+
 					break loop
 				} else {
 					// No messages? Sleep for a bit
-					for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
-						time.Sleep(10 * time.Millisecond)
+					for i := 0; i < 10; i++ {
+						//atomic.WhereAmIMsg(s.FactomNodeName)
+						l := state.InMsgQueue().Length()
+						//atomic.WhereAmIMsg(s.FactomNodeName)
+						if ( l == 0) {
+							//atomic.WhereAmIMsg(s.FactomNodeName)
+							time.Sleep(10 * time.Millisecond)
+							//atomic.WhereAmIMsg(s.FactomNodeName)
+						} else {
+							//atomic.WhereAmIMsg(s.FactomNodeName)
+							break;
+						}
+						//atomic.WhereAmIMsg(s.FactomNodeName)
 					}
+					//atomic.WhereAmIMsg(s.FactomNodeName)
 				}
 			}
 		}
-		atomic.WhereAmI(s.FactomNodeName, 1)
+		//atomic.WhereAmIMsg(s.FactomNodeName)
 
 		// Sort the messages.
 		if msg != nil {
+			//atomic.WhereAmIMsg(s.FactomNodeName)
+
 			state.getTimestampMutex.Lock()
 			if state.IsReplaying == true { //L
 				state.ReplayTimestamp = msg.GetTimestamp() //L
 			}
 			state.getTimestampMutex.Unlock()
+			//atomic.WhereAmIMsg(s.FactomNodeName)
+
 			if _, ok := msg.(*messages.Ack); ok {
+				//atomic.WhereAmIMsg(s.FactomNodeName)
 				state.ackQueue <- msg
 			} else {
+				//atomic.WhereAmIMsg(s.FactomNodeName)
 				state.msgQueue <- msg
 			}
 		}
-		atomic.WhereAmI(s.FactomNodeName, 1)
+		//atomic.WhereAmIMsg(s.FactomNodeName)
 
 		// Update the part of state used by EntrySync
 		state.HighestKnownBlock = state.GetHighestKnownBlock()
 		state.HighestSavedBlk = state.GetHighestSavedBlk()
-		/*
-				// Keep the EntrySync thread up-to-date
-				if entrySyncInfo != state.ShareWithEntrySyncInfo {
-					atomic.WhereAmI(s.FactomNodeName, 1)
-					entrySyncInfo = state.ShareWithEntrySyncInfo // Save the state EntrySync() cares about
-					entrySyncInfo.randomId = random.RandInt()    // debug -- clay
-					fmt.Printf("%13s Feed %40s %+v %p\n", state.FactomNodeName, "EntrySyncInfo",
-						entrySyncInfo.MakeMissingEntryRequestsInfo, state.ShareWithEntrySyncInfoChannel)
-					state.ShareWithEntrySyncInfoChannel <- entrySyncInfo // if there is now info share it
-					l := len(state.ShareWithEntrySyncInfoChannel)
-					fmt.Printf("%13s Feed length %d %p\n", state.FactomNodeName, l, state.ShareWithEntrySyncInfoChannel)
-					j := l
-					_ = j
-				}
-		*/
-		atomic.WhereAmI(s.FactomNodeName, 1)
+
+		// Keep the EntrySync thread up-to-date
+		if entrySyncInfo != state.ShareWithEntrySyncInfo {
+			if (len(state.ShareWithEntrySyncInfoChannel) == cap(state.ShareWithEntrySyncInfoChannel)) {
+				<- state.ShareWithEntrySyncInfoChannel
+//				fmt.Println("Dropping entrySyncInfo update") // This print stalles the sytem
+			}
+
+			//atomic.WhereAmIMsg(s.FactomNodeName)
+			entrySyncInfo = state.ShareWithEntrySyncInfo // Save the state EntrySync() cares about
+			entrySyncInfo.randomId = random.RandInt()    // debug -- clay
+			//					fmt.Printf("%13s Feed %40s %+v %p\n", state.FactomNodeName, "EntrySyncInfo",
+			//						entrySyncInfo.MakeMissingEntryRequestsInfo, state.ShareWithEntrySyncInfoChannel)
+			state.ShareWithEntrySyncInfoChannel <- entrySyncInfo // if there is now info share it
+			l := len(state.ShareWithEntrySyncInfoChannel)
+			//					fmt.Printf("%13s Feed length %d %p\n", state.FactomNodeName, l, state.ShareWithEntrySyncInfoChannel)
+			j := l
+			_ = j
+		}
+		//atomic.WhereAmIMsg(s.FactomNodeName)
 	}
 }
 
