@@ -10,7 +10,7 @@ import (
 	"os"
 )
 
-func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.AtomicInt) {
+func printSummary(summary *int, value int, listenTo *atomic.AtomicInt, wsapiNode *atomic.AtomicInt) {
 
 	defer func() {
 		if false {
@@ -25,7 +25,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.Atom
 
 	out := ""
 
-	if *listenTo < 0 || *listenTo >= len(fnodes) {
+	if ListenTo.Load() < 0 || ListenTo.Load() >= len(fnodes) {
 		return
 	}
 
@@ -64,7 +64,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.Atom
 		for i, f := range pnodes {
 			in := ""
 			api := ""
-			if f.Index == *listenTo {
+			if f.Index == ListenTo.Load() {
 				in = "f"
 			}
 			if f.Index == wsapiNode.Load() {
@@ -74,14 +74,14 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.Atom
 			prt = prt + fmt.Sprintf("%3d %1s%1s %s \n", i, in, api, f.State.ShortString())
 		}
 
-		if *listenTo < len(fnodes) {
-			f := fnodes[*listenTo]
+		if ListenTo.Load() < len(fnodes) {
+			f := fnodes[ListenTo.Load()]
 			prt = fmt.Sprintf("%s EB Complete %d EB Processing %d Entries Complete %d Faults %d\n", prt, f.State.EntryBlockDBHeightComplete, f.State.EntryBlockDBHeightProcessing, f.State.EntryDBHeightComplete, totalServerFaults)
 		}
 
 		sumOut := 0
 		sumIn := 0
-		f := fnodes[*listenTo]
+		f := fnodes[ListenTo.Load()]
 		cnt := len(f.Peers)
 		for _, p := range f.Peers {
 			peer, ok := p.(*SimPeer)
@@ -240,7 +240,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.Atom
 			}
 
 		}
-		prt = prt + "\n" + systemFaults(fnodes[*listenTo])
+		prt = prt + "\n" + systemFaults(fnodes[ListenTo.Load()])
 
 		prt = prt + faultSummary()
 

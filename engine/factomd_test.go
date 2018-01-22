@@ -36,33 +36,44 @@ func WaitMinutes(s *state.State, min int) {
 	}
 }
 
+var capBool bool = false
+
 func TestSetupANetwork(t *testing.T) {
 
-	rescueStdout := os.Stdout
-	r, w, _ := os.Pipe()
+	var startCap func()
+	var endCap func() string
 
-	startCap := func() {
-		rescueStdout = os.Stdout
-		r, w, _ = os.Pipe()
-		os.Stdout = w
-	}
-	endCap := func() string {
-		<-ProcessChan
-		w.Close()
-		out, _ := ioutil.ReadAll(r)
-		os.Stdout = rescueStdout
-		return string(out)
-	}
+	if (capBool) {
+		rescueStdout := os.Stdout
+		r, w, _ := os.Pipe()
 
-	runCmd := func(cmd string)  {
-		os.Stderr.WriteString("Executing: " + cmd + "\n")
-		startCap()
-		InputChan <- cmd
-		for len(InputChan) > 0 { // wait till the simulator accespts the command
-			time.Sleep(100*time.Millisecond)
+		startCap = func() {
+			rescueStdout = os.Stdout
+			r, w, _ = os.Pipe()
+			os.Stdout = w
 		}
-		_ = endCap()
-		return 
+		endCap = func() string {
+			<-ProcessChan
+			w.Close()
+			out, _ := ioutil.ReadAll(r)
+			os.Stdout = rescueStdout
+			return string(out)
+		}
+	}
+
+	runCmd := func(cmd string) {
+		os.Stderr.WriteString("Executing: " + cmd + "\n")
+		if (capBool) {
+			startCap()
+		}
+		InputChan <- cmd
+		for len(InputChan) > 0 { // wait till the simulator accepts the command
+			time.Sleep(100 * time.Millisecond)
+		}
+		if (capBool) {
+			_ = endCap()
+		}
+		return
 	}
 
 	usr, err := user.Current()
@@ -270,4 +281,3 @@ func TestSetupANetwork(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 }
-

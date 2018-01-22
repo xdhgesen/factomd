@@ -287,7 +287,7 @@ func ReadConfig(filename string) *FactomdConfig {
 	if err != nil {
 		log.Printfln("Reading from '%s'", filename)
 		log.Printfln("Cannot open custom config file,\nStarting with default settings.\n%v\n", err)
-		err = gcfg.ReadStringInto(cfg, defaultConfig)
+		err = gcfg.ReadStringInto(cfg, defaultConfig)// TODO: This is already done above. Do we need to redo it? -- Clay
 		if err != nil {
 			panic(err)
 		}

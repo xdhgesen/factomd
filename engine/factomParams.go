@@ -111,7 +111,7 @@ func (f *FactomParams) Init() {
 	f.Sim_Stdin = true
 	f.exposeProfiling = false
 	f.Sync2 = -1
-	f.DebugConsole = false
+	f.DebugConsole = true
 }
 
 func ParseCmdLine(args []string) *FactomParams {

@@ -80,7 +80,7 @@ type ProcessList struct {
 	oldmsgslock atomic.DebugMutex
 
 	// Chains that are executed, but not processed. There is a small window of a pending chain that the ack
-	// will pass and the chainhead will fail. This covers that window. This is only used by WSAPI,
+	// will pass and the chain head will fail. This covers that window. This is only used by WSAPI,
 	// do not use it anywhere internally.
 	PendingChainHeads *SafeMsgMap
 
@@ -1222,7 +1222,7 @@ func (p *ProcessList) Reset() bool {
 	}*/
 
 	s := p.State
-	s.LLeaderHeight-- // this is change a few lines downs What's up? -- Clay
+	s.LLeaderHeight-- // TODO: this is changed a few lines downs What's up? -- Clay
 	s.Saving = true
 	s.Syncing = false
 	s.EOM = false
