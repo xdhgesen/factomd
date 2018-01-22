@@ -665,12 +665,12 @@ func SimControl(listenTo int, listenStdin bool) {
 					os.Stderr.WriteString("--Print Messages Off--\n")
 				}
 			case 'M' == b[0]:
-				if !fnodes[ListenTo].State.MessageTally {
+				if !fnodes[ListenTo].State.MessageTally.Load() {
 					os.Stderr.WriteString("--Print Message Tallies On--\n")
-					fnodes[ListenTo].State.MessageTally = true
+					fnodes[ListenTo].State.MessageTally.Store(true)
 				} else {
 					os.Stderr.WriteString("--Print Message Tallies Off--\n")
-					fnodes[ListenTo].State.MessageTally = false
+					fnodes[ListenTo].State.MessageTally.Store(false)
 				}
 			case 'z' == b[0]: // Add Audit server, Remove server, and Add Leader fall through to 'n', switch to next node.
 				var msg interfaces.IMsg

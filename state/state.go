@@ -318,7 +318,7 @@ type StateOnly struct {
 
 	// MessageTally causes the node to keep track of (and display) running totals of each
 	// type of message received during the tally interval
-	MessageTally           bool
+	MessageTally           atomic.AtomicBool
 	MessageTalliesReceived [constants.NUM_MESSAGES]int
 	MessageTalliesSent     [constants.NUM_MESSAGES]int
 
@@ -985,9 +985,7 @@ func (s *State) Init() {
 		}
 	}
 	// Feeds for worker threads
-	// TODO: Should have length >0 so things run in parallel
 	s.ShareWithEntrySyncInfoChannel = make(chan ShareWithEntrySyncInfo,1) // Info needed by GoSyncEntries()
-    fmt.Printf("%s Make ShareWithEntrySyncInfo\n", s.FactomNodeName)
 }
 
 func (s *State) HookLogstash() error {

@@ -7,8 +7,6 @@ package p2p
 import (
 	"fmt"
 	"math/rand"
-	"strconv"
-	"strings"
 	"time"
 	"net"
 )
@@ -86,22 +84,26 @@ func (p *Peer) PeerFixedIdent() string {
 // locationFromAddress converts the peers address into a uint32 "location" numeric
 func (p *Peer) LocationFromAddress() (location uint32) {
 	location = 0
-	// Split the IPv4 octets
-	octets := strings.Split(p.Address, ".")
-	if 4 == len(octets) {
-		// Turn into uint32
-		b0, _ := strconv.Atoi(octets[0])
-		b1, _ := strconv.Atoi(octets[1])
-		b2, _ := strconv.Atoi(octets[2])
-		b3, _ := strconv.Atoi(octets[3])
-		location += uint32(b0) << 24
-		location += uint32(b1) << 16
-		location += uint32(b2) << 8
-		location += uint32(b3)
-		verbose("peer", "Peer: %s with octets: %+v has Location: %d", p.Hash, octets, location)
-	} else {
-		silence("peer", "len(octets) != 4 \n Invalid Peer Address: %v", octets)
+
+	ip:= net.ParseIP(p.Address)
+	if ip == nil {
+		ipAddress, err := net.LookupHost(p.Address)
+		if err != nil {
+			verbose("peer", "LocationFromAddress(%v) failed. %v ", p.Address, err)
+			silence("peer", "Invalid Peer Address: %v", p.Address)
+		}
+		p.Address = ipAddress[0]
+		ip = net.ParseIP(p.Address)
 	}
+	if(len(ip) == 16) { // If we got back an IP6 (16 byte) address, use the last 4 byte
+		ip = ip[12:]
+	}
+
+		location += uint32(ip[0]) << 24
+		location += uint32(ip[1]) << 16
+		location += uint32(ip[2]) << 8
+		location += uint32(ip[3])
+		verbose("peer", "Peer: %s has Location: %d", p.Hash, location)
 	return location
 }
 

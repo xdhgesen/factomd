@@ -224,7 +224,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.Atom
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "WriteEntry", list)
 
-		if f.State.MessageTally {
+		if f.State.MessageTally.Load() {
 			prt = prt + "\nType:"
 			for i := 0; i < constants.NUM_MESSAGES; i++ {
 				prt = prt + fmt.Sprintf("%5d ", i)

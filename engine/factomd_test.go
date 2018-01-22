@@ -54,13 +54,15 @@ func TestSetupANetwork(t *testing.T) {
 		return string(out)
 	}
 
-	runCmd := func(cmd string) string {
+	runCmd := func(cmd string)  {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		startCap()
 		InputChan <- cmd
-		//		time.Sleep(1000*time.Millisecond) // Uncommenting this makes us ill at this point.
-		v := endCap()
-		return v
+		for len(InputChan) > 0 { // wait till the simulator accespts the command
+			time.Sleep(100*time.Millisecond)
+		}
+		_ = endCap()
+		return 
 	}
 
 	usr, err := user.Current()
@@ -120,8 +122,8 @@ func TestSetupANetwork(t *testing.T) {
 
 	params := ParseCmdLine(args)
 	state0 := Factomd(params, false).(*state.State)
-	state0.MessageTally = true
-	time.Sleep(3 * time.Second)
+	state0.MessageTally.Store(true)
+	time.Sleep(20 * time.Second)
 
 	t.Logf("Allocated %d nodes", nodeCount)
 	if len(GetFnodes()) != nodeCount {

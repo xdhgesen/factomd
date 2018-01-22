@@ -208,8 +208,11 @@ func (s *State) Process() (progress bool) {
 
 	preAckLoopTime := time.Now()
 	// Process acknowledgements if we have some.
+
+
 ackLoop:
-	for room() {
+	for room() { // todo: How does process (the channel monitored by room()) ever change in this loop?
+
 		select {
 		case ack := <-s.ackQueue:
 			a := ack.(*messages.Ack)

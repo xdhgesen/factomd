@@ -144,7 +144,7 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 
 				cnt++
 
-				if fnode.State.MessageTally {
+				if fnode.State.MessageTally.Load() {
 					fnode.State.TallyReceived(int(msg.Type()))
 				}
 
@@ -244,7 +244,7 @@ func NetworkOutputs(fnode *FactomNode) {
 							fnode.Peers[p].Send(msg)
 							sendTime := time.Since(preSendTime)
 							TotalSendTime.Add(float64(sendTime.Nanoseconds()))
-							if fnode.State.MessageTally {
+							if fnode.State.MessageTally.Load() {
 								fnode.State.TallySent(int(msg.Type()))
 							}
 						}
@@ -264,7 +264,7 @@ func NetworkOutputs(fnode *FactomNode) {
 								peer.Send(msg)
 								sendTime := time.Since(preSendTime)
 								TotalSendTime.Add(float64(sendTime.Nanoseconds()))
-								if fnode.State.MessageTally {
+								if fnode.State.MessageTally.Load() {
 									fnode.State.TallySent(int(msg.Type()))
 								}
 							}

@@ -63,7 +63,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 	var info MakeMissingEntryRequestsInfo
 
 	info = <-MakeMissingEntryRequestsInfoChannel // block if no update available
-	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "initial MakeMissingEntryRequestsInfo", info)
+//	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "initial MakeMissingEntryRequestsInfo", info)
 
 	for {
 		
@@ -189,7 +189,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 		if (len(MakeMissingEntryRequestsInfoChannel) > 0) {
 			
 			info = <-MakeMissingEntryRequestsInfoChannel // block if no update available
-			fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "MakeMissingEntryRequestsInfo", info)
+//			fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "MakeMissingEntryRequestsInfo", info)
 		}
 	}
 }
@@ -197,7 +197,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 func GoSyncEntries (wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo) {
 
 	// Feeds for worker threads
-	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo, 3) // Info needed by MakeMissingEntries()
+	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo, 1) // Info needed by MakeMissingEntries()
 
 	// Map to track what I know is missing
 	missingMap := make(map[[32]byte]interfaces.IHash)
