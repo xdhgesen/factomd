@@ -57,7 +57,7 @@ type MakeMissingEntryRequestsInfo struct {
 // This go routine checks every so often to see if we have any missing entries or entry blocks.  It then requests
 // them if it finds entries in the missing lists.
 func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo) {
-	var threadId = util.ThreadStart(ss.FactomNodeName+":MakeMissingEntryRequests")
+	var threadId = util.ThreadStart(ss.FactomNodeName+":MakeMissingEntryRequests", true)
 	defer util.ThreadStop(threadId)
 
 	missing := 0
@@ -198,7 +198,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 }
 
 func GoSyncEntries (wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo) {
-	var threadId = util.ThreadStart(ss.FactomNodeName+":GoSyncEntries")
+	var threadId = util.ThreadStart(ss.FactomNodeName+":GoSyncEntries", true)
 	defer util.ThreadStop(threadId)
 
 	// Feeds for worker threads

@@ -12,7 +12,7 @@ import (
 )
 
 func printSummary(summary *int, value int, listenTo *atomic.AtomicInt, wsapiNode *atomic.AtomicInt) {
-	var threadId = util.ThreadStart("printSummary")
+	var threadId = util.ThreadStart("printSummary", true)
 	defer util.ThreadStop(threadId)
 
 	defer func() {

@@ -328,7 +328,7 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 
 // runloop is a goroutine that does all the heavy lifting
 func (c *Controller) runloop() {
-	var threadId = util.ThreadStart("Controller.runloop")
+	var threadId = util.ThreadStart("Controller.runloop", true)
 	defer util.ThreadStop(threadId)
 
 	// In long running processes it seems the runloop is exiting.

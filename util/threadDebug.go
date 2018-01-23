@@ -7,12 +7,14 @@ import (
 )
 
 var (
-	ThreadMutex       atomic.DebugMutex
-	ThreadGoidToNames map[string]string // map Goid() to name
-	ThreadNameToGoids map[string]string // map Goid() to name
-	ThreadIds         map[string]int    // map name to id
-	ThreadNames       []string
-	ThreadLoopCount   []int
+	enableThreadDebug  bool = false
+	ThreadMutex        atomic.DebugMutex
+	ThreadGoidToNames  map[string]string // map Goid() to name
+	ThreadNameToGoids  map[string]string // map Goid() to name
+	ThreadIds          map[string]int    // map name to id
+	ThreadNames        []string
+	ThreadLoopCount    []int
+	ThreadProgressFlag []bool
 )
 
 func init() {
@@ -22,12 +24,14 @@ func init() {
 	ThreadIds = make(map[string]int)
 	ThreadNames = make([]string, 0)
 	ThreadLoopCount = make([]int, 0)
+	ThreadProgressFlag = make([]bool, 0)
 	ThreadMutex.Unlock()
 	go ThreadStallReport()
 }
 
 func ThreadStallReport() {
-	var threadId = ThreadStart("ThreadStallReport")
+	if !enableThreadDebug {return}
+	var threadId = ThreadStart("ThreadStallReport", true)
 	for {
 		oldThreadLoopCount := make([]int, len(ThreadLoopCount))
 		copy(oldThreadLoopCount, ThreadLoopCount) // save current size
@@ -36,7 +40,7 @@ func ThreadStallReport() {
 		ThreadMutex.Lock()
 
 		for id, name := range ThreadNames {
-			if ( id < len(oldThreadLoopCount) && oldThreadLoopCount[id] == ThreadLoopCount[id]) {
+			if ( id < len(oldThreadLoopCount) && oldThreadLoopCount[id] == ThreadLoopCount[id] && ThreadProgressFlag[id]) {
 				count := ThreadLoopCount[id]
 				goid := ThreadNameToGoids[name]
 				ThreadMutex.Unlock()
@@ -45,28 +49,32 @@ func ThreadStallReport() {
 			}
 		}
 		for id, name := range ThreadNames {
-			count := ThreadLoopCount[id]
-			goid := ThreadNameToGoids[name]
-			ThreadMutex.Unlock()
-			fmt.Printf("Thread %33s:%03d (%14s)  %6v itterations\n", name, id, goid, count)
-			ThreadMutex.Lock()
+			if ( id < len(oldThreadLoopCount) && oldThreadLoopCount[id] != ThreadLoopCount[id] /*&& !ThreadProgressFlag[id]*/) {
+				count := ThreadLoopCount[id]
+				goid := ThreadNameToGoids[name]
+				ThreadMutex.Unlock()
+				fmt.Printf("Running Thread %33s:%03d (%14s)  %6v itterations (+%d)\n", name, id, goid, count, ThreadLoopCount[id]-oldThreadLoopCount[id])
+				ThreadMutex.Lock()
+			}
 		}
-
 
 		ThreadMutex.Unlock()
 	}
 	ThreadStop(threadId)
 }
 
-func ThreadName() (name string) {
+func ThreadName()(name string) {
+	if !enableThreadDebug {return}
 	ThreadMutex.Lock()
 	name = ThreadGoidToNames[atomic.Goid()]
 	ThreadMutex.Unlock()
 	return name
 }
 
-func ThreadStart(name string) (id int) {
-//	fmt.Printf("ThreadStart(%s)\n", name)
+func ThreadStart(name string, progress bool) (id int) {
+	if !enableThreadDebug {return}
+
+	//	fmt.Printf("ThreadStart(%s)\n", name)
 	goid := atomic.Goid()
 	ThreadMutex.Lock()
 	id, ok := ThreadIds[name]
@@ -77,8 +85,9 @@ func ThreadStart(name string) (id int) {
 	ThreadGoidToNames[goid] = name
 	ThreadNameToGoids[name] = goid
 	ThreadNames = append(ThreadNames, name)
+	ThreadProgressFlag = append(ThreadProgressFlag,progress)
 	ThreadLoopCount = append(ThreadLoopCount, 0)
-	id = len(ThreadNames)-1 // -1 so the first one gets Id 0
+	id = len(ThreadNames) - 1 // -1 so the first one gets Id 0
 	ThreadIds[name] = id
 	ThreadMutex.Unlock()
 	fmt.Printf("ThreadStart(%33s:%03d) (%14s)\n", name, id, goid)
@@ -86,6 +95,7 @@ func ThreadStart(name string) (id int) {
 }
 
 func ThreadStop(id int) {
+	if !enableThreadDebug {return}
 	ThreadMutex.Lock()
 	name := ThreadNames[id]
 	count := ThreadLoopCount[id]
@@ -95,6 +105,7 @@ func ThreadStop(id int) {
 }
 
 func ThreadLoopInc(id int) {
+	if !enableThreadDebug {return}
 	ThreadMutex.Lock()
 	ThreadLoopCount[id]++
 	ThreadMutex.Unlock()

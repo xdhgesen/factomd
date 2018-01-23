@@ -278,7 +278,7 @@ func FormatDuration(initial time.Time) string {
 
 // map[string]p2p.ConnectionMetrics
 func manageConnections(connections chan interface{}) {
-	var threadId = util.ThreadStart("manageConnections")
+	var threadId = util.ThreadStart("manageConnections", true)
 	defer util.ThreadStop(threadId)
 
 	for {

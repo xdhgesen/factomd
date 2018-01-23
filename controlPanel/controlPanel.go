@@ -92,7 +92,7 @@ func InitTemplates() {
 
 // Main function. This initiates appropriate variables and starts the control panel serving
 func ServeControlPanel(displayStateChannel chan state.DisplayState, statePointer *state.State, connections chan interface{}, controller *p2p.Controller, gitBuild string) {
-	var threadId = util.ThreadStart("ServeControlPanel")
+	var threadId = util.ThreadStart("ServeControlPanel", false)
 	defer util.ThreadStop(threadId)
 	defer func() {
 		if r := recover(); r != nil {
@@ -784,7 +784,7 @@ func getPastEntries(last interfaces.IDirectoryBlock, eNeeded int, fNeeded int) {
 
 // For go routines. Calls function once each duration.
 func doEvery(d time.Duration, f func(time.Time)) {
-	var threadId = util.ThreadStart("Connections.DoEvery")
+	var threadId = util.ThreadStart("Connections.DoEvery", true)
 	defer util.ThreadStop(threadId)
 
 	for x := range time.Tick(d) {

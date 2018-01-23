@@ -290,7 +290,7 @@ func (p *P2PProxy) ManageLogging() {
 
 // manageOutChannel takes messages from the f.broadcastOut channel and sends them to the network.
 func (f *P2PProxy) ManageOutChannel() {
-	var threadId = util.ThreadStart("ManageOutChannel")
+	var threadId = util.ThreadStart("ManageOutChannel",false)
 	defer util.ThreadStop(threadId)
 
 	for data := range f.BroadcastOut {
@@ -318,7 +318,7 @@ func (f *P2PProxy) ManageOutChannel() {
 
 // manageInChannel takes messages from the network and stuffs it in the f.BroadcastIn channel
 func (f *P2PProxy) ManageInChannel() {
-	var threadId = util.ThreadStart("ManageInChannel")
+	var threadId = util.ThreadStart("ManageInChannel",false)
 	defer util.ThreadStop(threadId)
 
 	for data := range f.FromNetwork {

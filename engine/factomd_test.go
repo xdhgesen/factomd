@@ -11,6 +11,8 @@ import (
 	"io/ioutil"
 	"os/user"
 	"github.com/FactomProject/factomd/util"
+	"log"
+	linuxproc "github.com/c9s/goprocinfo/linux"
 )
 
 var _ = Factomd
@@ -41,8 +43,7 @@ var capBool bool = false
 
 func TestSetupANetwork(t *testing.T) {
 
-
-	var threadId = util.ThreadStart(("TestSetupANetwork"))
+	var threadId = util.ThreadStart("TestSetupANetwork", false)
 	var startCap func()
 	var endCap func() string
 
@@ -56,7 +57,7 @@ func TestSetupANetwork(t *testing.T) {
 			os.Stdout = w
 		}
 		endCap = func() string {
-			<-ProcessChan
+
 			w.Close()
 			out, _ := ioutil.ReadAll(r)
 			os.Stdout = rescueStdout
@@ -71,9 +72,8 @@ func TestSetupANetwork(t *testing.T) {
 			startCap()
 		}
 		InputChan <- cmd
-		for len(InputChan) > 0 { // wait till the simulator accepts the command
-			time.Sleep(100 * time.Millisecond)
-		}
+		<-ProcessChan // wait till the simulator accepts the command
+
 		if (capBool) {
 			_ = endCap()
 		}
@@ -146,8 +146,11 @@ func TestSetupANetwork(t *testing.T) {
 		t.Fail()
 	}
 
+	numberOfNodes := GetFnodesLen()
+
 	runCmd("s") // start display of status
 	WaitMinutes(state0, 3)
+
 	runCmd("g10") // Create 10 identity (one FCT transaction and a pile of chain and entry creation)
 	runCmd("9")   // select 9
 	runCmd("x")   // take it offline
@@ -159,10 +162,11 @@ func TestSetupANetwork(t *testing.T) {
 	WaitBlocks(state0, 2) // wait till the dust settles
 	// Allocate leaders
 	WaitMinutes(state0, 1) // don't start at the beginning of the block (third minute absolute)
-	runCmd("1")            // select node 1
-	for i := 0; i < expectedLeaderCount-1; i++ {
+
+	runCmd("1") // select node 1
+	for i := 0; i < expectedLeaderCount-1; i++ { //-1 because node0 is already a leader
 		if i == 0 {
-			runCmd("numberOfNodes") // make current node a leader, advance to next node
+			runCmd("l") // make current node a leader, advance to next node
 		} else {
 			runCmd("") // Repeat make current node a leader, advance to next node
 		}
@@ -179,8 +183,7 @@ func TestSetupANetwork(t *testing.T) {
 
 	leadercnt := 0
 	auditcnt := 0
-	numberOfNodes := GetFnodesLen()
-	for i:=0;i< numberOfNodes;i++ {
+	for i := 0; i < numberOfNodes; i++ {
 		fn := GetFnode(i)
 		s := fn.State
 		if s.Leader {
@@ -278,7 +281,7 @@ func TestSetupANetwork(t *testing.T) {
 	WaitBlocks(fn1.State, 1)
 
 	t.Log("Shutting down the network")
-	for i:=0;i< numberOfNodes;i++ {
+	for i := 0; i < numberOfNodes; i++ {
 		fn := GetFnode(i)
 		fn.State.ShutdownChan <- 1
 	}
@@ -287,4 +290,6 @@ func TestSetupANetwork(t *testing.T) {
 	if state0.LLeaderHeight > 13 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
+
+
 }

@@ -16,7 +16,7 @@ import (
 )
 
 func (state *State) ValidatorLoop() {
-	var threadId = util.ThreadStart(state.FactomNodeName+":ValidatorLoop")
+	var threadId = util.ThreadStart(state.FactomNodeName+":ValidatorLoop", true)
 	defer util.ThreadStop(threadId)
 
 	timeStruct := new(Timer)

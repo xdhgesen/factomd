@@ -72,7 +72,7 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	state0.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(0))
 	fmt.Println("len(Args)", len(os.Args))
 
-	go NetStart(state0, params, listenToStdin)
+	NetStart(state0, params, listenToStdin)
 	return state0
 }
 
@@ -104,7 +104,7 @@ func isCompilerVersionOK() bool {
 func launchDebugServer() {
 	// start a go routine to tee stdout to out.txt
 	go func() {
-		var threadId = util.ThreadStart("DebugServer stdout copy")
+		var threadId = util.ThreadStart("DebugServer stdout copy", false)
 		defer util.ThreadStop(threadId)
 
 		outfile, err := os.Create("./out.txt")
@@ -128,7 +128,7 @@ func launchDebugServer() {
 	stdErrPipe_r, stdErrPipe_w, _ := os.Pipe() // Can't use the writer directly as os.Stdout so make a pipe
 
 	go func() {
-		var threadId = util.ThreadStart("DebugServer stderr copy")
+		var threadId = util.ThreadStart("DebugServer stderr copy", false)
 		defer util.ThreadStop(threadId)
 
 		outfile, err := os.Create("./err.txt")
@@ -166,7 +166,7 @@ func launchDebugServer() {
 
 	// Accept connections (one at a time)
 	go func() {
-		var threadId = util.ThreadStart("DebugServer stdin hook")
+		var threadId = util.ThreadStart("DebugServer stdin hook", false)
 		defer util.ThreadStop(threadId)
 
 		for {

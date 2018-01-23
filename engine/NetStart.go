@@ -527,11 +527,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
 
 	fnodesMu.Unlock()
-	SimControl(p.ListenTo, listenToStdin)
-	fnodesMu.Lock() // lok it so the deferred Unlock is good
+	go SimControl(p.ListenTo, listenToStdin)
+	fnodesMu.Lock() // lock it so the deferred Unlock is good
 
 }
-
 //**********************************************************************
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
@@ -624,7 +623,7 @@ func setupFirstAuthority(s *state.State) {
 }
 
 func networkHousekeeping() {
-	var threadId = util.ThreadStart("networkHousekeeping")
+	var threadId = util.ThreadStart("networkHousekeeping", true)
 	defer util.ThreadStop(threadId)
 
 	for {

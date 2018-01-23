@@ -30,7 +30,7 @@ func NetworkProcessorNet(fnode *FactomNode) {
 }
 
 func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
-	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":Peers")
+	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":Peers", true)
 	defer util.ThreadStop(threadId)
 
 	cnt := 0
@@ -203,7 +203,7 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 }
 
 func NetworkOutputs(fnode *FactomNode) {
-	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":NetworkOutput")
+	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":NetworkOutput", false)
 	defer util.ThreadStop(threadId)
 
 	for {
@@ -287,7 +287,7 @@ func NetworkOutputs(fnode *FactomNode) {
 
 // Just throw away the trash
 func InvalidOutputs(fnode *FactomNode) {
-	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":InvalidOutput")
+	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":InvalidOutput", false)
 	defer util.ThreadStop(threadId)
 
 	for {

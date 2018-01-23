@@ -1182,7 +1182,7 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 		return
 	}
 
-	// Don't sign while negotiationg the EOM
+	// Don't sign while negotiating the EOM
 	if list.State.EOM {
 		return
 	}
