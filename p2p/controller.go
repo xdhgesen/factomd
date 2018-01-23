@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
+	"github.com/FactomProject/factomd/util"
 )
 
 // packageLogger is the general logger for all p2p related logs. You can add additional fields,
@@ -327,6 +328,9 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 
 // runloop is a goroutine that does all the heavy lifting
 func (c *Controller) runloop() {
+	var threadId = util.ThreadStart("Controller.runloop")
+	defer util.ThreadStop(threadId)
+
 	// In long running processes it seems the runloop is exiting.
 	reportExit := func() {
 		significant("ctrlr", "@@@@@@@@@@ Controller.runloop() has exited! Here's its final state:")
@@ -361,7 +365,7 @@ func (c *Controller) runloop() {
 	time.Sleep(time.Second * time.Duration(2)) // Wait a few seconds to let the system come up.
 
 	for c.keepRunning { // Run until we get the exit command
-
+		util.ThreadLoopInc(threadId)
 		c.numConnections.Store(uint32(len(c.connections)))
 		c.numConnectionsByAddress.Store(uint32(len(c.connectionsByAddress)))
 

@@ -20,6 +20,7 @@ import (
 	"net"
 	"bufio"
 	"os/exec"
+	"github.com/FactomProject/factomd/util"
 )
 
 var _ = fmt.Print
@@ -63,7 +64,7 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 
 	//  Go Optimizations...
 	t:=runtime.NumCPU()
-	runtime.GOMAXPROCS(t)
+	runtime.GOMAXPROCS(t)//TODO: Should this be *2 so we take advantage of hyper-threading -- clay
 	fmt.Printf("Using %d threads\n", t)
 
 	state0 := new(state.State)
@@ -103,6 +104,9 @@ func isCompilerVersionOK() bool {
 func launchDebugServer() {
 	// start a go routine to tee stdout to out.txt
 	go func() {
+		var threadId = util.ThreadStart("DebugServer stdout copy")
+		defer util.ThreadStop(threadId)
+
 		outfile, err := os.Create("./out.txt")
 		if err != nil {
 			panic(err)
@@ -124,6 +128,9 @@ func launchDebugServer() {
 	stdErrPipe_r, stdErrPipe_w, _ := os.Pipe() // Can't use the writer directly as os.Stdout so make a pipe
 
 	go func() {
+		var threadId = util.ThreadStart("DebugServer stderr copy")
+		defer util.ThreadStop(threadId)
+
 		outfile, err := os.Create("./err.txt")
 		if err != nil {
 			panic(err)
@@ -159,7 +166,11 @@ func launchDebugServer() {
 
 	// Accept connections (one at a time)
 	go func() {
+		var threadId = util.ThreadStart("DebugServer stdin hook")
+		defer util.ThreadStop(threadId)
+
 		for {
+			util.ThreadLoopInc(threadId)
 			fmt.Printf("Debug server waiting for connection.") // Does not accept a reconnect not sure why ... revist
 			connection, err := ln.Accept()
 			if err != nil {

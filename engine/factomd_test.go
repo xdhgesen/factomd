@@ -10,6 +10,7 @@ import (
 	"github.com/FactomProject/factomd/state"
 	"io/ioutil"
 	"os/user"
+	"github.com/FactomProject/factomd/util"
 )
 
 var _ = Factomd
@@ -40,6 +41,8 @@ var capBool bool = false
 
 func TestSetupANetwork(t *testing.T) {
 
+
+	var threadId = util.ThreadStart(("TestSetupANetwork"))
 	var startCap func()
 	var endCap func() string
 
@@ -62,6 +65,7 @@ func TestSetupANetwork(t *testing.T) {
 	}
 
 	runCmd := func(cmd string) {
+		util.ThreadLoopInc(threadId)
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		if (capBool) {
 			startCap()
@@ -137,7 +141,7 @@ func TestSetupANetwork(t *testing.T) {
 	time.Sleep(20 * time.Second)
 
 	t.Logf("Allocated %d nodes", nodeCount)
-	if len(GetFnodes()) != nodeCount {
+	if GetFnodesLen() != nodeCount {
 		t.Fatalf("Should have allocated %d nodes", nodeCount)
 		t.Fail()
 	}
@@ -158,7 +162,7 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("1")            // select node 1
 	for i := 0; i < expectedLeaderCount-1; i++ {
 		if i == 0 {
-			runCmd("l") // make current node a leader, advance to next node
+			runCmd("numberOfNodes") // make current node a leader, advance to next node
 		} else {
 			runCmd("") // Repeat make current node a leader, advance to next node
 		}
@@ -175,7 +179,9 @@ func TestSetupANetwork(t *testing.T) {
 
 	leadercnt := 0
 	auditcnt := 0
-	for _, fn := range GetFnodes() {
+	numberOfNodes := GetFnodesLen()
+	for i:=0;i< numberOfNodes;i++ {
+		fn := GetFnode(i)
 		s := fn.State
 		if s.Leader {
 			leadercnt++
@@ -272,7 +278,8 @@ func TestSetupANetwork(t *testing.T) {
 	WaitBlocks(fn1.State, 1)
 
 	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
+	for i:=0;i< numberOfNodes;i++ {
+		fn := GetFnode(i)
 		fn.State.ShutdownChan <- 1
 	}
 

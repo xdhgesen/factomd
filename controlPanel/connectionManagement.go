@@ -8,6 +8,7 @@ import (
 
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/util/atomic"
+	"github.com/FactomProject/factomd/util"
 )
 
 var AllConnections *ConnectionsMap
@@ -277,9 +278,13 @@ func FormatDuration(initial time.Time) string {
 
 // map[string]p2p.ConnectionMetrics
 func manageConnections(connections chan interface{}) {
+	var threadId = util.ThreadStart("manageConnections")
+	defer util.ThreadStop(threadId)
+
 	for {
+		util.ThreadLoopInc(threadId)
 		select {
-		case connectionsMessage := <-connections:
+		case connectionsMessage := <-connections: // TODO: Why not block here?
 			switch connectionsMessage.(type) {
 			case map[string]p2p.ConnectionMetrics:
 				newConnections := connectionsMessage.(map[string]p2p.ConnectionMetrics)

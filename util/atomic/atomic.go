@@ -89,12 +89,13 @@ func Goid() string {
 	var buf [64]byte
 	n := runtime.Stack(buf[:], false)
 	s := string(buf[:n])
-	idField := s[:strings.Index(s, "[")]
+	idField := s[:strings.Index(s, "[")-1]
 	return idField
 }
 
 func WhereAmIString(depth int) string {
 	_, fn, line, _ := runtime.Caller(depth + 1)
+	fn = strings.TrimPrefix(fn, "/home/clay/go/src/github.com/FactomProject/factomd/")
 	return fmt.Sprintf("%v-%s:%d", Goid(), fn, line)
 }
 
@@ -119,26 +120,33 @@ type DebugMutex struct {
 	done     chan struct{} // Channel to signal success to starvation detector
 }
 
-var yeaOfLittleFaith AtomicBool = AtomicBool(1) // true means mutex lock instead of CAS lock
-var enableStarvationDetection AtomicBool = AtomicBool(0)
+var yeaOfLittleFaith AtomicBool = AtomicBool(0) // true means mutex lock instead of CAS lock
+var enableStarvationDetection AtomicBool = AtomicBool(1)
 var enableAlreadyLockedDetection AtomicBool = AtomicBool(0)
 var enableOwnerTracking AtomicBool = AtomicBool(1 & enableStarvationDetection) // no point in tracking owners if not detecting starvation
 
 func (c *DebugMutex) timeStarvation(whereAmI string) {
+	var starved bool = false
 	for {
 		for i := 0; i < 1000; i++ {
 			select {
 			case <-c.done:
+				if starved {
+					fmt.Printf("%s:Got Lock!", c.name.Load())
+				}
 				return
 			default:
-				time.Sleep(3 * time.Millisecond)
+				time.Sleep(5 * time.Millisecond)
 			}
 		}
-		if enableOwnerTracking.Load() {
-			fmt.Printf("%s:Lock starving waiting for [%s] at %s\n", c.name.Load(), c.owner.Load(), whereAmI)
-		} else {
-			fmt.Printf("%s:Lock starving at %s\n", c.name.Load(), whereAmI)
+		if !starved {
+			if enableOwnerTracking.Load() {
+				fmt.Printf("%s:Lock starving waiting for [%s] at %s\n", c.name.Load(), c.owner.Load(), whereAmI)
+			} else {
+				fmt.Printf("%s:Lock starving at %s\n", c.name.Load(), whereAmI)
+			}
 		}
+		starved = true
 	}
 }
 

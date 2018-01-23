@@ -14,6 +14,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/log"
 	"sync"
+	"github.com/FactomProject/factomd/util"
 )
 
 var _ = log.Printf
@@ -29,6 +30,9 @@ func NetworkProcessorNet(fnode *FactomNode) {
 }
 
 func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
+	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":Peers")
+	defer util.ThreadStop(threadId)
+
 	cnt := 0
 	done := false
 	// ackHeight is used in ignoreMsg to determine if we should ignore an acknowledgment
@@ -88,6 +92,7 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 	}
 
 	for {
+		util.ThreadLoopInc(threadId)
 		for i := 0; i < 100 && fnode.State.APIQueue().Length() > 0; i++ {
 			msg := fnode.State.APIQueue().Dequeue()
 			if msg != nil {
@@ -198,7 +203,11 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 }
 
 func NetworkOutputs(fnode *FactomNode) {
+	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":NetworkOutput")
+	defer util.ThreadStop(threadId)
+
 	for {
+		util.ThreadLoopInc(threadId)
 		// if len(fnode.State.NetworkOutMsgQueue()) > 500 {
 		// 	fmt.Print(fnode.State.GetFactomNodeName(), "-", len(fnode.State.NetworkOutMsgQueue()), " ")
 		// }
@@ -278,13 +287,18 @@ func NetworkOutputs(fnode *FactomNode) {
 
 // Just throw away the trash
 func InvalidOutputs(fnode *FactomNode) {
+	var threadId = util.ThreadStart(fnode.State.FactomNodeName+":InvalidOutput")
+	defer util.ThreadStop(threadId)
+
 	for {
-		time.Sleep(1 * time.Millisecond)
+		util.ThreadLoopInc(threadId)
+		time.Sleep(1 * time.Millisecond) // TODO: Why Sleep this next line block ? -- clay
 		_ = <-fnode.State.NetworkInvalidMsgQueue()
+
 		//fmt.Println(invalidMsg)
 
 		// The following code was giving a demerit for each instance of a message in the NetworkInvalidMsgQueue.
-		// However the concensus system is not properly limiting the messages going into this queue to be ones
+		// However the consensus system is not properly limiting the messages going into this queue to be ones
 		//  indicating an attack.  So the demerits are turned off for now.
 		// if len(invalidMsg.GetNetworkOrigin()) > 0 {
 		// 	p2pNetwork.AdjustPeerQuality(invalidMsg.GetNetworkOrigin(), -2)

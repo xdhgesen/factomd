@@ -46,15 +46,22 @@ var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
 var logPort string
 
-func GetFnodes() []*FactomNode {
+
+func GetFnodesLen() int {
 	fnodesMu.Lock()
 	defer fnodesMu.Unlock()
-	for fnodes == nil { // wait for it to be allocated
+	return len(fnodes)
+}
+
+func GetFnode(n int) *FactomNode {
+	fnodesMu.Lock()
+	defer fnodesMu.Unlock()
+	for fnodes == nil || fnodes[n] == nil { // wait for it to be allocated
 		fnodesMu.Unlock()
 		time.Sleep(50 * time.Millisecond)
 		fnodesMu.Lock()
 	}
-	return fnodes
+	return fnodes[n]
 }
 
 func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
@@ -617,8 +624,13 @@ func setupFirstAuthority(s *state.State) {
 }
 
 func networkHousekeeping() {
+	var threadId = util.ThreadStart("networkHousekeeping")
+	defer util.ThreadStop(threadId)
+
 	for {
+		util.ThreadLoopInc(threadId)
 		time.Sleep(1 * time.Second)
 		p2pProxy.SetWeight(p2pNetwork.GetNumberConnections())
 	}
+	fmt.Println("I should never ever get here!")
 }

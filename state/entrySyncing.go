@@ -14,6 +14,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"sync"
+	"github.com/FactomProject/factomd/util"
 )
 
 func (s *MakeMissingEntryRequestsInfo) has(DB interfaces.DBOverlaySimple, entry interfaces.IHash) bool {
@@ -56,6 +57,8 @@ type MakeMissingEntryRequestsInfo struct {
 // This go routine checks every so often to see if we have any missing entries or entry blocks.  It then requests
 // them if it finds entries in the missing lists.
 func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo) {
+	var threadId = util.ThreadStart(ss.FactomNodeName+":MakeMissingEntryRequests")
+	defer util.ThreadStop(threadId)
 
 	missing := 0
 	found := 0
@@ -66,7 +69,7 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 //	fmt.Printf("%13s Got  %40s %+v\n", ss.FactomNodeName, "initial MakeMissingEntryRequestsInfo", info)
 
 	for {
-		
+		util.ThreadLoopInc(threadId)
 		now := time.Now()
 		newrequest := 0
 		cnt := 0
@@ -195,6 +198,8 @@ func MakeMissingEntryRequests(ss *MakeMissingEntryRequestsStatic, MakeMissingEnt
 }
 
 func GoSyncEntries (wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithEntrySyncInfoChannel chan ShareWithEntrySyncInfo) {
+	var threadId = util.ThreadStart(ss.FactomNodeName+":GoSyncEntries")
+	defer util.ThreadStop(threadId)
 
 	// Feeds for worker threads
 	var MakeMissingEntryRequestsInfoChannel chan MakeMissingEntryRequestsInfo = make(chan MakeMissingEntryRequestsInfo, 1) // Info needed by MakeMissingEntries()
@@ -226,6 +231,7 @@ func GoSyncEntries (wg *sync.WaitGroup, ss *ShareWithEntrySyncStatic, ShareWithE
 	var m MakeMissingEntryRequestsInfo = s.MakeMissingEntryRequestsInfo // set initial MakeMissingEntryRequestsInfo
 
 	for {
+		util.ThreadLoopInc(threadId)
 		// feed the MakeMissingEntryRequests() thread
 		if m != s.MakeMissingEntryRequestsInfo {
 			m = s.MakeMissingEntryRequestsInfo

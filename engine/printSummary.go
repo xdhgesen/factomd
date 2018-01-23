@@ -8,9 +8,12 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/util/atomic"
 	"os"
+	"github.com/FactomProject/factomd/util"
 )
 
 func printSummary(summary *int, value int, listenTo *atomic.AtomicInt, wsapiNode *atomic.AtomicInt) {
+	var threadId = util.ThreadStart("printSummary")
+	defer util.ThreadStop(threadId)
 
 	defer func() {
 		if false {
@@ -30,6 +33,7 @@ func printSummary(summary *int, value int, listenTo *atomic.AtomicInt, wsapiNode
 	}
 
 	for *summary == value {
+		util.ThreadLoopInc(threadId)
 		prt := "===SummaryStart===\n\n"
 		prt = fmt.Sprintf("%sTime: %d\n", prt, time.Now().Unix())
 

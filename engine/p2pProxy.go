@@ -18,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/p2p"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/FactomProject/factomd/util"
 )
 
 var _ = fmt.Print
@@ -289,7 +290,11 @@ func (p *P2PProxy) ManageLogging() {
 
 // manageOutChannel takes messages from the f.broadcastOut channel and sends them to the network.
 func (f *P2PProxy) ManageOutChannel() {
+	var threadId = util.ThreadStart("ManageOutChannel")
+	defer util.ThreadStop(threadId)
+
 	for data := range f.BroadcastOut {
+		util.ThreadLoopInc(threadId)
 		switch data.(type) {
 		case FactomMessage:
 			fmessage := data.(FactomMessage)
@@ -313,7 +318,11 @@ func (f *P2PProxy) ManageOutChannel() {
 
 // manageInChannel takes messages from the network and stuffs it in the f.BroadcastIn channel
 func (f *P2PProxy) ManageInChannel() {
+	var threadId = util.ThreadStart("ManageInChannel")
+	defer util.ThreadStop(threadId)
+
 	for data := range f.FromNetwork {
+		util.ThreadLoopInc(threadId)
 		switch data.(type) {
 		case p2p.Parcel:
 			parcel := data.(p2p.Parcel)

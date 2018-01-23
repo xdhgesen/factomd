@@ -12,9 +12,13 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/util"
 )
 
 func (state *State) ValidatorLoop() {
+	var threadId = util.ThreadStart(state.FactomNodeName+":ValidatorLoop")
+	defer util.ThreadStop(threadId)
+
 	timeStruct := new(Timer)
 
 	s := state // for debugging
@@ -34,6 +38,7 @@ func (state *State) ValidatorLoop() {
 		}
 	}()
 	for {
+		util.ThreadLoopInc(threadId)
 		//atomic.WhereAmIMsg(s.FactomNodeName)
 		QQQ++
 		_ = QQQ
