@@ -8,13 +8,10 @@ import (
 	"fmt"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
-	"io/ioutil"
 	"os/user"
 	"github.com/FactomProject/factomd/util"
-	"log"
-	linuxproc "github.com/c9s/goprocinfo/linux"
+	"strconv"
 )
-
 var _ = Factomd
 
 // Wait so many blocks
@@ -39,44 +36,15 @@ func WaitMinutes(s *state.State, min int) {
 	}
 }
 
-var capBool bool = false
-
 func TestSetupANetwork(t *testing.T) {
 
 	var threadId = util.ThreadStart("TestSetupANetwork", false)
-	var startCap func()
-	var endCap func() string
-
-	if (capBool) {
-		rescueStdout := os.Stdout
-		r, w, _ := os.Pipe()
-
-		startCap = func() {
-			rescueStdout = os.Stdout
-			r, w, _ = os.Pipe()
-			os.Stdout = w
-		}
-		endCap = func() string {
-
-			w.Close()
-			out, _ := ioutil.ReadAll(r)
-			os.Stdout = rescueStdout
-			return string(out)
-		}
-	}
 
 	runCmd := func(cmd string) {
 		util.ThreadLoopInc(threadId)
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
-		if (capBool) {
-			startCap()
-		}
 		InputChan <- cmd
 		<-ProcessChan // wait till the simulator accepts the command
-
-		if (capBool) {
-			_ = endCap()
-		}
 		return
 	}
 
@@ -91,10 +59,14 @@ func TestSetupANetwork(t *testing.T) {
 		done := make(chan struct{})
 
 		timeout := func(seconds int, updatePeriod int) {
+			timeout := seconds // remember how long we started with
 			for {
 				for seconds > 0 {
 					select {
 					case <-done:
+						seconds = timeout-seconds;
+						fmt.Printf("\nTest ended after %02d:%02d:%02d timeout\n", int(seconds/3600), int(seconds/60)%60, seconds%60)
+
 						return
 					default:
 						fmt.Printf("\nTimeout in %02d:%02d:%02d timeout\n", int(seconds/3600), int(seconds/60)%60, seconds%60)
@@ -152,12 +124,12 @@ func TestSetupANetwork(t *testing.T) {
 	WaitMinutes(state0, 3)
 
 	runCmd("g10") // Create 10 identity (one FCT transaction and a pile of chain and entry creation)
-	runCmd("9")   // select 9
+	runCmd(strconv.Itoa(nodeCount-1))   // select the last server
 	runCmd("x")   // take it offline
 	runCmd("w")   // make the API point to current (for code coverage, there is no traffic)
-	runCmd("10")
-	runCmd("8")
-	runCmd("w") // make the API point to 8 it will
+	runCmd("2")
+	runCmd("1")
+	runCmd("w") // make the API point to 1
 
 	WaitBlocks(state0, 2) // wait till the dust settles
 	// Allocate leaders
@@ -235,15 +207,15 @@ func TestSetupANetwork(t *testing.T) {
 	WaitMinutes(state0, 3)
 	runCmd("g20")
 	WaitBlocks(state0, 1)
-	runCmd("9")
+	runCmd(strconv.Itoa(nodeCount-1))   // select the last server
 	runCmd("x")
-	runCmd("8")
+	runCmd("2")
 
 	time.Sleep(100 * time.Millisecond)
 
 	fn2 := GetFocus()
-	if fn2.State.FactomNodeName != "FNode08" {
-		t.Fatalf("Expected FNode08, but got %s", fn1.State.FactomNodeName)
+	if fn2.State.FactomNodeName != "FNode02" {
+		t.Fatalf("Expected FNode02, but got %s", fn1.State.FactomNodeName)
 	}
 
 	runCmd("i")
@@ -290,6 +262,5 @@ func TestSetupANetwork(t *testing.T) {
 	if state0.LLeaderHeight > 13 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
-
 
 }
