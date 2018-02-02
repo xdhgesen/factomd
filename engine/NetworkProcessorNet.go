@@ -113,7 +113,7 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 					msg.GetTimestamp(),
 					fnode.State.GetTimestamp()) {
 					//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, msg)
-					if fnode.State.InMsgQueue().Length() < 9000 {
+					if fnode.State.InMsgQueue().Length() < constants.INMSGQUEUE_MAX {
 						fnode.State.InMsgQueue().Enqueue(msg)
 					}
 				} else {
@@ -177,7 +177,16 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 					fnode.MLog.Add2(fnode, false, peer.GetNameTo(), nme, true, msg)
 
 					// Ignore messages if there are too many.
-					if fnode.State.InMsgQueue().Length() < 9000 && !ignoreMsg(msg) {
+					ignore := ignoreMsg(msg)
+					if ignore {
+						//						messages.LogMessage(logName, "ignore", msg)
+					}
+					if !(fnode.State.InMsgQueue().Length() < constants.INMSGQUEUE_MAX) {
+						//						messages.LogMessage(logName, "drop", msg)
+					}
+
+					// Ignore messages if there are too many.
+					if fnode.State.InMsgQueue().Length() < constants.INMSGQUEUE_MAX && !ignore {
 						fnode.State.InMsgQueue().Enqueue(msg)
 					}
 				} else {
@@ -218,20 +227,19 @@ func NetworkOutputs(fnode *FactomNode) {
 				// seen this message before, because we might have generated the message
 				// ourselves.
 				if msg.GetRepeatHash() == nil {
+					//					messages.LogMessage(logName, "Drop nilRepeatHash", msg)
 					continue
 				}
 
-				_, ok := msg.(*messages.Ack)
-				if ok {
 					fnode.State.Replay.IsTSValid_(
 						constants.NETWORK_REPLAY,
 						msg.GetRepeatHash().Fixed(),
 						msg.GetTimestamp(),
 						fnode.State.GetTimestamp())
-				}
 
 				p := msg.GetOrigin() - 1
 
+				if !fnode.State.GetNetStateOff() {
 				if msg.IsPeer2Peer() {
 					// Must have a Peer to send a message to a peer
 					if len(fnode.Peers) > 0 {
@@ -239,7 +247,6 @@ func NetworkOutputs(fnode *FactomNode) {
 							p = rand.Int() % len(fnode.Peers)
 						}
 						fnode.MLog.Add2(fnode, true, fnode.Peers[p].GetNameTo(), "P2P out", true, msg)
-						if !fnode.State.GetNetStateOff() {
 							preSendTime := time.Now()
 							fnode.Peers[p].Send(msg)
 							sendTime := time.Since(preSendTime)
@@ -247,9 +254,10 @@ func NetworkOutputs(fnode *FactomNode) {
 							if fnode.State.MessageTally {
 								fnode.State.TallySent(int(msg.Type()))
 							}
+						} else {
+							//							messages.LogMessage(logName, "Drop noPeers", msg)
 						}
-					}
-				} else {
+					} else { // it's broadcast
 					for i, peer := range fnode.Peers {
 						wt := 1
 						if p >= 0 {
@@ -268,10 +276,15 @@ func NetworkOutputs(fnode *FactomNode) {
 									fnode.State.TallySent(int(msg.Type()))
 								}
 							}
-						}
+}
+						} // all peers
 					}
+				} else {
+					// messages.LogMessage(logName, "Drop networkOff", msg)
 				}
 			}
+		} else {
+			// messages.LogMessage(logName, "Drop isLocal", msg)
 		}
 	}
 }
@@ -280,7 +293,7 @@ func NetworkOutputs(fnode *FactomNode) {
 func InvalidOutputs(fnode *FactomNode) {
 	for {
 		time.Sleep(1 * time.Millisecond)
-		_ = <-fnode.State.NetworkInvalidMsgQueue()
+		invalidMsg := <-fnode.State.NetworkInvalidMsgQueue()
 		//fmt.Println(invalidMsg)
 
 		// The following code was giving a demerit for each instance of a message in the NetworkInvalidMsgQueue.
@@ -289,5 +302,8 @@ func InvalidOutputs(fnode *FactomNode) {
 		// if len(invalidMsg.GetNetworkOrigin()) > 0 {
 		// 	p2pNetwork.AdjustPeerQuality(invalidMsg.GetNetworkOrigin(), -2)
 		// }
+		if false && len(invalidMsg.GetNetworkOrigin()) > 0 {
+			p2pNetwork.AdjustPeerQuality(invalidMsg.GetNetworkOrigin(), -2)
+		}
 	}
 }

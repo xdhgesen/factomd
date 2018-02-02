@@ -31,7 +31,7 @@ type P2PProxy struct {
 	ToName   string
 	FromName string
 	// Channels that define the connection:
-	BroadcastOut chan interface{} // FactomMessage ToNetwork from factomd
+	BroadcastOut chan interface{} // FactomMessage ToNetwork from Factomd
 	BroadcastIn  chan interface{} // FactomMessage FromNetwork for Factomd
 
 	ToNetwork   chan interface{} // p2p.Parcel From p2pProxy to the p2p Controller

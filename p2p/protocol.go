@@ -51,9 +51,9 @@ var (
 	BroadcastFlag                                    = "<BROADCAST>"
 	RandomPeerFlag                                   = "<RANDOMPEER>"
 	NodeID                       uint64              = 0           // Random number used for loopback protection
-	MinimumQualityScore          int32               = -200        // if a peer's score is less than this we ignore them.
+	MinumumQualityScore           int32  = -200        // if a peer's score is less than this we ignore them.
 	BannedQualityScore           int32               = -2147000000 // Used to ban a peer
-	MinimumSharingQualityScore   int32               = 20          // if a peer's score is less than this we don't share them.
+	MinumumSharingQualityScore    int32  = 20          // if a peer's score is less than this we don't share them.
 	OnlySpecialPeers                                 = false
 	NetworkDeadline                                  = time.Duration(30) * time.Second
 	NumberPeersToConnect                             = 32

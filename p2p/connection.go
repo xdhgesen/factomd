@@ -289,7 +289,7 @@ func (c *Connection) runLoop() {
 				c.updatePeer() // every PeerSaveInterval * 0.90 we send an update peer to the controller.
 			}
 
-			if MinimumQualityScore > c.peer.QualityScore && !c.isPersistent {
+			if MinumumQualityScore > c.peer.QualityScore && !c.isPersistent {
 				c.updatePeer() // every PeerSaveInterval * 0.90 we send an update peer to the controller.
 				c.goShutdown()
 			}
@@ -316,10 +316,10 @@ func (c *Connection) runLoop() {
 	significant(c.peer.PeerIdent(), "runLoop() Connection runloop() exiting %+v", c)
 }
 
-// assumes it is called with c.mu already locked
 func (c *Connection) setNotes(format string, v ...interface{}) {
+        s := fmt.Sprintf(format, v...)
 	c.lock()
-	c.notes = fmt.Sprintf(format, v...)
+	c.notes = s
 	c.unlock()
 	significant(c.peer.PeerIdent(), c.notes)
 
@@ -472,10 +472,10 @@ func (c *Connection) handleCommand() {
 			delta := command.Delta
 			note(c.peer.PeerIdent(), "handleCommand() ConnectionAdjustPeerQuality: Current Score: %d Delta: %d", c.peer.QualityScore, delta)
 			c.peer.QualityScore = c.peer.QualityScore + delta
-			if MinimumQualityScore > c.peer.QualityScore {
+			if MinumumQualityScore > c.peer.QualityScore {
 				debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s for quality score: %d", c.peer.PeerIdent(), c.peer.QualityScore)
 				c.updatePeer()
-				c.setNotes(fmt.Sprintf("Connection(%s) shutting down due to QualityScore %d being below MinimumQualityScore: %d.", c.peer.AddressPort(), c.peer.QualityScore, MinimumQualityScore))
+				c.setNotes(fmt.Sprintf("Connection(%s) shutting down due to QualityScore %d being below MinumumQualityScore: %d.", c.peer.AddressPort(), c.peer.QualityScore, MinumumQualityScore))
 				c.goShutdown()
 			}
 		case ConnectionGoOffline:
@@ -491,7 +491,7 @@ func (c *Connection) handleCommand() {
 // assume c.mu is locked before we get here
 func (c *Connection) sendParcel(parcel Parcel) {
 
-	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback detection.
+	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
 	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline * 500))
 
 	//deadline := time.Now().Add(NetworkDeadline)
@@ -650,7 +650,7 @@ func (c *Connection) parcelValidity(parcel Parcel) uint8 {
 	case parcel.Header.NodeID == NodeID: // We are talking to ourselves!
 		parcel.Trace("Connection.isValidParcel()-loopback", "H")
 		c.setNotes(fmt.Sprintf("Connection.isValidParcel(), failed due to loopback!: %+v", parcel.Header))
-		c.peer.QualityScore = MinimumQualityScore - 50 // Ban ourselves for a week
+		c.peer.QualityScore = MinumumQualityScore - 50 // Ban ourselves for a week
 		return InvalidDisconnectPeer
 	case parcel.Header.Network != CurrentNetwork:
 		parcel.Trace("Connection.isValidParcel()-network", "H")

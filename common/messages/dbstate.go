@@ -340,10 +340,16 @@ func (m *DBStateMsg) SigTally(state interfaces.IState) int {
 	// If there is a repeat signature, we do not count it twice
 	sigmap := make(map[string]bool)
 	for _, sig := range m.SignatureList.List {
-		if sigmap[fmt.Sprintf("%x", sig.GetSignature()[:])] {
+sig2:=fmt.Sprintf("%x", sig.GetSignature()[:])
+		if sigmap[sig2] {
 			continue // Toss duplicate signatures
 		}
-		sigmap[fmt.Sprintf("%x", sig.GetSignature()[:])] = true
+		sigmap[sig2] = true
+		check, err := state.VerifyAuthoritySignature(data, sig.GetSignature(), dbheight)
+		if err == nil && check >= 0 {
+			validSigCount++
+			continue
+		}
 		//Check signature against the Skeleton key
 		authoritativeKey := state.GetNetworkBootStrapKey()
 		if authoritativeKey != nil {
@@ -353,12 +359,6 @@ func (m *DBStateMsg) SigTally(state interfaces.IState) int {
 					continue
 				}
 			}
-		}
-
-		check, err := state.VerifyAuthoritySignature(data, sig.GetSignature(), dbheight)
-		if err == nil && check >= 0 {
-			validSigCount++
-			continue
 		}
 
 		if sig.Verify(data) {

@@ -121,8 +121,10 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *atomic.Atom
 		list = ""
 		for _, f := range pnodes {
 			f.State.XReviewMutex.Lock()
-			list = list + fmt.Sprintf(" %3d", len(f.State.XReview)) // RL
+l:= len(f.State.XReview)
 			f.State.XReviewMutex.Unlock()
+			list = list + fmt.Sprintf(" %3d",l) // L
+
 		}
 		prt = prt + fmt.Sprintf(fmtstr, "Review", list)
 

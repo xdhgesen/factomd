@@ -5,13 +5,16 @@
 package identity
 
 import (
+	"fmt"
 	"encoding/json"
 
 	ed "github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/globals"
 	"github.com/FactomProject/factomd/util/atomic"
 )
 
@@ -26,6 +29,7 @@ type Authority struct {
 	KeyHistory []HistoricKey
 }
 
+var ZeroKey primitives.PublicKey // all zero public key
 var _ interfaces.BinaryMarshallable = (*Authority)(nil)
 
 func RandomAuthority() *Authority {
@@ -36,7 +40,7 @@ func RandomAuthority() *Authority {
 	a.MatryoshkaHash = primitives.RandomHash()
 
 	a.SigningKey = *primitives.RandomPrivateKey().Pub
-	a.Status.Store(random.RandUInt8())
+	a.Status = random.RandUInt8()
 
 	l := random.RandIntBetween(1, 10)
 	for i := 0; i < l; i++ {
@@ -202,7 +206,9 @@ func (e *Authority) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 		if err != nil {
 			return
 		}
+		if hk.SigningKey != ZeroKey {
 		e.KeyHistory = append(e.KeyHistory, hk)
+	}
 	}
 
 	newData = buf.DeepCopyBytes()
@@ -224,30 +230,63 @@ func (auth *Authority) Type() int {
 	return -1
 }
 
+type foo struct {
+	Key [32]byte
+	Msg []byte
+}
+
+var failsMutex sync.Mutex
+var fails map[[64]byte]foo
 func (auth *Authority) VerifySignature(msg []byte, sig *[constants.SIGNATURE_LENGTH]byte) (bool, error) {
 	//return true, nil // Testing
-	var pub [32]byte
+	var pub primitives.PublicKey
 	tmp, err := auth.SigningKey.MarshalBinary()
 	if err != nil {
+		fmt.Println("Can't unmarshal a key!")
 		return false, err
-	} else {
+	} 
 		copy(pub[:], tmp)
-		valid := ed.VerifyCanonical(&pub, msg, sig)
-		if !valid {
+	if pub == ZeroKey {
+		fmt.Println("zero key whole key")
+		return false, err
+	}
+
+	valid := ed.VerifyCanonical((*[32]byte)(&pub), msg, sig)
+	if valid {
+		return true, nil
+	}
 			for _, histKey := range auth.KeyHistory {
 				histTemp, err := histKey.SigningKey.MarshalBinary()
 				if err != nil {
 					continue
 				}
 				copy(pub[:], histTemp)
+                                if pub == ZeroKey {
+		               	fmt.Println("zero key whole key")
+		}
 				if ed.VerifyCanonical(&pub, msg, sig) {
 					return true, nil
 				}
-			}
-		} else {
-			return true, nil
-		}
+
+			if ed.VerifyCanonical((*[32]byte)(&pub), msg, sig) {
+				// debug ...
+				if false {
+					failsMutex.Lock()
+					pc, ok := fails[*sig]
+					failsMutex.Unlock()
+					if ok {
+						logName := globals.FactomNodeName + "_executeMsg" + ".txt"
+						messages.LogPrint(logName,
+							fmt.Sprintf("VerifySig false key <%x> sig <%x> %3d[%x]", pc.Key, sig, len(pc.Msg), pc.Msg) + "\n"+
+								fmt.Sprintf("VerifySig true1 key <%x> sig <%x> %3d[%x]", pub, sig, len(msg), msg))
+			
+				// debug ...
+				return true, nil
+		} 
+
 	}
+		}
+	} // for all the historical keys
 	return false, nil
 }
 
@@ -288,6 +327,7 @@ func statusToJSONString(status uint8) string {
 		return "none"
 	case constants.IDENTITY_SKELETON:
 		return "skeleton"
+	default:
+		return fmt.Sprintf("Unknown status 0x%x", status)
 	}
-	return "NA"
 }

@@ -49,6 +49,7 @@ const NUM_MESSAGES = 29
 
 const (
 	// Limits for keeping inputs from flooding our execution
+	INMSGQUEUE_MAX  = 9000
 	INMSGQUEUE_HIGH = 1000
 	INMSGQUEUE_MED  = 500
 	INMSGQUEUE_LOW  = 100

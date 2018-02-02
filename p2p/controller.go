@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"github.com/FactomProject/factomd/common/primitives"
 	log "github.com/sirupsen/logrus"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -220,9 +221,11 @@ func (c *Controller) DialSpecialPeersString(peersString string) {
 	}
 	peerAddresses := strings.FieldsFunc(peersString, parseFunc)
 	for _, peerAddress := range peerAddresses {
-		ipPort := strings.Split(peerAddress, ":")
-		if len(ipPort) == 2 {
-			peer := new(Peer).Init(ipPort[0], ipPort[1], 0, SpecialPeer, 0)
+		address, port, err := net.SplitHostPort(peerAddress)
+		if err != nil {
+			logfatal("Controller", "DialSpecialPeersString: %s is not a valid peer (%v), use format: 127.0.0.1:8999", peersString, err)
+		} else {
+			peer := new(Peer).Init(address, port, 0, SpecialPeer, 0)
 			peer.Source["Local-Configuration"] = time.Now()
 			c.DialPeer(*peer, true) // these are persistent connections
 		} else {
@@ -650,7 +653,7 @@ func (c *Controller) managePeers() {
 }
 
 func (c *Controller) updateConnectionCounts() {
-	// If we are low on outgoing onnections, attempt to connect to some more.
+	// If we are low on outgoing connections, attempt to connect to some more.
 	// If the connection is not online, we don't count it as connected.
 	c.numberOutgoingConnections = 0
 	c.numberIncomingConnections = 0

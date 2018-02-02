@@ -9,6 +9,8 @@ Starts the following:
  - a full ELK (*Elasticsearch* + *Logstash* + *Kibana*) stack that gathers logs
    from the network
  - a *Prometheus* instance for gathering metrics from the nodes
+ - an *nginx* instance to serve a list of peers so that the *factomd* instaces
+   can find each other
 
 > Warning: This setup is for development environment only and should not be
 > used in production. Specifically the data for all services are not persisted

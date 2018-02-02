@@ -1,6 +1,7 @@
 package engine_test
 
 import (
+	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -58,7 +59,6 @@ func TestSetupANetwork(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		startCap()
 		InputChan <- cmd
-		//		time.Sleep(1000*time.Millisecond) // Uncommenting this makes us ill at this point.
 		v := endCap()
 		return v
 	}

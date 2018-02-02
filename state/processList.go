@@ -538,6 +538,9 @@ func (p *ProcessList) GetOldMsgs(key interfaces.IHash) interfaces.IMsg {
 		return nil
 	}
 
+	if p.oldmsgslock == nil {
+		return nil
+	}
 	p.oldmsgslock.Lock()
 	defer p.oldmsgslock.Unlock()
 	return p.OldMsgs[key.Fixed()]
@@ -1030,6 +1033,10 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
 		vm.ListAck = append(vm.ListAck, nil)
+	}
+
+	if int(ack.Height)-len(vm.List) > 1 {
+		fmt.Println("unexpected nil") // A place to put a breakpoint
 	}
 
 	delete(p.State.Acks, m.GetMsgHash().Fixed())

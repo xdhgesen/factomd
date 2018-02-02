@@ -80,7 +80,8 @@ func (m *Ack) VerifySignature() (bool, error) {
 //  1   -- Message is valid
 func (m *Ack) Validate(state interfaces.IState) int {
 	// If too old, it isn't valid.
-	if m.DBHeight <= state.GetHighestSavedBlk() {
+	h := state.GetHighestSavedBlk()
+	if m.DBHeight <= h {
 		return -1
 	}
 
@@ -266,18 +267,21 @@ func (m *Ack) MarshalForSignature() ([]byte, error) {
 
 	data, err = m.MessageHash.MarshalBinary()
 	if err != nil {
+		fmt.Printf("Error from MarshalBinary %v\n", err)
 		return nil, err
 	}
 	buf.Write(data)
 
 	data, err = m.GetFullMsgHash().MarshalBinary()
 	if err != nil {
+		fmt.Printf("Error from MarshalBinary %v\n", err)
 		return nil, err
 	}
 	buf.Write(data)
 
 	data, err = m.LeaderChainID.MarshalBinary()
 	if err != nil {
+		fmt.Printf("Error from MarshalBinary %v\n", err)
 		return nil, err
 	}
 	buf.Write(data)
@@ -288,6 +292,7 @@ func (m *Ack) MarshalForSignature() ([]byte, error) {
 
 	data, err = m.SerialHash.MarshalBinary()
 	if err != nil {
+		fmt.Printf("Error from MarshalBinary %v\n", err)
 		return nil, err
 	}
 	buf.Write(data)
