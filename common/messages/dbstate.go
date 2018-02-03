@@ -39,7 +39,7 @@ type DBStateMsg struct {
 
 	SignatureList SigList
 
-	//Not marshaled
+	//Not marshalled
 	IgnoreSigs bool
 	Sent       interfaces.Timestamp
 	IsInDB     bool
@@ -350,6 +350,7 @@ sig2:=fmt.Sprintf("%x", sig.GetSignature()[:])
 			validSigCount++
 			continue
 		}
+
 		//Check signature against the Skeleton key
 		authoritativeKey := state.GetNetworkBootStrapKey()
 		if authoritativeKey != nil {
@@ -360,7 +361,7 @@ sig2:=fmt.Sprintf("%x", sig.GetSignature()[:])
 				}
 			}
 		}
-
+		// save the unverified sig so we can check for leadership changes later on
 		if sig.Verify(data) {
 			remainingSig = append(remainingSig, sig)
 		}

@@ -16,6 +16,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives/random"
 	"github.com/FactomProject/factomd/globals"
 	"github.com/FactomProject/factomd/util/atomic"
+	"sync"
 )
 
 type Authority struct {
@@ -40,7 +41,7 @@ func RandomAuthority() *Authority {
 	a.MatryoshkaHash = primitives.RandomHash()
 
 	a.SigningKey = *primitives.RandomPrivateKey().Pub
-	a.Status = random.RandUInt8()
+	a.Status.Store(random.RandUInt8())
 
 	l := random.RandIntBetween(1, 10)
 	for i := 0; i < l; i++ {
@@ -207,8 +208,8 @@ func (e *Authority) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 			return
 		}
 		if hk.SigningKey != ZeroKey {
-		e.KeyHistory = append(e.KeyHistory, hk)
-	}
+			e.KeyHistory = append(e.KeyHistory, hk)
+		}
 	}
 
 	newData = buf.DeepCopyBytes()
@@ -237,6 +238,7 @@ type foo struct {
 
 var failsMutex sync.Mutex
 var fails map[[64]byte]foo
+
 func (auth *Authority) VerifySignature(msg []byte, sig *[constants.SIGNATURE_LENGTH]byte) (bool, error) {
 	//return true, nil // Testing
 	var pub primitives.PublicKey
@@ -244,8 +246,8 @@ func (auth *Authority) VerifySignature(msg []byte, sig *[constants.SIGNATURE_LEN
 	if err != nil {
 		fmt.Println("Can't unmarshal a key!")
 		return false, err
-	} 
-		copy(pub[:], tmp)
+	}
+	copy(pub[:], tmp)
 	if pub == ZeroKey {
 		fmt.Println("zero key whole key")
 		return false, err
@@ -255,39 +257,37 @@ func (auth *Authority) VerifySignature(msg []byte, sig *[constants.SIGNATURE_LEN
 	if valid {
 		return true, nil
 	}
-			for _, histKey := range auth.KeyHistory {
-				histTemp, err := histKey.SigningKey.MarshalBinary()
-				if err != nil {
-					continue
-				}
-				copy(pub[:], histTemp)
-                                if pub == ZeroKey {
-		               	fmt.Println("zero key whole key")
+	// check the historical keys
+	for _, histKey := range auth.KeyHistory {
+		histTemp, err := histKey.SigningKey.MarshalBinary()
+		if err != nil {
+			continue
 		}
-				if ed.VerifyCanonical(&pub, msg, sig) {
-					return true, nil
-				}
-
-			if ed.VerifyCanonical((*[32]byte)(&pub), msg, sig) {
-				// debug ...
-				if false {
-					failsMutex.Lock()
-					pc, ok := fails[*sig]
-					failsMutex.Unlock()
-					if ok {
-						logName := globals.FactomNodeName + "_executeMsg" + ".txt"
-						messages.LogPrint(logName,
-							fmt.Sprintf("VerifySig false key <%x> sig <%x> %3d[%x]", pc.Key, sig, len(pc.Msg), pc.Msg) + "\n"+
-								fmt.Sprintf("VerifySig true1 key <%x> sig <%x> %3d[%x]", pub, sig, len(msg), msg))
-			
-				// debug ...
-				return true, nil
-		} 
-
-	}
+		copy(pub[:], histTemp)
+		if pub == ZeroKey {
+			fmt.Println("zero key whole key")
+			continue
 		}
-	} // for all the historical keys
-	return false, nil
+		if ed.VerifyCanonical((*[32]byte)(&pub), msg, sig) {
+			// debug ...
+			if false {
+				failsMutex.Lock()
+				pc, ok := fails[*sig]
+				failsMutex.Unlock()
+				if ok {
+					logName := globals.FactomNodeName + "_executeMsg" + ".txt"
+					messages.LogPrint(logName,
+						fmt.Sprintf("VerifySig false key <%x> sig <%x> %3d[%x]", pc.Key, sig, len(pc.Msg), pc.Msg) + "\n"+
+							fmt.Sprintf("VerifySig true1 key <%x> sig <%x> %3d[%x]", pub, sig, len(msg), msg))
+
+				}
+			}
+			// debug ...
+			return true, nil
+		}
+
+	}                 // for all the historical keys
+	return false, nil // Didn't find a key among the historical keys
 }
 
 func (auth *Authority) MarshalJSON() ([]byte, error) {

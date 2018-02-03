@@ -9,7 +9,6 @@ import (
 	"fmt"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
-	"io/ioutil"
 	"os/user"
 )
 

@@ -13,24 +13,20 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/log"
-	"sync"
 )
 
 var _ = log.Printf
 var _ = fmt.Print
 
 func NetworkProcessorNet(fnode *FactomNode) {
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go Peers(fnode, &wg)
-	wg.Wait()
+	go Peers(fnode)
 	go NetworkOutputs(fnode)
 	go InvalidOutputs(fnode)
 }
 
-func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
+func Peers(fnode *FactomNode) {
 	cnt := 0
-	done := false
+
 	// ackHeight is used in ignoreMsg to determine if we should ignore an ackowledgment
 	ackHeight := uint32(0)
 	// When syncing from disk/network we want to selectivly ignore certain msgs to allow
@@ -84,10 +80,12 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 				ackHeight = amsg.(*messages.Ack).DBHeight
 			}
 		}
+		// If we are not syncing, we may ignore some old messages if we are rebooting
 		return false
 	}
 
 	for {
+		// fmt.Println("Sinceboot", sinceBoot)
 		for i := 0; i < 100 && fnode.State.APIQueue().Length() > 0; i++ {
 			msg := fnode.State.APIQueue().Dequeue()
 			if msg != nil {
@@ -199,10 +197,6 @@ func Peers(fnode *FactomNode, wg *sync.WaitGroup) {
 			time.Sleep(50 * time.Millisecond)
 		}
 		cnt = 0
-		if !done {
-			wg.Done()
-			done = true
-		}
 	}
 }
 
@@ -276,7 +270,7 @@ func NetworkOutputs(fnode *FactomNode) {
 									fnode.State.TallySent(int(msg.Type()))
 								}
 							}
-}
+						}
 						} // all peers
 					}
 				} else {
@@ -286,7 +280,7 @@ func NetworkOutputs(fnode *FactomNode) {
 		} else {
 			// messages.LogMessage(logName, "Drop isLocal", msg)
 		}
-	}
+	} // forever ...}
 }
 
 // Just throw away the trash

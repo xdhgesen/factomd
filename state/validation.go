@@ -56,6 +56,7 @@ func (state *State) ValidatorLoop() {
 				}
 
 				msg = state.InMsgQueue().Dequeue()
+
 				if msg != nil {
 					state.JournalMessage(msg)
 					break loop

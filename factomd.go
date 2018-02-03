@@ -6,6 +6,7 @@ package main
 
 import (
 	"os"
+
 	"fmt"
 	. "github.com/FactomProject/factomd/engine"
 	log "github.com/sirupsen/logrus"

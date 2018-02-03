@@ -398,10 +398,12 @@ func addServerSigningKey(chainID interfaces.IHash, key interfaces.IHash, height 
 		}
 	}
 	// Add Key History
-	st.Authorities[AuthorityIndex].KeyHistory = append(st.Authorities[AuthorityIndex].KeyHistory, struct {
-		ActiveDBHeight uint32
-		SigningKey     primitives.PublicKey
-	}{height, st.Authorities[AuthorityIndex].SigningKey})
+	if st.Authorities[AuthorityIndex].SigningKey != ZeroKey {
+		st.Authorities[AuthorityIndex].KeyHistory = append(st.Authorities[AuthorityIndex].KeyHistory, struct {
+			ActiveDBHeight uint32
+			SigningKey     primitives.PublicKey
+		}{height, st.Authorities[AuthorityIndex].SigningKey})
+	}
 	// Replace Active Key
 	st.Authorities[AuthorityIndex].SigningKey = primitives.PubKeyFromString(key.String())
 }

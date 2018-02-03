@@ -25,6 +25,7 @@ func (q NetOutMsgQueue) Cap() int {
 // Enqueue adds item to channel and instruments based on type
 func (q NetOutMsgQueue) Enqueue(m interfaces.IMsg) {
 	measureMessage(TotalMessageQueueNetOutMsgGeneralVec, m, true)
+
 	q <- m
 }
 

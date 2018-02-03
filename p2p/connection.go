@@ -1,5 +1,4 @@
 // Copyright 2017 Factom Foundation
-// Copyright 2017 Factom Foundation
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	atomic2 "github.com/FactomProject/factomd/util/atomic"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,7 +36,7 @@ type Connection struct {
 	// and as "address" for sending messages to specific nodes.
 	encoder         *gob.Encoder      // Wire format is gobs in this version, may switch to binary
 	decoder         *gob.Decoder      // Wire format is gobs in this version, may switch to binary
-	peer            Peer              // the data structure representing the peer we are talking to. defined in peer.go
+	peer            Peer              // the datastructure representing the peer we are talking to. defined in peer.go
 	attempts        int               // reconnection attempts
 	TimeLastPacket  time.Time         // Time we last successfully received a packet or command.
 	timeLastAttempt time.Time         // time of last attempt to connect via dial
@@ -148,7 +148,6 @@ const (
 // Public API
 //
 //////////////////////////////
-
 func (c *Connection) lock() {
 	c.mu.Lock() // used to be debug code here
 }
@@ -231,6 +230,7 @@ func (c *Connection) commonInit(peer Peer) {
 	c.timeLastMetrics = now
 	c.timeLastAttempt = now
 	c.timeLastStatus = now
+
 	c.Logger = conLogger.WithField("peer", c.peer.PeerFixedIdent())
 	c.unlock()
 	c.setNotes("commonInit()") // needs top be unlocked before setNotes()
@@ -276,7 +276,7 @@ func (c *Connection) runLoop() {
 		switch c.state {
 		case ConnectionInitialized:
 			p2pConnectionRunLoopInitalized.Inc()
-			if MinimumQualityScore > c.peer.QualityScore && !c.isPersistent {
+			if MinumumQualityScore > c.peer.QualityScore && !c.isPersistent {
 				c.updatePeer() // every PeerSaveInterval * 0.90 we send an update peer to the controller.
 				c.goShutdown()
 			} else {
@@ -322,7 +322,6 @@ func (c *Connection) setNotes(format string, v ...interface{}) {
 	c.notes = s
 	c.unlock()
 	significant(c.peer.PeerIdent(), c.notes)
-
 }
 
 // dialLoop:  dials the connection until giving up. Called in offline or initializing states.
@@ -349,6 +348,7 @@ func (c *Connection) dialLoop() {
 			c.goShutdown()
 			return
 		}
+
 		time.Sleep(TimeBetweenRedials)
 	}
 }
@@ -377,7 +377,9 @@ func (c *Connection) goOnline() {
 	c.timeLastAttempt = now
 	c.timeLastUpdate = now
 	c.peer.LastContact = now
+
 	c.state = ConnectionOnline
+
 	c.unlock()
 	// Drain the handleNetErrors to avoid immediate disconnect
 	c.handleNetErrors(true)
@@ -391,8 +393,6 @@ func (c *Connection) goOnline() {
 
 func (c *Connection) goOffline() {
 	p2pConnectionOfflineCall.Inc()
-	c.lock()
-	defer c.unlock()
 	c.state = ConnectionOffline
 	c.attempts = 0
 	c.peer.demerit()
@@ -401,15 +401,12 @@ func (c *Connection) goOffline() {
 func (c *Connection) goShutdown() {
 	c.goOffline()
 	c.updatePeer()
-	c.lock()
-	defer c.unlock()
 	if nil != c.conn {
 		defer c.conn.Close()
 	}
 	c.decoder = nil
 	c.encoder = nil
 	c.state = ConnectionShuttingDown
-
 }
 
 // processSends gets all the messages from the application and sends them out over the network
@@ -424,13 +421,13 @@ func (c *Connection) processSends() {
 			// go routine.
 		}
 	}()
-	c.lock() // lock so I can read the state
+
 	for ConnectionClosed != c.state && c.state != ConnectionShuttingDown {
 		// note(c.peer.PeerIdent(), "Connection.processSends() called. Items in send channel: %d State: %s", len(c.SendChannel), c.ConnectionState())
 	conloop:
 		for ConnectionOnline == c.state && len(c.SendChannel) > 0 {
 			// This was blocking. By checking the length of the channel before entering, this does not block.
-			// The problem was this routine was blocked on a closed connection. Ideally we do want to block
+			// The problem was this routine was blocked on a closed connection. Idealling we do want to block
 			// on a 0 length channel, and this is still possible if use a select and close the channel when we
 			// close the connection.
 			message := <-c.SendChannel
@@ -447,11 +444,8 @@ func (c *Connection) processSends() {
 			default:
 			}
 		}
-		c.unlock()
 		time.Sleep(100 * time.Millisecond)
-		c.lock()
 	}
-	c.unlock()
 }
 
 func (c *Connection) handleCommand() {
@@ -479,7 +473,7 @@ func (c *Connection) handleCommand() {
 				c.goShutdown()
 			}
 		case ConnectionGoOffline:
-			debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s goOffline command received", c.peer.PeerIdent())
+			debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s goOffline command recieved", c.peer.PeerIdent())
 			c.goOffline()
 		default:
 			logfatal(c.peer.PeerIdent(), "handleCommand() unknown command?: %+v ", command)
@@ -488,7 +482,6 @@ func (c *Connection) handleCommand() {
 	}
 }
 
-// assume c.mu is locked before we get here
 func (c *Connection) sendParcel(parcel Parcel) {
 
 	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
@@ -501,15 +494,11 @@ func (c *Connection) sendParcel(parcel Parcel) {
 	//}
 	//c.conn.SetWriteDeadline(deadline)
 	encode := c.encoder
-	c.unlock()
 	err := encode.Encode(parcel)
-	c.lock()
 	switch {
 	case nil == err:
-		c.metricsMutex.Lock()
-		c.metrics.BytesSent += parcel.Header.Length //L
-		c.metrics.MessagesSent += 1                 //L
-		c.metricsMutex.Unlock()
+		c.metrics.BytesSent += parcel.Header.Length
+		c.metrics.MessagesSent += 1
 	default:
 		c.Errors <- err
 	}
@@ -531,37 +520,26 @@ func (c *Connection) processReceives() {
 		}
 	}()
 
-	c.lock() // lock it so we can get the state
 	for ConnectionClosed != c.state && c.state != ConnectionShuttingDown {
 		for c.state == ConnectionOnline {
 			var message Parcel
 
 			// c.conn.SetReadDeadline(time.Now().Add(NetworkDeadline))
-			decoder := c.decoder
-			if decoder != nil {
-				c.unlock()
-				err := decoder.Decode(&message)
-				c.lock()
-				switch {
-				case nil == err:
-					c.metricsMutex.Lock()
-					c.metrics.BytesReceived += message.Header.Length //L
-					c.metrics.MessagesReceived += 1                  //L
-					c.metricsMutex.Unlock()
-					message.Header.PeerAddress = c.peer.Address
-					c.ReceiveParcel <- &message
-					c.TimeLastPacket = time.Now()
-				default:
-					c.Errors <- err
-				}
+			err := c.decoder.Decode(&message)
+			switch {
+			case nil == err:
+				c.metrics.BytesReceived += message.Header.Length
+				c.metrics.MessagesReceived += 1
+				message.Header.PeerAddress = c.peer.Address
+				c.ReceiveParcel <- &message
+				c.TimeLastPacket = time.Now()
+			default:
+				c.Errors <- err
 			}
 		}
 		// If not online, give some time up to handle states that are not online, closed, or shuttingdown.
-		c.unlock()
-		time.Sleep(1 * time.Second) // clay -- seems a bit long
-		c.lock()
+		time.Sleep(1 * time.Second)
 	}
-	c.unlock()
 }
 
 //handleNetErrors Reacts to errors we get from encoder or decoder
@@ -728,16 +706,14 @@ func (c *Connection) updatePeer() {
 }
 
 func (c *Connection) updateStats() {
-	c.metricsMutex.Lock()
-	defer c.metricsMutex.Unlock()
 	if time.Second < time.Since(c.timeLastMetrics) {
-		c.timeLastMetrics = time.Now()                                                                                                                                // L
-		c.metrics.PeerAddress = c.peer.Address                                                                                                                        // L
-		c.metrics.PeerQuality = c.peer.QualityScore                                                                                                                   // L
-		c.metrics.ConnectionState = connectionStateStrings[c.state]                                                                                                   // L
-		c.metrics.ConnectionNotes = c.notes                                                                                                                           // L
-		verbose(c.peer.PeerIdent(), "updatePeer() SENDING ConnectionUpdateMetrics - Bytes Sent: %d Bytes Received: %d", c.metrics.BytesSent, c.metrics.BytesReceived) // L
-		BlockFreeChannelSend(c.ReceiveChannel, ConnectionCommand{Command: ConnectionUpdateMetrics, Metrics: c.metrics})                                               // L
+		c.timeLastMetrics = time.Now()
+		c.metrics.PeerAddress = c.peer.Address
+		c.metrics.PeerQuality = c.peer.QualityScore
+		c.metrics.ConnectionState = connectionStateStrings[c.state]
+		c.metrics.ConnectionNotes = c.notes
+		verbose(c.peer.PeerIdent(), "updatePeer() SENDING ConnectionUpdateMetrics - Bytes Sent: %d Bytes Received: %d", c.metrics.BytesSent, c.metrics.BytesReceived)
+		BlockFreeChannelSend(c.ReceiveChannel, ConnectionCommand{Command: ConnectionUpdateMetrics, Metrics: c.metrics})
 	}
 }
 
@@ -749,9 +725,6 @@ func (c *Connection) connectionStatusReport() {
 	reportDuration := time.Since(c.timeLastStatus)
 	if reportDuration > ConnectionStatusInterval {
 		c.timeLastStatus = time.Now()
-		c.metricsMutex.Lock()
-		significant("connection-report", "\n\n===============================================================================\n     Connection: %s\n          State: %s\n          Notes: %s\n           Hash: %s\n     Persistent: %t\n       Outgoing: %t\n ReceiveChannel: %d\n    SendChannel: %d\n\tConnStatusInterval:\t%s\n\treportDuration:\t\t%s\n\tTime Online:\t\t%s \nMsgs/Bytes: %d / %d \n==============================================================================\n\n",
-			c.peer.AddressPort(), c.ConnectionState(), c.Notes(), c.peer.Hash[0:12], c.IsPersistent(), c.IsOutGoing(), len(c.ReceiveChannel), len(c.SendChannel), ConnectionStatusInterval.String(), reportDuration.String(), time.Since(c.timeLastAttempt), c.metrics.MessagesReceived+c.metrics.MessagesSent, c.metrics.BytesSent+c.metrics.BytesReceived)
-		c.metricsMutex.Unlock()
+		significant("connection-report", "\n\n===============================================================================\n     Connection: %s\n          State: %s\n          Notes: %s\n           Hash: %s\n     Persistent: %t\n       Outgoing: %t\n ReceiveChannel: %d\n    SendChannel: %d\n\tConnStatusInterval:\t%s\n\treportDuration:\t\t%s\n\tTime Online:\t\t%s \nMsgs/Bytes: %d / %d \n==============================================================================\n\n", c.peer.AddressPort(), c.ConnectionState(), c.Notes(), c.peer.Hash[0:12], c.IsPersistent(), c.IsOutGoing(), len(c.ReceiveChannel), len(c.SendChannel), ConnectionStatusInterval.String(), reportDuration.String(), time.Since(c.timeLastAttempt), c.metrics.MessagesReceived+c.metrics.MessagesSent, c.metrics.BytesSent+c.metrics.BytesReceived)
 	}
 }

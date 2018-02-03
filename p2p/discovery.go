@@ -14,7 +14,6 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 	"net"
 )
@@ -129,7 +128,7 @@ func (d *Discovery) SavePeers() {
 	UpdateKnownPeers.Unlock()
 	encoder.Encode(qualityPeers)
 	writer.Flush()
-	note("discovery", "SavePeers() saved %d peers in peers.json.\n They were: %+v", len(qualityPeers), qualityPeers)
+	note("discovery", "SavePeers() saved %d peers in peers.json. \n They were: %+v", len(qualityPeers), qualityPeers)
 }
 
 // LearnPeers receive a set of peers from other hosts

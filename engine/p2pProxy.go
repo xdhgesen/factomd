@@ -140,6 +140,7 @@ func (f *P2PProxy) Send(msg interfaces.IMsg) error {
 	return nil
 }
 
+
 // Non-blocking return value from channel.
 func (f *P2PProxy) Receive() (interfaces.IMsg, error) {
 	select {
@@ -289,7 +290,9 @@ func (p *P2PProxy) ManageLogging() {
 
 // manageOutChannel takes messages from the f.broadcastOut channel and sends them to the network.
 func (f *P2PProxy) ManageOutChannel() {
+
 	for data := range f.BroadcastOut {
+
 		switch data.(type) {
 		case FactomMessage:
 			fmessage := data.(FactomMessage)

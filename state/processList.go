@@ -538,9 +538,6 @@ func (p *ProcessList) GetOldMsgs(key interfaces.IHash) interfaces.IMsg {
 		return nil
 	}
 
-	if p.oldmsgslock == nil {
-		return nil
-	}
 	p.oldmsgslock.Lock()
 	defer p.oldmsgslock.Unlock()
 	return p.OldMsgs[key.Fixed()]

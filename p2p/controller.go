@@ -19,7 +19,6 @@ import (
 	"unicode"
 	"github.com/FactomProject/factomd/common/primitives"
 	log "github.com/sirupsen/logrus"
-	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
 )
 
@@ -228,8 +227,6 @@ func (c *Controller) DialSpecialPeersString(peersString string) {
 			peer := new(Peer).Init(address, port, 0, SpecialPeer, 0)
 			peer.Source["Local-Configuration"] = time.Now()
 			c.DialPeer(*peer, true) // these are persistent connections
-		} else {
-			logfatal("Controller", "Error: %s is not a valid peer, use format: 127.0.0.1:8999", peerAddress)
 		}
 	}
 }
@@ -411,6 +408,7 @@ func (c *Controller) route() {
 		// Empty the receive channel, stuff the application channel.
 		for 0 < len(connection.ReceiveChannel) { // effectively "While there are messages"
 			message := <-connection.ReceiveChannel
+
 			switch message.(type) {
 			case ConnectionCommand:
 				c.handleConnectionCommand(message.(ConnectionCommand), connection) // Used to pass a copy of the connection
@@ -567,7 +565,6 @@ func (c *Controller) handleCommand(command interface{}) {
 		c.connections[conn.peer.Hash] = conn
 		c.connectionsByAddress[conn.peer.Address] = conn
 	case CommandAddPeer: // parameter is a Connection. This message is sent by the accept loop which is in a different goroutine
-
 		parameters := command.(CommandAddPeer)
 		conn := parameters.conn // net.Conn
 		addPort := strings.Split(conn.RemoteAddr().String(), ":")

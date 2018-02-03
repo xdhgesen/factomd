@@ -34,6 +34,7 @@ import (
 	"github.com/FactomProject/logrustash"
 
 	"errors"
+
 	"github.com/FactomProject/factomd/util/atomic"
 	log "github.com/sirupsen/logrus"
 )
@@ -45,12 +46,12 @@ var packageLogger = log.WithFields(log.Fields{"package": "state"})
 var _ = fmt.Print
 
 type State struct {
-	Logger            *log.Entry
-	IsRunning         bool
-	filename          string
+	Logger           *log.Entry
+	IsRunning        bool
+	filename         string
 	NetworkController *p2p.Controller
-	Salt              interfaces.IHash
-	Cfg               interfaces.IFactomConfig
+	Salt             interfaces.IHash
+	Cfg              interfaces.IFactomConfig
 
 	Prefix            string
 	FactomNodeName    string
@@ -222,7 +223,7 @@ type State struct {
 	Syncing bool // Looking for messages from leaders to sync
 
 	NetStateOff     atomic.AtomicBool // Disable if true, Enable if false
-	DebugConsensus  bool              // If true, dump consensus trace
+	DebugConsensus  bool // If true, dump consensus trace
 	FactoidTrans    int
 	ECCommits       int
 	ECommits        int
@@ -785,9 +786,9 @@ func (s *State) Init() {
 	s.timerMsgQueue = make(chan interfaces.IMsg, 100)          //incoming eom notifications, used by leaders
 	s.TimeOffset = new(primitives.Timestamp)                   //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
 	s.networkInvalidMsgQueue = make(chan interfaces.IMsg, 100) //incoming message queue from the network messages
-	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
+	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)       //
 	s.networkOutMsgQueue = NewNetOutMsgQueue(1000)      //Messages to be broadcast to the network
-	s.inMsgQueue = NewInMsgQueue(10000)                 //incoming message queue for factom application messages
+	s.inMsgQueue = NewInMsgQueue(constants.INMSGQUEUE_MAX / 9 * 10) //incoming message queue for factom application messages
 	s.apiQueue = NewAPIQueue(100)                       //incoming message queue from the API
 	s.ackQueue = make(chan interfaces.IMsg, 100)        //queue of Leadership messages
 	s.msgQueue = make(chan interfaces.IMsg, 400)        //queue of Follower messages
