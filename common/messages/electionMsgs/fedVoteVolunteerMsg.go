@@ -288,7 +288,6 @@ func (m *FedVoteVolunteerMsg) MarshalBinary() (data []byte, err error) {
 	if e := buf.PushInt(m.VMIndex); e != nil {
 		return nil, e
 	}
-
 	if e := buf.PushByte(m.Minute); e != nil {
 		return nil, e
 	}

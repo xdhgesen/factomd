@@ -12,6 +12,10 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 )
 
+func init() {
+	primitives.General = new(msgsupport.GeneralFactory)
+}
+
 func TestMarshalUnmarshalFedVoteProposal(t *testing.T) {
 	test := func(va *FedVoteProposalMsg, num string) {
 		vas, err := va.JSONString()
