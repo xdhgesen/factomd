@@ -113,21 +113,15 @@ func (m *FedVoteMsg) Type() byte {
 func (m *FedVoteMsg) ElectionValidate(ie interfaces.IElections) int {
 	e := ie.(*elections.Elections)
 
-	// TODO: Correct this
-	if e.Adapter == nil || e.Electing == -1 {
-		return 0
-	}
-
-	// TODO: Check all the cases
-
-	if int(m.DBHeight) == e.DBHeight && e.Minute == int(m.Minute) {
-		return 1 // This is our election!
-	}
-
 	// Ignore all elections messages from the past
 	if int(m.DBHeight) < e.DBHeight || (int(m.DBHeight) == e.DBHeight && int(m.Minute) < e.Minute) {
 		e.LogMessage("election", "Message is invalid (past)", m)
 		return -1
+	}
+
+	// TODO: Correct this
+	if e.Adapter == nil || e.Electing == -1 {
+		return 0
 	}
 
 	// Is from the future, probably from Marty McFly
@@ -135,7 +129,11 @@ func (m *FedVoteMsg) ElectionValidate(ie interfaces.IElections) int {
 		return 0
 	}
 
-	panic(errors.New("Though I covered all the cases"))
+	if int(m.DBHeight) == e.DBHeight && e.Minute == int(m.Minute) {
+		return 1 // This is our election!
+	}
+
+	panic(errors.New("Thought I covered all the cases!"))
 }
 
 // ValidateVolunteer validates if the volunteer has their process list at the correct height
