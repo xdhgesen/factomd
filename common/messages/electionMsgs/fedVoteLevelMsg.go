@@ -18,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/state"
 	log "github.com/sirupsen/logrus"
 
+	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/elections"
 )
 
@@ -41,6 +42,8 @@ type FedVoteLevelMsg struct {
 	// Information about the vote for comparing
 	Level uint32
 	Rank  uint32
+
+	Signature interfaces.IFullSignature
 
 	// Need a majority of these to justify our vote
 	Justification []interfaces.IMsg
@@ -140,6 +143,18 @@ func (m *FedVoteLevelMsg) processIfCommitted(is interfaces.IState, elect interfa
 		e.Adapter.SetElectionProcessed(true)
 		m.ProcessInState = true
 		m.SetValid()
+
+		// Ensure we don't start another election for this server
+		se := new(EomSigInternal)
+		se.SigType = m.Volunteer.EOM
+		se.NName = m.Volunteer.Name
+		se.DBHeight = m.Volunteer.DBHeight
+		se.Minute = m.Volunteer.Minute
+		se.VMIndex = m.Volunteer.VMIndex
+		se.ServerID = m.Volunteer.ServerID
+
+		e.Msgs = append(e.Msgs, se)
+
 		// Send for the state to do the swap. It will only be sent with this
 		// flag ONCE
 		is.InMsgQueue().Enqueue(m)
@@ -165,6 +180,9 @@ func DoElectionSwap(e *elections.Elections, m *FedVoteLevelMsg) {
 	vIndex2 := e.AuditIndex(vId)
 
 	{
+	// Hack code to make broken authority sets not segfault
+	// Force the lists to be the same size by adding Dummy
+	// len()-1 < index to make index be valid [0:index] is index+1==len()
 		if fIndex2 == -1 {
 			e.LogPrintf("election", "Federated Server Missing from election.Federated", m.Volunteer.ServerIdx)
 			// Should I just append it and live?
@@ -174,7 +192,7 @@ func DoElectionSwap(e *elections.Elections, m *FedVoteLevelMsg) {
 			e.LogPrintf("election", "Federated Server Missing from election.Federated", m.Volunteer.ServerIdx)
 			// Should I just append it and live?
 			panic(errors.New("Audit Server Missing from list"))
-		}
+	}
 		if fIndex2 != fIndex {
 			e.LogPrintf("election", "Bad fIndex %d, changed to %d", fIndex, fIndex2)
 			fIndex = fIndex2
@@ -182,7 +200,7 @@ func DoElectionSwap(e *elections.Elections, m *FedVoteLevelMsg) {
 		if vIndex2 != vIndex {
 			e.LogPrintf("election", "Bad vIndex %d, changed to %d", vIndex, vIndex2)
 			vIndex = vIndex2
-		}
+	}
 	}
 	e.LogPrintf("election", "LeaderSwapState %d/%d/%d", m.VMIndex, m.DBHeight, m.Minute)
 	e.LogPrintf("election", "Demote  %x", fId.Bytes()[3:6])
@@ -326,6 +344,10 @@ func (a *FedVoteLevelMsg) IsSameAs(msg interfaces.IMsg) bool {
 		}
 	}
 
+	if !a.Signature.IsSameAs(b.Signature) {
+		return false
+	}
+
 	return true
 }
 
@@ -371,6 +393,17 @@ func (m *FedVoteLevelMsg) Validate(state interfaces.IState) int {
 	if baseMsg != 1 {
 		return baseMsg
 	}
+
+	signed, err := m.MarshalForSignature()
+	if err != nil {
+		return -1
+	}
+
+	valid, err := state.VerifyAuthoritySignature(signed, m.GetSignature().GetSignature(), m.DBHeight)
+	if err != nil || valid < 0 {
+		return -1
+	}
+
 	return 1
 }
 
@@ -440,6 +473,12 @@ func (m *FedVoteLevelMsg) UnmarshalBinaryData(data []byte) (newData []byte, err 
 		return
 	}
 
+	m.Signature = new(primitives.Signature)
+	err = buf.PopBinaryMarshallable(m.Signature)
+	if err != nil {
+		return nil, err
+	}
+
 	data = buf.Bytes()
 	return data, nil
 }
@@ -449,7 +488,44 @@ func (m *FedVoteLevelMsg) UnmarshalBinary(data []byte) error {
 	return err
 }
 
-func (m *FedVoteLevelMsg) MarshalBinary() (data []byte, err error) {
+func (m *FedVoteLevelMsg) Sign(key interfaces.Signer) error {
+	signature, err := msgbase.SignSignable(m, key)
+	if err != nil {
+		return err
+	}
+	m.Signature = signature
+	return nil
+}
+
+func (m *FedVoteLevelMsg) GetSignature() interfaces.IFullSignature {
+	return m.Signature
+}
+
+func (m *FedVoteLevelMsg) MarshalBinary() ([]byte, error) {
+	var buf primitives.Buffer
+
+	data, err := m.MarshalForSignature()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(data)
+
+	err = buf.PushBinaryMarshallableMsgArray(m.Justification)
+	if err != nil {
+		return nil, err
+	}
+
+	if m.Signature != nil {
+		err = buf.PushBinaryMarshallable(m.Signature)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return buf.DeepCopyBytes(), nil
+}
+
+func (m *FedVoteLevelMsg) MarshalForSignature() (data []byte, err error) {
 	var buf primitives.Buffer
 
 	if err = buf.PushByte(constants.VOLUNTEERLEVELVOTE); err != nil {
@@ -487,11 +563,6 @@ func (m *FedVoteLevelMsg) MarshalBinary() (data []byte, err error) {
 	}
 
 	err = buf.PushUInt32(m.Rank)
-	if err != nil {
-		return
-	}
-
-	err = buf.PushBinaryMarshallableMsgArray(m.Justification)
 	if err != nil {
 		return
 	}
