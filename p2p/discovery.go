@@ -131,7 +131,7 @@ func (d *Discovery) SavePeers() {
 	note("discovery", "SavePeers() saved %d peers in peers.json. \n They were: %+v", len(qualityPeers), qualityPeers)
 }
 
-// LearnPeers recieves a set of peers from other hosts
+// LearnPeers receives a set of peers from other hosts
 // The unique peers are added to our peer list.
 // The peers are in a json encoded string as a byte slice
 func (d *Discovery) LearnPeers(parcel Parcel) {

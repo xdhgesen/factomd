@@ -338,8 +338,8 @@ func (c *Controller) runloop() {
 		significant("ctrlr", "     Command Queue: %d", len(c.commandChannel))
 		significant("ctrlr", "         ToNetwork: %d", len(c.ToNetwork))
 		significant("ctrlr", "       FromNetwork: %d", len(c.FromNetwork))
-		significant("ctrlr", "        Total RECV: %d", TotalMessagesRecieved)
-		significant("ctrlr", "  Application RECV: %d", ApplicationMessagesRecieved)
+		significant("ctrlr", "        Total RECV: %d", TotalMessagesReceived)
+		significant("ctrlr", "  Application RECV: %d", ApplicationMessagesReceived)
 		significant("ctrlr", "        Total XMIT: %d", TotalMessagesSent)
 		significant("ctrlr", "###################################")
 		significant("ctrlr", "@@@@@@@@@@ Controller.runloop() is terminated!")
@@ -390,16 +390,16 @@ func (c *Controller) runloop() {
 		c.updateMetrics()
 		dot("@@11\n")
 	}
-	significant("ctrlr", "runloop() - Final network statistics: TotalMessagesRecieved: %d TotalMessagesSent: %d", TotalMessagesRecieved, TotalMessagesSent)
+	significant("ctrlr", "runloop() - Final network statistics: TotalMessagesReceived: %d TotalMessagesSent: %d", TotalMessagesReceived, TotalMessagesSent)
 }
 
 // Route pulls all of the messages from the application and sends them to the appropriate
 // peer. Broadcast messages go to everyone, directed messages go to the named peer.
 // route also passes incomming messages on to the application.
 func (c *Controller) route() {
-	// Recieve messages from the peers & forward to application.
+	// Receive messages from the peers & forward to application.
 	for peerHash, connection := range c.connections {
-		// Empty the recieve channel, stuff the application channel.
+		// Empty the receive channel, stuff the application channel.
 		for 0 < len(connection.ReceiveChannel) { // effectively "While there are messages"
 			message := <-connection.ReceiveChannel
 			switch message.(type) {
@@ -500,18 +500,18 @@ func (c *Controller) doDirectedSend(parcel Parcel) {
 
 // handleParcelReceive takes a parcel from the network and annotates it for the application then routes it.
 func (c *Controller) handleParcelReceive(message interface{}, peerHash string, connection Connection) {
-	TotalMessagesRecieved++
+	TotalMessagesReceived++
 	parameters := message.(ConnectionParcel)
 	parcel := parameters.Parcel
 	parcel.Header.TargetPeer = peerHash // Set the connection ID so the application knows which peer the message is from.
 	switch parcel.Header.Type {
 	case TypeMessage: // Application message, send it on.
-		ApplicationMessagesRecieved++
+		ApplicationMessagesReceived++
 		BlockFreeChannelSend(c.FromNetwork, parcel)
 	case TypeMessagePart: // A part of the application message, handle by assembler and if we have the full message, send it on.
 		assembled := c.partsAssembler.handlePart(parcel)
 		if assembled != nil {
-			ApplicationMessagesRecieved++
+			ApplicationMessagesReceived++
 			BlockFreeChannelSend(c.FromNetwork, *assembled)
 		}
 	case TypePeerRequest: // send a response to the connection over its connection.SendChannel
@@ -588,7 +588,7 @@ func (c *Controller) handleCommand(command interface{}) {
 			BlockFreeChannelSend(connection.SendChannel, ConnectionCommand{Command: ConnectionShutdownNow})
 		}
 	default:
-		logfatal("ctrlr", "Unkown p2p.Controller command recieved: %+v", commandType)
+		logfatal("ctrlr", "Unkown p2p.Controller command received: %+v", commandType)
 	}
 }
 
@@ -741,8 +741,8 @@ func (c *Controller) networkStatusReport() {
 		silence("ctrlr", "Unique Connections: %d", len(c.connectionsByAddress))
 		silence("ctrlr", "    In Connections: %d", c.numberIncommingConnections)
 		silence("ctrlr", "   Out Connections: %d (only online are counted)", c.numberOutgoingConnections)
-		silence("ctrlr", "        Total RECV: %d", TotalMessagesRecieved)
-		silence("ctrlr", "  Application RECV: %d", ApplicationMessagesRecieved)
+		silence("ctrlr", "        Total RECV: %d", TotalMessagesReceived)
+		silence("ctrlr", "  Application RECV: %d", ApplicationMessagesReceived)
 		silence("ctrlr", "        Total XMIT: %d", TotalMessagesSent)
 		silence("ctrlr", " ")
 		silence("ctrlr", "\tPeer\t\t\t\tDuration\tStatus\t\tNotes")

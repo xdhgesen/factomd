@@ -10,18 +10,19 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/controlPanel"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/wsapi"
-	"runtime"
 )
 
 var _ = fmt.Print
@@ -44,7 +45,7 @@ func GetLine(listenToStdin bool) string {
 	if listenToStdin {
 		line := make([]byte, 100)
 		var err error
-		// When running as a detatched process, this routine becomes a very tight loop and starves other goroutines.
+		// When running as a detached process, this routine becomes a very tight loop and starves other goroutines.
 		// So, we will sleep before letting it check to see if Stdin has been reconnected
 		for {
 			if _, err = os.Stdin.Read(line); err == nil {
@@ -126,7 +127,7 @@ func SimControl(listenTo int, listenStdin bool) {
 
 			case 'b' == b[0]:
 				if len(b) == 1 {
-					os.Stderr.WriteString("specifivy how long a block will be recorded (in nanoseconds).  1 records all blocks.\n")
+					os.Stderr.WriteString("specifically how long a block will be recorded (in nanoseconds).  1 records all blocks.\n")
 					break
 				}
 				delay, err := strconv.Atoi(string(b[1:]))
@@ -836,7 +837,7 @@ func SimControl(listenTo int, listenStdin bool) {
 						if amt != -1 && c == amt {
 							break
 						}
-						stat := returnStatString(ident.Status)
+						stat := returnStatString(ident.Status.Load())
 						if show == 5 {
 							if c != amt {
 							} else {
@@ -969,7 +970,7 @@ func SimControl(listenTo int, listenStdin bool) {
 				for _, i := range fnodes[ListenTo].State.Authorities {
 					os.Stderr.WriteString("-------------------------------------------------------------------------------\n")
 					var stat string
-					stat = returnStatString(i.Status)
+					stat = returnStatString(i.Status.Load())
 					os.Stderr.WriteString(fmt.Sprint("Server Status: ", stat, "\n"))
 					os.Stderr.WriteString(fmt.Sprint("Identity Chain: ", i.AuthorityChainID, "\n"))
 					os.Stderr.WriteString(fmt.Sprint("Management Chain: ", i.ManagementChainID, "\n"))
@@ -1136,26 +1137,8 @@ func SimControl(listenTo int, listenStdin bool) {
 	}
 }
 func returnStatString(i uint8) string {
-	var stat string
-	switch i {
-	case 0:
-		stat = "Unassigned"
-	case 1:
-		stat = "Federated Server"
-	case 2:
-		stat = "Audit Server"
-	case 3:
-		stat = "Full"
-	case 4:
-		stat = "Pending Federated Server"
-	case 5:
-		stat = "Pending Audit Server"
-	case 6:
-		stat = "Pending Full"
-	case 7:
-		stat = "Skeleton Identity"
-	}
-	return stat
+	// Use the better code already written
+	return identity.StatusToJSONString(i)
 }
 
 // Allows us to scatter transactions across all nodes.

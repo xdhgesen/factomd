@@ -35,6 +35,7 @@ import (
 
 	"errors"
 
+	"github.com/FactomProject/factomd/util/atomic"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,7 +49,7 @@ type State struct {
 	Logger           *log.Entry
 	IsRunning        bool
 	filename         string
-	NetworkControler *p2p.Controller
+	NetworkController *p2p.Controller
 	Salt             interfaces.IHash
 	Cfg              interfaces.IFactomConfig
 
@@ -105,8 +106,8 @@ type State struct {
 	Authorities          []*Authority     // Identities of all servers in management chain
 	AuthorityServerCount int              // number of federated or audit servers allowed
 
-	// Just to print (so debugging doesn't drive functionaility)
-	Status      int // Return a status (0 do nothing, 1 provide queues, 2 provide consensus data)
+	// Just to print (so debugging doesn't drive functionality)
+	Status      atomic.AtomicInt // Return a status (0 do nothing, 1 provide queues, 2 provide consensus data)
 	serverPrt   string
 	StatusMutex sync.Mutex
 	StatusStrs  []string
@@ -175,7 +176,7 @@ type State struct {
 	// Server State
 	StartDelay      int64 // Time in Milliseconds since the last DBState was applied
 	StartDelayLimit int64
-	DBFinished      bool
+	DBFinished      atomic.AtomicBool
 	RunLeader       bool
 	BootTime        int64 // Time in seconds that we last booted
 
@@ -1060,7 +1061,7 @@ func (s *State) ValidatePrevious(dbheight uint32) error {
 		} else {
 			if pdblk2.GetKeyMR().Fixed() != dblk.GetHeader().GetPrevKeyMR().Fixed() {
 				errs += fmt.Sprintln("xxxx Hash is incorrect.  Expected: ", dblk.GetHeader().GetPrevKeyMR().String())
-				errs += fmt.Sprintln("xxxx Hash is incorrect.  Recieved: ", pdblk2.GetKeyMR().String())
+				errs += fmt.Sprintln("xxxx Hash is incorrect.  Received: ", pdblk2.GetKeyMR().String())
 				errs += fmt.Sprintf("Hash is incorrect at %d", dbheight-1)
 			}
 		}

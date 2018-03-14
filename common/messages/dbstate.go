@@ -28,7 +28,7 @@ type DBStateMsg struct {
 	MessageBase
 	Timestamp interfaces.Timestamp
 
-	//TODO: handle malformed DBStates!
+	//TODO: handle misformed DBStates!
 	DirectoryBlock   interfaces.IDirectoryBlock
 	AdminBlock       interfaces.IAdminBlock
 	FactoidBlock     interfaces.IFBlock

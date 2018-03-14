@@ -148,7 +148,7 @@ func SetMsg(msg interfaces.IMsg) {
 
 func listen() {
 	for {
-		msg, err := p2pProxy.Recieve()
+		msg, err := p2pProxy.Receive()
 		if err != nil || msg == nil {
 			time.Sleep(1 * time.Millisecond)
 			continue
@@ -246,7 +246,7 @@ func main() {
 		SetMsg(bounce)
 
 		if isp2p {
-			fmt.Printf("netTest(%s):  ::p2p:: request sent: %d request recieved %d sent: %d received: %d\n",
+			fmt.Printf("netTest(%s):  ::p2p:: request sent: %d request received %d sent: %d received: %d\n",
 				name,
 				p2pRequestSent, p2pRequestReceived,
 				p2pSent, p2pReceived)
@@ -262,7 +262,7 @@ func main() {
 }
 
 // if isp2p {
-// 	fmt.Printf("netTest(%s): Reads: %d errs %d Writes %d errs %d  ::p2p:: request sent: %d request recieved %d sent: %d received: %d\n",
+// 	fmt.Printf("netTest(%s): Reads: %d errs %d Writes %d errs %d  ::p2p:: request sent: %d request received %d sent: %d received: %d\n",
 // 		name,
 // 		p2p.Reads, p2p.ReadsErr,
 // 		p2p.Writes, p2p.WritesErr,

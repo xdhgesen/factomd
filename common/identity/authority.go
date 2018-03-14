@@ -6,12 +6,14 @@ package identity
 
 import (
 	"encoding/json"
+	"fmt"
 
 	ed "github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 type Authority struct {
@@ -19,7 +21,7 @@ type Authority struct {
 	ManagementChainID interfaces.IHash
 	MatryoshkaHash    interfaces.IHash
 	SigningKey        primitives.PublicKey
-	Status            uint8
+	Status            atomic.AtomicUint8
 	AnchorKeys        []AnchorSigningKey
 
 	KeyHistory []HistoricKey
@@ -35,7 +37,7 @@ func RandomAuthority() *Authority {
 	a.MatryoshkaHash = primitives.RandomHash()
 
 	a.SigningKey = *primitives.RandomPrivateKey().Pub
-	a.Status = random.RandUInt8()
+	a.Status.Store(random.RandUInt8())
 
 	l := random.RandIntBetween(1, 10)
 	for i := 0; i < l; i++ {
@@ -176,7 +178,7 @@ func (e *Authority) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	if err != nil {
 		return
 	}
-	e.Status = uint8(status)
+	e.Status.Store(uint8(status))
 
 	l, err := buf.PopVarInt()
 	if err != nil {
@@ -215,9 +217,9 @@ func (e *Authority) UnmarshalBinary(p []byte) error {
 
 // 1 if fed, 0 if audit, -1 if neither
 func (auth *Authority) Type() int {
-	if auth.Status == constants.IDENTITY_FEDERATED_SERVER {
+	if auth.Status.Load() == constants.IDENTITY_FEDERATED_SERVER {
 		return 1
-	} else if auth.Status == constants.IDENTITY_AUDIT_SERVER {
+	} else if auth.Status.Load() == constants.IDENTITY_AUDIT_SERVER {
 		return 0
 	}
 	return -1
@@ -263,13 +265,13 @@ func (auth *Authority) MarshalJSON() ([]byte, error) {
 		ManagementChainID: auth.ManagementChainID,
 		MatryoshkaHash:    auth.MatryoshkaHash,
 		SigningKey:        auth.SigningKey.String(),
-		Status:            statusToJSONString(auth.Status),
+		Status:            StatusToJSONString(auth.Status.Load()),
 		AnchorKeys:        auth.AnchorKeys,
 	})
 }
 
 // Only used for marshaling JSON
-func statusToJSONString(status uint8) string {
+func StatusToJSONString(status uint8) string {
 	switch status {
 	case constants.IDENTITY_UNASSIGNED:
 		return "none"
@@ -288,5 +290,6 @@ func statusToJSONString(status uint8) string {
 	case constants.IDENTITY_SKELETON:
 		return "skeleton"
 	}
-	return "NA"
+	return fmt.Sprintf("UNKNOWN_%x", status)
+
 }

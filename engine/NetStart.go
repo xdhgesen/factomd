@@ -289,7 +289,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		fnodes[i].State.IntiateNetworkSkeletonIdentity()
 	}
 
-	// Start the P2P netowork
+	// Start the P2P network
 	var networkID p2p.NetworkID
 	var seedURL, networkPort, specialPeers string
 	switch s.Network {
@@ -343,7 +343,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 			ConnectionMetricsChannel: connectionMetricsChannel,
 		}
 		p2pNetwork = new(p2p.Controller).Init(ci)
-		fnodes[0].State.NetworkControler = p2pNetwork
+		fnodes[0].State.NetworkController = p2pNetwork
 		p2pNetwork.StartNetwork()
 		p2pProxy = new(P2PProxy).Init(fnodes[0].State.FactomNodeName, "P2P Network").(*P2PProxy)
 		p2pProxy.FromNetwork = p2pNetwork.FromNetwork
@@ -471,7 +471,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	}
 
-	// Initate dbstate plugin if enabled. Only does so for first node,
+	// Initiate dbstate plugin if enabled. Only does so for first node,
 	// any more nodes on sim control will use default method
 	fnodes[0].State.SetTorrentUploader(p.torUpload)
 	if p.torManage {
