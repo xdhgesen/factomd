@@ -49,15 +49,15 @@ type Controller struct {
 
 	discovery Discovery // Our discovery structure
 
-	numberOutgoingConnections  int       // In PeerManagmeent we track this to know whent to dial out.
-	numberIncommingConnections int       // In PeerManagmeent we track this and refuse incomming connections when we have too many.
-	lastPeerManagement         time.Time // Last time we ran peer management.
-	lastDiscoveryRequest       time.Time
-	NodeID                     uint64
-	lastStatusReport           time.Time
-	lastPeerRequest            time.Time       // Last time we asked peers about the peers they know about.
-	specialPeersString         string          // configuration set special peers
-	partsAssembler             *PartsAssembler // a data structure that assembles full messages from received message parts
+	numberOutgoingConnections int       // In PeerManagement we track this to know when to dial out.
+	numberIncomingConnections int       // In PeerManagement we track this and refuse incoming connections when we have too many.
+	lastPeerManagement        time.Time // Last time we ran peer management.
+	lastDiscoveryRequest      time.Time
+	NodeID                    uint64
+	lastStatusReport          time.Time
+	lastPeerRequest           time.Time       // Last time we asked peers about the peers they know about.
+	specialPeersString        string          // configuration set special peers
+	partsAssembler            *PartsAssembler // a data structure that assembles full messages from received message parts
 }
 
 type ControllerInit struct {
@@ -305,11 +305,11 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 		switch err {
 		case nil:
 			switch {
-			case c.numberIncommingConnections < MaxNumberIncommingConnections:
+			case c.numberIncomingConnections < MaxNumberIncomingConnections:
 				c.AddPeer(conn) // Sends command to add the peer to the peers list
 				note("ctrlr", "Controller.acceptLoop() new peer: %+v", conn)
 			default:
-				note("ctrlr", "Controller.acceptLoop() new peer, but too many incomming connections. %d", c.numberIncommingConnections)
+				note("ctrlr", "Controller.acceptLoop() new peer, but too many incoming connections. %d", c.numberIncomingConnections)
 				conn.Close()
 			}
 		default:
@@ -395,7 +395,7 @@ func (c *Controller) runloop() {
 
 // Route pulls all of the messages from the application and sends them to the appropriate
 // peer. Broadcast messages go to everyone, directed messages go to the named peer.
-// route also passes incomming messages on to the application.
+// route also passes incoming messages on to the application.
 func (c *Controller) route() {
 	// Receive messages from the peers & forward to application.
 	for peerHash, connection := range c.connections {
@@ -644,13 +644,13 @@ func (c *Controller) updateConnectionCounts() {
 	// If we are low on outgoing onnections, attempt to connect to some more.
 	// If the connection is not online, we don't count it as connected.
 	c.numberOutgoingConnections = 0
-	c.numberIncommingConnections = 0
+	c.numberIncomingConnections = 0
 	for _, connection := range c.connections {
 		switch {
 		case connection.IsOutGoing() && connection.IsOnline():
 			c.numberOutgoingConnections++
 		case !connection.IsOutGoing() && connection.IsOnline():
-			c.numberIncommingConnections++
+			c.numberIncomingConnections++
 		default: // we don't count offline connections for these purposes.
 		}
 	}
@@ -739,7 +739,7 @@ func (c *Controller) networkStatusReport() {
 		c.updateConnectionAddressMap()
 		silence("ctrlr", "     # Connections: %d", len(c.connections))
 		silence("ctrlr", "Unique Connections: %d", len(c.connectionsByAddress))
-		silence("ctrlr", "    In Connections: %d", c.numberIncommingConnections)
+		silence("ctrlr", "    In Connections: %d", c.numberIncomingConnections)
 		silence("ctrlr", "   Out Connections: %d (only online are counted)", c.numberOutgoingConnections)
 		silence("ctrlr", "        Total RECV: %d", TotalMessagesReceived)
 		silence("ctrlr", "  Application RECV: %d", ApplicationMessagesReceived)

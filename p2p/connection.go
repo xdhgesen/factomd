@@ -43,7 +43,7 @@ type Connection struct {
 	timeLastStatus  time.Time         // last time we printed our status for debugging.
 	timeLastMetrics time.Time         // last time we updated metrics
 	state           uint8             // Current state of the connection. Private. Only communication
-	isOutGoing      bool              // We keep track of outgoing dial() vs incomming accept() connections
+	isOutGoing      bool              // We keep track of outgoing dial() vs incoming accept() connections
 	isPersistent    bool              // Persistent connections we always redail.
 	notes           string            // Notes about the connection, for debugging (eg: error)
 	metrics         ConnectionMetrics // Metrics about this connection
