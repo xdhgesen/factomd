@@ -15,13 +15,14 @@ import (
 	"time"
 	"unicode"
 
+	"runtime"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/controlPanel"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/wsapi"
-	"runtime"
 )
 
 var _ = fmt.Print
@@ -44,7 +45,7 @@ func GetLine(listenToStdin bool) string {
 	if listenToStdin {
 		line := make([]byte, 100)
 		var err error
-		// When running as a detatched process, this routine becomes a very tight loop and starves other goroutines.
+		// When running as a detached process, this routine becomes a very tight loop and starves other goroutines.
 		// So, we will sleep before letting it check to see if Stdin has been reconnected
 		for {
 			if _, err = os.Stdin.Read(line); err == nil {
@@ -836,7 +837,7 @@ func SimControl(listenTo int, listenStdin bool) {
 						if amt != -1 && c == amt {
 							break
 						}
-						stat := returnStatString(ident.Status)
+						stat := returnStatString(ident.Status.Load())
 						if show == 5 {
 							if c != amt {
 							} else {
@@ -969,7 +970,7 @@ func SimControl(listenTo int, listenStdin bool) {
 				for _, i := range fnodes[ListenTo].State.Authorities {
 					os.Stderr.WriteString("-------------------------------------------------------------------------------\n")
 					var stat string
-					stat = returnStatString(i.Status)
+					stat = returnStatString(i.Status.Load())
 					os.Stderr.WriteString(fmt.Sprint("Server Status: ", stat, "\n"))
 					os.Stderr.WriteString(fmt.Sprint("Identity Chain: ", i.AuthorityChainID, "\n"))
 					os.Stderr.WriteString(fmt.Sprint("Management Chain: ", i.ManagementChainID, "\n"))

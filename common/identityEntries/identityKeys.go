@@ -1,11 +1,9 @@
 package identityEntries
 
-import ()
-
 //https://github.com/FactomProject/FactomDocs/blob/master/Identity.md
 
 //TODO:
-//- Add conversion to human-readible private / public key
+//- Add conversion to human-readableprivate / public key
 
 const (
 	IdentityPrivateKeyPrefix1 = "4db6c9"

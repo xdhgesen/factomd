@@ -639,7 +639,7 @@ func getFactomPackageEntryFromString(message string) (*factom.Entry, error) {
 			return nil, errors.New("Invalid Reveal Entry")
 		}
 		fEntry := new(factom.Entry)
-		// build factom pkg entry.
+		// build Factom pkg entry.
 		fEntry.ChainID = entry.ChainID.String()
 		fEntry.ExtIDs = entry.ExternalIDs()
 		fEntry.Content = entry.Content.Bytes

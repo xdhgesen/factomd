@@ -14,8 +14,9 @@ import (
 	"os"
 	"sort"
 	"strconv"
-	"sync"
 	"time"
+
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 type Discovery struct {
@@ -27,7 +28,7 @@ type Discovery struct {
 	seedURL       string     // URL to the source of a list of peers
 }
 
-var UpdateKnownPeers sync.Mutex
+var UpdateKnownPeers atomic.DebugMutex
 
 // Discovery provides the code for sharing and managing peers,
 // namely keeping track of all the peers we know about (not just the ones
@@ -131,7 +132,7 @@ func (d *Discovery) SavePeers() {
 	note("discovery", "SavePeers() saved %d peers in peers.json. \n They were: %+v", len(qualityPeers), qualityPeers)
 }
 
-// LearnPeers recieves a set of peers from other hosts
+// LearnPeers receives a set of peers from other hosts
 // The unique peers are added to our peer list.
 // The peers are in a json encoded string as a byte slice
 func (d *Discovery) LearnPeers(parcel Parcel) {

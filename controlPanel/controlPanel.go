@@ -21,6 +21,7 @@ import (
 	"github.com/FactomProject/factomd/controlPanel/files"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 // Initiates control panel variables and controls the http requests
@@ -52,7 +53,7 @@ var (
 	DisplayStateChannel chan state.DisplayState
 
 	// Sync Mutex
-	TemplateMutex     sync.Mutex
+	TemplateMutex     atomic.DebugMutex
 	DisplayStateMutex sync.RWMutex
 )
 
@@ -368,9 +369,9 @@ func factomdQuery(item string, value string, batchQueried bool) []byte {
 		feds := 0
 		auds := 0
 		for _, a := range DisplayState.Authorities {
-			if a.Status == 1 {
+			if a.Status.Load() == 1 {
 				feds++
-			} else if a.Status == 2 {
+			} else if a.Status.Load() == 2 {
 				auds++
 			}
 		}
@@ -488,7 +489,7 @@ var RecentTransactions *LastDirectoryBlockTransactions
 
 // Flag to tell if RecentTransactions is already being built
 var DoingRecentTransactions bool
-var RecentTransactionsMutex sync.Mutex
+var RecentTransactionsMutex atomic.DebugMutex
 
 func toggleDCT() {
 	if DoingRecentTransactions {

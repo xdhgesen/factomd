@@ -231,7 +231,7 @@ func (im *IdentityManager) ApplyNewBitcoinKeyStructure(bnk *NewBitcoinKeyStructu
 
 	/*
 		// Add to admin block
-		status := st.Identities[IdentityIndex].Status
+		status := st.Identities[IdentityIndex].Status.Load()
 		if !initial && statusIsFedOrAudit(status) && st.GetLeaderVM() == st.ComputeVMIndex(entry.GetChainID().Bytes()) {
 			copy(key[:20], extIDs[5][:20])
 			extIDs[5] = append(extIDs[5], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}...)
@@ -305,7 +305,7 @@ func (im *IdentityManager) ApplyNewBlockSigningKeyStruct(nbsk *NewBlockSigningKe
 		//		Not the initial load
 		//		A Federated or Audit server
 		//		This node is charge of admin block
-		status := st.Identities[IdentityIndex].Status
+		status := st.Identities[IdentityIndex].Status.Load()
 		if !initial && statusIsFedOrAudit(status) && st.GetLeaderVM() == st.ComputeVMIndex(entry.GetChainID().Bytes()) {
 			key := primitives.NewHash(extIDs[3])
 			msg := messages.NewChangeServerKeyMsg(st, chainID, constants.TYPE_ADD_FED_SERVER_KEY, 0, 0, key)

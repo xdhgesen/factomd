@@ -9,5 +9,6 @@ import (
 	"testing"
 
 	. "github.com/FactomProject/factomd/common/identity"
+"github.com/FactomProject/factomd/util/atomic"
 )
 */

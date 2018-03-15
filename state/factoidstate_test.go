@@ -514,6 +514,7 @@ import (
 	. "github.com/FactomProject/factomd/database/boltdb"
 	"math/rand"
 	"testing"
+"github.com/FactomProject/factomd/util/atomic"
 )
 
 var _ = hex.EncodeToString

@@ -22,21 +22,21 @@ import (
 var conLogger = packageLogger.WithFields(log.Fields{"subpack": "connection"})
 
 // Connection represents a single connection to another peer over the network. It communicates with the application
-// via two channels, send and recieve.  These channels take structs of type ConnectionCommand or ConnectionParcel
+// via two channels, send and receive.  These channels take structs of type ConnectionCommand or ConnectionParcel
 // (defined below).
 type Connection struct {
 	conn           net.Conn
 	Errors         chan error              // handle errors from connections.
 	Commands       chan *ConnectionCommand // handle connection commands
 	SendChannel    chan interface{}        // Send means "towards the network" Channel sends Parcels and ConnectionCommands
-	ReceiveChannel chan interface{}        // Recieve means "from the network" Channel recieves Parcels and ConnectionCommands
+	ReceiveChannel chan interface{}        // Receive means "from the network" Channel receives Parcels and ConnectionCommands
 	ReceiveParcel  chan *Parcel            // Parcels to be handled.
 	// and as "address" for sending messages to specific nodes.
 	encoder         *gob.Encoder      // Wire format is gobs in this version, may switch to binary
 	decoder         *gob.Decoder      // Wire format is gobs in this version, may switch to binary
 	peer            Peer              // the datastructure representing the peer we are talking to. defined in peer.go
 	attempts        int               // reconnection attempts
-	TimeLastpacket  time.Time         // Time we last successfully recieved a packet or command.
+	TimeLastpacket  time.Time         // Time we last successfully received a packet or command.
 	timeLastAttempt time.Time         // time of last attempt to connect via dial
 	timeLastPing    time.Time         // time of last ping sent
 	timeLastUpdate  time.Time         // time of last peer update sent
@@ -62,7 +62,7 @@ const (
 	ConnectionInitialized  uint8 = iota //Structure created, have peer info. Dial command moves us to Online or Shutdown (depending)
 	ConnectionOnline                    // We're connected to the other side.  Normal state
 	ConnectionOffline                   // We've been disconnected for whatever reason.  Attempt to reconnect some number of times. Moves to Online if successful, Shutdown if not.
-	ConnectionShuttingDown              // We're shutting down, the recieves loop exits.
+	ConnectionShuttingDown              // We're shutting down, the receives loop exits.
 	ConnectionClosed                    // We're shut down, the runloop sets this state right before exiting. Controller can clean us up.
 )
 
@@ -96,10 +96,10 @@ func (e *ConnectionParcel) String() string {
 // ConnectionMetrics is used to encapsulate various metrics about the connection.
 type ConnectionMetrics struct {
 	MomentConnected  time.Time // when the connection started.
-	BytesSent        uint32    // Keeping track of the data sent/recieved for console
-	BytesReceived    uint32    // Keeping track of the data sent/recieved for console
-	MessagesSent     uint32    // Keeping track of the data sent/recieved for console
-	MessagesReceived uint32    // Keeping track of the data sent/recieved for console
+	BytesSent        uint32    // Keeping track of the data sent/received for console
+	BytesReceived    uint32    // Keeping track of the data sent/received for console
+	MessagesSent     uint32    // Keeping track of the data sent/received for console
+	MessagesReceived uint32    // Keeping track of the data sent/received for console
 	PeerAddress      string    // Peer IP Address
 	PeerQuality      int32     // Quality of the connection.
 	// Red: Below -50
@@ -130,7 +130,7 @@ func (e *ConnectionCommand) String() string {
 	return str
 }
 
-// These are the commands that connections can send/recieve
+// These are the commands that connections can send/receive
 const (
 	ConnectionIsClosed uint8 = iota // Notifies the controller that we are shut down and can be released
 	ConnectionShutdownNow
@@ -436,7 +436,7 @@ func (c *Connection) handleCommand() {
 				c.goShutdown()
 			}
 		case ConnectionGoOffline:
-			debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s goOffline command recieved", c.peer.PeerIdent())
+			debug(c.peer.PeerIdent(), "handleCommand() disconnecting peer: %s goOffline command received", c.peer.PeerIdent())
 			c.goOffline()
 		default:
 			logfatal(c.peer.PeerIdent(), "handleCommand() unknown command?: %+v ", command)

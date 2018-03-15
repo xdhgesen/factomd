@@ -890,14 +890,14 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 		if !containsServer(previousFeds, cf) {
 			// Promote to federated
 			//index := list.State.isIdentityChain(cf.GetChainID())
-			/*if index == -1 || !(list.State.Identities[index].Status == constants.IDENTITY_PENDING_FEDERATED_SERVER ||
-			list.State.Identities[index].Status == constants.IDENTITY_FEDERATED_SERVER) ||
-			list.State.Identities[index].Status == constants.IDENTITY_AUDIT_SERVER) {*/
+			/*if index == -1 || !(list.State.Identities[index].Status.Load() == constants.IDENTITY_PENDING_FEDERATED_SERVER ||
+			list.State.Identities[index].Status.Load() == constants.IDENTITY_FEDERATED_SERVER) ||
+			list.State.Identities[index].Status.Load() == constants.IDENTITY_AUDIT_SERVER) {*/
 			addEntry := adminBlock.NewAddFederatedServer(cf.GetChainID(), currentDBHeight+1)
 			//list.State.AddStatus(fmt.Sprintf("FIXUPLINKS: Adding delta to the Admin Block: %s", addEntry.String()))
 			d.AdminBlock.AddFirstABEntry(addEntry)
 			/*} else {
-				list.State.AddStatus(fmt.Sprintf("FIXUPLINKS: Not Adding delta to the Admin Block: Idx: %d Status: %d", index, list.State.Identities[index].Status))
+				list.State.AddStatus(fmt.Sprintf("FIXUPLINKS: Not Adding delta to the Admin Block: Idx: %d Status: %d", index, list.State.Identities[index].Status.Load()))
 			}*/
 		}
 	}

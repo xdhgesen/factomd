@@ -129,7 +129,7 @@ func ParseCmdLine(args []string) *FactomParams {
 	fnetPtr := flag.String("fnet", "", "Read the given file to build the network connections")
 	dropPtr := flag.Int("drop", 0, "Number of messages to drop out of every thousand")
 	journalPtr := flag.String("journal", "", "Rerun a Journal of messages")
-	journalingPtr := flag.Bool("journaling", false, "Write a journal of all messages recieved. Default is off.")
+	journalingPtr := flag.Bool("journaling", false, "Write a journal of all messages received. Default is off.")
 	followerPtr := flag.Bool("follower", false, "If true, force node to be a follower.  Only used when replaying a journal.")
 	leaderPtr := flag.Bool("leader", true, "If true, force node to be a leader.  Only used when replaying a journal.")
 	dbPtr := flag.String("db", "", "Override the Database in the Config file and use this Database implementation. Options Map, LDB, or Bolt")
@@ -154,7 +154,7 @@ func ParseCmdLine(args []string) *FactomParams {
 	factomdLocationsflag := flag.String("selfaddr", "", "comma seperated IPAddresses and DNS names of this factomd to use when creating a cert file")
 	memProfileRate := flag.Int("mpr", 512*1024, "Set the Memory Profile Rate to update profiling per X bytes allocated. Default 512K, set to 1 to profile everything, 0 to disable.")
 	exposeProfilePtr := flag.Bool("exposeprofiler", false, "Setting this exposes the profiling port to outside localhost.")
-	factomHomePtr := flag.String("factomhome", "", "Set the factom home directory. The .factom folder will be placed here if set, otherwise it will default to $HOME")
+	factomHomePtr := flag.String("factomhome", "", "Set the Factom home directory. The .factom folder will be placed here if set, otherwise it will default to $HOME")
 
 	logportPtr := flag.String("logPort", "6060", "Port for pprof logging")
 	portOverridePtr := flag.Int("port", 0, "Port where we serve WSAPI;  default 8088")

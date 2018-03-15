@@ -23,7 +23,7 @@ func TestAuthoritySignature(t *testing.T) {
 
 	index := s.AddAuthorityFromChainID(primitives.NewZeroHash())
 	s.Authorities[index].SigningKey = *(s.GetServerPublicKey())
-	s.Authorities[index].Status = 1
+	s.Authorities[index].Status.Store(1)
 
 	ack := new(messages.Ack)
 	ack.DBHeight = s.LLeaderHeight

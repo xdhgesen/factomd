@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	. "github.com/FactomProject/factomd/common/identityEntries"
+"github.com/FactomProject/factomd/util/atomic"
 )
 
 func TestLinkEntryCreditKeyStructure(t *testing.T) {

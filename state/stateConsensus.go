@@ -1254,7 +1254,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 	pl := s.ProcessLists.Get(dbheight)
 	pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitChain); e == nil {
-		// save the Commit to match agains the Reveal later
+		// save the Commit to match againstthe Reveal later
 		h := c.CommitChain.EntryHash
 		s.PutCommit(h, c)
 		entry := s.Holding[h.Fixed()]
@@ -1279,7 +1279,7 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 	pl := s.ProcessLists.Get(dbheight)
 	pl.EntryCreditBlock.GetBody().AddEntry(c.CommitEntry)
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitEntry); e == nil {
-		// save the Commit to match agains the Reveal later
+		// save the Commit to match againstthe Reveal later
 		h := c.CommitEntry.EntryHash
 		s.PutCommit(h, c)
 		entry := s.Holding[h.Fixed()]
@@ -2211,7 +2211,7 @@ func (s *State) GetLeaderHeight() uint32 {
 }
 
 // The highest block for which we have received a message.  Sometimes the same as
-// BuildingBlock(), but can be different depending or the order messages are recieved.
+// BuildingBlock(), but can be different depending or the order messages are received.
 func (s *State) GetHighestKnownBlock() uint32 {
 	if s.ProcessLists == nil {
 		return 0

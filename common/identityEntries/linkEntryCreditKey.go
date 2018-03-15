@@ -13,6 +13,7 @@ import (
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+"github.com/FactomProject/factomd/util/atomic"
 )
 
 //https://github.com/FactomProject/FactomDocs/blob/master/Identity.md#link-entry-credit-key-to-identity

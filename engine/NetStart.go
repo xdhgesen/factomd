@@ -343,7 +343,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 			ConnectionMetricsChannel: connectionMetricsChannel,
 		}
 		p2pNetwork = new(p2p.Controller).Init(ci)
-		fnodes[0].State.NetworkControler = p2pNetwork
+		fnodes[0].State.NetworkController = p2pNetwork
 		p2pNetwork.StartNetwork()
 		p2pProxy = new(P2PProxy).Init(fnodes[0].State.FactomNodeName, "P2P Network").(*P2PProxy)
 		p2pProxy.FromNetwork = p2pNetwork.FromNetwork
@@ -575,11 +575,11 @@ func setupFirstAuthority(s *state.State) {
 	id.Key2 = primitives.NewZeroHash()
 	id.Key3 = primitives.NewZeroHash()
 	id.Key4 = primitives.NewZeroHash()
-	id.Status = 1
+	id.Status.Store(1)
 	s.Identities = append(s.Identities, &id)
 
 	var auth identity.Authority
-	auth.Status = 1
+	auth.Status.Store(1)
 	auth.SigningKey = primitives.PubKeyFromString(id.SigningKey.String())
 	auth.MatryoshkaHash = primitives.NewZeroHash()
 	auth.AuthorityChainID = id.IdentityChainID
