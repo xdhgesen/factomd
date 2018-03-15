@@ -3,8 +3,8 @@ package electionMsgTesting
 import (
 	"fmt"
 
-	"github.com/FactomProject/electiontesting/election"
-	priminterpreter "github.com/FactomProject/electiontesting/interpreter/primitives"
+	"github.com/FactomProject/factomd/electionsCore/election"
+	priminterpreter "github.com/FactomProject/factomd/electionsCore/interpreter/primitives"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
