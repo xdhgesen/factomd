@@ -80,10 +80,10 @@ func NewDisplayState() *DisplayState {
 
 // Sends the copy of State over channel to control panel
 func (s *State) CopyStateToControlPanel() error {
-	if !s.ControlPanelDataRequest {
+	if !s.ControlPanelDataRequest.Load() {
 		return nil
 	}
-	s.ControlPanelDataRequest = false
+	s.ControlPanelDataRequest.Store(false)
 	if len(s.ControlPanelChannel) < ControlPanelAllowedSize {
 		ds, err := DeepStateDisplayCopy(s)
 		if err != nil {
@@ -107,7 +107,7 @@ func DeepStateDisplayCopy(s *State) (*DisplayState, error) {
 	// DB Info
 	ds.CurrentNodeHeight = s.GetHighestSavedBlk()
 	ds.CurrentLeaderHeight = s.GetLeaderHeight()
-	ds.CurrentEBDBHeight = s.EntryDBHeightComplete
+	ds.CurrentEBDBHeight = s.GetEntryDBHeightComplete()
 	ds.LeaderHeight = s.GetTrueLeaderHeight()
 	dir := s.GetDirectoryBlockByHeight(s.GetLeaderHeight())
 	if dir == nil {

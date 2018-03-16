@@ -5,13 +5,14 @@ import (
 	"os"
 
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 type FactomParams struct {
 	AckbalanceHash           bool
 	EnableNet                bool
 	WaitEntries              bool
-	ListenTo                 int
+	ListenTo                 atomic.AtomicInt
 	Cnt                      int
 	Net                      string
 	Fnet                     string
@@ -67,7 +68,7 @@ func (f *FactomParams) Init() { // maybe used by test code
 	f.AckbalanceHash = true
 	f.EnableNet = true
 	f.WaitEntries = false
-	f.ListenTo = 0
+	f.ListenTo.Store(0)
 	f.Cnt = 1
 	f.Net = "tree"
 	f.Fnet = ""
@@ -192,7 +193,7 @@ func ParseCmdLine(args []string) *FactomParams {
 	p.AckbalanceHash = *ackBalanceHashPtr
 	p.EnableNet = *enablenetPtr
 	p.WaitEntries = *waitEntriesPtr
-	p.ListenTo = *listenToPtr
+	p.ListenTo.Store(*listenToPtr)
 	p.Cnt = *cntPtr
 	p.Net = *netPtr
 	p.Fnet = *fnetPtr

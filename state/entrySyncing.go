@@ -158,7 +158,7 @@ func (s *State) MakeMissingEntryRequests() {
 			} else {
 				time.Sleep(100 * time.Millisecond)
 			}
-			if s.EntryDBHeightComplete == s.GetHighestSavedBlk() {
+			if s.GetEntryDBHeightComplete() == s.GetHighestSavedBlk() {
 				time.Sleep(20 * time.Second)
 			}
 		}
@@ -175,7 +175,7 @@ func (s *State) GoSyncEntries() {
 	start := uint32(1)
 
 	if s.EntryDBHeightComplete > 0 {
-		start = s.EntryDBHeightComplete
+		start = s.GetEntryDBHeightComplete()
 	}
 
 	entryMissing := 0
@@ -215,7 +215,7 @@ func (s *State) GoSyncEntries() {
 
 			if firstMissing < 0 {
 				if scan > 1 {
-					s.EntryDBHeightComplete = scan - 1
+					s.EntryDBHeightComplete.Store(scan - 1)
 					start = scan
 				}
 			}
@@ -292,7 +292,7 @@ func (s *State) GoSyncEntries() {
 			if s.EntryDBHeightComplete%1000 == 0 {
 				if firstMissing < 0 {
 					//Only save EntryDBHeightComplete IF it's a multiple of 1000 AND there are no missing entries
-					err := s.DB.SaveDatabaseEntryHeight(s.EntryDBHeightComplete)
+					err := s.DB.SaveDatabaseEntryHeight(s.GetEntryDBHeightComplete())
 					if err != nil {
 						fmt.Printf("ERROR: %v\n", err)
 					}
@@ -301,7 +301,7 @@ func (s *State) GoSyncEntries() {
 		}
 		lastfirstmissing = firstMissing
 		if firstMissing < 0 {
-			s.EntryDBHeightComplete = s.GetHighestSavedBlk()
+			s.EntryDBHeightComplete.Store(s.GetHighestSavedBlk())
 			time.Sleep(5 * time.Second)
 		}
 

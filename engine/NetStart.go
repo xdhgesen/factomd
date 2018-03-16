@@ -152,7 +152,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	fmt.Println(">>>>>>>>>>>>>>>>")
 	fmt.Println(">>>>>>>>>>>>>>>> Net Sim Start!")
 	fmt.Println(">>>>>>>>>>>>>>>>")
-	fmt.Println(">>>>>>>>>>>>>>>> Listening to Node", p.ListenTo)
+	fmt.Println(">>>>>>>>>>>>>>>> Listening to Node", p.ListenTo.Load())
 	fmt.Println(">>>>>>>>>>>>>>>>")
 
 	AddInterruptHandler(func() {
@@ -217,13 +217,13 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	s.SetDropRate(p.DropRate)
 
 	if p.Sync2 >= 0 {
-		s.EntryDBHeightComplete = uint32(p.Sync2)
+		s.EntryDBHeightComplete.Store(uint32(p.Sync2))
 	} else {
 		height, err := s.DB.FetchDatabaseEntryHeight()
 		if err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("ERROR: %v", err))
 		} else {
-			s.EntryDBHeightComplete = height
+			s.EntryDBHeightComplete.Store(height)
 		}
 	}
 
@@ -236,7 +236,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	os.Stderr.WriteString(fmt.Sprintf("%20s %s\n", "FNode 0 Salt", s.Salt.String()[:16]))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "enablenet", p.EnableNet))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "waitentries", p.WaitEntries))
-	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "node", p.ListenTo))
+	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "node", p.ListenTo.Load()))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %s\n", "prefix", p.prefix))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "node count", p.Cnt))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "net spec", pnet))
@@ -505,7 +505,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
 
-	SimControl(p.ListenTo, listenToStdin)
+	SimControl(p.ListenTo.Load(), listenToStdin)
 
 }
 

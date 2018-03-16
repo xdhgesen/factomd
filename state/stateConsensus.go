@@ -125,7 +125,7 @@ func (s *State) Process() (progress bool) {
 	if !s.RunLeader {
 		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
-			if s.DBFinished == true {
+			if s.DBFinished.Load() {
 				s.RunLeader = true
 				if !s.IgnoreDone {
 					s.StartDelay = now // Reset StartDelay for Ignore Missing
@@ -559,7 +559,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 func (s *State) ExecuteEntriesInDBState(dbmsg *messages.DBStateMsg) {
 	height := dbmsg.DirectoryBlock.GetDatabaseHeight()
 
-	if s.EntryDBHeightComplete > height {
+	if s.GetEntryDBHeightComplete() > height {
 		return
 	}
 	// If no Eblocks, leave
@@ -606,7 +606,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	dbheight := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
 
 	// ignore if too old. If its under EntryDBHeightComplete
-	if dbheight > 0 && dbheight <= s.GetHighestSavedBlk() && dbheight < s.EntryDBHeightComplete {
+	if dbheight > 0 && dbheight <= s.GetHighestSavedBlk() && dbheight < s.GetEntryDBHeightComplete() {
 		return
 	}
 
@@ -642,13 +642,13 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		// Do nothing because this dbstate looks to be invalid
 		cntFail()
 		if dbstatemsg.IsLast { // this is the last DBState in this load
-			s.DBFinished = true // Just in case we toss the last one for some reason
+			s.DBFinished.Store(true) // Just in case we toss the last one for some reason
 		}
 		return
 	}
 
 	if dbstatemsg.IsLast { // this is the last DBState in this load
-		s.DBFinished = true // Normal case
+		s.DBFinished.Store(true) // Normal case
 	}
 	/**************************
 	for int(s.ProcessLists.DBHeightBase)+len(s.ProcessLists.Lists) > int(dbheight+1) {

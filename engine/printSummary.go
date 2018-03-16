@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
-func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
+func printSummary(summary *int, value int, listenTo *atomic.AtomicInt, wsapiNode *atomic.AtomicInt) {
 	out := ""
 
-	if *listenTo < 0 || *listenTo >= len(fnodes) {
+	if listenTo.Load() < 0 || listenTo.Load() >= len(fnodes) {
 		return
 	}
 
@@ -50,24 +51,24 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 		for i, f := range pnodes {
 			in := ""
 			api := ""
-			if f.Index == *listenTo {
+			if f.Index == listenTo.Load() {
 				in = "f"
 			}
-			if f.Index == *wsapiNode {
+			if f.Index == wsapiNode.Load() {
 				api = "w"
 			}
 
 			prt = prt + fmt.Sprintf("%3d %1s%1s %s \n", i, in, api, f.State.ShortString())
 		}
 
-		if *listenTo < len(fnodes) {
-			f := fnodes[*listenTo]
+		if listenTo.Load() < len(fnodes) {
+			f := fnodes[listenTo.Load()]
 			prt = fmt.Sprintf("%s EB Complete %d EB Processing %d Entries Complete %d Faults %d\n", prt, f.State.EntryBlockDBHeightComplete, f.State.EntryBlockDBHeightProcessing, f.State.EntryDBHeightComplete, totalServerFaults)
 		}
 
 		sumOut := 0
 		sumIn := 0
-		f := fnodes[*listenTo]
+		f := fnodes[listenTo.Load()]
 		cnt := len(f.Peers)
 		for _, p := range f.Peers {
 			peer, ok := p.(*SimPeer)
@@ -222,7 +223,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 			}
 
 		}
-		prt = prt + "\n" + systemFaults(fnodes[*listenTo])
+		prt = prt + "\n" + systemFaults(fnodes[listenTo.Load()])
 
 		prt = prt + faultSummary()
 

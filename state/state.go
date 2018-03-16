@@ -83,7 +83,7 @@ type State struct {
 	ControlPanelPort        int
 	ControlPanelSetting     int
 	ControlPanelChannel     chan DisplayState
-	ControlPanelDataRequest bool // If true, update Display state
+	ControlPanelDataRequest atomic.AtomicBool // If true, update Display state
 
 	// Network Configuration
 	Network                 string
@@ -176,7 +176,7 @@ type State struct {
 	// Server State
 	StartDelay      int64 // Time in Milliseconds since the last DBState was applied
 	StartDelayLimit int64
-	DBFinished      bool
+	DBFinished      atomic.AtomicBool
 	RunLeader       bool
 	BootTime        int64 // Time in seconds that we last booted
 
@@ -191,7 +191,7 @@ type State struct {
 	LeaderPL        *ProcessList
 	PLProcessHeight uint32
 	OneLeader       bool
-	OutputAllowed   bool
+	OutputAllowed   atomic.AtomicBool
 	CurrentMinute   int
 
 	// These are the start times for blocks and minutes
@@ -222,8 +222,8 @@ type State struct {
 	Saving  bool // True if we are in the process of saving to the database
 	Syncing bool // Looking for messages from leaders to sync
 
-	NetStateOff     bool // Disable if true, Enable if false
-	DebugConsensus  bool // If true, dump consensus trace
+	NetStateOff     atomic.AtomicBool // Disable if true, Enable if false
+	DebugConsensus  bool              // If true, dump consensus trace
 	FactoidTrans    int
 	ECCommits       int
 	ECommits        int
@@ -307,7 +307,7 @@ type State struct {
 
 	MissingEntryRepeat interfaces.Timestamp
 	// DBlock Height at which node has a complete set of eblocks+entries
-	EntryDBHeightComplete uint32
+	EntryDBHeightComplete atomic.AtomicUint32
 	// DBlock Height at which we have started asking for or have all entries
 	EntryDBHeightProcessing uint32
 	// Height in the Directory Block where we have
@@ -532,11 +532,11 @@ func (s *State) GetAuthorityDeltas() string {
 }
 
 func (s *State) GetNetStateOff() bool { //	If true, all network communications are disabled
-	return s.NetStateOff
+	return s.NetStateOff.Load()
 }
 
 func (s *State) SetNetStateOff(net bool) {
-	s.NetStateOff = net
+	s.NetStateOff.Store(net)
 }
 
 func (s *State) GetRpcUser() string {
@@ -977,7 +977,7 @@ func (s *State) GetFaultWait() int {
 }
 
 func (s *State) GetEntryDBHeightComplete() uint32 {
-	return s.EntryDBHeightComplete
+	return s.EntryDBHeightComplete.Load()
 }
 
 func (s *State) GetMissingEntryCount() uint32 {
@@ -1724,7 +1724,7 @@ func (s *State) UpdateState() (progress bool) {
 	progress = progress || p2
 
 	s.SetString()
-	if s.ControlPanelDataRequest {
+	if s.ControlPanelDataRequest.Load() {
 		s.CopyStateToControlPanel()
 	}
 
@@ -2314,7 +2314,7 @@ func (s *State) SetStringQueues() {
 			}
 		}
 	}
-	if s.NetStateOff {
+	if s.NetStateOff.Load() {
 		X = "X"
 	}
 	if !s.RunLeader && found {
@@ -2447,7 +2447,7 @@ func (s *State) GetTrueLeaderHeight() uint32 {
 }
 
 func (s *State) Print(a ...interface{}) (n int, err error) {
-	if s.OutputAllowed {
+	if s.OutputAllowed.Load() {
 		str := ""
 		for _, v := range a {
 			str = str + fmt.Sprintf("%v", v)
@@ -2467,7 +2467,7 @@ func (s *State) Print(a ...interface{}) (n int, err error) {
 }
 
 func (s *State) Println(a ...interface{}) (n int, err error) {
-	if s.OutputAllowed {
+	if s.OutputAllowed.Load() {
 		str := ""
 		for _, v := range a {
 			str = str + fmt.Sprintf("%v", v)
@@ -2488,11 +2488,11 @@ func (s *State) Println(a ...interface{}) (n int, err error) {
 }
 
 func (s *State) GetOut() bool {
-	return s.OutputAllowed
+	return s.OutputAllowed.Load()
 }
 
 func (s *State) SetOut(o bool) {
-	s.OutputAllowed = o
+	s.OutputAllowed.Store(o)
 }
 
 func (s *State) GetSystemHeight(dbheight uint32) int {
