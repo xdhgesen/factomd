@@ -89,9 +89,11 @@ func TestSetupANetwork(t *testing.T) {
 		"-ControlPanelPort=37002",
 		"-networkPort=37003",
 		"-startdelay=1",
-		)
+	)
 
 	params := ParseCmdLine(args)
+
+	HandleLogfiles("out.txt", "out.txt")
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
@@ -255,7 +257,7 @@ func TestAnElection(t *testing.T) {
 		"-blktime=10",
 		fmt.Sprintf("-count=%d", nodes),
 		"-startdelay=1",
-                "-debuglog=F.*",
+		"-debuglog=F.*",
 	)
 	HandleLogfiles("out.txt", "out.txt")
 	params := ParseCmdLine(args)
@@ -288,7 +290,7 @@ func TestAnElection(t *testing.T) {
 			break
 		}
 		fmt.Printf("Waiting for G5 to complete\n")
-	WaitMinutes(state0, 1)
+		WaitMinutes(state0, 1)
 
 	}
 	// Allocate leaders
