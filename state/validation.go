@@ -14,8 +14,16 @@ import (
 )
 
 func (state *State) ValidatorLoop() {
-	timeStruct := new(Timer)
+	//	timeStruct := new(Timer)
+
+	var inMsgChan chan interfaces.IMsg = make(chan interfaces.IMsg, 1)
+
+	// Run a routine to copy messages into a channel so I can use select
+	go func() { inMsgChan <- state.InMsgQueue().BlockingDequeue() }()
+
 	for {
+		var progress bool
+		var cntMessage int
 		// Check if we should shut down.
 		select {
 		case <-state.ShutdownChan:
@@ -29,65 +37,67 @@ func (state *State) ValidatorLoop() {
 		}
 
 		// Look for pending messages, and get one if there is one.
-		var msg interfaces.IMsg
-	loop:
 		for i := 0; i < 10; i++ {
-			// Process any messages we might have queued up.
-			for i = 0; i < 10; i++ {
-				p, b := state.Process(), state.UpdateState()
-				if !p && !b {
-					break
-				}
-				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
+			var msg interfaces.IMsg
+
+			ackRoom := cap(state.ackQueue) - len(state.ackQueue)
+			msgRoom := cap(state.msgQueue) - len(state.msgQueue)
+			if ackRoom == 0 || msgRoom == 0 {
+				break // no room skip looking for messages
 			}
 
-			for i := 0; i < 10; i++ {
-				select {
-				case min := <-state.tickerQueue:
-					timeStruct.timer(state, min)
-				default:
+			select {
+			case _ = <-state.tickerQueue:
+				if state.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
+					eom := new(messages.EOM)
+					eom.Timestamp = state.GetTimestamp()
+					eom.ChainID = state.GetIdentityChainID()
+					eom.Sign(state)
+					eom.SetLocal(true)
+					consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": state.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
+					msg = eom
+					state.LogMessage("InMsgQueue", "insert EOM", msg)
 				}
+			case msg = <-inMsgChan:
+				state.LogMessage("InMsgQueue", "dequeue", msg)
+			default:
+			}
 
-				select {
-				case msg = <-state.TimerMsgQueue():
-					state.JournalMessage(msg)
-					break loop
-				default:
+			if msg != nil {
+				// Sort the messages.
+				cntMessage++
+				state.JournalMessage(msg)
+				if state.IsReplaying == true {
+					state.ReplayTimestamp = msg.GetTimestamp()
 				}
-
-				msg = state.InMsgQueue().Dequeue()
-
-				// This doesn't block so it intentionally returns nil, don't log nils
-				if msg != nil {
-					state.LogMessage("InMsgQueue", "dequeue", msg)
-				}
-
-				if msg != nil {
-					state.JournalMessage(msg)
-					break loop
+				if _, ok := msg.(*messages.Ack); ok {
+					state.LogMessage("ackQueue", "enqueue", msg)
+					state.ackQueue <- msg //
 				} else {
-					// No messages? Sleep for a bit
-					for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
-						time.Sleep(10 * time.Millisecond)
-					}
+					state.LogMessage("msgQueue", "enqueue", msg)
+					state.msgQueue <- msg //
 				}
 			}
+
+		} // for up to 10 messages
+
+		// Process any messages we might have queued up.
+		for i := 0; i < 10; i++ {
+			p, b := state.Process(), state.UpdateState()
+			progress = progress || p
+			if !p && !b {
+				break
+			}
+			//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
 		}
 
-		// Sort the messages.
-		if msg != nil {
-			if state.IsReplaying == true {
-				state.ReplayTimestamp = msg.GetTimestamp()
-			}
-			if _, ok := msg.(*messages.Ack); ok {
-				state.LogMessage("ackQueue", "enqueue", msg)
-				state.ackQueue <- msg //
-			} else {
-				state.LogMessage("msgQueue", "enqueue", msg)
-				state.msgQueue <- msg //
+		if !progress && cntMessage == 0 {
+			// No progress and no messages? Sleep for a bit
+			for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
+				time.Sleep(10 * time.Millisecond)
 			}
 		}
-	}
+	} // forever....
 }
 
 type Timer struct {
@@ -97,15 +107,4 @@ type Timer struct {
 
 func (t *Timer) timer(state *State, min int) {
 	t.lastMin = min
-
-	eom := new(messages.EOM)
-	eom.Timestamp = state.GetTimestamp()
-	eom.ChainID = state.GetIdentityChainID()
-	eom.Sign(state)
-	eom.SetLocal(true)
-	consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": state.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
-
-	if state.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
-		state.TimerMsgQueue() <- eom
-	}
 }

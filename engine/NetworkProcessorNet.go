@@ -273,6 +273,8 @@ func Peers(fnode *FactomNode) {
 				if !crossBootIgnore(msg) {
 					fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
 					fnode.State.InMsgQueue().Enqueue(msg)
+				} else {
+					fnode.State.LogMessage("NetworkInputs", "Drop CrossBoot Ignore", msg)
 				}
 			} // For a peer read up to 100 messages {...}
 		} // for each peer {...}

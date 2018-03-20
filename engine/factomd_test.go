@@ -95,7 +95,6 @@ func TestSetupANetwork(t *testing.T) {
 
 	HandleLogfiles("out.txt", "out.txt")
 	globals.DebugLogRegEx = ".*exec.*"
-
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)

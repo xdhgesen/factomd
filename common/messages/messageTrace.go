@@ -110,7 +110,7 @@ func LogMessage(name string, note string, msg interfaces.IMsg) {
 		embeddedHash = fmt.Sprintf(" EmbeddedMsg %26v[%2v]:%v", constants.MessageName(m.Type()), m.Type(), m.GetHash().String()[:8])
 	}
 
-	s := fmt.Sprintf("%5v %20s M-%v|R-%v %26s[%2v]:%v {%v}\n", seq, note, hash, rhash, constants.MessageName(byte(t)), t,
+	s := fmt.Sprintf("%5v %20s M-%v|R-%v %26s[%2v]:%v {%v}\n", seq, note, hash, rhash, constants.MessageName(t), t,
 		embeddedHash, msgString)
 	s = addNodeNames(s)
 
