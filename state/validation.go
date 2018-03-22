@@ -15,6 +15,59 @@ import (
 
 func (state *State) ValidatorLoop() {
 	timeStruct := new(Timer)
+
+	startup := false
+	sendMsg := func(msg interfaces.IMsg) {
+		if msg != nil {
+			if _, ok := msg.(*messages.Ack); ok {
+				state.LogMessage("ackQueue", "enqueue", msg)
+				state.ackQueue <- msg //
+			} else {
+				state.LogMessage("msgQueue", "enqueue", msg)
+				state.msgQueue <- msg //
+			}
+		}
+	}
+
+	go func() {
+		for !startup {
+			time.Sleep(10 * time.Millisecond)
+		}
+		for {
+			min := <-state.tickerQueue
+			timeStruct.timer(state, min)
+		}
+	}()
+	go func() {
+		for !startup {
+			time.Sleep(10 * time.Millisecond)
+		}
+		for {
+			msg := <-state.TimerMsgQueue()
+			sendMsg(msg)
+		}
+	}()
+	go func() {
+		for !startup {
+			time.Sleep(10 * time.Millisecond)
+		}
+		for {
+			msg := state.apiQueue.BlockingDequeue()
+			sendMsg(msg)
+		}
+	}()
+	go func() {
+		for !startup {
+			time.Sleep(10 * time.Millisecond)
+		}
+		for {
+			msg := state.InMsgQueue().BlockingDequeue()
+			sendMsg(msg)
+		}
+	}()
+
+	// Sort the messages.
+
 	for {
 		// Check if we should shut down.
 		select {
@@ -29,70 +82,18 @@ func (state *State) ValidatorLoop() {
 		}
 
 		// Look for pending messages, and get one if there is one.
-		var msg interfaces.IMsg
-	loop:
-		for i := 0; i < 10; i++ {
-			// Process any messages we might have queued up.
-			for i = 0; i < 10; i++ {
-				p, b := state.Process(), state.UpdateState()
-				if !p && !b {
-					break
-				}
-				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
+		// Process any messages we might have queued up.
+		for i := 0; i < 50; i++ {
+			p, b := state.Process(), state.UpdateState()
+			if !p && !b {
+				time.Sleep(10 * time.Millisecond)
+				break
 			}
-
-			for i := 0; i < 10; i++ {
-				ackRoom := cap(state.ackQueue) - len(state.ackQueue)
-				msgRoom := cap(state.msgQueue) - len(state.msgQueue)
-
-				select {
-				case min := <-state.tickerQueue:
-					timeStruct.timer(state, min)
-				default:
-				}
-
-				if ackRoom > 1 && msgRoom > 1 {
-					select {
-					case msg = <-state.TimerMsgQueue():
-						state.JournalMessage(msg)
-						break loop
-					default:
-					}
-				}
-
-				if ackRoom > 1 && msgRoom > 1 {
-					msg = state.InMsgQueue().Dequeue()
-				}
-				// This doesn't block so it intentionally returns nil, don't log nils
-				if msg != nil {
-					state.LogMessage("InMsgQueue", "dequeue", msg)
-				}
-
-				if msg != nil {
-					state.JournalMessage(msg)
-					break loop
-				} else {
-					// No messages? Sleep for a bit
-					for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
-						time.Sleep(10 * time.Millisecond)
-					}
-				}
-			}
+			//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
 		}
 
-		// Sort the messages.
-		if msg != nil {
-			if state.IsReplaying == true {
-				state.ReplayTimestamp = msg.GetTimestamp()
-			}
-			if _, ok := msg.(*messages.Ack); ok {
-				state.LogMessage("ackQueue", "enqueue", msg)
-				state.ackQueue <- msg //
-			} else {
-				state.LogMessage("msgQueue", "enqueue", msg)
-				state.msgQueue <- msg //
-			}
-		}
+		startup = true
+
 	}
 }
 

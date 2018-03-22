@@ -24,7 +24,8 @@ type Entry struct {
 	Content primitives.ByteSlice   `json:"content"`
 
 	// cache
-	hash interfaces.IHash
+	hash         interfaces.IHash
+	marshalcache []byte
 }
 
 var _ interfaces.IEBEntry = (*Entry)(nil)
@@ -178,6 +179,11 @@ func (e *Entry) GetHash() interfaces.IHash {
 }
 
 func (e *Entry) MarshalBinary() ([]byte, error) {
+
+	if e.marshalcache != nil {
+		return e.marshalcache, nil
+	}
+
 	buf := primitives.NewBuffer(nil)
 
 	// 1 byte Version
@@ -307,6 +313,8 @@ func (e *Entry) UnmarshalBinaryData(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	e.marshalcache = append(e.marshalcache[:0], data...)
 
 	return nil, nil
 }
