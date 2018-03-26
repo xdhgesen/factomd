@@ -368,7 +368,7 @@ func NetworkOutputs(fnode *FactomNode) {
 // Just throw away the trash
 func InvalidOutputs(fnode *FactomNode) {
 	for {
-		time.Sleep(1 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		_ = <-fnode.State.NetworkInvalidMsgQueue()
 		//fmt.Println(invalidMsg)
 

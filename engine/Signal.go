@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 )
 
 // interruptChannel is used to receive SIGINT (Ctrl+C) signals.
@@ -45,6 +46,7 @@ func mainInterruptHandler() {
 			}
 			isShutdown = true
 			fmt.Println("Received SIGINT (Ctrl+C).  Shutting down...")
+			pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
 
 			// Run handlers in LIFO order.
 			for i := range interruptCallbacks {

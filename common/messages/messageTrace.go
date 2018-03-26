@@ -144,7 +144,14 @@ func addNodeNames(s string) (rval string) {
 	for i := len(hexStr); i > 0; {
 		i--
 		l := s[hexStr[i][0]:hexStr[i][1]]
-		s = s[:hexStr[i][1]] + lookupName(l) + s[hexStr[i][1]:]
+		n := lookupName(l)
+		if len(l) == 64 && n != "" {
+			// Shorten full IDs to [3:6]
+			s = s[:hexStr[i][0]] + s[hexStr[i][0]+6:hexStr[i][0]+12] + n + s[hexStr[i][1]:]
+
+		} else {
+			s = s[:hexStr[i][1]] + n + s[hexStr[i][1]:]
+		}
 	}
 	return s
 }
