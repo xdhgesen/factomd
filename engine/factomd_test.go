@@ -3,6 +3,7 @@ package engine_test
 import (
 	"fmt"
 	"os"
+	"runtime/pprof"
 	"testing"
 	"time"
 
@@ -275,6 +276,20 @@ func TestAnElection(t *testing.T) {
 		"--stderrlog=err.txt",
 	)
 	params := ParseCmdLine(args)
+
+	outfile, err := os.Create("trace.txt")
+	if err != nil {
+		panic(err)
+	}
+
+	go func(outfile *os.File) {
+		defer outfile.Close()
+		for {
+			pprof.Lookup("goroutine").WriteTo(outfile, 1)
+			outfile.WriteString("--------------------------------\n")
+			time.Sleep(5 * time.Second)
+		}
+	}(outfile)
 
 	time.Sleep(5 * time.Second) // wait till the control panel is setup
 	state0 := Factomd(params, false).(*state.State)

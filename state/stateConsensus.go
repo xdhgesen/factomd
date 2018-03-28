@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"runtime"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -55,7 +54,7 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
-	runtime.Gosched() // Make sure all the simulation progress...
+	//	runtime.Gosched() // Make sure all the simulation progress...
 
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
@@ -671,7 +670,8 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	pdbstate := s.DBStates.Get(int(dbheight - 1))
 
-	switch pdbstate.ValidNext(s, dbstatemsg) {
+	valid := pdbstate.ValidNext(s, dbstatemsg)
+	switch valid {
 	case 0:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
 
