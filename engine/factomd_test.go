@@ -294,7 +294,7 @@ func TestAnElection(t *testing.T) {
 	time.Sleep(5 * time.Second) // wait till the control panel is setup
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
-	time.Sleep(5 * time.Second) // wait till the simulation is setup
+	time.Sleep(50 * time.Second) // wait till the simulation is setup
 
 	t.Log(fmt.Sprintf("Allocated %d nodes", nodes))
 	fnodes := GetFnodes()

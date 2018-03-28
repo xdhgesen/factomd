@@ -13,88 +13,70 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (s *State) ValidatorLoop() {
-	for {
-		// Check if we should shut down.
-		select {
-		case <-s.ShutdownChan:
-			fmt.Println("Closing the Database on", s.GetFactomNodeName())
-			s.DB.Close()
-			s.StateSaverStruct.StopSaving()
-			fmt.Println(s.GetFactomNodeName(), "closed")
-			s.IsRunning = false
-			return
-		default:
-		}
+func readInMsgQueue(s *State, inMsgQueue chan interfaces.IMsg) {
+	// TODO: to really work isRunning has to be a chan I select on ....
+	for s.IsRunning {
+		msg := s.InMsgQueue().BlockingDequeue()
+		inMsgQueue <- msg
+	}
+}
 
+func execute(s *State) {
+	for s.IsRunning {
+		p, b := s.Process(), s.UpdateState()
+		if !p && !b {
+			time.Sleep(10 * time.Millisecond)
+		}
+		//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", s.FactomNodeName, "Process", p, "Update", b)
+	}
+}
+
+func checkForStop(s *State) {
+	<-s.ShutdownChan
+	fmt.Println("Closing the Database on", s.GetFactomNodeName())
+	s.DB.Close()
+	s.StateSaverStruct.StopSaving()
+	fmt.Println(s.GetFactomNodeName(), "closed")
+	s.IsRunning = false
+	return
+}
+
+func (s *State) ValidatorLoop() {
+
+	var inMsgQueue chan interfaces.IMsg = make(chan interfaces.IMsg, 1)q
+
+	go checkForStop(s)
+	go readInMsgQueue(s, inMsgQueue)
+	go execute(s)
+
+	for s.IsRunning {
 		// Look for pending messages, and get one if there is one.
 		var msg interfaces.IMsg
-	loop:
-		for i := 0; i < 10; i++ {
-			// Process any messages we might have queued up.
-			for i := 0; i < 10; i++ {
-				p, b := s.Process(), s.UpdateState()
-				if !p && !b {
-					break
-				}
-				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", s.FactomNodeName, "Process", p, "Update", b)
+
+		select {
+		case msg = <-inMsgQueue:
+		case _ = <-s.tickerQueue:
+			// don't generate EOM if we are not a leader or are loading the DBState messages or are in replay
+			if s.RunLeader && !s.IsReplaying {
+				eom := new(messages.EOM)
+				eom.Timestamp = s.GetTimestamp()
+				eom.ChainID = s.GetIdentityChainID()
+				eom.Sign(s)
+				eom.SetLocal(true)
+				consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
+				msg = eom
 			}
-			time.Sleep(1 * time.Millisecond)
-
-			if s.DBFinished == true {
-
-				for i := 0; i < 10; i++ {
-					ackRoom := cap(s.ackQueue) - len(s.ackQueue)
-					msgRoom := cap(s.msgQueue) - len(s.msgQueue)
-					l := s.InMsgQueue().Length()
-					_ = l
-					select {
-					case _ = <-s.tickerQueue:
-						if s.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
-							eom := new(messages.EOM)
-							eom.Timestamp = s.GetTimestamp()
-							eom.ChainID = s.GetIdentityChainID()
-							eom.Sign(s)
-							eom.SetLocal(true)
-							consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
-							msg = eom
-						}
-					default:
-					}
-
-					if ackRoom > 1 && msgRoom > 1 {
-						msg = s.InMsgQueue().Dequeue()
-					}
-					// This doesn't block so it intentionally returns nil, don't log nils
-					if msg != nil {
-						s.LogMessage("InMsgQueue", "dequeue", msg)
-					}
-
-					if msg != nil {
-						break loop
-					} else {
-						// No messages? Sleep for a bit
-						for i := 0; i < 10 && s.InMsgQueue().Length() == 0; i++ {
-							time.Sleep(10 * time.Millisecond)
-						}
-					}
-				}
-			}
-
-			// Sort the messages.
-			if msg != nil {
-				s.JournalMessage(msg)
-				if s.IsReplaying == true {
-					s.ReplayTimestamp = msg.GetTimestamp()
-				}
-				if _, ok := msg.(*messages.Ack); ok {
-					s.LogMessage("ackQueue", "enqueue", msg)
-					s.ackQueue <- msg //
-				} else {
-					s.LogMessage("msgQueue", "enqueue", msg)
-					s.msgQueue <- msg //
-				}
-			}
+		}
+		if s.IsReplaying == true {
+			s.ReplayTimestamp = msg.GetTimestamp()
+		}
+		s.JournalMessage(msg)
+		if _, ok := msg.(*messages.Ack); ok {
+			s.LogMessage("ackQueue", "enqueue", msg)
+			s.ackQueue <- msg //
+		} else {
+			s.LogMessage("msgQueue", "enqueue", msg)
+			s.msgQueue <- msg //
 		}
 	}
 }

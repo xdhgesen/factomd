@@ -133,7 +133,7 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 	// Nil pointer exception at start up -- clay
 	for _, f := range pnodes {
 		var i int
-		if f.State.LeaderPL.NewEBlocks != nil {
+		if f.State.LeaderPL != nil && f.State.LeaderPL.NewEBlocks != nil {
 			i = len(f.State.LeaderPL.NewEBlocks)
 		} else {
 			i = 0

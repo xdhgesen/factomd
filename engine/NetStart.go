@@ -513,6 +513,12 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
 
+	for {
+		if fnodes == nil || fnodes[ListenTo].State == nil || !fnodes[ListenTo].State.RunLeader {
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+
 	SimControl(p.ListenTo, listenToStdin)
 
 }
