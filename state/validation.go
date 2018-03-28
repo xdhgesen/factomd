@@ -19,17 +19,18 @@ func readInMsgQueue(s *State, inMsgQueue chan interfaces.IMsg) {
 		msg := s.InMsgQueue().BlockingDequeue()
 		inMsgQueue <- msg
 	}
-}
+		}
 
 func execute(s *State) {
 	for s.IsRunning {
 		p, b := s.Process(), s.UpdateState()
 		if !p && !b {
 			time.Sleep(10 * time.Millisecond)
-		}
+			}
 		//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", s.FactomNodeName, "Process", p, "Update", b)
-	}
-}
+			}
+
+				}
 
 func checkForStop(s *State) {
 	<-s.ShutdownChan
@@ -39,7 +40,7 @@ func checkForStop(s *State) {
 	fmt.Println(s.GetFactomNodeName(), "closed")
 	s.IsRunning = false
 	return
-}
+				}
 
 func checkTimer(s *State) {
 	for s.IsRunning {
@@ -53,10 +54,9 @@ func checkTimer(s *State) {
 			eom.SetLocal(true)
 			consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
 			s.TimerMsgQueue() <- eom
-		}
-	}
-}
-
+					}
+				}
+			}
 func (s *State) ValidatorLoop() {
 
 	var inMsgQueue chan interfaces.IMsg = make(chan interfaces.IMsg, 1)
@@ -77,14 +77,14 @@ func (s *State) ValidatorLoop() {
 
 		if s.IsReplaying == true {
 			s.ReplayTimestamp = msg.GetTimestamp()
-		}
+			}
 		s.JournalMessage(msg)
-		if _, ok := msg.(*messages.Ack); ok {
+			if _, ok := msg.(*messages.Ack); ok {
 			s.LogMessage("ackQueue", "enqueue", msg)
 			s.ackQueue <- msg //
-		} else {
+			} else {
 			s.LogMessage("msgQueue", "enqueue", msg)
 			s.msgQueue <- msg //
-		}
+			}
 	}
 }
