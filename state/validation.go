@@ -6,15 +6,39 @@ package state
 
 import (
 	"fmt"
+
 	"time"
 
-	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
 )
 
 func (state *State) ValidatorLoop() {
 	timeStruct := new(Timer)
+
+	go func() {
+		for {
+			min := <-state.tickerQueue
+			timeStruct.timer(state, min)
+		}
+	}()
+
+	go func() {
+		for {
+			msg := state.InMsgQueue().BlockingDequeue()
+			if msg != nil {
+				state.LogMessage("InMsgQueue", "dequeue", msg)
+				if _, ok := msg.(*messages.Ack); ok {
+					state.LogMessage("ackQueue", "enqueue", msg)
+					state.ackQueue <- msg //
+				} else {
+					state.LogMessage("msgQueue", "enqueue", msg)
+					state.msgQueue <- msg //
+				}
+			}
+		}
+	}()
+
 	for {
 		// Check if we should shut down.
 		select {
@@ -28,71 +52,13 @@ func (state *State) ValidatorLoop() {
 		default:
 		}
 
-		// Look for pending messages, and get one if there is one.
-		var msg interfaces.IMsg
-	loop:
-		for i := 0; i < 10; i++ {
-			// Process any messages we might have queued up.
-			for i := 0; i < 10; i++ {
-				p, b := state.Process(), state.UpdateState()
-				if !p && !b {
-					break
-				}
-				//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v\n", "Validation", state.FactomNodeName, "Process", p, "Update", b)
-			}
-
-			for i := 0; i < 10; i++ {
-				ackRoom := cap(state.ackQueue) - len(state.ackQueue)
-				msgRoom := cap(state.msgQueue) - len(state.msgQueue)
-
-				select {
-				case min := <-state.tickerQueue:
-					timeStruct.timer(state, min)
-				default:
-				}
-
-				if ackRoom > 1 && msgRoom > 1 {
-					select {
-					case msg = <-state.TimerMsgQueue():
-						state.JournalMessage(msg)
-						break loop
-					default:
-					}
-				}
-
-				if ackRoom > 1 && msgRoom > 1 {
-					msg = state.InMsgQueue().Dequeue()
-				}
-				// This doesn't block so it intentionally returns nil, don't log nils
-				if msg != nil {
-					state.LogMessage("InMsgQueue", "dequeue", msg)
-				}
-
-				if msg != nil {
-					state.JournalMessage(msg)
-					break loop
-				} else {
-					// No messages? Sleep for a bit
-					for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
-						time.Sleep(10 * time.Millisecond)
-					}
-				}
-			}
+		for state.Process() {
 		}
-
+		for state.UpdateState() {
+		}
+		time.Sleep(10 * time.Millisecond)
 		// Sort the messages.
-		if msg != nil {
-			if state.IsReplaying == true {
-				state.ReplayTimestamp = msg.GetTimestamp()
-			}
-			if _, ok := msg.(*messages.Ack); ok {
-				state.LogMessage("ackQueue", "enqueue", msg)
-				state.ackQueue <- msg //
-			} else {
-				state.LogMessage("msgQueue", "enqueue", msg)
-				state.msgQueue <- msg //
-			}
-		}
+
 	}
 }
 
@@ -103,15 +69,15 @@ type Timer struct {
 
 func (t *Timer) timer(state *State, min int) {
 	t.lastMin = min
-
-	eom := new(messages.EOM)
-	eom.Timestamp = state.GetTimestamp()
-	eom.ChainID = state.GetIdentityChainID()
-	eom.Sign(state)
-	eom.SetLocal(true)
-	consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": state.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
-
 	if state.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
-		state.TimerMsgQueue() <- eom
+
+		eom := new(messages.EOM)
+		eom.Timestamp = state.GetTimestamp()
+		eom.ChainID = state.GetIdentityChainID()
+		eom.Sign(state)
+		eom.SetLocal(true)
+		consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": state.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
+
+		state.msgQueue <- eom
 	}
 }
