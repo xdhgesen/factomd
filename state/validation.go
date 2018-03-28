@@ -41,13 +41,30 @@ func checkForStop(s *State) {
 	return
 }
 
+func checkTimer(s *State) {
+	for s.IsRunning {
+		_ = <-s.tickerQueue
+		// don't generate EOM if we are not a leader or are loading the DBState messages or are in replay
+		if s.RunLeader && !s.IsReplaying {
+			eom := new(messages.EOM)
+			eom.Timestamp = s.GetTimestamp()
+			eom.ChainID = s.GetIdentityChainID()
+			eom.Sign(s)
+			eom.SetLocal(true)
+			consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
+			s.TimerMsgQueue() <- eom
+		}
+	}
+}
+
 func (s *State) ValidatorLoop() {
 
-	var inMsgQueue chan interfaces.IMsg = make(chan interfaces.IMsg, 1)q
+	var inMsgQueue chan interfaces.IMsg = make(chan interfaces.IMsg, 1)
 
 	go checkForStop(s)
 	go readInMsgQueue(s, inMsgQueue)
 	go execute(s)
+	go checkTimer(s)
 
 	for s.IsRunning {
 		// Look for pending messages, and get one if there is one.
@@ -55,18 +72,9 @@ func (s *State) ValidatorLoop() {
 
 		select {
 		case msg = <-inMsgQueue:
-		case _ = <-s.tickerQueue:
-			// don't generate EOM if we are not a leader or are loading the DBState messages or are in replay
-			if s.RunLeader && !s.IsReplaying {
-				eom := new(messages.EOM)
-				eom.Timestamp = s.GetTimestamp()
-				eom.ChainID = s.GetIdentityChainID()
-				eom.Sign(s)
-				eom.SetLocal(true)
-				consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
-				msg = eom
-			}
+		case msg = <-s.TimerMsgQueue():
 		}
+
 		if s.IsReplaying == true {
 			s.ReplayTimestamp = msg.GetTimestamp()
 		}
