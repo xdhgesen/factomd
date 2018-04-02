@@ -238,13 +238,13 @@ func (r *Replay) Valid(mask int, hash [32]byte, timestamp interfaces.Timestamp, 
 // this code remembers hashes tested in the past, and rejects the
 // second submission of the same hash.
 func (r *Replay) IsTSValid(mask int, hash interfaces.IHash, timestamp interfaces.Timestamp) bool {
-	return r.IsTSValid_(mask, hash.Fixed(), timestamp, primitives.NewTimestampNow())
+	return r.IsTSValidAndUpdateState(mask, hash.Fixed(), timestamp, primitives.NewTimestampNow())
 }
 
 // To make the function testable, the logic accepts the current time
 // as a parameter.  This way, the test code can manipulate the clock
 // at will.
-func (r *Replay) IsTSValid_(mask int, hash [32]byte, timestamp interfaces.Timestamp, now interfaces.Timestamp) bool {
+func (r *Replay) IsTSValidAndUpdateState(mask int, hash [32]byte, timestamp interfaces.Timestamp, now interfaces.Timestamp) bool {
 
 	//TODO: There is a race that the index could go stale while the replay is unlocked. -- clay
 	if index, ok := r.Valid(mask, hash, timestamp, now); ok {

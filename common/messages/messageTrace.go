@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
@@ -110,7 +111,9 @@ func LogMessage(name string, note string, msg interfaces.IMsg) {
 		embeddedHash = fmt.Sprintf(" EmbeddedMsg %26v[%2v]:%v", constants.MessageName(m.Type()), m.Type(), m.GetHash().String()[:8])
 	}
 
-	s := fmt.Sprintf("%5v %20s M-%v|R-%v %26s[%2v]:%v {%v}\n", seq, note, hash, rhash, constants.MessageName(byte(t)), t,
+	now := time.Now().Local()
+
+	s := fmt.Sprintf("%7v %02d:%02d:%02d %20s M-%v|R-%v %26s[%2v]:%v {%v}\n", seq, now.Hour()%24, now.Minute()%60, now.Second()%60, note, hash, rhash, constants.MessageName(byte(t)), t,
 		embeddedHash, msgString)
 	s = addNodeNames(s)
 

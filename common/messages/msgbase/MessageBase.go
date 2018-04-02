@@ -78,44 +78,44 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	//}
 	m.ResendCnt++
 	sends++
-
-	mu.Lock()
-	f, ok := outs[s.GetFactomNodeName()]
-	if !ok {
-		f = new(foo)
-		f.where = make(map[[32]byte]string)
-		f.what = make(map[[32]byte]interfaces.IMsg)
-		outs[s.GetFactomNodeName()] = f
-	}
-	mu.Unlock()
-
-	whereAmIString := atomic.WhereAmIString(1)
-	hash := msg.GetRepeatHash().Fixed()
-	where, ok := f.where[hash]
-	if ok {
-		duplicate++
-		orig := f.what[hash]
-		s.LogPrintf("NetworkOutputs", "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:4], sends, duplicate, unique)
-		s.LogPrintf("NetworkOutputs", "Original: %p: %s", orig, where)
-		s.LogPrintf("NetworkOutputs", "This:     %p: %s", msg, whereAmIString)
-		s.LogMessage("NetworkOutputs", "Orig Message:", msg)
-		s.LogMessage("NetworkOutputs", "This Message:", msg)
-
+	{ // debug code
 		mu.Lock()
-		which, ok := places[whereAmIString]
-		mu.Unlock()
-		if ok {
-			s.LogPrintf("NetworkOutputs", "message <%s> is original from %s\n", which.String(), whereAmIString)
+		f, ok := outs[s.GetFactomNodeName()]
+		if !ok {
+			f = new(foo)
+			f.where = make(map[[32]byte]string)
+			f.what = make(map[[32]byte]interfaces.IMsg)
+			outs[s.GetFactomNodeName()] = f
 		}
-	} else {
-		unique++
-		mu.Lock()
-		f.where[hash] = whereAmIString
-		f.what[hash] = msg
-		places[whereAmIString] = msg
 		mu.Unlock()
-	}
 
+		whereAmIString := atomic.WhereAmIString(1)
+		hash := msg.GetRepeatHash().Fixed()
+		where, ok := f.where[hash]
+		if ok {
+			duplicate++
+			orig := f.what[hash]
+			s.LogPrintf("NetworkOutputs", "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:4], sends, duplicate, unique)
+			s.LogPrintf("NetworkOutputs", "Original: %p: %s", orig, where)
+			s.LogPrintf("NetworkOutputs", "This:     %p: %s", msg, whereAmIString)
+			s.LogMessage("NetworkOutputs", "Orig Message:", msg)
+			s.LogMessage("NetworkOutputs", "This Message:", msg)
+
+			mu.Lock()
+			which, ok := places[whereAmIString]
+			mu.Unlock()
+			if ok {
+				s.LogPrintf("NetworkOutputs", "message <%s> is original from %s\n", which.String(), whereAmIString)
+			}
+		} else {
+			unique++
+			mu.Lock()
+			f.where[hash] = whereAmIString
+			f.what[hash] = msg
+			places[whereAmIString] = msg
+			mu.Unlock()
+		}
+	}
 	switch msg.Type() {
 	//case ServerFault:
 	//	go resend(s, msg, 20, 1)
@@ -284,7 +284,7 @@ func VerifyMessage(s interfaces.Signable) (bool, error) {
 		s.SetValid()
 		return true, nil
 	}
-	return false, errors.New("Signarue is invalid")
+	return false, errors.New("signature is invalid")
 }
 
 func SignSignable(s interfaces.Signable, key interfaces.Signer) (interfaces.IFullSignature, error) {

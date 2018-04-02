@@ -83,14 +83,7 @@ func (e *EOM) Process(dbheight uint32, state interfaces.IState) bool {
 }
 
 func (m *EOM) GetRepeatHash() interfaces.IHash {
-	if m.RepeatHash == nil {
-		data, err := m.MarshalBinary()
-		if err != nil {
-			return nil
-		}
-		m.RepeatHash = primitives.Sha(data)
-	}
-	return m.RepeatHash
+	return m.GetMsgHash()
 }
 
 func (m *EOM) GetHash() interfaces.IHash {
@@ -99,7 +92,7 @@ func (m *EOM) GetHash() interfaces.IHash {
 
 func (m *EOM) GetMsgHash() interfaces.IHash {
 	if m.MsgHash == nil {
-		data, err := m.MarshalForSignature()
+		data, err := m.MarshalBinary()
 		if err != nil {
 			return nil
 		}
@@ -333,11 +326,11 @@ func (m *EOM) String() string {
 	if m.FactoidVM {
 		f = "F"
 	}
-	return fmt.Sprintf("%6s-VM%3d: Min:%4d DBHt:%5d FF %2d -%1s-Leader[%x] hash[%x] %s",
+	return fmt.Sprintf("%6s-DBHt/VM/Min %d/%d/%d FF %2d -%1s-Leader[%x] hash[%x] %s",
 		"EOM",
+		m.DBHeight,
 		m.VMIndex,
 		m.Minute,
-		m.DBHeight,
 		m.SysHeight,
 		f,
 		m.ChainID.Bytes()[3:6],

@@ -132,47 +132,6 @@ type VM struct {
 	ProcessTime interfaces.Timestamp // Last time we made progress on this VM
 }
 
-func (p *ProcessList) Clear() {
-	return
-	//p.State.AddStatus(fmt.Sprintf("PROCESSLIST.Clear dbht %d", p.DBHeight))
-
-	// Restructured so the lock are not locked across all the other locking/unlocking in case one of them blocks.
-	p.FactoidBalancesTMutex.Lock()
-	p.FactoidBalancesT = nil
-	p.FactoidBalancesTMutex.Unlock()
-
-	p.ECBalancesTMutex.Lock()
-	p.ECBalancesT = nil
-	p.ECBalancesTMutex.Unlock()
-
-	p.oldmsgslock.Lock()
-	p.OldMsgs = nil
-	p.oldmsgslock.Unlock()
-
-	p.oldackslock.Lock()
-	p.OldAcks = nil
-	p.oldackslock.Unlock()
-
-	p.neweblockslock.Lock()
-	p.NewEBlocks = nil
-	p.neweblockslock.Unlock()
-
-	p.NewEntriesMutex.Lock()
-	p.NewEntries = nil
-	p.NewEntriesMutex.Unlock()
-
-	p.AdminBlock = nil
-	p.EntryCreditBlock = nil
-	p.DirectoryBlock = nil
-
-	p.Matryoshka = nil
-	p.AuditServers = nil
-	p.FedServers = nil
-
-	p.DBSignatures = nil
-
-}
-
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
 	keys = make([][32]byte, p.LenNewEntries())
 
@@ -689,7 +648,8 @@ func (p *ProcessList) Ask(vmIndex int, height int) {
 
 		// Might as well as for the next message too.  Won't hurt.
 		// Zero based so len(vm.List) asks for the next message which may or may not exist
-		missingMsgRequest := messages.NewMissingMsg(p.State, vmIndex, p.DBHeight, uint32(len(vm.List)))
+		lenVMList := len(vm.List)
+		missingMsgRequest := messages.NewMissingMsg(p.State, vmIndex, p.DBHeight, uint32(lenVMList))
 
 		// Okay, we are going to send one, so ask for all nil messages for this vm
 		// Maybe we Should build this in reverse order...
@@ -704,7 +664,13 @@ func (p *ProcessList) Ask(vmIndex int, height int) {
 
 		vm.MM_AskTime = now
 		vm.MMRequests = make(map[int]bool) // Clear out the map
-		vm.MMRequests[len(vm.List)] = true // Add the next slot since we ask for it
+		vm.MMRequests[lenVMList] = true    // Add the next slot since we ask for it
+
+		if height < lenVMList && vm.List[height] != nil {
+			_ = height // this should never happen
+			vm.MMRequests[height] = true
+
+		}
 
 		for i := 0; i < len(vm.List); i++ {
 			if vm.List[i] == nil {
@@ -868,8 +834,8 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 					// We have already tested and found m to be a new message.  We now record its hashes so later, we
 					// can detect that it has been recorded.  We don't care about the results of IsTSValid_ at this point.
-					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now)
-					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, msg.GetMsgHash().Fixed(), msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msg.GetMsgHash().Fixed(), msg.GetTimestamp(), now)
 
 					delete(p.State.Acks, msg.GetMsgHash().Fixed())
 					delete(p.State.Holding, msg.GetMsgHash().Fixed())
@@ -976,11 +942,21 @@ func (p *ProcessList) AddToSystemList(m interfaces.IMsg) bool {
 }
 
 func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
+
+	p.State.LogMessage("processList", "Message:", m)
+	p.State.LogMessage("processList", "Ack:", ack)
+
 	if p == nil {
+		p.State.LogPrintf("processList", "Drop no process lIst to add to")
 		return
 	}
 
-	if ack == nil || ack.GetMsgHash() == nil {
+	if ack == nil {
+		p.State.LogPrintf("processList", "drop Ack==nil")
+		return
+	}
+	if ack.GetMsgHash() == nil {
+		p.State.LogPrintf("processList", "Drop ack.GetMsgHash() == nil")
 		return
 	}
 
@@ -997,6 +973,8 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	if !ack.Response && ack.LeaderChainID.IsSameAs(p.State.IdentityChainID) {
 		now := p.State.GetTimestamp()
 		if now.GetTimeSeconds()-ack.Timestamp.GetTimeSeconds() > 120 {
+			p.State.LogPrintf("processList", "Drop1")
+
 			// Us and too old?  Just ignore.
 			return
 		}
@@ -1015,6 +993,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	}
 
 	toss := func(hint string) {
+		p.State.LogPrintf("processList", "Drop "+hint)
 		TotalHoldingQueueOutputs.Inc()
 		TotalAcksOutputs.Inc()
 		delete(p.State.Holding, ack.GetHash().Fixed())
@@ -1081,6 +1060,8 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	p.OldAcks[m.GetMsgHash().Fixed()] = ack
 
 	plLogger.WithFields(log.Fields{"func": "AddToProcessList", "node-name": p.State.GetFactomNodeName(), "plheight": ack.Height, "dbheight": p.DBHeight}).WithFields(m.LogFields()).Info("Add To Process List")
+	p.State.LogMessage("processList", fmt.Sprintf("Added at %d/%d/%d", ack.DBHeight, ack.VMIndex, ack.Height), m)
+
 }
 
 func (p *ProcessList) ContainsDBSig(serverID interfaces.IHash) bool {
