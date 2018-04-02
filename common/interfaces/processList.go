@@ -37,7 +37,7 @@ type IProcessList interface {
 	ResetDiffSigTally()
 	IncrementDiffSigTally()
 	CheckDiffSigTally() bool
-	Ask(vmIndex int, height int, waitSeconds int64, tag int) int
+//	Ask(vmIndex int, height int) int
 	TrimVMList(height uint32, vmIndex int)
 	//Process(state IState) (progress bool)
 	AddToSystemList(m IMsg) bool

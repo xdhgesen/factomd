@@ -6,12 +6,10 @@ package state
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
-	"sync"
-
-	"encoding/binary"
-
 	"os"
+	"sync"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -20,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -29,32 +28,6 @@ var _ = fmt.Print
 var _ = log.Print
 
 var plLogger = packageLogger.WithFields(log.Fields{"subpack": "process-list"})
-
-type Request struct {
-	vmIndex    int    // VM Index
-	vmheight   uint32 // Height in the Process List where we are missing a message
-	wait       int64  // How long to wait before we actually request
-	sent       int64  // Last time sent (zero means none have been sent)
-	requestCnt int
-}
-
-var _ interfaces.IRequest = (*Request)(nil)
-
-func (r *Request) key() (thekey [32]byte) {
-	binary.BigEndian.PutUint32(thekey[0:4], uint32(r.vmIndex))
-	binary.BigEndian.PutUint64(thekey[5:13], uint64(r.wait))
-	binary.BigEndian.PutUint64(thekey[14:22], uint64(r.vmheight))
-	return thekey
-}
-
-/*
-func (r *Request) key() (thekey [20]byte) {
-	binary.BigEndian.PutUint32(thekey[0:4], uint32(r.vmIndex))
-	binary.BigEndian.PutUint64(thekey[4:12], uint64(r.wait))
-	binary.BigEndian.PutUint64(thekey[12:20], uint64(r.sent))
-	return
-}
-*/
 
 type ProcessList struct {
 	DBHeight uint32 // The directory block height for these lists
@@ -79,7 +52,7 @@ type ProcessList struct {
 	oldmsgslock *sync.Mutex
 
 	// Chains that are executed, but not processed. There is a small window of a pending chain that the ack
-	// will pass and the chainhead will fail. This covers that window. This is only used by WSAPI,
+	// will pass and the chain head will fail. This covers that window. This is only used by WSAPI,
 	// do not use it anywhere internally.
 	PendingChainHeads *SafeMsgMap
 
@@ -118,7 +91,6 @@ type ProcessList struct {
 	DBSignatures     []DBSig
 	DBSigAlreadySent bool
 
-	Requests map[[32]byte]*Request
 	//Requests map[[20]byte]*Request
 	NextHeightToProcess [64]int
 }
@@ -153,34 +125,41 @@ type VM struct {
 	WhenFaulted int64 // WhenFaulted is a timestamp of when this VM was faulted
 	// vm.WhenFaulted serves as a bool flag (if > 0, the vm is currently considered faulted)
 	FaultFlag int // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
+
+	// Info for handing missing messages
+	MMRequests  map[int]bool         // List of heights we have asked for via MissingMsgRequest
+	MM_AskTime  int64                // Time of last missing message request
+	ProcessTime interfaces.Timestamp // Last time we made progress on this VM
 }
 
 func (p *ProcessList) Clear() {
 	return
 	//p.State.AddStatus(fmt.Sprintf("PROCESSLIST.Clear dbht %d", p.DBHeight))
+
+	// Restructured so the lock are not locked across all the other locking/unlocking in case one of them blocks.
 	p.FactoidBalancesTMutex.Lock()
-	defer p.FactoidBalancesTMutex.Unlock()
 	p.FactoidBalancesT = nil
+	p.FactoidBalancesTMutex.Unlock()
 
 	p.ECBalancesTMutex.Lock()
-	defer p.ECBalancesTMutex.Unlock()
 	p.ECBalancesT = nil
+	p.ECBalancesTMutex.Unlock()
 
 	p.oldmsgslock.Lock()
-	defer p.oldmsgslock.Unlock()
 	p.OldMsgs = nil
+	p.oldmsgslock.Unlock()
 
 	p.oldackslock.Lock()
-	defer p.oldackslock.Unlock()
 	p.OldAcks = nil
+	p.oldackslock.Unlock()
 
 	p.neweblockslock.Lock()
-	defer p.neweblockslock.Unlock()
 	p.NewEBlocks = nil
+	p.neweblockslock.Unlock()
 
 	p.NewEntriesMutex.Lock()
-	defer p.NewEntriesMutex.Unlock()
 	p.NewEntries = nil
+	p.NewEntriesMutex.Unlock()
 
 	p.AdminBlock = nil
 	p.EntryCreditBlock = nil
@@ -192,7 +171,6 @@ func (p *ProcessList) Clear() {
 
 	p.DBSignatures = nil
 
-	p.Requests = nil
 }
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
@@ -691,72 +669,53 @@ func (p *ProcessList) CheckDiffSigTally() bool {
 	return true
 }
 
-func (p *ProcessList) GetRequest(now int64, vmIndex int, height int, waitSeconds int64) *Request {
-	r := new(Request)
-	r.wait = waitSeconds
-	r.vmIndex = vmIndex
-	r.vmheight = uint32(height)
-
-	if p.Requests[r.key()] == nil {
-		r.sent = now + 2000
-		p.Requests[r.key()] = r
-	} else {
-		r = p.Requests[r.key()]
-	}
-
-	return r
-
-}
-
-// Return the number of times we have tripped an ask for this request.
-func (p *ProcessList) Ask(vmIndex int, height int, waitSeconds int64, tag int) int {
+func (p *ProcessList) Ask(vmIndex int, height int) {
 	now := p.State.GetTimestamp().GetTimeMilli()
 
-	r := p.GetRequest(now, vmIndex, len(p.VMs[0].List), waitSeconds)
-
-	if r == nil {
-		return 0
+	var vm *VM
+	if vmIndex < 0 {
+		panic(errors.New("Old Faulting code"))
 	}
+	// Look up the VM
+	vm = p.VMs[vmIndex]
 
-	if now-r.sent >= waitSeconds*1000+500 && p.State.inMsgQueue.Length() < constants.INMSGQUEUE_MED {
-		missingMsgRequest := messages.NewMissingMsg(p.State, r.vmIndex, p.DBHeight, r.vmheight)
-
-		// The System (handling full faults) is a special VM.  Let's guess it first.
-		vm := &p.System
-		if vmIndex >= 0 {
-			// Ah, not the System VM, so let's look up the one we are really talking about.
-			vm = p.VMs[vmIndex]
+	// if there have not been any MMR or this height has never been asked for or it's been 2 seconds
+	deltaT := now - vm.MM_AskTime
+	if vm.MMRequests == nil || !vm.MMRequests[height] || (deltaT >= 2000) {
+		// If this is not the first request and we have a lot of unhandled messages
+		if vm.MMRequests[height] && p.State.inMsgQueue.Length() > constants.INMSGQUEUE_MED {
+			return
 		}
 
-		for k := range p.Requests {
-			r2 := p.Requests[k]
-			if r2.vmIndex == vmIndex && int(r2.vmheight) < vm.Height {
-				delete(p.Requests, k)
-			}
-		}
+		// Might as well as for the next message too.  Won't hurt.
+		// Zero based so len(vm.List) asks for the next message which may or may not exist
+		missingMsgRequest := messages.NewMissingMsg(p.State, vmIndex, p.DBHeight, uint32(len(vm.List)))
 
-		missingMsgRequest.AddHeight(uint32(height))
 		// Okay, we are going to send one, so ask for all nil messages for this vm
+		// Maybe we Should build this in reverse order...
 		for i := 0; i < len(vm.List); i++ {
 			if vm.List[i] == nil {
-				missingMsgRequest.AddHeight(uint32(i))
+				missingMsgRequest.ProcessListHeight = append(missingMsgRequest.ProcessListHeight, uint32(i))
+				//				vm.MMRequests[i] = true
 			}
-		}
-		// Might as well as for the next message too.  Won't hurt.
-		missingMsgRequest.AddHeight(uint32(len(vm.List)))
-
-		if vmIndex < 0 {
-			missingMsgRequest.SystemHeight = uint32(p.System.Height)
 		}
 
 		missingMsgRequest.SendOut(p.State, missingMsgRequest)
+
+		vm.MM_AskTime = now
+		vm.MMRequests = make(map[int]bool) // Clear out the map
+		vm.MMRequests[len(vm.List)] = true // Add the next slot since we ask for it
+
+		for i := 0; i < len(vm.List); i++ {
+			if vm.List[i] == nil {
+				vm.MMRequests[i] = true
+			}
+		}
+
 		p.State.MissingRequestAskCnt++
 
-		r.sent = now
-		r.requestCnt++
 	}
-
-	return r.requestCnt
+	return
 }
 
 func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
@@ -775,32 +734,33 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 	state.PLProcessHeight = p.DBHeight
 
-	if len(p.System.List) >= p.System.Height {
-	systemloop:
-		for i, f := range p.System.List[p.System.Height:] {
-			if f == nil {
-				p.Ask(-1, i, 10, 100)
-				break systemloop
-			}
-
-			fault, ok := f.(*messages.FullServerFault)
-
-			if ok {
-				vm := p.VMs[fault.VMIndex]
-				if vm.Height < int(fault.Height) {
-					//p.State.AddStatus(fmt.Sprint("VM HEIGHT IS", vm.Height, "FH IS", fault.Height))
-					break systemloop
-				}
-				if !fault.Process(p.DBHeight, p.State) {
-					fault.SetAlreadyProcessed()
-					break systemloop
-				}
-				p.System.Height++
-				progress = true
-			}
-		}
-	}
-
+	// Removed OLD Faulting code
+	//if len(p.System.List) >= p.System.Height {
+	//systemloop:
+	//	for i, f := range p.System.List[p.System.Height:] {
+	//		if f == nil {
+	//			p.Ask(-1, i, 10, 100)
+	//			break systemloop
+	//		}
+	//
+	//		fault, ok := f.(*messages.FullServerFault)
+	//
+	//		if ok {
+	//			vm := p.VMs[fault.VMIndex]
+	//			if vm.Height < int(fault.Height) {
+	//				//p.State.AddStatus(fmt.Sprint("VM HEIGHT IS", vm.Height, "FH IS", fault.Height))
+	//				break systemloop
+	//			}
+	//			if !fault.Process(p.DBHeight, p.State) {
+	//				fault.SetAlreadyProcessed()
+	//				break systemloop
+	//			}
+	//			p.System.Height++
+	//			progress = true
+	//		}
+	//	}
+	//}
+	now := p.State.GetTimestamp()
 	for i := 0; i < len(p.FedServers); i++ {
 		vm := p.VMs[i]
 
@@ -822,19 +782,19 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 		if vm.Height == len(vm.List) && p.State.Syncing && !vm.Synced {
 			// means that we are missing an EOM
-			p.Ask(i, vm.Height, 0, 1)
+			p.Ask(i, vm.Height)
 		}
 
-		// If we haven't heard anything from a VM, ask for a message at the last-known height
-		if vm.Height == len(vm.List) {
-			p.Ask(i, vm.Height, 20, 2)
+		// If we haven't heard anything from a VM in 2 seconds, ask for a message at the last-known height
+		if vm.Height == len(vm.List) && now.GetTimeMilli()-vm.ProcessTime.GetTimeMilli() > 2000 {
+			p.Ask(i, vm.Height)
 		}
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
-				p.Ask(i, j, 0, 3)
+				p.Ask(i, j)
 				break VMListLoop
 			}
 
@@ -851,7 +811,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if err != nil {
 					vm.List[j] = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
-					p.Ask(i, j, 3, 4)
+					p.Ask(i, j)
 					break VMListLoop
 				}
 
@@ -898,6 +858,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					break VMListLoop
 				}
+				vm.ProcessTime = now
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
 					vm.heartBeat = 0
@@ -1104,8 +1065,9 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	ack.SetPeer2Peer(false)
 	m.SetPeer2Peer(false)
 
-	ack.SendOut(p.State, ack)
+	// Always send the message first because sending the ack first cause the the recipient to do missing messages requests
 	m.SendOut(p.State, m)
+	ack.SendOut(p.State, ack)
 
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
@@ -1231,8 +1193,6 @@ func (p *ProcessList) Reset() bool {
 	// Make a copy of the previous FedServers
 	p.System.List = p.System.List[:0]
 	p.System.Height = 0
-	p.Requests = make(map[[32]byte]*Request)
-	//pl.Requests = make(map[[20]byte]*Request)
 
 	p.FactoidBalancesT = map[[32]byte]int64{}
 	p.ECBalancesT = map[[32]byte]int64{}
@@ -1252,6 +1212,7 @@ func (p *ProcessList) Reset() bool {
 	p.SortFedServers()
 	p.SortAuditServers()
 
+	// TODO: Should we be locking these before updating?
 	// empty my maps --
 	p.OldMsgs = make(map[[32]byte]interfaces.IMsg)
 	p.OldAcks = make(map[[32]byte]interfaces.IMsg)
@@ -1340,7 +1301,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 	// Make a copy of the previous FedServers
 	pl.FedServers = make([]interfaces.IServer, 0)
 	pl.AuditServers = make([]interfaces.IServer, 0)
-	pl.Requests = make(map[[32]byte]*Request)
+
 	//pl.Requests = make(map[[20]byte]*Request)
 
 	pl.FactoidBalancesT = map[[32]byte]int64{}
@@ -1364,7 +1325,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.AddFedServer(state.GetNetworkBootStrapIdentity()) // Our default fed server, dependent on network type
 		// pl.AddFedServer(primitives.Sha([]byte("FNode0"))) // Our default for now fed server on LOCAL network
 	}
-
+	now := state.GetTimestamp()
 	// We just make lots of VMs as they have nearly no impact if not used.
 	pl.VMs = make([]*VM, 65)
 	for i := 0; i < 65; i++ {
@@ -1372,6 +1333,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.VMs[i].List = make([]interfaces.IMsg, 0)
 		pl.VMs[i].Synced = true
 		pl.VMs[i].WhenFaulted = 0
+		pl.VMs[i].ProcessTime = now
 	}
 
 	pl.DBHeight = dbheight
