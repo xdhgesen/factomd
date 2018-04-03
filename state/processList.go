@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"sync"
-
 	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -20,6 +19,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -40,7 +40,6 @@ type askRef struct {
 	plRef
 	When int64
 }
-
 
 type ProcessList struct {
 	DBHeight uint32 // The directory block height for these lists
@@ -141,11 +140,9 @@ type VM struct {
 	Signed      bool  // We have signed the previous block.
 	WhenFaulted int64 // WhenFaulted is a timestamp of when this VM was faulted
 	// vm.WhenFaulted serves as a bool flag (if > 0, the vm is currently considered faulted)
-	FaultFlag int // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
-        ProcessTime interfaces.Timestamp // Last time we made progress on this VM
+	FaultFlag   int                  // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
+	ProcessTime interfaces.Timestamp // Last time we made progress on this VM
 }
-
-
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
 	keys = make([][32]byte, p.LenNewEntries())
@@ -642,10 +639,11 @@ func (p *ProcessList) CheckDiffSigTally() bool {
 
 	return true
 }
+
 // Receive all asks and all process list adds and create missing message requests for asks that are 2 seconds old
 // and still pending.
 // Doesn't really use (can't use) the process list but I have it for debug
-func (p *ProcessList) makeMMRs(state interfaces.IState, asks <-chan askRef, adds <-chan askRef, done chan struct{}) {
+func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-chan askRef, done chan struct{}) {
 	var pending map[plRef]int64 = make(map[plRef]int64)
 	var ticker chan int64 = make(chan int64, 1)
 	type dbhvm struct {
@@ -655,13 +653,16 @@ func (p *ProcessList) makeMMRs(state interfaces.IState, asks <-chan askRef, adds
 	var mmrs map[dbhvm]*messages.MissingMsg // an MMR per VM
 
 	// tick ever second to check the  pending MMRs
-	go func() { ticker <- state.GetTimestamp().GetTimeMilli(); time.Sleep(1 * time.Second) }()
+	go func() { ticker <- s.GetTimestamp().GetTimeMilli(); time.Sleep(1 * time.Second) }()
+
+	s.LogPrintf("missing_messages", "Start PL DBH %d", p.DBHeight)
 
 	for {
 		select {
 		case ask := <-asks:
 			_, ok := pending[ask.plRef]
 			if !ok {
+				s.LogPrintf("missing_messages", "Ask %d/%d/%d", ask.DBH, ask.VM, ask.H)
 				pending[ask.plRef] = ask.When // add the requests to the map
 			}
 		case add := <-adds:
@@ -671,12 +672,14 @@ func (p *ProcessList) makeMMRs(state interfaces.IState, asks <-chan askRef, adds
 				case ask := <-asks:
 					_, ok := pending[ask.plRef]
 					if !ok {
+						s.LogPrintf("missing_messages", "Ask %d/%d/%d", ask.DBH, ask.VM, ask.H)
 						pending[ask.plRef] = ask.When // add the requests to the map
 					}
 				default:
 					break readasks1
 				}
 			} // process all pending asks before any adds
+			s.LogPrintf("missing_messages", "Add %d/%d/%d", add.DBH, add.VM, add.H)
 			delete(pending, add.plRef) // Delete request that was just added to the process list in the map
 
 		case now := <-ticker:
@@ -686,6 +689,7 @@ func (p *ProcessList) makeMMRs(state interfaces.IState, asks <-chan askRef, adds
 				case ask := <-asks:
 					_, ok := pending[ask.plRef]
 					if !ok {
+						s.LogPrintf("missing_messages", "Ask %d/%d/%d", ask.DBH, ask.VM, ask.H)
 						pending[ask.plRef] = ask.When // add the requests to the map
 					}
 				default:
@@ -696,6 +700,7 @@ func (p *ProcessList) makeMMRs(state interfaces.IState, asks <-chan askRef, adds
 			for {
 				select {
 				case add := <-adds:
+					s.LogPrintf("missing_messages", "Add %d/%d/%d", add.DBH, add.VM, add.H)
 					delete(pending, add.plRef) // Delete request that was just added to the process list in the map
 				default:
 					break readadds
@@ -707,20 +712,23 @@ func (p *ProcessList) makeMMRs(state interfaces.IState, asks <-chan askRef, adds
 				var index dbhvm = dbhvm{ref.DBH, ref.VM}
 				if now-when > 2000 {
 					if mmrs[index] == nil {
-						mmrs[index] = messages.NewMissingMsg(state, ref.VM, ref.DBH, uint32(ref.H))
+						mmrs[index] = messages.NewMissingMsg(s, ref.VM, ref.DBH, uint32(ref.H))
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
 					}
 				}
 			} //build a MMRs with all the asks pending over 2 seconds old.
 			for index, mmr := range mmrs {
-				mmr.SendOut(state, mmr)
+				s.LogMessage("missing_messages", "sendout", mmr)
+
+				mmr.SendOut(s, mmr)
 				delete(mmrs, index)
 			} // Send MMRs that were built
 		case <-done:
 			if len(pending) > 1 {
 				panic("")
 			}
+			s.LogPrintf("missing_messages", "End PL DBH %d", p.DBHeight)
 			return // this process list is all done...
 		}
 	} // forever
@@ -739,15 +747,15 @@ func (p *ProcessList) Ask(vmIndex int, height int) {
 	lenVMList := len(vm.List)
 	// ask for every nil -- probably should remember the bottom nil and save scanning the whole list
 	for i := 0; i < lenVMList; i++ {
-			if vm.List[i] == nil {
+		if vm.List[i] == nil {
 			ask := askRef{plRef{p.DBHeight, vmIndex, height}, now}
 			p.asks <- ask
-			}
 		}
+	}
 	// always ask for one past the end as well...Can't hurt ... Famous last words...
 	ask := askRef{plRef{p.DBHeight, vmIndex, lenVMList}, now}
 	p.asks <- ask
-		p.State.MissingRequestAskCnt++
+	p.State.MissingRequestAskCnt++
 
 	return
 }

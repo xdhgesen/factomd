@@ -40,6 +40,12 @@ func (lists *ProcessLists) UpdateState(dbheight uint32) (progress bool) {
 		var newlist []*ProcessList
 
 		newlist = append(newlist, lists.Lists[diff:]...)
+
+		// End the MMR processing for the old process lists
+		for _, pl := range lists.Lists[:diff] {
+			pl.done <- struct{}{}
+		}
+
 		lists.Lists = newlist
 	}
 	dbstate := lists.State.DBStates.Get(int(dbheight))
