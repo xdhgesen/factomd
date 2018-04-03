@@ -115,6 +115,8 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		TotalHoldingQueueInputs.Inc()
 		TotalHoldingQueueRecycles.Inc()
 		s.LogMessage("executeMsg", "Add to Holding", msg)
+		t := msg.Type() // Get the type so I can break on EOM
+		_ = t
 		s.Holding[msg.GetMsgHash().Fixed()] = msg
 
 	default:
@@ -567,7 +569,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	eom, ok := m.(*messages.EOM)
 	if !ok {
-		return
+		return // TODO: Really? This isn't a error?
 	}
 
 	if eom.DBHeight == s.ProcessLists.Lists[0].DBHeight && int(eom.Minute) < s.CurrentMinute {
@@ -576,7 +578,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	FollowerEOMExecutions.Inc()
 	TotalHoldingQueueInputs.Inc()
-	s.Holding[m.GetMsgHash().Fixed()] = m
+	//	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteEOM
 
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
@@ -1037,7 +1039,7 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 		}
 	}
 
-	s.Holding[m.GetMsgHash().Fixed()] = m
+	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteRevealEntry
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack != nil {
@@ -1500,8 +1502,6 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 				dbs.LeaderExecute(s)
 				vm.Signed = true
 				pl.DBSigAlreadySent = true
-			} else {
-				pl.Ask(vmIndex, 0, 0, 5)
 			}
 		}
 	}
@@ -1555,8 +1555,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.Syncing = false
 			s.EOMProcessed = 0
 			s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
+			s.SendHeartBeat() // Only do this once
 		}
-		s.SendHeartBeat()
 
 		return true
 	}

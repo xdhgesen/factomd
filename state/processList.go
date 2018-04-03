@@ -153,47 +153,10 @@ type VM struct {
 	WhenFaulted int64 // WhenFaulted is a timestamp of when this VM was faulted
 	// vm.WhenFaulted serves as a bool flag (if > 0, the vm is currently considered faulted)
 	FaultFlag int // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
+        ProcessTime interfaces.Timestamp // Last time we made progress on this VM
 }
 
-func (p *ProcessList) Clear() {
-	return
-	//p.State.AddStatus(fmt.Sprintf("PROCESSLIST.Clear dbht %d", p.DBHeight))
-	p.FactoidBalancesTMutex.Lock()
-	defer p.FactoidBalancesTMutex.Unlock()
-	p.FactoidBalancesT = nil
 
-	p.ECBalancesTMutex.Lock()
-	defer p.ECBalancesTMutex.Unlock()
-	p.ECBalancesT = nil
-
-	p.oldmsgslock.Lock()
-	defer p.oldmsgslock.Unlock()
-	p.OldMsgs = nil
-
-	p.oldackslock.Lock()
-	defer p.oldackslock.Unlock()
-	p.OldAcks = nil
-
-	p.neweblockslock.Lock()
-	defer p.neweblockslock.Unlock()
-	p.NewEBlocks = nil
-
-	p.NewEntriesMutex.Lock()
-	defer p.NewEntriesMutex.Unlock()
-	p.NewEntries = nil
-
-	p.AdminBlock = nil
-	p.EntryCreditBlock = nil
-	p.DirectoryBlock = nil
-
-	p.Matryoshka = nil
-	p.AuditServers = nil
-	p.FedServers = nil
-
-	p.DBSignatures = nil
-
-	p.Requests = nil
-}
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
 	keys = make([][32]byte, p.LenNewEntries())
@@ -775,32 +738,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 	state.PLProcessHeight = p.DBHeight
 
-	if len(p.System.List) >= p.System.Height {
-	systemloop:
-		for i, f := range p.System.List[p.System.Height:] {
-			if f == nil {
-				p.Ask(-1, i, 10, 100)
-				break systemloop
-			}
-
-			fault, ok := f.(*messages.FullServerFault)
-
-			if ok {
-				vm := p.VMs[fault.VMIndex]
-				if vm.Height < int(fault.Height) {
-					//p.State.AddStatus(fmt.Sprint("VM HEIGHT IS", vm.Height, "FH IS", fault.Height))
-					break systemloop
-				}
-				if !fault.Process(p.DBHeight, p.State) {
-					fault.SetAlreadyProcessed()
-					break systemloop
-				}
-				p.System.Height++
-				progress = true
-			}
-		}
-	}
-
+	
 	for i := 0; i < len(p.FedServers); i++ {
 		vm := p.VMs[i]
 
@@ -898,6 +836,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					break VMListLoop
 				}
+				vm.ProcessTime = now
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
 					vm.heartBeat = 0
@@ -1104,8 +1043,9 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	ack.SetPeer2Peer(false)
 	m.SetPeer2Peer(false)
 
-	ack.SendOut(p.State, ack)
+	// Always send the message first because sending the ack first cause the the recipient to do missing messages requests
 	m.SendOut(p.State, m)
+	ack.SendOut(p.State, ack)
 
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
@@ -1252,6 +1192,7 @@ func (p *ProcessList) Reset() bool {
 	p.SortFedServers()
 	p.SortAuditServers()
 
+	// TODO: Should we be locking these before updating?
 	// empty my maps --
 	p.OldMsgs = make(map[[32]byte]interfaces.IMsg)
 	p.OldAcks = make(map[[32]byte]interfaces.IMsg)
@@ -1365,6 +1306,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		// pl.AddFedServer(primitives.Sha([]byte("FNode0"))) // Our default for now fed server on LOCAL network
 	}
 
+	now := state.GetTimestamp()
 	// We just make lots of VMs as they have nearly no impact if not used.
 	pl.VMs = make([]*VM, 65)
 	for i := 0; i < 65; i++ {
@@ -1372,6 +1314,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.VMs[i].List = make([]interfaces.IMsg, 0)
 		pl.VMs[i].Synced = true
 		pl.VMs[i].WhenFaulted = 0
+		pl.VMs[i].ProcessTime = now
 	}
 
 	pl.DBHeight = dbheight
