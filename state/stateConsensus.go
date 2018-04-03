@@ -834,14 +834,14 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	// Just ignore missing messages for a period after going off line or starting up.
-	if s.IgnoreMissing || s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
-		//TODO: Log here -- clay
 		if s.IgnoreMissing {
 			s.LogMessage("executeMsg", "Drop IgnoreMissing", m)
+		return
 		}
-		if s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
-			s.LogMessage("executeMsg", "Drop INMSGQUEUE_HIGH", m)
-		}
+	// Drop the missing message responce if it's already in the process list
+	_, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
+	if !valid {
+		s.LogMessage("executeMsg", "replayInvalid", m)
 		return
 	}
 
