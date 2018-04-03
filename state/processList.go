@@ -672,7 +672,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 				case ask := <-asks:
 					_, ok := pending[ask.plRef]
 					if !ok {
-						s.LogPrintf("missing_messages", "Ask %d/%d/%d", ask.DBH, ask.VM, ask.H)
+						s.LogPrintf("missing_messages", "Ask2 %d/%d/%d", ask.DBH, ask.VM, ask.H)
 						pending[ask.plRef] = ask.When // add the requests to the map
 					}
 				default:
@@ -689,7 +689,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 				case ask := <-asks:
 					_, ok := pending[ask.plRef]
 					if !ok {
-						s.LogPrintf("missing_messages", "Ask %d/%d/%d", ask.DBH, ask.VM, ask.H)
+						s.LogPrintf("missing_messages", "Ask3 %d/%d/%d", ask.DBH, ask.VM, ask.H)
 						pending[ask.plRef] = ask.When // add the requests to the map
 					}
 				default:
@@ -700,17 +700,19 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			for {
 				select {
 				case add := <-adds:
-					s.LogPrintf("missing_messages", "Add %d/%d/%d", add.DBH, add.VM, add.H)
+					s.LogPrintf("missing_messages", "Add1 %d/%d/%d", add.DBH, add.VM, add.H)
 					delete(pending, add.plRef) // Delete request that was just added to the process list in the map
 				default:
 					break readadds
 				}
 			} // process all pending add before any ticks
+			s.LogPrintf("missing_messages", "tick")
 
 			//build MMRs with all the asks pending over 2 seconds old.
 			for ref, when := range pending {
-				var index dbhvm = dbhvm{ref.DBH, ref.VM}
-				if now-when > 2000 {
+				i := now - when
+				if i > 2000 {
+					var index dbhvm = dbhvm{ref.DBH, ref.VM}
 					if mmrs[index] == nil {
 						mmrs[index] = messages.NewMissingMsg(s, ref.VM, ref.DBH, uint32(ref.H))
 					} else {
