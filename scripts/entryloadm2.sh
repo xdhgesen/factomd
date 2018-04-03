@@ -2,7 +2,7 @@
 
 nchains=3    # number of chains to create
 nchains2=3    # number of chains to create
-nentries=150   # number of entries to add to each chain
+nentries=250   # number of entries to add to each chain
 
 #factomd=10.41.2.5:8088
  factomd=localhost:8088

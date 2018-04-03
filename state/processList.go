@@ -640,47 +640,48 @@ func (p *ProcessList) Ask(vmIndex int, height int) {
 
 	// if there have not been any MMR or this height has never been asked for or it's been 2 seconds
 	deltaT := now - vm.MM_AskTime
-	if vm.MMRequests == nil || !vm.MMRequests[height] || (deltaT >= 2000) {
-		// If this is not the first request and we have a lot of unhandled messages
-		if vm.MMRequests[height] && p.State.inMsgQueue.Length() > constants.INMSGQUEUE_MED {
-			return
+	if vm.MMRequests != nil && vm.MMRequests[height] || (deltaT >= 2000) {
+		return
+	}
+	// If this is not the first request and we have a lot of unhandled messages
+	if vm.MMRequests[height] && p.State.inMsgQueue.Length() > constants.INMSGQUEUE_MED {
+		return
+	}
+
+	// Might as well as for the next message too.  Won't hurt.
+	// Zero based so len(vm.List) asks for the next message which may or may not exist
+	lenVMList := len(vm.List)
+	missingMsgRequest := messages.NewMissingMsg(p.State, vmIndex, p.DBHeight, uint32(lenVMList))
+
+	// Okay, we are going to send one, so ask for all nil messages for this vm
+	// Maybe we Should build this in reverse order...
+	for i := 0; i < len(vm.List); i++ {
+		if vm.List[i] == nil {
+			missingMsgRequest.ProcessListHeight = append(missingMsgRequest.ProcessListHeight, uint32(i))
+			//				vm.MMRequests[i] = true
 		}
+	}
 
-		// Might as well as for the next message too.  Won't hurt.
-		// Zero based so len(vm.List) asks for the next message which may or may not exist
-		lenVMList := len(vm.List)
-		missingMsgRequest := messages.NewMissingMsg(p.State, vmIndex, p.DBHeight, uint32(lenVMList))
+	missingMsgRequest.SendOut(p.State, missingMsgRequest)
 
-		// Okay, we are going to send one, so ask for all nil messages for this vm
-		// Maybe we Should build this in reverse order...
-		for i := 0; i < len(vm.List); i++ {
-			if vm.List[i] == nil {
-				missingMsgRequest.ProcessListHeight = append(missingMsgRequest.ProcessListHeight, uint32(i))
-				//				vm.MMRequests[i] = true
-			}
-		}
+	vm.MM_AskTime = now
+	vm.MMRequests = make(map[int]bool) // Clear out the map
+	vm.MMRequests[lenVMList] = true    // Add the next slot since we ask for it
 
-		missingMsgRequest.SendOut(p.State, missingMsgRequest)
-
-		vm.MM_AskTime = now
-		vm.MMRequests = make(map[int]bool) // Clear out the map
-		vm.MMRequests[lenVMList] = true    // Add the next slot since we ask for it
-
-		if height < lenVMList && vm.List[height] != nil {
-			_ = height // this should never happen
-			vm.MMRequests[height] = true
-
-		}
-
-		for i := 0; i < len(vm.List); i++ {
-			if vm.List[i] == nil {
-				vm.MMRequests[i] = true
-			}
-		}
-
-		p.State.MissingRequestAskCnt++
+	if height < lenVMList && vm.List[height] != nil {
+		_ = height // this should never happen
+		vm.MMRequests[height] = true
 
 	}
+
+	for i := 0; i < lenVMList; i++ {
+		if vm.List[i] == nil {
+			vm.MMRequests[i] = true
+		}
+	}
+
+	p.State.MissingRequestAskCnt++
+
 	return
 }
 
