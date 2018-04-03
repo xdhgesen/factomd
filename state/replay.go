@@ -226,6 +226,10 @@ func (r *Replay) validate(mask int, hash [32]byte, timestamp interfaces.Timestam
 	}
 	return index, true
 }
+
+// Returns false if the hash is too old, or is already a
+// member of the set.  Timestamp is in seconds.
+// Does not add the hash to the buckets!
 func (r *Replay) Valid(mask int, hash [32]byte, timestamp interfaces.Timestamp, systemtime interfaces.Timestamp) (index int, valid bool) {
 	r.Mutex.Lock()
 	defer r.Mutex.Unlock()
@@ -238,26 +242,24 @@ func (r *Replay) Valid(mask int, hash [32]byte, timestamp interfaces.Timestamp, 
 // this code remembers hashes tested in the past, and rejects the
 // second submission of the same hash.
 func (r *Replay) IsTSValid(mask int, hash interfaces.IHash, timestamp interfaces.Timestamp) bool {
-	return r.IsTSValid_(mask, hash.Fixed(), timestamp, primitives.NewTimestampNow())
+	return r.IsTSValidAndUpdateState(mask, hash.Fixed(), timestamp, primitives.NewTimestampNow())
 }
 
 // To make the function testable, the logic accepts the current time
 // as a parameter.  This way, the test code can manipulate the clock
 // at will.
-func (r *Replay) IsTSValid_(mask int, hash [32]byte, timestamp interfaces.Timestamp, now interfaces.Timestamp) bool {
-
-	//TODO: There is a race that the index could go stale while the replay is unlocked. -- clay
-	if index, ok := r.Valid(mask, hash, timestamp, now); ok {
+func (r *Replay) IsTSValidAndUpdateState(mask int, hash [32]byte, timestamp interfaces.Timestamp, now interfaces.Timestamp) bool {
+	r.Mutex.Lock()
+	index, ok := r.validate(mask, hash, timestamp, now)
+	if ok {
 		// Mark this hash as seen
 		if mask != constants.TIME_TEST {
-			r.Mutex.Lock()
 			r.Buckets[index][hash] = r.Buckets[index][hash] | mask
-			r.Mutex.Unlock()
-			//			r.s.LogPrintf(r.name, "AddHash1 %x from %s", hash[:4], atomic.WhereAmIString(1))
 		}
+		r.Mutex.Unlock()
 		return true
 	}
-
+	r.Mutex.Unlock()
 	return false
 }
 
