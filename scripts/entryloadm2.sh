@@ -1,4 +1,16 @@
 #!/bin/bash
+trap_with_arg() { # from https://stackoverflow.com/a/2183063/804678
+  local func="$1"; shift
+  for sig in "$@"; do
+    trap "$func $sig" "$sig"
+  done
+}
+
+stop() {
+  trap - SIGINT EXIT
+  printf '\n%s\n' "recieved $1, killing children"
+  kill -s SIGINT 0
+}
 
 nchains=3    # number of chains to create
 nchains2=3    # number of chains to create

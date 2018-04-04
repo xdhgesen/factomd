@@ -644,97 +644,113 @@ func (p *ProcessList) CheckDiffSigTally() bool {
 // and still pending.
 // Doesn't really use (can't use) the process list but I have it for debug
 func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-chan askRef, done chan struct{}) {
-	var pending map[plRef]int64 = make(map[plRef]int64)
-	var ticker chan int64 = make(chan int64, 1)
 	type dbhvm struct {
 		dbh uint32
 		vm  int
 	}
-	var mmrs map[dbhvm]*messages.MissingMsg // an MMR per VM
+	type when struct {
+		ask, mmr int64
+	}
+
+	pending := make(map[plRef]*when)
+	ticker := make(chan int64, 1)
+	mmrs := make(map[dbhvm]*messages.MissingMsg) // an MMR per DBH/VM
+	logname := "missing_messages"
+
+	addAsk := func(ask askRef) {
+		_, ok := pending[ask.plRef]
+		if !ok {
+			when := when{ask.When, 0}
+			pending[ask.plRef] = &when // add the requests to the map
+			s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
+		}
+	}
+
+	addAdd := func(add askRef) {
+		delete(pending, add.plRef) // Delete request that was just added to the process list in the map
+		s.LogPrintf(logname, "Add %d/%d/%d %d", add.DBH, add.VM, add.H, len(pending))
+	}
+
+	addAllAsks := func() {
+	readasks:
+		for {
+			select {
+			case ask := <-asks:
+				addAsk(ask)
+			default:
+				break readasks
+			}
+		} // process all pending asks before any adds
+	}
+
+	addAllAdds := func() {
+	readadds:
+		for {
+			select {
+			case add := <-adds:
+				addAdd(add)
+			default:
+				break readadds
+			}
+		} // process all pending add before any ticks
+	}
 
 	// tick ever second to check the  pending MMRs
-	go func() { ticker <- s.GetTimestamp().GetTimeMilli(); time.Sleep(1 * time.Second) }()
+	go func() {
+		for {
+			ticker <- s.GetTimestamp().GetTimeMilli()
+			time.Sleep(1 * time.Second)
+		}
+	}()
 
-	s.LogPrintf("missing_messages", "Start PL DBH %d", p.DBHeight)
+	s.LogPrintf(logname, "Start PL DBH %d", p.DBHeight)
 
 	for {
 		select {
 		case ask := <-asks:
-			_, ok := pending[ask.plRef]
-			if !ok {
-				s.LogPrintf("missing_messages", "Ask %d/%d/%d", ask.DBH, ask.VM, ask.H)
-				pending[ask.plRef] = ask.When // add the requests to the map
-			}
+			addAsk(ask)
+
 		case add := <-adds:
-		readasks1:
-			for {
-				select {
-				case ask := <-asks:
-					_, ok := pending[ask.plRef]
-					if !ok {
-						s.LogPrintf("missing_messages", "Ask2 %d/%d/%d", ask.DBH, ask.VM, ask.H)
-						pending[ask.plRef] = ask.When // add the requests to the map
-					}
-				default:
-					break readasks1
-				}
-			} // process all pending asks before any adds
-			s.LogPrintf("missing_messages", "Add %d/%d/%d", add.DBH, add.VM, add.H)
-			delete(pending, add.plRef) // Delete request that was just added to the process list in the map
+			addAllAsks() // process all pending asks before any adds
+			addAdd(add)
 
 		case now := <-ticker:
-		readasks2:
-			for {
-				select {
-				case ask := <-asks:
-					_, ok := pending[ask.plRef]
-					if !ok {
-						s.LogPrintf("missing_messages", "Ask3 %d/%d/%d", ask.DBH, ask.VM, ask.H)
-						pending[ask.plRef] = ask.When // add the requests to the map
-					}
-				default:
-					break readasks2
-				}
-			} // process all pending asks before any adds
-		readadds:
-			for {
-				select {
-				case add := <-adds:
-					s.LogPrintf("missing_messages", "Add1 %d/%d/%d", add.DBH, add.VM, add.H)
-					delete(pending, add.plRef) // Delete request that was just added to the process list in the map
-				default:
-					break readadds
-				}
-			} // process all pending add before any ticks
-			s.LogPrintf("missing_messages", "tick")
+			addAllAsks() // process all pending asks before any adds
+			addAllAdds() // process all pending add before any ticks
+
+			s.LogPrintf(logname, "tick [%v]", pending)
 
 			//build MMRs with all the asks pending over 2 seconds old.
 			for ref, when := range pending {
-				i := now - when
-				if i > 2000 {
+				deltaTask := now - when.ask
+				deltaTmmr := now - when.mmr
+				// if ask over 2 seconds old and last MMR is over 10 seconds old send an MMR
+				if deltaTask > 2000 && deltaTmmr > 10000 {
+					when.mmr = now // update when we asked...
 					var index dbhvm = dbhvm{ref.DBH, ref.VM}
-					if mmrs[index] == nil {
+					if mmrs[index] == nil { // If we don't have a message for this DBH/VM
 						mmrs[index] = messages.NewMissingMsg(s, ref.VM, ref.DBH, uint32(ref.H))
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
 					}
 				}
 			} //build a MMRs with all the asks pending over 2 seconds old.
+
 			for index, mmr := range mmrs {
-				s.LogMessage("missing_messages", "sendout", mmr)
+				s.LogMessage(logname, "sendout", mmr)
 
 				mmr.SendOut(s, mmr)
 				delete(mmrs, index)
 			} // Send MMRs that were built
+
 		case <-done:
-			if len(pending) > 1 {
-				panic("")
-			}
-			s.LogPrintf("missing_messages", "End PL DBH %d", p.DBHeight)
+			addAllAsks() // process all pending asks before any adds
+			addAllAdds() // process all pending add before any ticks
+			s.LogPrintf(logname, "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
 			return // this process list is all done...
 		}
-	} // forever
-}
+	} // forever .. well until the done chan tells us to quit
+} // func  makeMMRs() {...}
 
 func (p *ProcessList) Ask(vmIndex int, height int) {
 
@@ -872,7 +888,10 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 				now := p.State.GetTimestamp()
 
-				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now); !valid {
+				msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
+				msgHashFixed := msg.GetMsgHash().Fixed()
+
+				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					break VMListLoop
 				}
@@ -889,11 +908,12 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 					// We have already tested and found m to be a new message.  We now record its hashes so later, we
 					// can detect that it has been recorded.  We don't care about the results of IsTSValid_ at this point.
-					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now)
-					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msg.GetMsgHash().Fixed(), msg.GetTimestamp(), now)
+					// block network replay too since we have already seen this message there is not need to see it again
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
-					delete(p.State.Acks, msg.GetMsgHash().Fixed())
-					delete(p.State.Holding, msg.GetMsgHash().Fixed())
+					delete(p.State.Acks, msgHashFixed)
+					delete(p.State.Holding, msgHashFixed)
 
 				} else {
 					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
@@ -1097,6 +1117,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	m.SetPeer2Peer(false)
 
 	// Always send the message first because sending the ack first cause the the recipient to do missing messages requests
+
 	m.SendOut(p.State, m)
 	ack.SendOut(p.State, ack)
 

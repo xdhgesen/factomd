@@ -347,7 +347,7 @@ func (m *Ack) MarshalBinary() (data []byte, err error) {
 }
 
 func (m *Ack) String() string {
-	return fmt.Sprintf("%6s-%30s -- Leader[%x] hash[%x]",
+	return fmt.Sprintf("%6s-%27s -- Leader[%x] hash[%x]",
 		"ACK",
 		fmt.Sprintf("DBh/VMh/h %d/%d/%d       ", m.DBHeight, m.VMIndex, m.Height),
 		m.LeaderChainID.Bytes()[3:6],
