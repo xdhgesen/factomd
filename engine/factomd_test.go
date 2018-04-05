@@ -96,9 +96,12 @@ func TestSetupANetwork(t *testing.T) {
 		"-count=10",
 		"-logPort=37000",
 		"-port=37001",
-		"-ControlPanelPort=37002",
-		"-networkPort=37003",
+		"-controlpanelport=37002",
+		"-networkport=37003",
 		"-startdelay=1",
+		//"-debuglog=F.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=out.txt",
 	)
 
 	params := ParseCmdLine(args)
