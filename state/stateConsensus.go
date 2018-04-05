@@ -86,15 +86,20 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		}
 		ret = true
 	case 0:
-		TotalHoldingQueueInputs.Inc()
-		TotalHoldingQueueRecycles.Inc()
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
+		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
+		// this check makes sure we don't put them back in holding after just deleting them
+		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); !valid {
+			TotalHoldingQueueInputs.Inc()
+			TotalHoldingQueueRecycles.Inc()
+			//s.LogMessage("executeMsg", "Add to Holding", msg)
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		} else {
+			//s.LogMessage("executeMsg", "drop, IReplay", msg)
+		}
 	default:
-		TotalHoldingQueueInputs.Inc()
-		TotalHoldingQueueRecycles.Inc()
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
 		if !msg.SentInvalid() {
 			msg.MarkSentInvalid(true)
+			//s.LogMessage("executeMsg", "InvalidMsg", msg)
 			s.networkInvalidMsgQueue <- msg
 		}
 	}

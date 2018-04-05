@@ -6,12 +6,10 @@ package state
 
 import (
 	"bytes"
-	"fmt"
-	"sync"
-
 	"encoding/binary"
-
+	"fmt"
 	"os"
+	"sync"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -20,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -148,46 +147,6 @@ type VM struct {
 	WhenFaulted int64 // WhenFaulted is a timestamp of when this VM was faulted
 	// vm.WhenFaulted serves as a bool flag (if > 0, the vm is currently considered faulted)
 	FaultFlag int // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
-}
-
-func (p *ProcessList) Clear() {
-	return
-	//p.State.AddStatus(fmt.Sprintf("PROCESSLIST.Clear dbht %d", p.DBHeight))
-	p.FactoidBalancesTMutex.Lock()
-	defer p.FactoidBalancesTMutex.Unlock()
-	p.FactoidBalancesT = nil
-
-	p.ECBalancesTMutex.Lock()
-	defer p.ECBalancesTMutex.Unlock()
-	p.ECBalancesT = nil
-
-	p.oldmsgslock.Lock()
-	defer p.oldmsgslock.Unlock()
-	p.OldMsgs = nil
-
-	p.oldackslock.Lock()
-	defer p.oldackslock.Unlock()
-	p.OldAcks = nil
-
-	p.neweblockslock.Lock()
-	defer p.neweblockslock.Unlock()
-	p.NewEBlocks = nil
-
-	p.NewEntriesMutex.Lock()
-	defer p.NewEntriesMutex.Unlock()
-	p.NewEntries = nil
-
-	p.AdminBlock = nil
-	p.EntryCreditBlock = nil
-	p.DirectoryBlock = nil
-
-	p.Matryoshka = nil
-	p.AuditServers = nil
-	p.FedServers = nil
-
-	p.DBSignatures = nil
-
-	p.Requests = nil
 }
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
@@ -814,7 +773,10 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 				now := p.State.GetTimestamp()
 
-				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now); !valid {
+				msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
+				msgHashFixed := msg.GetMsgHash().Fixed()
+
+				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					break VMListLoop
 				}
@@ -827,11 +789,12 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 					// We have already tested and found m to be a new message.  We now record its hashes so later, we
 					// can detect that it has been recorded.  We don't care about the results of IsTSValid_ at this point.
-					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now)
-					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, msg.GetMsgHash().Fixed(), msg.GetTimestamp(), now)
+					// block network replay too since we have already seen this message there is not need to see it again
+					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
-					delete(p.State.Acks, msg.GetMsgHash().Fixed())
-					delete(p.State.Holding, msg.GetMsgHash().Fixed())
+					delete(p.State.Acks, msgHashFixed)
+					delete(p.State.Holding, msgHashFixed)
 
 				} else {
 					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
@@ -1060,7 +1023,7 @@ func (p *ProcessList) AddDBSig(serverID interfaces.IHash, sig interfaces.IFullSi
 	dbsig.ChainID = serverID
 	dbsig.Signature = sig
 	found, dbsig.VMIndex = p.GetVirtualServers(0, serverID) //set the vmindex of the dbsig to the vm this server should sign
-	if !found {                                             // Should never happen.
+	if !found { // Should never happen.
 		return
 	}
 	p.DBSignatures = append(p.DBSignatures, *dbsig)
