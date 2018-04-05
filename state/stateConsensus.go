@@ -112,12 +112,16 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		ret = true
 
 	case 0:
-		TotalHoldingQueueInputs.Inc()
-		TotalHoldingQueueRecycles.Inc()
-		s.LogMessage("executeMsg", "Add to Holding", msg)
-		t := msg.Type() // Get the type so I can break on EOM
-		_ = t
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
+		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
+		// this check makes sure we don't put them back in holding after just deleting them
+		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); !valid {
+			TotalHoldingQueueInputs.Inc()
+			TotalHoldingQueueRecycles.Inc()
+			s.LogMessage("executeMsg", "Add to Holding", msg)
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		} else {
+			s.LogMessage("executeMsg", "drop, IReplay", msg)
+		}
 
 	default:
 		if !msg.SentInvalid() {
@@ -834,10 +838,10 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	// Just ignore missing messages for a period after going off line or starting up.
-		if s.IgnoreMissing {
-			s.LogMessage("executeMsg", "Drop IgnoreMissing", m)
+	if s.IgnoreMissing {
+		s.LogMessage("executeMsg", "Drop IgnoreMissing", m)
 		return
-		}
+	}
 	// Drop the missing message responce if it's already in the process list
 	_, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !valid {
@@ -1038,6 +1042,7 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 			m.SendOut(s, m)
 		}
 	}
+	s.LogPrintf("executeMsg", "hold2 %x", m.GetMsgHash().Fixed())
 
 	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteRevealEntry
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
@@ -1257,11 +1262,11 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 	m.SetMinute(ack.Minute)
 
 	// Put the acknowledgement in the Acks so we can tell if AddToProcessList() adds it.
-	s.Acks[m.GetMsgHash().Fixed()] = ack
+	s.Acks[ack.GetHash().Fixed()] = ack
 	TotalAcksInputs.Inc()
 	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(ack, m)
 	// If it was added, then get rid of the matching Commit.
-	if s.Acks[m.GetMsgHash().Fixed()] != nil {
+	if s.Acks[ack.GetHash().Fixed()] != nil {
 		s.PutCommit(eh, commit)
 		m.FollowerExecute(s)
 	} else {
@@ -1269,7 +1274,9 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 		s.Replay.IsTSValidAndUpdateState(constants.REVEAL_REPLAY, eh.Fixed(), m.GetTimestamp(), now)
 		TotalCommitsOutputs.Inc()
 		s.Commits.Delete(eh.Fixed()) // delete(s.Commits, eh.Fixed())
-		delete(s.Holding, eh.Fixed())
+		s.LogPrintf("executeMsg", "del re %x", m.GetMsgHash().Fixed())
+
+		delete(s.Holding, m.GetMsgHash().Fixed())
 	}
 }
 
@@ -1334,7 +1341,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 	pl := s.ProcessLists.Get(dbheight)
 	pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitChain); e == nil {
-		// save the Commit to match againsttthe Reveal later
+		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
 		entry := s.Holding[h.Fixed()]

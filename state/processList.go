@@ -640,35 +640,32 @@ func (p *ProcessList) CheckDiffSigTally() bool {
 	return true
 }
 
-// Receive all asks and all process list adds and create missing message requests for asks that are 2 seconds old
-// and still pending.
+// Receive all asks and all process list adds and create missing message requests any ask that has expired
+// and still pending. Add 10 seconds to the ask.
 // Doesn't really use (can't use) the process list but I have it for debug
 func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-chan askRef, done chan struct{}) {
 	type dbhvm struct {
 		dbh uint32
 		vm  int
 	}
-	type when struct {
-		ask, mmr int64
-	}
 
-	pending := make(map[plRef]*when)
+	pending := make(map[plRef]*int64)
 	ticker := make(chan int64, 1)
 	mmrs := make(map[dbhvm]*messages.MissingMsg) // an MMR per DBH/VM
-	logname := "missing_messages"
+	//	logname := "missing_messages"
 
 	addAsk := func(ask askRef) {
 		_, ok := pending[ask.plRef]
 		if !ok {
-			when := when{ask.When, 0}
+			when := ask.When
 			pending[ask.plRef] = &when // add the requests to the map
-			s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
+			//			s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
 		}
 	}
 
 	addAdd := func(add askRef) {
 		delete(pending, add.plRef) // Delete request that was just added to the process list in the map
-		s.LogPrintf(logname, "Add %d/%d/%d %d", add.DBH, add.VM, add.H, len(pending))
+		//		s.LogPrintf(logname, "Add %d/%d/%d %d", add.DBH, add.VM, add.H, len(pending))
 	}
 
 	addAllAsks := func() {
@@ -699,11 +696,11 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 	go func() {
 		for {
 			ticker <- s.GetTimestamp().GetTimeMilli()
-			time.Sleep(1 * time.Second)
+			time.Sleep(200 * time.Millisecond)
 		}
 	}()
 
-	s.LogPrintf(logname, "Start PL DBH %d", p.DBHeight)
+	//	s.LogPrintf(logname, "Start PL DBH %d", p.DBHeight)
 
 	for {
 		select {
@@ -718,27 +715,25 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			addAllAsks() // process all pending asks before any adds
 			addAllAdds() // process all pending add before any ticks
 
-			s.LogPrintf(logname, "tick [%v]", pending)
+			//			s.LogPrintf(logname, "tick [%v]", pending)
 
-			//build MMRs with all the asks pending over 2 seconds old.
+			//build MMRs with all the asks expired asks.
 			for ref, when := range pending {
-				deltaTask := now - when.ask
-				deltaTmmr := now - when.mmr
-				// if ask over 2 seconds old and last MMR is over 10 seconds old send an MMR
-				if deltaTask > 2000 && deltaTmmr > 10000 {
-					when.mmr = now // update when we asked...
+				// if ask is expired
+				if now > *when {
 					var index dbhvm = dbhvm{ref.DBH, ref.VM}
 					if mmrs[index] == nil { // If we don't have a message for this DBH/VM
 						mmrs[index] = messages.NewMissingMsg(s, ref.VM, ref.DBH, uint32(ref.H))
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
 					}
+					*when += 10000 // update when we asked...
+					// Maybe when asking for past the end of the list we should not ask again?
 				}
-			} //build a MMRs with all the asks pending over 2 seconds old.
+			} //build a MMRs with all the expired asks.
 
 			for index, mmr := range mmrs {
-				s.LogMessage(logname, "sendout", mmr)
-
+				//			s.LogMessage(logname, "sendout", mmr)
 				mmr.SendOut(s, mmr)
 				delete(mmrs, index)
 			} // Send MMRs that were built
@@ -746,13 +741,16 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 		case <-done:
 			addAllAsks() // process all pending asks before any adds
 			addAllAdds() // process all pending add before any ticks
-			s.LogPrintf(logname, "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
+			//			s.LogPrintf(logname, "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
+			if len(pending) != 0 {
+				s.LogPrintf("executeMsg", "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
+			}
 			return // this process list is all done...
 		}
 	} // forever .. well until the done chan tells us to quit
 } // func  makeMMRs() {...}
 
-func (p *ProcessList) Ask(vmIndex int, height int) {
+func (p *ProcessList) Ask(vmIndex int, height int, delay int64) {
 
 	if vmIndex < 0 {
 		panic(errors.New("Old Faulting code"))
@@ -816,19 +814,19 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 		if vm.Height == len(vm.List) && p.State.Syncing && !vm.Synced {
 			// means that we are missing an EOM
-			p.Ask(i, vm.Height)
+			p.Ask(i, vm.Height, 100) // 100ms delay
 		}
 
 		// If we haven't heard anything from a VM in 2 seconds, ask for a message at the last-known height
 		if vm.Height == len(vm.List) && now.GetTimeMilli()-vm.ProcessTime.GetTimeMilli() > 2000 {
-			p.Ask(i, vm.Height)
+			p.Ask(i, vm.Height, 2000) // 2 second delay
 		}
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
-				p.Ask(i, j)
+				p.Ask(i, j, 100) // 100ms delay
 				break VMListLoop
 			}
 
@@ -845,7 +843,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if err != nil {
 					vm.List[j] = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
-					p.Ask(i, j)
+					p.Ask(i, j, 3000) // 3 second delay
 					break VMListLoop
 				}
 
@@ -1118,6 +1116,10 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	// Always send the message first because sending the ack first cause the the recipient to do missing messages requests
 
+	if ack.GetHash().Fixed() != m.GetMsgHash().Fixed() {
+		p.State.LogPrintf("executeMsg", "m/ack mismatch m-%x a-%x", m.GetMsgHash().Fixed(), ack.GetHash().Fixed())
+	}
+
 	m.SendOut(p.State, m)
 	ack.SendOut(p.State, ack)
 
@@ -1125,6 +1127,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 		vm.List = append(vm.List, nil)
 		vm.ListAck = append(vm.ListAck, nil)
 	}
+	p.State.LogPrintf("executeMsg", "del %x", m.GetMsgHash().Fixed())
 
 	delete(p.State.Acks, m.GetMsgHash().Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
