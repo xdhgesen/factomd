@@ -852,7 +852,10 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 				now := p.State.GetTimestamp()
 
-				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now); !valid {
+				msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
+				msgHashFixed := msg.GetMsgHash().Fixed()
+
+				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					break VMListLoop
 				}
@@ -865,11 +868,12 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 					// We have already tested and found m to be a new message.  We now record its hashes so later, we
 					// can detect that it has been recorded.  We don't care about the results of IsTSValid_ at this point.
-					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now)
-					p.State.Replay.IsTSValid_(constants.INTERNAL_REPLAY, msg.GetMsgHash().Fixed(), msg.GetTimestamp(), now)
+					// block network replay too since we have already seen this message there is not need to see it again
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
-					delete(p.State.Acks, msg.GetMsgHash().Fixed())
-					delete(p.State.Holding, msg.GetMsgHash().Fixed())
+					delete(p.State.Acks, msgHashFixed)
+					delete(p.State.Holding, msgHashFixed)
 
 				} else {
 					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
