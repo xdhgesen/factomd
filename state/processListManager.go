@@ -38,9 +38,6 @@ func (lists *ProcessLists) UpdateState(dbheight uint32) (progress bool) {
 		progress = true
 		lists.DBHeightBase += uint32(diff)
 		var newlist []*ProcessList
-		for i := 0; i < diff; i++ {
-			lists.Lists[i].Clear()
-		}
 		newlist = append(newlist, lists.Lists[diff:]...)
 		lists.Lists = newlist
 	}

@@ -6,12 +6,10 @@ package state
 
 import (
 	"bytes"
-	"fmt"
-	"sync"
-
 	"encoding/binary"
-
+	"fmt"
 	"os"
+	"sync"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -153,46 +151,6 @@ type VM struct {
 	WhenFaulted int64 // WhenFaulted is a timestamp of when this VM was faulted
 	// vm.WhenFaulted serves as a bool flag (if > 0, the vm is currently considered faulted)
 	FaultFlag int // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
-}
-
-func (p *ProcessList) Clear() {
-	return
-	//p.State.AddStatus(fmt.Sprintf("PROCESSLIST.Clear dbht %d", p.DBHeight))
-	p.FactoidBalancesTMutex.Lock()
-	defer p.FactoidBalancesTMutex.Unlock()
-	p.FactoidBalancesT = nil
-
-	p.ECBalancesTMutex.Lock()
-	defer p.ECBalancesTMutex.Unlock()
-	p.ECBalancesT = nil
-
-	p.oldmsgslock.Lock()
-	defer p.oldmsgslock.Unlock()
-	p.OldMsgs = nil
-
-	p.oldackslock.Lock()
-	defer p.oldackslock.Unlock()
-	p.OldAcks = nil
-
-	p.neweblockslock.Lock()
-	defer p.neweblockslock.Unlock()
-	p.NewEBlocks = nil
-
-	p.NewEntriesMutex.Lock()
-	defer p.NewEntriesMutex.Unlock()
-	p.NewEntries = nil
-
-	p.AdminBlock = nil
-	p.EntryCreditBlock = nil
-	p.DirectoryBlock = nil
-
-	p.Matryoshka = nil
-	p.AuditServers = nil
-	p.FedServers = nil
-
-	p.DBSignatures = nil
-
-	p.Requests = nil
 }
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
