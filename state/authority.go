@@ -14,6 +14,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/log"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 // Checks the signature of a message. Returns an int based on who signed it:
@@ -196,6 +197,8 @@ func (st *State) UpdateAuthorityFromABEntry(entry interfaces.IABEntry) error {
 		if err != nil {
 			//fmt.Println("Error when Making Identity,", err)
 		}
+		fmt.Printf("%s:UpdateAuthorityFromABEntry(%s)\n", st.FactomNodeName, atomic.Goid())
+
 		AuthorityIndex = st.AddAuthorityFromChainID(f.IdentityChainID)
 		st.Authorities[AuthorityIndex].Status = constants.IDENTITY_FEDERATED_SERVER
 		// check Identity status

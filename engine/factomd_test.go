@@ -110,7 +110,8 @@ func TestSetupANetwork(t *testing.T) {
 	time.Sleep(3 * time.Second)
 
 	t.Log("Allocated 10 nodes")
-	if len(GetFnodes()) != 10 {
+	i := len(GetFnodes())
+	if i != 10 {
 		t.Fatal("Should have allocated 10 nodes")
 		t.Fail()
 	}

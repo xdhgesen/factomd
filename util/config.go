@@ -8,7 +8,6 @@ import (
 
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/log"
-
 	"gopkg.in/gcfg.v1"
 )
 
@@ -282,6 +281,7 @@ func GetChangeAcksHeight(filename string) (change uint32, err error) {
 }
 
 func ReadConfig(filename string) *FactomdConfig {
+
 	if filename == "" {
 		filename = ConfigFilename()
 	}

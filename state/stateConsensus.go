@@ -19,6 +19,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/util"
+	"github.com/FactomProject/factomd/util/atomic"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -1754,6 +1755,8 @@ func (s *State) CheckForIDChange() {
 		}
 	}
 	if reloadIdentity {
+		fmt.Printf("%s:ReadConfig(%s) %s\n", s.FactomNodeName, s.filename, atomic.Goid())
+
 		config := util.ReadConfig(s.filename)
 		var err error
 		s.IdentityChainID, err = primitives.NewShaHashFromStr(config.App.IdentityChainID)
