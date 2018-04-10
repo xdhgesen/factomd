@@ -14,7 +14,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
-	//"github.com/FactomProject/factomd/util/atomic"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 const Range = 60                // Double this for the period we protect, i.e. 120 means +/- 120 minutes
@@ -283,21 +283,25 @@ func (r *Replay) IsTSValid(mask int, hash interfaces.IHash, timestamp interfaces
 // To make the function testable, the logic accepts the current time
 // as a parameter.  This way, the test code can manipulate the clock
 // at will.
-func (r *Replay) IsTSValidAndUpdateState(mask int, hash [32]byte, timestamp interfaces.Timestamp, systemtime interfaces.Timestamp) bool {
+func (r *Replay) IsTSValidAndUpdateState(mask int, hash [32]byte, timestamp interfaces.Timestamp, systemtime interfaces.Timestamp) (rval bool) {
 	r.Mutex.Lock()
-	defer r.Mutex.Unlock()
 	// Fixed to avoid a race with unlocking after finding the index and then using it in a later when it could be stale
 
-	index, ok := r.validate(mask, hash, timestamp, systemtime)
-	if ok {
+	index, rval := r.validate(mask, hash, timestamp, systemtime)
+	if rval {
 		// Mark this hash as seen
 		if mask != constants.TIME_TEST {
 			r.Buckets[index][hash] = r.Buckets[index][hash] | mask
+			r.Mutex.Unlock()
+			r.s.LogPrintf("replay", "Add %x (%s) to %s from %s", hash[:3], maskToString(mask), r.name, atomic.WhereAmIString(1))
+			return rval // true
 		}
-		return true
+		r.Mutex.Unlock()
+		return rval // true
 	}
 
-	return false
+	r.Mutex.Unlock()
+	return rval // false
 }
 
 // Returns True if there is no record of this hash in the Replay structures.

@@ -1019,7 +1019,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 		num := p.State.GetSalt(ack.Timestamp)
 		if num != ack.SaltNumber {
-			os.Stderr.WriteString(fmt.Sprintf("This  AckHash    %x\n", ack.GetHash().Bytes()))
+			os.Stderr.WriteString(fmt.Sprintf("This  AckHash    %x\n", messageHash.Bytes()))
 			os.Stderr.WriteString(fmt.Sprintf("This  ChainID    %x\n", p.State.IdentityChainID.Bytes()))
 			os.Stderr.WriteString(fmt.Sprintf("This  Salt       %x\n", p.State.Salt.Bytes()[:8]))
 			os.Stderr.WriteString(fmt.Sprintf("This  SaltNumber %x\n for this ack", num))
@@ -1034,8 +1034,8 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 		p.State.LogPrintf("processList", "Drop "+hint)
 		TotalHoldingQueueOutputs.Inc()
 		TotalAcksOutputs.Inc()
-		delete(p.State.Holding, ack.GetHash().Fixed())
-		delete(p.State.Acks, ack.GetHash().Fixed())
+		delete(p.State.Holding, msgHash.Fixed())
+		delete(p.State.Acks, msgHash.Fixed())
 	}
 
 	now := p.State.GetTimestamp()
@@ -1076,8 +1076,8 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	TotalHoldingQueueOutputs.Inc()
 	TotalAcksOutputs.Inc()
-	delete(p.State.Acks, m.GetMsgHash().Fixed())
-	delete(p.State.Holding, m.GetMsgHash().Fixed())
+	delete(p.State.Acks, msgHash.Fixed())
+	delete(p.State.Holding, msgHash.Fixed())
 
 	// Both the ack and the message hash to the same GetHash()
 	m.SetLocal(false)
@@ -1096,11 +1096,11 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	}
 	//	p.State.LogPrintf("executeMsg", "del %x", m.GetMsgHash().Fixed())
 
-	delete(p.State.Acks, m.GetMsgHash().Fixed())
+	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
 	p.AddOldMsgs(m)
-	p.OldAcks[m.GetMsgHash().Fixed()] = ack
+	p.OldAcks[msgHash.Fixed()] = ack
 
 	plLogger.WithFields(log.Fields{"func": "AddToProcessList", "node-name": p.State.GetFactomNodeName(), "plheight": ack.Height, "dbheight": p.DBHeight}).WithFields(m.LogFields()).Info("Add To Process List")
 	p.State.LogMessage("processList", fmt.Sprintf("Added at %d/%d/%d", ack.DBHeight, ack.VMIndex, ack.Height), m)

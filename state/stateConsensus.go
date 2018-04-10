@@ -61,7 +61,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 	if !ok {
-		consenLogger.WithFields(msg.LogFields()).Debug("ExecuteMsg (Replay Invalid)")
+		consenLogger.WithFields(msg.LogFields()).Debug("executeMsg (Replay Invalid)")
 		s.LogMessage("executeMsg", "replayInvalid", msg)
 		return
 	}
@@ -583,7 +583,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	FollowerEOMExecutions.Inc()
 	TotalHoldingQueueInputs.Inc()
-	s.Holding[m.GetMsgHash().Fixed()] = m
+	//	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteEOM
 
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
@@ -843,7 +843,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 		s.LogMessage("executeMsg", "Drop IgnoreMissing", m)
 		return
 	}
-	// Drop the missing message responce if it's already in the process list
+	// Drop the missing message response if it's already in the process list
 	_, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !valid {
 		s.LogMessage("executeMsg", "replayInvalid", m)
@@ -1160,6 +1160,9 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 
 	//_, vmindex := pl.GetVirtualServers(s.EOMMinute, s.IdentityChainID)
 
+	if eom.DBHeight != s.LLeaderHeight || eom.VMIndex != s.LeaderVMIndex || eom.Minute != byte(s.CurrentMinute) {
+		s.LogPrintf("executeMsg", "EOM has wrong data expected DBH/VM/M %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
+	}
 	eom.DBHeight = s.LLeaderHeight
 	eom.VMIndex = s.LeaderVMIndex
 	// eom.Minute is zerobased, while LeaderMinute is 1 based.  So
@@ -1185,10 +1188,12 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	pl := s.ProcessLists.Get(dbs.DBHeight)
 
 	if dbs.DBHeight != s.LLeaderHeight {
+		s.LogMessage("executeMsg", "followerExec", m)
 		m.FollowerExecute(s)
 		return
 	}
 	if len(pl.VMs[dbs.VMIndex].List) > 0 {
+		s.LogMessage("executeMsg", "drop len(pl.VMs[dbs.VMIndex].List) > 0", m)
 		return
 	}
 
@@ -1206,6 +1211,7 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 		TotalHoldingQueueOutputs.Inc()
 		HoldingQueueDBSigOutputs.Inc()
 		delete(s.Holding, m.GetMsgHash().Fixed())
+		s.LogMessage("executeMsg", "drop INTERNAL_REPLAY", m)
 		return
 	}
 
@@ -1520,8 +1526,6 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 				dbs.LeaderExecute(s)
 				vm.Signed = true
 				pl.DBSigAlreadySent = true
-			} else {
-				pl.Ask(vmIndex, 0, 0, 5)
 			}
 		}
 	}
@@ -1535,20 +1539,23 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	if s.Syncing && !s.EOM {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Will Not Process: return on s.Syncing(%v) && !s.SigType(%v)", s.FactomNodeName, e.VMIndex, s.Syncing, s.SigType))
+		s.LogMessage("executeMsg", "ProcessEOM false s.Syncing && !s.EOM", msg)
 		return false
 	}
 
 	if s.EOM && e.DBHeight != dbheight {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Invalid SigType s.SigType(%v) && e.DBHeight(%v) != dbheight(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.DBHeight, dbheight))
+		s.LogMessage("executeMsg", fmt.Sprintf("ProcessEOM ????  s.EOM && e.DBHeight(%d) != dbheight(%d) ", e.DBHeight, dbheight), msg)
 	}
 
 	if s.EOM && int(e.Minute) > s.EOMMinute {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Will Not Process: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
+		s.LogMessage("executeMsg", fmt.Sprintf("ProcessEOM false e.Minute(%d) > s.EOMMinute(%d)", e.Minute, s.EOMMinute), msg)
 		return false
 	}
 
 	pl := s.ProcessLists.Get(dbheight)
-	vm := s.ProcessLists.Get(dbheight).VMs[msg.GetVMIndex()]
+	vm := pl.VMs[msg.GetVMIndex()]
 
 	if uint32(pl.System.Height) >= e.SysHeight {
 		s.EOMSys = true
@@ -1560,10 +1567,12 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		dbstate := s.GetDBState(dbheight - 1)
 		if dbstate == nil {
 			//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState == nil: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
+			s.LogMessage("executeMsg", "ProcessEOM false dbstate == nil", msg)
 			return false
 		}
 		if !dbstate.Saved {
 			//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState not saved: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
+			s.LogMessage("executeMsg", "ProcessEOM false !dbstate.Saved", msg)
 			return false
 		}
 
@@ -1576,8 +1585,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.EOMProcessed = 0
 			s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
 			s.SendHeartBeat() // Only do this once
+			s.LogMessage("executeMsg", "ProcessEOM true", msg)
 		}
-
 		return true
 	}
 
@@ -1631,6 +1640,10 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	//	os.Stderr.WriteString(fmt.Sprintf("%s dbht %d min %d Don't have all faults\n", s.FactomNodeName, e.DBHeight, e.Minute))
 	//}
 	// After all EOM markers are processed, Claim we are done.  Now we can unwind
+	if !(allfaults && s.EOMProcessed == s.EOMLimit && !s.EOMDone) {
+		s.LogPrintf("executeMsg", "Check if all EOM are processed (allfaults(%v) && s.EOMProcessed(%v) == s.EOMLimit(%v) && !s.EOMDone(%v))",
+			allfaults, s.EOMProcessed, s.EOMLimit, s.EOMDone)
+	}
 	if allfaults && s.EOMProcessed == s.EOMLimit && !s.EOMDone {
 
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: SigType Complete: %10s vm %2d allfaults(%v) && s.EOMProcessed(%v) == s.EOMLimit(%v) && !s.EOMDone(%v)",
@@ -1671,6 +1684,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 			s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
 		case s.CurrentMinute == 10:
+			s.LogPrintf("executeMsg", "Start new block")
 			eBlocks := []interfaces.IEntryBlock{}
 			entries := []interfaces.IEBEntry{}
 			for _, v := range pl.NewEBlocks {
