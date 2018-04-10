@@ -124,6 +124,7 @@ type Timer struct {
 func (t *Timer) timer(state *State, min int) {
 	t.lastMin = min
 
+	if state.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
 	eom := new(messages.EOM)
 	eom.Timestamp = state.GetTimestamp()
 	eom.ChainID = state.GetIdentityChainID()
@@ -131,7 +132,6 @@ func (t *Timer) timer(state *State, min int) {
 	eom.SetLocal(true)
 	consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": state.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
 
-	if state.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
 		state.MsgQueue() <- eom
 	}
 }

@@ -6,12 +6,10 @@ package state
 
 import (
 	"bytes"
-	"fmt"
-	"sync"
-
 	"encoding/binary"
-
+	"fmt"
 	"os"
+	"sync"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"

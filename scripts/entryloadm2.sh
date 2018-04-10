@@ -1,8 +1,20 @@
 #!/bin/bash
+trap_with_arg() { # from https://stackoverflow.com/a/2183063/804678
+  local func="$1"; shift
+  for sig in "$@"; do
+    trap "$func $sig" "$sig"
+  done
+}
 
-nchains=18    # number of chains to create
-nchains2=2    # number of chains to create
-nentries=20   # number of entries to add to each chain
+stop() {
+  trap - SIGINT EXIT
+  printf '\n%s\n' "recieved $1, killing children"
+  kill -s SIGINT 0
+}
+
+nchains=3    # number of chains to create
+nchains2=3    # number of chains to create
+nentries=150   # number of entries to add to each chain
 
 #factomd=10.41.2.5:8088
  factomd=localhost:8088
@@ -48,11 +60,6 @@ addentries() {
     		cat $datafile | factom-cli -s=$factomd addentry -f -c $1 -e test -e $i -e $RANDOM -e $RANDOM -e $RANDOM $ec1 > /dev/null
 #		echo "write entry Chain:"  $2 $i
 		sleep $((  1 ))
-	done
-	for ((i=0; i<nentries; i++)); do
-    		cat $datafile | factom-cli -s=$factomd addentry -f -c $1 -e test -e $i -e $RANDOM -e $RANDOM -e $RANDOM $ec1 > /dev/null
-#		echo "write entry Chain:"  $2 $i
-		sleep $(( RANDOM % 30 ))
 	done
   
   # get rid of the random datafile
