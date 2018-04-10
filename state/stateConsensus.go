@@ -2356,12 +2356,14 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		v = s.FactoidBalancesP[adr]
 	}
 
+	s.LogPrintf("factoids", "GetF(%v,%x)=%d %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("factoids", "PutF(%v,%x,%d) %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2378,6 +2380,7 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 }
 
 func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
+
 	ok := false
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
@@ -2392,12 +2395,15 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		defer s.ECBalancesPMutex.Unlock()
 		v = s.ECBalancesP[adr]
 	}
+	s.LogPrintf("factoids", "GetE(%v,%x)=%d %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("factoids", "PutE(%v,%x,%d) %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
+
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
