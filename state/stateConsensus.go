@@ -113,10 +113,16 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		ret = true
 
 	case 0:
+		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
+		// this check makes sure we don't put them back in holding after just deleting them
+		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
 		TotalHoldingQueueInputs.Inc()
 		TotalHoldingQueueRecycles.Inc()
 		s.LogMessage("executeMsg", "Add to Holding", msg)
 		s.Holding[msg.GetMsgHash().Fixed()] = msg
+		} else {
+			s.LogMessage("executeMsg", "drop, IReplay", msg)
+		}
 
 	default:
 		if !msg.SentInvalid() {
@@ -2311,7 +2317,7 @@ func (s *State) GetHighestSavedBlk() uint32 {
 	return v
 }
 
-// This is the highest block signed off, but not necessarily validated.
+// This is the highest block signed off, but not necessarily validted.
 func (s *State) GetHighestCompletedBlk() uint32 {
 	v := s.DBStates.GetHighestCompletedBlk()
 	HighestCompleted.Set(float64(v))
