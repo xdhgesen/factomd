@@ -19,6 +19,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/util"
+	"github.com/FactomProject/factomd/util/atomic"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -1748,6 +1749,7 @@ func (s *State) CheckForIDChange() {
 		}
 	}
 	if reloadIdentity {
+		fmt.Printf("%s:ReadConfig(%s) %s\n", s.FactomNodeName, s.filename, atomic.Goid())
 		config := util.ReadConfig(s.filename)
 		var err error
 		s.IdentityChainID, err = primitives.NewShaHashFromStr(config.App.IdentityChainID)
@@ -2309,7 +2311,7 @@ func (s *State) GetHighestSavedBlk() uint32 {
 	return v
 }
 
-// This is the highest block signed off, but not necessarily validted.
+// This is the highest block signed off, but not necessarily validated.
 func (s *State) GetHighestCompletedBlk() uint32 {
 	v := s.DBStates.GetHighestCompletedBlk()
 	HighestCompleted.Set(float64(v))
@@ -2347,12 +2349,14 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		v = s.FactoidBalancesP[adr]
 	}
 
+	s.LogPrintf("factoids", "GetF(%v,%x)=%d %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("factoids", "PutF(%v,%x,%d) %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2383,12 +2387,14 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		defer s.ECBalancesPMutex.Unlock()
 		v = s.ECBalancesP[adr]
 	}
+	s.LogPrintf("factoids", "GetE(%v,%x)=%d %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("factoids", "PutE(%v,%x,%d) %s", rt, adr[:][:3], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
