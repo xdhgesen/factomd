@@ -978,15 +978,28 @@ func (p *ProcessList) AddToSystemList(m interfaces.IMsg) bool {
 }
 
 func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
+	p.State.LogMessage("processList", "Message:", m)
+	p.State.LogMessage("processList", "Ack:", ack)
 	if p == nil {
+		p.State.LogPrintf("processList", "Drop no process list to add to")
 		return
 	}
 
-	if ack == nil || ack.GetMsgHash() == nil {
+	if ack == nil {
+		p.State.LogPrintf("processList", "drop Ack==nil")
+		return
+	}
+	if ack.GetMsgHash() == nil {
+		p.State.LogPrintf("processList", "Drop ack.GetMsgHash() == nil")
 		return
 	}
 
 	TotalProcessListInputs.Inc()
+	messageHash := ack.GetHash() // This is the has of the message bring acknowledged not the hash of the ack message
+	msgHash := m.GetMsgHash()
+	if !messageHash.IsSameAs(msgHash) {
+		panic("Hash mismatch")
+	}
 
 	if ack.DBHeight > p.State.HighestAck && ack.Minute > 0 {
 		p.State.HighestAck = ack.DBHeight
@@ -999,6 +1012,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	if !ack.Response && ack.LeaderChainID.IsSameAs(p.State.IdentityChainID) {
 		now := p.State.GetTimestamp()
 		if now.GetTimeSeconds()-ack.Timestamp.GetTimeSeconds() > 120 {
+			p.State.LogPrintf("processList", "Drop1")
 			// Us and too old?  Just ignore.
 			return
 		}
@@ -1017,6 +1031,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	}
 
 	toss := func(hint string) {
+		p.State.LogPrintf("processList", "Drop "+hint)
 		TotalHoldingQueueOutputs.Inc()
 		TotalAcksOutputs.Inc()
 		delete(p.State.Holding, ack.GetHash().Fixed())
@@ -1037,16 +1052,19 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	if ack.DBHeight != p.DBHeight {
 		// panic(fmt.Sprintf("Ack is wrong height.  Expected: %d Ack: ", p.DBHeight))
+		p.State.LogPrintf("processList", "Drop Ack is wrong height.  Expected: %d Ack: ", p.DBHeight)
 		return
 	}
 
 	if len(vm.List) > int(ack.Height) && vm.List[ack.Height] != nil {
-		if vm.List[ack.Height].GetMsgHash().IsSameAs(m.GetMsgHash()) {
+		if vm.List[ack.Height].GetMsgHash().IsSameAs(msgHash) {
+			p.State.LogPrintf("processList", "Drop duplicate")
 			toss("2")
 			return
 		}
 
-		vm.List[ack.Height] = nil
+		p.State.LogMessage("processList", "drop from pl", vm.List[ack.Height])
+		vm.List[ack.Height] = nil // remove the old message
 
 		return
 	}
@@ -1067,13 +1085,16 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	ack.SetPeer2Peer(false)
 	m.SetPeer2Peer(false)
 
+	// Always send the message first because sending the ack first cause the the recipient to do missing messages requests
+
+	m.SendOut(p.State, m) // Send the message first because the ack could cause missing messages if it gets out first
 	ack.SendOut(p.State, ack)
-	m.SendOut(p.State, m)
 
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
 		vm.ListAck = append(vm.ListAck, nil)
 	}
+	//	p.State.LogPrintf("executeMsg", "del %x", m.GetMsgHash().Fixed())
 
 	delete(p.State.Acks, m.GetMsgHash().Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
@@ -1082,6 +1103,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	p.OldAcks[m.GetMsgHash().Fixed()] = ack
 
 	plLogger.WithFields(log.Fields{"func": "AddToProcessList", "node-name": p.State.GetFactomNodeName(), "plheight": ack.Height, "dbheight": p.DBHeight}).WithFields(m.LogFields()).Info("Add To Process List")
+	p.State.LogMessage("processList", fmt.Sprintf("Added at %d/%d/%d", ack.DBHeight, ack.VMIndex, ack.Height), m)
 }
 
 func (p *ProcessList) ContainsDBSig(serverID interfaces.IHash) bool {

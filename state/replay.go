@@ -14,6 +14,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	//"github.com/FactomProject/factomd/util/atomic"
 )
 
 const Range = 60                // Double this for the period we protect, i.e. 120 means +/- 120 minutes
@@ -167,6 +168,31 @@ func (r *Replay) Save() *Replay {
 // wants to be handed time in seconds.
 func Minutes(unix int64) int {
 	return int(unix / 60)
+}
+
+func maskToString(mask int) (rval string) {
+	if mask&constants.INTERNAL_REPLAY != 0 {
+		rval += "|INTERNAL_REPLAY"
+	}
+	if mask&constants.NETWORK_REPLAY != 0 {
+		rval += "|NETWORK_REPLAY"
+	}
+	if mask&constants.TIME_TEST != 0 {
+		rval += "|TIME_TEST"
+	}
+	if mask&constants.REVEAL_REPLAY != 0 {
+		rval += "|REVEAL_REPLAY"
+	}
+	if mask&constants.BLOCK_REPLAY != 0 {
+		rval += "|BLOCK_REPLAY"
+	}
+	if mask > 31 {
+		panic("Unknown replay mask")
+	}
+	if mask == 0 {
+		rval = "|Empty" // extra character to be removed
+	}
+	return rval[1:]
 }
 
 // This move the center time of the replay filter to the current systemtime.
