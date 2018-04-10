@@ -2092,6 +2092,7 @@ func (s *State) GetCfg() interfaces.IFactomConfig {
 // state of any cfg object held by other processes... Only what will be returned by
 // future calls to Cfg().(s.Cfg.(*util.FactomdConfig)).String()
 func (s *State) ReadCfg(filename string) interfaces.IFactomConfig {
+	fmt.Printf("%s:ReadConfig(%s) %s\n", s.FactomNodeName, filename, atomic.Goid())
 	s.Cfg = util.ReadConfig(filename)
 	return s.Cfg
 }

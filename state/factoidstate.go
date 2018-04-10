@@ -20,6 +20,7 @@ import (
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var _ = debug.PrintStack
@@ -122,6 +123,7 @@ func (fs *FactoidState) GetBalanceHash(includeTemp bool) interfaces.IHash {
 // given dbstate.
 func (fs *FactoidState) Reset(dbstate *DBState) {
 	ht := dbstate.DirectoryBlock.GetHeader().GetDBHeight()
+	fs.State.LogPrintf("executeMsg", "FactoidState.Reset(%d) %s", ht, atomic.WhereAmIString(1))
 	if fs.DBHeight > ht+1 {
 		fs.DBHeight = ht
 
