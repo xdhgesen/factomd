@@ -116,10 +116,10 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
 		// this check makes sure we don't put them back in holding after just deleting them
 		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
-		TotalHoldingQueueInputs.Inc()
-		TotalHoldingQueueRecycles.Inc()
-		s.LogMessage("executeMsg", "Add to Holding", msg)
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
+			TotalHoldingQueueInputs.Inc()
+			TotalHoldingQueueRecycles.Inc()
+			s.LogMessage("executeMsg", "Add to Holding", msg)
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		} else {
 			s.LogMessage("executeMsg", "drop, IReplay", msg)
 		}
@@ -882,8 +882,14 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	ack, ok := mmr.AckResponse.(*messages.Ack)
 
 	// If we don't need this message, we don't have to do everything else.
-	if !ok || ack.Validate(s) == -1 {
+	if !ok {
 		s.LogMessage("executeMsg", "Drop noAck", m)
+		return
+	}
+
+	// If we don't need this message, we don't have to do everything else.
+	if ack.Validate(s) == -1 {
+		s.LogMessage("executeMsg", "Drop ack invalid", m)
 		return
 	}
 
@@ -1041,10 +1047,17 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	if s.Commits.Get(m.GetMsgHash().Fixed()) != nil {
 		if m.Validate(s) == 1 {
 			m.SendOut(s, m)
+		} else {
+			s.LogPrintf("executeMsg", "Drop, invalid %x", m.GetMsgHash().Fixed())
 		}
 	}
 
-	s.Holding[m.GetMsgHash().Fixed()] = m
+	s.LogPrintf("executeMsg", "hold2 %x", m.GetMsgHash().Bytes()[:3])
+
+	// debug call again so I can trace
+	s.Commits.Get(m.GetMsgHash().Fixed())
+
+	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteRevealEntry
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack != nil {
@@ -1339,7 +1352,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 	pl := s.ProcessLists.Get(dbheight)
 	pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitChain); e == nil {
-		// save the Commit to match againsttthe Reveal later
+		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
 		entry := s.Holding[h.Fixed()]
@@ -1562,8 +1575,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.Syncing = false
 			s.EOMProcessed = 0
 			s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
+			s.SendHeartBeat() // Only do this once
 		}
-		s.SendHeartBeat()
 
 		return true
 	}
@@ -2297,6 +2310,11 @@ func (s *State) IsHighestCommit(hash interfaces.IHash, msg interfaces.IMsg) bool
 func (s *State) PutCommit(hash interfaces.IHash, msg interfaces.IMsg) {
 	if s.IsHighestCommit(hash, msg) {
 		s.Commits.Put(hash.Fixed(), msg)
+		s.LogMessage("executeMsg", "PutCommit", msg)
+	} else {
+		s.LogMessage("executeMsg", "PutCommit no", msg)
+		//debug extra call so I can walk the code
+		s.IsHighestCommit(hash, msg)
 	}
 }
 
@@ -2317,7 +2335,7 @@ func (s *State) GetHighestSavedBlk() uint32 {
 	return v
 }
 
-// This is the highest block signed off, but not necessarily validted.
+// This is the highest block signed off, but not necessarily validated.
 func (s *State) GetHighestCompletedBlk() uint32 {
 	v := s.DBStates.GetHighestCompletedBlk()
 	HighestCompleted.Set(float64(v))

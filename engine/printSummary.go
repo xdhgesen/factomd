@@ -17,7 +17,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 	for *summary == value {
 		PrintOneStatus(*listenTo, *wsapiNode)
 
-		time.Sleep(time.Second)
+		time.Sleep(2*time.Second)
 	}
 }
 
@@ -52,7 +52,6 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 		f.State.Status = 1
 	}
 
-	time.Sleep(time.Second)
 
 	prt = prt + "    " + pnodes[0].State.SummaryHeader()
 
