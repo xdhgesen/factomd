@@ -27,6 +27,34 @@ import (
 
 const API_VERSION string = "2.0"
 
+func HandleV2NoCTX(w http.ResponseWriter, r *http.Request) {
+	state := GlobalState // TODO: Fix this global
+
+	ctx := new(web.Context)
+	ctx.ResponseWriter = w
+
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		HandleV2Error(ctx, nil, NewInvalidRequestError())
+		return
+	}
+
+	j, err := primitives.ParseJSON2Request(string(body))
+	if err != nil {
+		HandleV2Error(ctx, nil, NewInvalidRequestError())
+		return
+	}
+
+	jsonResp, jsonError := HandleV2Request(state, j)
+
+	if jsonError != nil {
+		HandleV2Error(ctx, j, jsonError)
+		return
+	}
+
+	w.Write([]byte(jsonResp.String()))
+}
+
 func HandleV2(ctx *web.Context) {
 	n := time.Now()
 	defer HandleV2APICallGeneral.Observe(float64(time.Since(n).Nanoseconds()))

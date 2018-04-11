@@ -34,7 +34,68 @@ const (
 var Servers map[int]*web.Server
 var ServersMutex sync.Mutex
 
+var GlobalState interfaces.IState
+
+func StartWithoutHoisie(state interfaces.IState) {
+	RegisterPrometheus()
+
+	ServersMutex.Lock()
+	defer ServersMutex.Unlock()
+	if Servers == nil {
+		Servers = make(map[int]*web.Server)
+	}
+
+	rpcUser := state.GetRpcUser()
+	rpcPass := state.GetRpcPass()
+	h := sha256.New()
+	h.Write(httpBasicAuth(rpcUser, rpcPass))
+	state.SetRpcAuthHash(h.Sum(nil)) //set this in the beginning to prevent timing attacks
+	GlobalState = state
+
+	srv := &http.Server{Addr: fmt.Sprintf(":%d", state.GetPort())}
+	http.HandleFunc("/v2", HandleV2NoCTX)
+	go srv.ListenAndServe()
+	/*
+		server.Post("/v2", HandleV2)
+		server.Get("/v2", HandleV2)
+
+		// start the debugging api if we are not on the main network
+		if state.GetNetworkName() != "MAIN" {
+			server.Post("/debug", HandleDebug)
+			server.Get("/debug", HandleDebug)
+		}
+
+		tlsIsEnabled, tlsPrivate, tlsPublic := state.GetTlsInfo()
+		if tlsIsEnabled {
+			log.Print("Starting encrypted API server")
+			if !fileExists(tlsPrivate) && !fileExists(tlsPublic) {
+				err := genCertPair(tlsPublic, tlsPrivate, state.GetFactomdLocations())
+				if err != nil {
+					panic(fmt.Sprintf("could not start encrypted API server with error: %v", err))
+				}
+			}
+			keypair, err := tls.LoadX509KeyPair(tlsPublic, tlsPrivate)
+			if err != nil {
+				panic(fmt.Sprintf("could not create TLS keypair with error: %v", err))
+			}
+			tlsConfig := &tls.Config{
+				Certificates: []tls.Certificate{keypair},
+				MinVersion:   tls.VersionTLS12,
+			}
+			go server.RunTLS(fmt.Sprintf(":%d", state.GetPort()), tlsConfig)
+
+		} else {
+			log.Print("Starting API server")
+			go server.Run(fmt.Sprintf(":%d", state.GetPort()))
+		}
+
+	*/
+
+}
+
 func Start(state interfaces.IState) {
+	StartWithoutHoisie(state)
+	return
 	RegisterPrometheus()
 	var server *web.Server
 
