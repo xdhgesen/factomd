@@ -12,12 +12,13 @@ import (
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
-// Because we have to go back to a previous state should the network be partictoned and we are on a separate
-// brach, we need to log our state periodically so we can reset to a state prior to the network partitioin.
+// Because we have to go back to a previous state should the network be partitioned and we are on a separate
+// branch, we need to log our state periodically so we can reset to a state prior to the network partition.
 // The need to go back to a SaveState should be rare.  And even more rare would be the need to go back two
-// levels.   However, it is possible that a minority particion is able to see a level of consensus and save
+// levels.   However, it is possible that a minority partition is able to see a level of consensus and save
 // a state to disk that the majority of the nodes did not see.  However it is not possible for this to occur
 // more than once.  This is because any consensus a node can see requires that all the nodes saw the previous
 // consensus.
@@ -346,7 +347,8 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.Authorities = append(ss.Authorities, state.Authorities...)
 	ss.AuthorityServerCount = state.AuthorityServerCount
 
-	ss.LLeaderHeight = state.LLeaderHeight
+	ss.LLeaderHeight = state.LLeaderHeight // save state copy piece meal
+
 	ss.Leader = state.Leader
 	ss.LeaderVMIndex = state.LeaderVMIndex
 	ss.LeaderPL = state.LeaderPL
@@ -615,7 +617,9 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.Authorities = append(s.Authorities[:0], ss.Authorities...)
 	s.AuthorityServerCount = ss.AuthorityServerCount
 
-	s.LLeaderHeight = ss.LLeaderHeight
+	s.LLeaderHeight = ss.LLeaderHeight //RestoreFactomdState()
+	s.LogPrintf("executeMsg", "s.LLeaderHeight = %v %s", s.LLeaderHeight, atomic.WhereAmIString(0))
+
 	s.Leader = ss.Leader
 	s.LeaderVMIndex = ss.LeaderVMIndex
 	s.LeaderPL = ss.LeaderPL

@@ -794,7 +794,10 @@ func (s *State) Init() {
 	fmt.Print(salt)
 
 	s.StartDelay = s.GetTimestamp().GetTimeMilli() // We can't start as a leader until we know we are upto date
+
 	s.RunLeader = false
+	s.LogPrintf("executeMsg","s.RunLeader = %v %s", s.RunLeader, atomic.WhereAmIString(0))
+
 	s.IgnoreMissing = true
 	s.BootTime = s.GetTimestamp().GetTimeSeconds()
 

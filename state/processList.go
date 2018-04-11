@@ -18,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -153,7 +154,6 @@ type VM struct {
 	FaultFlag int // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
 }
 
-
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
 	keys = make([][32]byte, p.LenNewEntries())
 
@@ -189,7 +189,7 @@ func (p *ProcessList) Complete() bool {
 	if p == nil {
 		return false
 	}
-	if p.DBHeight <= p.State.GetHighestSavedBlk() {
+	if p.DBHeight <= p.State.GetHighestSavedBlk()  {
 		return true
 	}
 	for i := 0; i < len(p.FedServers); i++ {
@@ -862,6 +862,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				}
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
+					p.State.LogMessage("processList", "process", msg)
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
 
@@ -1104,6 +1105,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	plLogger.WithFields(log.Fields{"func": "AddToProcessList", "node-name": p.State.GetFactomNodeName(), "plheight": ack.Height, "dbheight": p.DBHeight}).WithFields(m.LogFields()).Info("Add To Process List")
 	p.State.LogMessage("processList", fmt.Sprintf("Added at %d/%d/%d", ack.DBHeight, ack.VMIndex, ack.Height), m)
+	p.Process(p.State)
 }
 
 func (p *ProcessList) ContainsDBSig(serverID interfaces.IHash) bool {
@@ -1124,7 +1126,7 @@ func (p *ProcessList) AddDBSig(serverID interfaces.IHash, sig interfaces.IFullSi
 	dbsig.ChainID = serverID
 	dbsig.Signature = sig
 	found, dbsig.VMIndex = p.GetVirtualServers(0, serverID) //set the vmindex of the dbsig to the vm this server should sign
-	if !found {                                             // Should never happen.
+	if !found { // Should never happen.
 		return
 	}
 	p.DBSignatures = append(p.DBSignatures, *dbsig)
@@ -1205,108 +1207,7 @@ func (p *ProcessList) String() string {
 
 func (p *ProcessList) Reset() bool {
 	return true
-	previous := p.State.ProcessLists.Get(p.DBHeight - 1)
 
-	if previous == nil {
-		return false
-	}
-
-	//p.State.AddStatus(fmt.Sprintf("PROCESSLIST.Reset(): at dbht %d", p.DBHeight))
-
-	// Make a copy of the previous FedServers
-	p.System.List = p.System.List[:0]
-	p.System.Height = 0
-	p.Requests = make(map[[32]byte]*Request)
-	//pl.Requests = make(map[[20]byte]*Request)
-
-	p.FactoidBalancesT = map[[32]byte]int64{}
-	p.ECBalancesT = map[[32]byte]int64{}
-
-	p.FedServers = append(p.FedServers[:0], previous.FedServers...)
-	p.AuditServers = append(p.AuditServers[:0], previous.AuditServers...)
-	for _, auditServer := range p.AuditServers {
-		auditServer.SetOnline(false)
-		if p.State.GetIdentityChainID().IsSameAs(auditServer.GetChainID()) {
-			// Always consider yourself "online"
-			auditServer.SetOnline(true)
-		}
-	}
-	for _, fedServer := range p.FedServers {
-		fedServer.SetOnline(true)
-	}
-	p.SortFedServers()
-	p.SortAuditServers()
-
-	// empty my maps --
-	p.OldMsgs = make(map[[32]byte]interfaces.IMsg)
-	p.OldAcks = make(map[[32]byte]interfaces.IMsg)
-
-	p.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-	p.NewEntries = make(map[[32]byte]interfaces.IEntry)
-
-	p.SetAmINegotiator(false)
-
-	p.DBSignatures = make([]DBSig, 0)
-
-	// If a federated server, this is the server index, which is our index in the FedServers list
-
-	var err error
-
-	if previous != nil {
-		p.DirectoryBlock = directoryBlock.NewDirectoryBlock(previous.DirectoryBlock)
-		p.AdminBlock = adminBlock.NewAdminBlock(previous.AdminBlock)
-		p.EntryCreditBlock, err = entryCreditBlock.NextECBlock(previous.EntryCreditBlock)
-	} else {
-		p.DirectoryBlock = directoryBlock.NewDirectoryBlock(nil)
-		p.AdminBlock = adminBlock.NewAdminBlock(nil)
-		p.EntryCreditBlock, err = entryCreditBlock.NextECBlock(nil)
-	}
-	if err != nil {
-		panic(err.Error())
-	}
-
-	p.ResetDiffSigTally()
-
-	for i := range p.FedServers {
-		vm := p.VMs[i]
-
-		vm.Height = 0 // Knock all the VMs back
-		vm.LeaderMinute = 0
-		vm.heartBeat = 0
-		vm.Signed = false
-		vm.Synced = false
-		vm.WhenFaulted = 0
-
-		p.VMs[i].List = p.VMs[i].List[:0]       // Knock all the lists back.
-		p.VMs[i].ListAck = p.VMs[i].ListAck[:0] // Knock all the lists back.
-		//p.State.SendDBSig(p.DBHeight, i)
-	}
-
-	/*fs := p.State.FactoidState.(*FactoidState)
-	if previous.NextTimestamp != nil {
-		fs.Reset(previous)
-	}*/
-
-	s := p.State
-	s.LLeaderHeight--
-	s.Saving = true
-	s.Syncing = false
-	s.EOM = false
-	s.EOMDone = false
-	s.DBSig = false
-	s.DBSigDone = false
-	s.CurrentMinute = 0
-	s.EOMProcessed = 0
-	s.DBSigProcessed = 0
-	s.StartDelay = s.GetTimestamp().GetTimeMilli()
-	s.RunLeader = false
-
-	s.LLeaderHeight = s.GetHighestSavedBlk() + 1
-	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
-
-	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
-
-	return true
 }
 
 /************************************************

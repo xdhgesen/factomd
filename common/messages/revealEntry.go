@@ -103,8 +103,8 @@ func CheckChainID(state interfaces.IState, ExternalIDs [][]byte, msg *RevealEntr
 //  1   -- Message is valid
 // Also return the matching commit, if 1 (Don't put it back into the Commit List)
 func (m *RevealEntryMsg) Validate(state interfaces.IState) int {
-	commit := state.NextCommit(m.Entry.GetHash())
 
+	commit := state.NextCommit(m.Entry.GetHash())
 	if commit == nil {
 		return 0
 	}
@@ -124,10 +124,12 @@ func (m *RevealEntryMsg) Validate(state interfaces.IState) int {
 		ECs := int(m.commitEntry.CommitEntry.Credits)
 		// Any entry over 10240 bytes will be rejected
 		if m.Entry.KSize() > 10 {
+			state.LogMessage("executeMsg","Drop, oversized", m)
 			return -1
 		}
 
 		if m.Entry.KSize() > ECs {
+			state.LogMessage("executeMsg","Drop, under paid", m)
 			return 0 // not enough payments on the EC to reveal this entry.  Return 0 to wait on another commit
 		}
 
