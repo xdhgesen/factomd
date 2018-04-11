@@ -477,6 +477,7 @@ func (s *State) pledgedByAudit(fullFault *messages.FullServerFault) bool {
 func (s *State) Reset() {
 	// We are no longer using Reset
 	// s.ResetRequest = true
+	s.LogPrintf("executeMsg","state.Reset() called!")
 }
 
 // Set to reprocess all messages and states

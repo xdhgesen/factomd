@@ -189,7 +189,7 @@ func (p *ProcessList) Complete() bool {
 	if p == nil {
 		return false
 	}
-	if p.DBHeight <= p.State.GetHighestSavedBlk()  {
+	if p.DBHeight <= p.State.GetHighestSavedBlk() {
 		return true
 	}
 	for i := 0; i < len(p.FedServers); i++ {
@@ -791,7 +791,8 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
-			if vm.List[j] == nil {
+			thisMsg := vm.List[j]
+			if thisMsg == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
 				p.Ask(i, j, 0, 3)
 				break VMListLoop
@@ -808,7 +809,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				last := vm.ListAck[vm.Height-1]
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
-					vm.List[j] = nil
+					thisMsg = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
 					p.Ask(i, j, 3, 4)
 					break VMListLoop
@@ -817,24 +818,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				// compare the SerialHash of this acknowledgement with the
 				// expected serialHash (generated above)
 				if !expectedSerialHash.IsSameAs(thisAck.SerialHash) {
-					//p.State.AddStatus(fmt.Sprintf("processList.Process(): SerialHash fail: dbht: %d vm %d msg %s", p.DBHeight, i, vm.List[j]))
-
-					//fmt.Printf("dddd %20s %10s --- %10s %10x %10s %10x \n", "Conflict", p.State.FactomNodeName, "expected", expectedSerialHash.Bytes()[:3], "This", thisAck.Bytes()[:3])
-					//fmt.Printf("dddd Error detected on %s\nSerial Hash failure: Fed Server %d  Leader ID %x List Ht: %d \nDetected on: %s\n",
-					//	state.GetFactomNodeName(),
-					//	i,
-					//	p.FedServers[i].GetChainID().Bytes()[:3],
-					//	j,
-					//	vm.List[j].String())
-					//fmt.Printf("dddd Last Ack: %6x  Last Serial: %6x\n", last.GetHash().Bytes()[:3], last.SerialHash.Bytes()[:3])
-					//fmt.Printf("dddd This Ack: %6x  This Serial: %6x\n", thisAck.GetHash().Bytes()[:3], thisAck.SerialHash.Bytes()[:3])
-					//fmt.Printf("dddd Expected: %6x\n", expectedSerialHash.Bytes()[:3])
-					//fmt.Printf("dddd The message that didn't work: %s\n\n", vm.List[j].String())
-					// the SerialHash of this acknowledgment is incorrect
-					// according to this node's processList
-
-					//fault(p, i, 0, vm, 0, j, 2)
-					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: SerialHash fails to match at dbht %d vm %d vm-height %d ", p.DBHeight, i, j))
 					p.State.Reset()
 					return
 				}
@@ -849,7 +832,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 			if !p.State.WaitForEntries || (vm.LeaderMinute < 2 && diff <= 3) || diff <= 2 {
 				// If we can't process this entry (i.e. returns false) then we can't process any more.
 				p.NextHeightToProcess[i] = j + 1
-				msg := vm.List[j]
+				msg := thisMsg
 
 				now := p.State.GetTimestamp()
 
@@ -857,8 +840,9 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				msgHashFixed := msg.GetMsgHash().Fixed()
 
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
-					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
-					break VMListLoop
+					msg = nil // If we have seen this message, we don't process it again.  Ever.
+					//					break VMListLoop
+					continue // If we break then this PL can never complete, maybe just skip over it? ... really this is bad thing
 				}
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
@@ -878,6 +862,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					delete(p.State.Holding, msgHashFixed)
 
 				} else {
+					p.State.LogMessage("processList", "process failed", msg)
 					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
 					break VMListLoop // Don't process further in this list, go to the next.
 				}
@@ -1126,7 +1111,7 @@ func (p *ProcessList) AddDBSig(serverID interfaces.IHash, sig interfaces.IFullSi
 	dbsig.ChainID = serverID
 	dbsig.Signature = sig
 	found, dbsig.VMIndex = p.GetVirtualServers(0, serverID) //set the vmindex of the dbsig to the vm this server should sign
-	if !found { // Should never happen.
+	if !found {                                             // Should never happen.
 		return
 	}
 	p.DBSignatures = append(p.DBSignatures, *dbsig)

@@ -1552,20 +1552,22 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	e := msg.(*messages.EOM)
 	// plog := consenLogger.WithFields(log.Fields{"func": "ProcessEOM", "msgheight": e.DBHeight, "lheight": s.GetLeaderHeight(), "min", e.Minute})
 
+	s.LogMessage("executeMsg", fmt.Sprintf("ProcessEOM@%d/%d", dbheight, msg.GetVMIndex()), msg)
+
 	if s.Syncing && !s.EOM {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Will Not Process: return on s.Syncing(%v) && !s.SigType(%v)", s.FactomNodeName, e.VMIndex, s.Syncing, s.SigType))
-		s.LogMessage("executeMsg", "ProcessEOM false s.Syncing && !s.EOM", msg)
+		s.LogPrintf("executeMsg", "ProcessEOM false s.Syncing && !s.EOM")
 		return false
 	}
 
 	if s.EOM && e.DBHeight != dbheight {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Invalid SigType s.SigType(%v) && e.DBHeight(%v) != dbheight(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.DBHeight, dbheight))
-		s.LogMessage("executeMsg", fmt.Sprintf("ProcessEOM ????  s.EOM && e.DBHeight(%d) != dbheight(%d) ", e.DBHeight, dbheight), msg)
+		s.LogPrintf("executeMsg", "ProcessEOM ????  s.EOM && e.DBHeight(%d) != dbheight(%d) ", e.DBHeight, dbheight)
 	}
 
 	if s.EOM && int(e.Minute) > s.EOMMinute {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Will Not Process: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
-		s.LogMessage("executeMsg", fmt.Sprintf("ProcessEOM false e.Minute(%d) > s.EOMMinute(%d)", e.Minute, s.EOMMinute), msg)
+		s.LogPrintf("executeMsg", "ProcessEOM false e.Minute(%d) > s.EOMMinute(%d)", e.Minute, s.EOMMinute)
 		return false
 	}
 
@@ -1576,18 +1578,22 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		s.EOMSys = true
 	}
 
+	s.LogPrintf("executeMsg", "DBH/VM/H %v/%v/%v, EOM %v, EOMDone %v, EOMsyncing %v, EOMProcessed %v, EOMLimit %v,, Syncing %v  ",
+		dbheight, msg.GetVMIndex(), len(vm.List),
+		s.EOM, s.EOMDone, s.EOMsyncing, s.EOMProcessed, s.EOMLimit, s.Syncing)
+
 	// If I have done everything for all EOMs for all VMs, then and only then do I
 	// let processing continue.
 	if s.EOMDone && s.EOMSys {
 		dbstate := s.GetDBState(dbheight - 1)
 		if dbstate == nil {
 			//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState == nil: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
-			s.LogMessage("executeMsg", "ProcessEOM false dbstate == nil", msg)
+			s.LogPrintf("executeMsg", "ProcessEOM false dbstate == nil")
 			return false
 		}
 		if !dbstate.Saved {
 			//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState not saved: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
-			s.LogMessage("executeMsg", "ProcessEOM false !dbstate.Saved", msg)
+			s.LogPrintf("executeMsg", "ProcessEOM false !dbstate.Saved")
 			return false
 		}
 
@@ -1596,13 +1602,14 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		if s.EOMProcessed <= 0 {
 			s.EOM = false
 			s.EOMDone = false
+			s.LogPrintf("executeMsg", "EOMDone")
 			s.Syncing = false
 			s.EOMProcessed = 0
 			s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
 			s.SendHeartBeat() // Only do this once
-			s.LogMessage("executeMsg", "ProcessEOM Clear Syncing", msg)
+			s.LogPrintf("executeMsg", "ProcessEOM Clear Syncing")
 		}
-		s.LogMessage("executeMsg", "ProcessEOM true", msg)
+		s.LogPrintf("executeMsg", "ProcessEOM true")
 		return true
 	}
 
@@ -1653,9 +1660,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	allfaults := s.LeaderPL.System.Height >= s.LeaderPL.SysHighest
 
-	//if !allfaults {
-	//	os.Stderr.WriteString(fmt.Sprintf("%s dbht %d min %d Don't have all faults\n", s.FactomNodeName, e.DBHeight, e.Minute))
-	//}
 	// After all EOM markers are processed, Claim we are done.  Now we can unwind
 	if !(allfaults && s.EOMProcessed == s.EOMLimit && !s.EOMDone) {
 		s.LogPrintf("executeMsg", "Check if all EOM are processed (allfaults(%v) && s.EOMProcessed(%v) == s.EOMLimit(%v) && !s.EOMDone(%v))",
@@ -1668,6 +1672,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		//	e.VMIndex, allfaults, s.EOMProcessed, s.EOMLimit, s.EOMDone))
 
 		s.EOMDone = true
+		s.LogPrintf("executeMsg", "EOMDone = true")
+
 		for _, eb := range pl.NewEBlocks {
 			eb.AddEndOfMinuteMarker(byte(e.Minute + 1))
 		}
@@ -1700,6 +1706,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			}
 			s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 			s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
+
 		case s.CurrentMinute == 10:
 			s.LogPrintf("executeMsg", "Start new block")
 			eBlocks := []interfaces.IEntryBlock{}
