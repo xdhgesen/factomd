@@ -809,7 +809,8 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				last := vm.ListAck[vm.Height-1]
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
-					thisMsg = nil
+					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash failed", dbht, i, j), thisMsg)
+					vm.List[j] = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
 					p.Ask(i, j, 3, 4)
 					break VMListLoop
@@ -847,10 +848,12 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
 				msgHashFixed := msg.GetMsgHash().Fixed()
 
-				// this was just wrong. it stopped processing and did not increment past the offending message stalling the system
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
-					vm.Height = j + 1 // Don't process it again ...
-					continue          // break VMListLoop
+					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", dbht, i, j), thisMsg)
+					vm.List[j] = nil  // If we have seen this message, we don't process it again.  Ever.
+					p.Ask(i, j, 0, 3) //the nil will cause an ask next loop so do it now.
+					// If we ask won't we just get the same thing back?
+					break VMListLoop
 				}
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
