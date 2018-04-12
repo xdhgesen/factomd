@@ -829,9 +829,17 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 			// Keep in mind, the process list is processing at a height one greater than the database. 1 is caught up.  2 is one behind.
 			// Until the first couple signatures are processed, we will be 2 behind.
-			if !p.State.WaitForEntries || (vm.LeaderMinute < 2 && diff <= 3) || diff <= 2 {
+
+			//TODO: Why is this in the execution per message per VM when it's global to the processlist -- clay
+			if p.State.WaitForEntries {
+				p.State.LogPrintf("processList", "p.State.WaitForEntries")
+				break VMListLoop // Don't process further in this list, go to the next.
+			}
+
+			// If the block is not yet being written to disk (22 minutes old...)
+			if (vm.LeaderMinute < 2 && diff <= 3) || diff <= 2 {
 				// If we can't process this entry (i.e. returns false) then we can't process any more.
-				p.NextHeightToProcess[i] = j + 1
+				p.NextHeightToProcess[i] = j + 1 // unused...
 				msg := thisMsg
 
 				now := p.State.GetTimestamp()
@@ -839,14 +847,14 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
 				msgHashFixed := msg.GetMsgHash().Fixed()
 
+				// this was just wrong. it stopped processing and did not increment past the offending message stalling the system
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
-					msg = nil // If we have seen this message, we don't process it again.  Ever.
-					//					break VMListLoop
-					continue // If we break then this PL can never complete, maybe just skip over it? ... really this is bad thing
+					vm.Height = j + 1 // Don't process it again ...
+					continue          // break VMListLoop
 				}
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
-					p.State.LogMessage("processList", "process", msg)
+					p.State.LogMessage("processList", "done", msg)
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
 
@@ -862,7 +870,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					delete(p.State.Holding, msgHashFixed)
 
 				} else {
-					p.State.LogMessage("processList", "process failed", msg)
+					p.State.LogMessage("processList", "try again", msg)
 					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
 					break VMListLoop // Don't process further in this list, go to the next.
 				}

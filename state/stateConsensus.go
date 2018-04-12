@@ -1827,18 +1827,20 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 	dbs := msg.(*messages.DirectoryBlockSignature)
 	//plog makes logging anything in ProcessDBSig() easier
 	//		The instantiation as a function makes it almost no overhead if you do not use it
-	plog := func(format string, args ...interface{}) {
-		consenLogger.WithFields(log.Fields{"func": "ProcessDBSig", "msgheight": dbs.DBHeight, "lheight": s.GetLeaderHeight(), "msg": msg.String()}).Errorf(format, args...)
-	}
+	//plog := func(format string, args ...interface{}) {
+	//	consenLogger.WithFields(log.Fields{"func": "ProcessDBSig", "msgheight": dbs.DBHeight, "lheight": s.GetLeaderHeight(), "msg": msg.String()}).Errorf(format, args...)
+	//}
 	// Don't process if syncing an EOM
 	if s.Syncing && !s.DBSig {
 		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Will Not Process: dbht: %d return on s.Syncing(%v) && !s.DBSig(%v)", s.FactomNodeName,
 		//	dbs.DBHeight, s.Syncing, s.DBSig))
+		s.LogPrintf("executeMsg", "Fail s.Syncing(%v) && !s.DBSig(%v)", s.Syncing, s.DBSig)
 		return false
 	}
 
-	pl := s.ProcessLists.Get(dbheight)
-	vm := s.ProcessLists.Get(dbheight).VMs[msg.GetVMIndex()]
+	// Because they are processed in the context of the next block we need to use the info from the prev block
+	pl := s.ProcessLists.Get(dbheight - 1)
+	vm := s.ProcessLists.Get(dbheight - 1).VMs[msg.GetVMIndex()]
 
 	if uint32(pl.System.Height) >= dbs.SysHeight {
 		s.DBSigSys = true
@@ -1857,138 +1859,177 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		}
 		vm.Signed = true
 		//s.LeaderPL.AdminBlock
+		s.LogPrintf("eom-dbsig", "finished dbsig block DBH/VM/H %v/%v/%v", dbheight, msg.GetVMIndex(), len(vm.List))
 		return true
 	}
 
 	// Put the stuff that only executes once at the start of DBSignatures here
 	if !s.DBSig {
-
-		//fmt.Printf("ProcessDBSig(): %s Start DBSig %s\n", s.FactomNodeName, dbs.String())
-		s.DBSigLimit = len(pl.FedServers)
-		s.DBSigProcessed = 0
+		s.LogPrintf("eom-dbsig", "start_dbsig_block DBH/VM/H %v/%v/%v", dbheight, msg.GetVMIndex(), len(vm.List))
 		s.DBSig = true
-		s.Syncing = true
 		s.DBSigDone = false
-		for _, vm := range pl.VMs {
-			vm.Synced = false
-		}
-		pl.ResetDiffSigTally()
+		start_dbsig_block(s, pl)
 	}
 
 	// Put the stuff that executes per DBSignature here
 	if !vm.Synced {
-
-		if s.LLeaderHeight > 0 && s.GetHighestCompletedBlk()+1 < s.LLeaderHeight {
-
-			pl := s.ProcessLists.Get(dbs.DBHeight - 1)
-			if !pl.Complete() {
-				dbstate := s.DBStates.Get(int(dbs.DBHeight - 1))
-				if dbstate == nil || (!dbstate.Locked && !dbstate.Saved) {
-					db, _ := s.DB.FetchDBlockByHeight(dbs.DBHeight - 1)
-					if db == nil {
-						//fmt.Printf("ProcessDBSig(): %10s Previous Process List isn't complete. %s\n", s.FactomNodeName, dbs.String())
-						return false
-					}
-				}
-			}
-		}
-
-		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Process the %d DBSig: %v", s.FactomNodeName, s.DBSigProcessed, dbs.String()))
-		if dbs.VMIndex == 0 {
-			//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Set Leader Timestamp to: %v %d", s.FactomNodeName, dbs.GetTimestamp().String(), dbs.GetTimestamp().GetTimeMilli()))
-			s.SetLeaderTimestamp(dbs.GetTimestamp())
-		}
-
-		dblk, err := s.DB.FetchDBlockByHeight(dbheight - 1)
-		if err != nil || dblk == nil {
-			dbstate := s.GetDBState(dbheight - 1)
-			if dbstate == nil || !(!dbstate.IsNew || dbstate.Locked || dbstate.Saved) {
-				//fmt.Println(fmt.Sprintf("ProcessingDBSig(): %10s The prior dbsig %d is nil", s.FactomNodeName, dbheight-1))
-				return false
-			}
-			dblk = dbstate.DirectoryBlock
-		}
-
-		if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
-			pl.IncrementDiffSigTally()
-			plog("Failed. DBlocks do not match Expected-Body-Mr: %x, Got: %x",
-				dblk.GetHeader().GetBodyMR().Fixed(), dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+		s.LogMessage("eom-dbsig", fmt.Sprintf("once_per_vm (%v)", msg.GetVMIndex()), dbs)
+		if !once_per_vm(dbheight, s, pl, vm, dbs) {
 			return false
 		}
-
-		// Adds DB Sig to be added to Admin block if passes sig checks
-		data, err := dbs.DirectoryBlockHeader.MarshalBinary()
-		if err != nil {
-			return false
-		}
-		if !dbs.DBSignature.Verify(data) {
-			return false
-		}
-
-		valid, err := s.VerifyAuthoritySignature(data, dbs.DBSignature.GetSignature(), dbs.DBHeight)
-		if err != nil || valid != 1 {
-			plog("Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
-			return false
-		}
-
-		dbs.Matches = true
-		s.AddDBSig(dbheight, dbs.ServerIdentityChainID, dbs.DBSignature)
-
-		s.DBSigProcessed++
-		//fmt.Println(fmt.Sprintf("Process DBSig %10s vm %2v DBSigProcessed++ (%2d)", s.FactomNodeName, dbs.VMIndex, s.DBSigProcessed))
-		vm.Synced = true
-
-		InMsg := s.EFactory.NewDBSigSigInternal(
-			s.FactomNodeName,
-			dbs.DBHeight,
-			uint32(0),
-			msg.GetVMIndex(),
-			uint32(vm.Height),
-			dbs.LeaderChainID,
-		)
-		s.electionsQueue.Enqueue(InMsg)
 	}
 
 	allfaults := s.LeaderPL.System.Height >= s.LeaderPL.SysHighest
 
+	s.LogPrintf("eom-dbsig", "s.DBSigProcessed(%d) >= s.DBSigLimit(%d)", s.DBSigProcessed, s.DBSigLimit)
 	// Put the stuff that executes once for set of DBSignatures (after I have them all) here
 	if allfaults && !s.DBSigDone && s.DBSigProcessed >= s.DBSigLimit {
-		//fmt.Println(fmt.Sprintf("All DBSigs are processed: allfaults(%v), && !s.DBSigDone(%v) && s.DBSigProcessed(%v)>= s.DBSigLimit(%v)",
-		//	allfaults, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit))
-		fails := 0
-		for i := range pl.FedServers {
-			vm := pl.VMs[i]
-			if len(vm.List) > 0 {
-				tdbsig, ok := vm.List[0].(*messages.DirectoryBlockSignature)
-				if !ok || !tdbsig.Matches {
-					s.DBSigProcessed--
+		s.LogPrintf("eom-dbsig", "end_dbsig_block DBH/VM/H %v/%v/%v", dbheight, msg.GetVMIndex(), len(vm.List))
+		if !end_dbsig_for_block(s, pl) {
+			return false
+		}
+		s.DBSigDone = true
+	}
+	s.LogPrintf("executeMsg", "not done yet")
+	return false
+}
+
+func end_dbsig_for_block(s *State, pl *ProcessList) bool {
+	//fmt.Println(fmt.Sprintf("All DBSigs are processed: allfaults(%v), && !s.DBSigDone(%v) && s.DBSigProcessed(%v)>= s.DBSigLimit(%v)",
+	//	allfaults, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit))
+	for i := range pl.FedServers {
+		vm := pl.VMs[i]
+		if len(vm.List) > 0 {
+			tdbsig, ok := vm.List[0].(*messages.DirectoryBlockSignature)
+			if !ok || !tdbsig.Matches {
+				s.LogMessage("executeMsg", "Bad DBSig", tdbsig)
+			} else if !tdbsig.Matches {
+				s.LogMessage("executeMsg", "Bad sig", tdbsig)
+			}
+			if !ok || !tdbsig.Matches {
+				s.DBSigProcessed--
+				return false
+			}
+		}
+	}
+
+	// TODO: check signatures here.  Count what match and what don't.  Then if a majority
+	// disagree with us, null our entry out.  Otherwise toss our DBState and ask for one from
+	// our neighbors.
+	if !s.KeepMismatch && !pl.CheckDiffSigTally() {
+		s.LogPrintf("executeMsg", atomic.WhereAmIString(0))
+		return false
+	}
+
+	s.ReviewHolding()
+	s.Saving = false
+	s.DBSigDone = true
+
+	return true
+}
+
+func start_dbsig_block(s *State, pl *ProcessList) {
+	//fmt.Printf("ProcessDBSig(): %s Start DBSig %s\n", s.FactomNodeName, dbs.String())
+
+	s.DBSigLimit = len(pl.FedServers)
+	s.DBSigProcessed = 0
+	s.DBSig = true
+	s.Syncing = true
+	s.DBSigDone = false
+	for _, vm := range pl.VMs {
+		vm.Synced = false
+	}
+	pl.ResetDiffSigTally()
+}
+
+func once_per_vm(dbheight uint32, s *State, pl *ProcessList, vm *VM, dbs *messages.DirectoryBlockSignature) bool {
+
+	plog := func(format string, args ...interface{}) {
+		consenLogger.WithFields(log.Fields{"func": "ProcessDBSig", "msgheight": dbs.DBHeight, "lheight": s.GetLeaderHeight(), "msg": dbs.String()}).Errorf(format, args...)
+	}
+
+	if s.LLeaderHeight > 0 && s.GetHighestCompletedBlk()+1 < s.LLeaderHeight {
+		if !pl.Complete() {
+			dbstate := s.DBStates.Get(int(dbs.DBHeight - 1))
+			if dbstate == nil || (!dbstate.Locked && !dbstate.Saved) {
+				db, _ := s.DB.FetchDBlockByHeight(dbs.DBHeight - 1)
+				if db == nil {
+					s.LogPrintf("executeMsg", "ProcessDBSig(): %10s Previous Process List isn't complete. %s\n", s.FactomNodeName, dbs.String())
+					s.LogPrintf("executeMsg", "Fail db == nil")
 					return false
 				}
 			}
 		}
-		if fails > 0 {
-			//fmt.Println("DBSig Fails Detected")
-			return false
-		}
-
-		// TODO: check signatures here.  Count what match and what don't.  Then if a majority
-		// disagree with us, null our entry out.  Otherwise toss our DBState and ask for one from
-		// our neighbors.
-		if !s.KeepMismatch && !pl.CheckDiffSigTally() {
-			return false
-		}
-
-		s.ReviewHolding()
-		s.Saving = false
-		s.DBSigDone = true
 	}
-	return false
-	/*
-		err := s.LeaderPL.AdminBlock.AddDBSig(dbs.ServerIdentityChainID, dbs.DBSignature)
-		if err != nil {
-			fmt.Printf("Error in adding DB sig to admin block, %s\n", err.Error())
+
+	//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Process the %d DBSig: %v", s.FactomNodeName, s.DBSigProcessed, dbs.String()))
+	// Done here so all nodes used the same message to set the timestamp so the hashes will match
+	if dbs.VMIndex == 0 {
+		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Set Leader Timestamp to: %v %d", s.FactomNodeName, dbs.GetTimestamp().String(), dbs.GetTimestamp().GetTimeMilli()))
+		s.SetLeaderTimestamp(dbs.GetTimestamp())
+	}
+
+	dblk, err := s.DB.FetchDBlockByHeight(dbheight - 1)
+	if err != nil || dblk == nil {
+		dbstate := s.GetDBState(dbheight - 1)
+		if dbstate == nil || !(!dbstate.IsNew || dbstate.Locked || dbstate.Saved) {
+			s.LogPrintf("executeMsg", "ProcessingDBSig(): %10s The prior dbsig %d is nil", s.FactomNodeName, dbheight-1)
+			if dbstate == nil {
+				s.LogPrintf("executeMsg", "Fail dbstate(%v) == nil", dbstate)
+			} else {
+				s.LogPrintf("executeMsg", "Fail !(!dbstate.IsNew(%v) || dbstate.Locked(%v) || dbstate.Saved(%v))",
+					dbstate.IsNew, dbstate.Locked, dbstate.Saved)
+			}
+			return false
 		}
-	*/
+		dblk = dbstate.DirectoryBlock
+	}
+
+	if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
+		pl.IncrementDiffSigTally()
+		plog("Failed. DBlocks do not match Expected-Body-Mr: %x, Got: %x",
+			dblk.GetHeader().GetBodyMR().Fixed(), dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+
+		s.LogPrintf("executeMsg", "dbs.DirectoryBlockHeader.GetBodyMR().Fixed()<%x> != ", dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+		s.LogPrintf("executeMsg", "dblk.GetHeader().GetBodyMR().Fixed()        <%x>", dblk.GetHeader().GetBodyMR().Fixed)
+
+		return false
+	}
+
+	// Adds DB Sig to be added to Admin block if passes sig checks
+	data, err := dbs.DirectoryBlockHeader.MarshalBinary()
+	if err != nil {
+		s.LogPrintf("executeMsg", atomic.WhereAmIString(0))
+		return false
+	}
+	if !dbs.DBSignature.Verify(data) {
+		s.LogPrintf("executeMsg", atomic.WhereAmIString(0))
+		return false
+	}
+
+	valid, err := s.VerifyAuthoritySignature(data, dbs.DBSignature.GetSignature(), dbs.DBHeight)
+	if err != nil || valid != 1 {
+		s.LogPrintf("executeMsg", "Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
+		return false
+	}
+
+	dbs.Matches = true
+	s.AddDBSig(dbheight, dbs.ServerIdentityChainID, dbs.DBSignature)
+
+	s.DBSigProcessed++
+	//fmt.Println(fmt.Sprintf("Process DBSig %10s vm %2v DBSigProcessed++ (%2d)", s.FactomNodeName, dbs.VMIndex, s.DBSigProcessed))
+	vm.Synced = true
+
+	InMsg := s.EFactory.NewDBSigSigInternal(
+		s.FactomNodeName,
+		dbs.DBHeight,
+		uint32(0),
+		dbs.GetVMIndex(),
+		uint32(vm.Height),
+		dbs.LeaderChainID,
+	)
+	s.electionsQueue.Enqueue(InMsg)
+	return true
 }
 
 func (s *State) ProcessFullServerFault(dbheight uint32, msg interfaces.IMsg) bool {
