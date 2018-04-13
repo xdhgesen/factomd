@@ -10,13 +10,12 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 	"unicode"
-
-	"runtime"
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -39,35 +38,42 @@ var ListenTo int
 // Used for signing messages
 var LOCAL_NET_PRIV_KEY string = "4c38c72fc5cdad68f13b74674d3ffb1f3d63a112710868c9b08946553448d26d"
 
-var ProcessChan = make(chan int)  // signal done here.
 var InputChan = make(chan string) // Get commands here
+
+var once bool
 
 func GetLine(listenToStdin bool) string {
 
-	if listenToStdin {
-		line := make([]byte, 100)
-		var err error
-		// When running as a detached process, this routine becomes a very tight loop and starves other goroutines.
-		// So, we will sleep before letting it check to see if Stdin has been reconnected
-		for {
-			if _, err = os.Stdin.Read(line); err == nil {
-				return string(line)
-			} else {
-				if err == io.EOF {
-					fmt.Printf("Error reading from std, sleeping for 5s: %s\n", err.Error())
-					time.Sleep(5 * time.Second)
-				} else {
-					fmt.Printf("Error reading from std, sleeping for 1s: %s\n", err.Error())
-					time.Sleep(1 * time.Second)
+	if !once {
+		once = true
+
+		// read stdin and copy it to the simcr
+		go func() {
+			line := make([]byte, 100)
+			for {
+				var err error
+				// When running as a detached process, this routine becomes a very tight loop and starves other goroutines.
+				// So, we will sleep before letting it check to see if Stdin has been reconnected
+				for {
+					if _, err = os.Stdin.Read(line); err == nil {
+						InputChan <- string(line)
+					} else {
+						if err == io.EOF {
+							fmt.Printf("Error reading from std, sleeping for 5s: %s\n", err.Error())
+							time.Sleep(5 * time.Second)
+						} else {
+							fmt.Printf("Error reading from std, sleeping for 1s: %s\n", err.Error())
+							time.Sleep(1 * time.Second)
+						}
+						continue
+					}
 				}
-				continue
-			}
-		}
-	} else {
-		line := <-InputChan
-		ProcessChan <- 1
-		return line
+			} // forever
+		}()
 	}
+
+	line := <-InputChan
+	return line
 }
 
 func GetFocus() *FactomNode {

@@ -83,7 +83,6 @@ func TestSetupANetwork(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
 		time.Sleep(100 * time.Millisecond)
-		<-ProcessChan
 		return
 	}
 
@@ -255,7 +254,6 @@ func TestMakeALeader(t *testing.T) {
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
 		time.Sleep(100 * time.Millisecond)
-		<-ProcessChan
 		return
 	}
 
@@ -263,12 +261,13 @@ func TestMakeALeader(t *testing.T) {
 		"-db=Map",
 		"-network=LOCAL",
 		"-enablenet=true",
-		"-blktime=15",
+		"-blktime=30",
 		"-count=2",
 		"-startdelay=1",
 		"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=out.txt",
+		"--debugconsole=localhost",
 	)
 
 	params := ParseCmdLine(args)
@@ -329,7 +328,6 @@ func TestAnElection(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
 		time.Sleep(100 * time.Millisecond)
-		<-ProcessChan
 		return
 	}
 
