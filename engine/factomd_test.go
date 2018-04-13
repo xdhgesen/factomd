@@ -339,7 +339,7 @@ func TestAnElection(t *testing.T) {
 		"-blktime=10",
 		fmt.Sprintf("-count=%d", nodes),
 		"-startdelay=1",
-		"-debuglog=F.*",
+//		"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 	)

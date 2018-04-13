@@ -65,6 +65,7 @@ var outs map[string]*foo = make(map[string]*foo)
 var places map[string]interfaces.IMsg = make(map[string]interfaces.IMsg)
 
 var sends, unique, duplicate int
+
 func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	// Are we ever modifying a message?
 	if m.ResendCnt > 0 { // never send the same message twice ...
@@ -81,42 +82,42 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	{ // debug code
 		whereAmIString := atomic.WhereAmIString(1)
 		hash := msg.GetRepeatHash().Fixed()
-	mu.Lock()
-	f, ok := outs[s.GetFactomNodeName()]
-	if !ok {
-		f = new(foo)
-		f.where = make(map[[32]byte]string)
-		f.what = make(map[[32]byte]interfaces.IMsg)
-		outs[s.GetFactomNodeName()] = f
-	}
-		where, ok := f.where[hash]
-	mu.Unlock()
-
-	if ok {
-		duplicate++
-			mu.Lock()
-		orig := f.what[hash]
-			mu.Unlock()
-		s.LogPrintf("NetworkOutputs", "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:4], sends, duplicate, unique)
-		s.LogPrintf("NetworkOutputs", "Original: %p: %s", orig, where)
-		s.LogPrintf("NetworkOutputs", "This:     %p: %s", msg, whereAmIString)
-		s.LogMessage("NetworkOutputs", "Orig Message:", msg)
-		s.LogMessage("NetworkOutputs", "This Message:", msg)
-
 		mu.Lock()
-		which, ok := places[whereAmIString]
-		mu.Unlock()
-		if ok {
-			s.LogPrintf("NetworkOutputs", "message <%s> is original from %s\n", which.String(), whereAmIString)
+		f, ok := outs[s.GetFactomNodeName()]
+		if !ok {
+			f = new(foo)
+			f.where = make(map[[32]byte]string)
+			f.what = make(map[[32]byte]interfaces.IMsg)
+			outs[s.GetFactomNodeName()] = f
 		}
-	} else {
-		unique++
-		mu.Lock()
-		f.where[hash] = whereAmIString
-		f.what[hash] = msg
-		places[whereAmIString] = msg
+		where, ok := f.where[hash]
 		mu.Unlock()
-	}
+
+		if ok {
+			duplicate++
+			mu.Lock()
+			orig := f.what[hash]
+			mu.Unlock()
+			s.LogPrintf("NetworkOutputs", "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:4], sends, duplicate, unique)
+			s.LogPrintf("NetworkOutputs", "Original: %p: %s", orig, where)
+			s.LogPrintf("NetworkOutputs", "This:     %p: %s", msg, whereAmIString)
+			s.LogMessage("NetworkOutputs", "Orig Message:", msg)
+			s.LogMessage("NetworkOutputs", "This Message:", msg)
+
+			//mu.Lock()
+			//which, ok := places[whereAmIString]
+			//mu.Unlock()
+			//if ok {
+			//	s.LogPrintf("NetworkOutputs", "message <%s> is original from %s\n", which.String(), whereAmIString)
+			//}
+		} else {
+			unique++
+			mu.Lock()
+			f.where[hash] = whereAmIString
+			f.what[hash] = msg
+			///minute 9[whereAmIString] = msg
+			mu.Unlock()
+		}
 
 	}
 

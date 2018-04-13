@@ -9,8 +9,6 @@ import (
 	"log"
 
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/util/atomic"
-
 )
 
 var _ = fmt.Print
@@ -57,7 +55,6 @@ func (lists *ProcessLists) UpdateState(dbheight uint32) (progress bool) {
 		s := lists.State
 		//fmt.Println(fmt.Sprintf("EOM PROCESS: %10s ProcessListManager: !s.EOM(%v)", s.FactomNodeName, s.EOM))
 		s.LLeaderHeight = dbheight
-		s.LogPrintf("executeMsg", "s.LLeaderHeight = %v %s", s.LLeaderHeight, atomic.WhereAmIString(0))
 
 		s.CurrentMinute = 0
 		s.EOMProcessed = 0
@@ -119,9 +116,6 @@ func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
 			prev = nil
 		} else {
 			prev = lists.Get(dbheight - 1)
-			if !prev.Complete() {
-				prev.State.LogPrintf("executeMsg","Making PL when prev is not complete")
-			}
 		}
 		pl = NewProcessList(lists.State, prev, dbheight)
 		lists.Lists[i] = pl

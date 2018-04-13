@@ -12,7 +12,6 @@ import (
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/util/atomic"
 )
 
 // Because we have to go back to a previous state should the network be partitioned and we are on a separate
@@ -347,7 +346,7 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.Authorities = append(ss.Authorities, state.Authorities...)
 	ss.AuthorityServerCount = state.AuthorityServerCount
 
-	ss.LLeaderHeight = state.LLeaderHeight // save state copy piece meal
+	ss.LLeaderHeight = state.LLeaderHeight
 
 	ss.Leader = state.Leader
 	ss.LeaderVMIndex = state.LeaderVMIndex
@@ -617,8 +616,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.Authorities = append(s.Authorities[:0], ss.Authorities...)
 	s.AuthorityServerCount = ss.AuthorityServerCount
 
-	s.LLeaderHeight = ss.LLeaderHeight //RestoreFactomdState()
-	s.LogPrintf("executeMsg", "s.LLeaderHeight = %v %s", s.LLeaderHeight, atomic.WhereAmIString(0))
+	s.LLeaderHeight = ss.LLeaderHeight
 
 	s.Leader = ss.Leader
 	s.LeaderVMIndex = ss.LeaderVMIndex

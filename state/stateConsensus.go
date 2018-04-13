@@ -45,14 +45,21 @@ func (s *State) debugExec() (ret bool) {
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
 	if s.debugExec() {
 		logFileName := s.FactomNodeName + "_" + logName + ".txt"
-		messages.LogMessage(logFileName, comment, msg)
+		t := fmt.Sprintf("%d-:-%d ", s.LeaderPL.DBHeight, s.CurrentMinute)
+
+		messages.LogMessage(logFileName, t+comment, msg)
 	}
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	if s.debugExec() {
 		logFileName := s.FactomNodeName + "_" + logName + ".txt"
-		messages.LogPrintf(logFileName, format, more...)
+		h := 0
+		if s.LeaderPL != nil {
+			h = int(s.LeaderPL.DBHeight)
+		}
+		t := fmt.Sprintf("%d-:-%d ", h, s.CurrentMinute)
+		messages.LogPrintf(logFileName, t+format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
@@ -595,6 +602,11 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	if ack != nil {
 		pl := s.ProcessLists.Get(ack.DBHeight)
 		pl.AddToProcessList(ack, m)
+	} else {
+		TotalHoldingQueueInputs.Inc()
+		TotalHoldingQueueRecycles.Inc()
+		s.LogMessage("executeMsg", "Add to Holding", m)
+		s.Holding[m.GetMsgHash().Fixed()] = m
 	}
 }
 
@@ -618,7 +630,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	list := pl.VMs[ack.VMIndex].List
 	if len(list) > int(ack.Height) && list[ack.Height] != nil {
 		// there is already a message in our slot?
-		s.LogMessage("executeMsg", "drop, en(list) > int(ack.Height) && list[ack.Height] != nil", msg)
+		s.LogPrintf("executeMsg", "drop, len(list)(%d) > int(ack.Height)(%d) && list[ack.Height](%p) != nil", len(list), int(ack.Height), list[ack.Height])
 		s.LogMessage("executeMsg", "found ", list[ack.Height])
 		return
 	}
@@ -1605,7 +1617,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	// If I have done everything for all EOMs for all VMs, then and only then do I
 	// let processing continue.
 	if s.EOMDone && s.EOMSys {
-		s.LogPrintf("dbsig-eom", "ProcessEOM finalize EOM processing")
 
 		dbstate := s.GetDBState(dbheight - 1)
 		if dbstate == nil {
@@ -1618,6 +1629,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LogPrintf("dbsig-eom", "ProcessEOM wait prev !dbstate.Saved")
 			return false
 		}
+		s.LogMessage("dbsig-eom", "ProcessEOM complete", e)
 
 		//fmt.Println(fmt.Sprintf("EOM PROCESS: %10s vm %2d Done! s.EOMDone(%v) && s.EOMSys(%v)", s.FactomNodeName, e.VMIndex, s.EOMDone, s.EOMSys))
 		s.EOMProcessed--
@@ -1628,7 +1640,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.EOMProcessed = 0
 			s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
 			s.SendHeartBeat() // Only do this once
-			s.LogPrintf("dbsig-eom", "ProcessEOM complete for %d", e.Minute)
+			s.LogPrintf("dbsig-eom", "ProcessEOM All complete for minute %d", e.Minute)
 		}
 		return true
 	}
@@ -1688,7 +1700,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	// After all EOM markers are processed, Claim we are done.  Now we can unwind
 
 	if allfaults && s.EOMProcessed == s.EOMLimit && !s.EOMDone {
-		s.LogPrintf("dbsig-eom", "ProcessEOM stop EOM processing minute %d", s.CurrentMinute)
+		s.LogPrintf("dbsig-eom", "ProcessEOM registered all EOMs for %d", s.CurrentMinute)
 
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: SigType Complete: %10s vm %2d allfaults(%v) && s.EOMProcessed(%v) == s.EOMLimit(%v) && !s.EOMDone(%v)",
 		//	s.FactomNodeName,
@@ -1713,6 +1725,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.setCurrentMinute(int(e.Minute))
 		}
 
+		// Start a new minute
 		s.setCurrentMinute(s.CurrentMinute + 1)
 		s.CurrentMinuteStartTime = time.Now().UnixNano()
 

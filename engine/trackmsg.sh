@@ -1,2 +1,5 @@
 #/bin/sh
-grep -E "$1" $2 | awk -f debug/msgOrder.awk | sort -n | grep -E "$1" --color='always' | less -R
+pattern=$1
+shift
+echo "grep -E \"$pattern\" $@ | awk -f debug/msgOrder.awk | sort -n | grep -E \"$pattern\" --color='always' | less -R"
+grep -E \"$pattern\" $@

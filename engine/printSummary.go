@@ -17,7 +17,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 	for *summary == value {
 		PrintOneStatus(*listenTo, *wsapiNode)
 
-		time.Sleep(2*time.Second)
+		time.Sleep(2 * time.Second)
 	}
 }
 
@@ -51,7 +51,6 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 	for _, f := range pnodes {
 		f.State.Status = 1
 	}
-
 
 	prt = prt + "    " + pnodes[0].State.SummaryHeader()
 
@@ -132,7 +131,7 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 	// Nil pointer exception at start up -- clay
 	for _, f := range pnodes {
 		var i int
-		if f.State.LeaderPL.NewEBlocks != nil {
+		if f.State.LeaderPL != nil && f.State.LeaderPL.NewEBlocks != nil {
 			i = len(f.State.LeaderPL.NewEBlocks)
 		} else {
 			i = 0

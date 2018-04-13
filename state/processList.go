@@ -791,6 +791,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
+			//fmt.Printf("%s:process %d/%d/%d\n", p.State.FactomNodeName, p.DBHeight, i, j)
 			thisMsg := vm.List[j]
 			if thisMsg == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
@@ -809,7 +810,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				last := vm.ListAck[vm.Height-1]
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
-					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash failed", dbht, i, j), thisMsg)
+					p.State.LogMessage("processList", fmt.Sprintf("drop %v/%v/%v, hash failed", dbht, i, j), thisMsg)
 					vm.List[j] = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
 					p.Ask(i, j, 3, 4)
@@ -850,7 +851,8 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", dbht, i, j), thisMsg)
-					vm.List[j] = nil  // If we have seen this message, we don't process it again.  Ever.
+					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
+					p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
 					p.Ask(i, j, 0, 3) //the nil will cause an ask next loop so do it now.
 					// If we ask won't we just get the same thing back?
 					break VMListLoop
@@ -873,7 +875,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					delete(p.State.Holding, msgHashFixed)
 
 				} else {
-					p.State.LogMessage("processList", "try again", msg)
 					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
 					break VMListLoop // Don't process further in this list, go to the next.
 				}
@@ -1084,8 +1085,8 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	// Always send the message first because sending the ack first cause the the recipient to do missing messages requests
 
-	m.SendOut(p.State, m) // Send the message first because the ack could cause missing messages if it gets out first
 	ack.SendOut(p.State, ack)
+	m.SendOut(p.State, m) // Send the message first because the ack could cause missing messages if it gets out first
 
 	for len(vm.List) <= int(ack.Height) {
 		vm.List = append(vm.List, nil)
@@ -1101,7 +1102,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	plLogger.WithFields(log.Fields{"func": "AddToProcessList", "node-name": p.State.GetFactomNodeName(), "plheight": ack.Height, "dbheight": p.DBHeight}).WithFields(m.LogFields()).Info("Add To Process List")
 	p.State.LogMessage("processList", fmt.Sprintf("Added at %d/%d/%d", ack.DBHeight, ack.VMIndex, ack.Height), m)
-	p.Process(p.State)
 }
 
 func (p *ProcessList) ContainsDBSig(serverID interfaces.IHash) bool {
