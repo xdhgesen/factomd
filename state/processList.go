@@ -783,19 +783,19 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 		if vm.Height == len(vm.List) && p.State.Syncing && !vm.Synced {
 			// means that we are missing an EOM
-			p.Ask(i, vm.Height, 0) // Ask immediately, unless we already asked
+			p.Ask(i, vm.Height, 100) // Ask immediately, unless we already asked
 		}
 
 		// If we haven't heard anything from a VM in 2 seconds, ask for a message at the last-known height
 		if vm.Height == len(vm.List) && now.GetTimeMilli()-vm.ProcessTime.GetTimeMilli() > 2000 {
-			p.Ask(i, vm.Height, 2000) // 2 second delay
+			p.Ask(i, vm.Height, 100)
 		}
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
-				p.Ask(i, j, 100) // 100ms delay
+				p.Ask(i, j, 200) // 200ms delay
 				break VMListLoop
 			}
 
@@ -813,7 +813,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if err != nil {
 					vm.List[j] = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
-					p.Ask(i, j, 3000) // 3 second delay
+					p.Ask(i, j, 5000) // 3 second delay
 					break VMListLoop
 				}
 
