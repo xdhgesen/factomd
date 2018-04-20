@@ -121,10 +121,16 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		ret = true
 
 	case 0:
-		TotalHoldingQueueInputs.Inc()
-		TotalHoldingQueueRecycles.Inc()
-		s.LogMessage("executeMsg", "Add to Holding", msg)
-		s.Holding[msg.GetMsgHash().Fixed()] = msg
+		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
+		// this check makes sure we don't put them back in holding after just deleting them
+		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
+			TotalHoldingQueueInputs.Inc()
+			TotalHoldingQueueRecycles.Inc()
+			s.LogMessage("executeMsg", "Add to Holding", msg)
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		} else {
+			s.LogMessage("executeMsg", "drop, IReplay", msg)
+		}
 
 	default:
 		if !msg.SentInvalid() {
@@ -158,8 +164,10 @@ func (s *State) Process() (progress bool) {
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
 	}
 
+	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
+	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
+
 	if !s.RunLeader {
-		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			if s.DBFinished == true {
 				s.RunLeader = true
@@ -169,11 +177,7 @@ func (s *State) Process() (progress bool) {
 				}
 			}
 		}
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
-
 	} else if s.IgnoreMissing {
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
-		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			s.IgnoreMissing = false
 		}
@@ -181,14 +185,6 @@ func (s *State) Process() (progress bool) {
 
 	process := make(chan interfaces.IMsg, 10000)
 	room := func() bool { return len(process) < 9995 }
-
-	var vm *VM
-	if s.Leader {
-		vm = s.LeaderPL.VMs[s.LeaderVMIndex]
-		if vm.Height == 0 && s.RunLeader { // Shouldn't send DBSigs out until we have fully loaded our db
-			s.SendDBSig(s.LeaderPL.DBHeight, s.LeaderVMIndex)
-		}
-	}
 
 	/** Process all the DBStates  that might be pending **/
 
@@ -207,6 +203,13 @@ func (s *State) Process() (progress bool) {
 
 	s.ReviewHolding()
 
+	var vm *VM
+	if s.Leader {
+		vm = s.LeaderPL.VMs[s.LeaderVMIndex]
+		if vm.Height == 0 && s.RunLeader { // Shouldn't send DBSigs out until we have fully loaded our db
+			s.SendDBSig(s.LeaderPL.DBHeight, s.LeaderVMIndex)
+		}
+	}
 	preAckLoopTime := time.Now()
 	// Process acknowledgements if we have some.
 ackLoop:
@@ -563,6 +566,8 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	}
 
 	FollowerEOMExecutions.Inc()
+
+	// add it to the holding queue in case AddToProcessList doesn't ...
 	TotalHoldingQueueInputs.Inc()
 	s.Holding[m.GetMsgHash().Fixed()] = m
 
@@ -585,14 +590,16 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 
 	pl := s.ProcessLists.Get(ack.DBHeight)
 	if pl == nil {
+		s.LogMessage("executeMsg", "drop, no pl", msg)
 		// Does this mean it's from the future?
 		// TODO: Should we put the ack back on the inMsgQueue queue here instead of dropping it? -- clay
 		return
 	}
 	list := pl.VMs[ack.VMIndex].List
 	if len(list) > int(ack.Height) && list[ack.Height] != nil {
-		// This means we haven't seen the matching message yet?
-		// TODO: Should we put the ack back on the inMsgQueue queue here instead of dropping it? -- clay
+		// there is already a message in our slot?
+		s.LogPrintf("executeMsg", "drop, len(list)(%d) > int(ack.Height)(%d) && list[ack.Height](%p) != nil", len(list), int(ack.Height), list[ack.Height])
+		s.LogMessage("executeMsg", "found ", list[ack.Height])
 		return
 	}
 
@@ -601,6 +608,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	s.Acks[ack.GetHash().Fixed()] = ack
 	m, _ := s.Holding[ack.GetHash().Fixed()]
 	if m != nil {
+		s.LogMessage("executeMsg", "FollowerExecute3 ", m)
 		m.FollowerExecute(s)
 	}
 }
@@ -820,15 +828,15 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	// Just ignore missing messages for a period after going off line or starting up.
-	if s.IgnoreMissing || s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
-		//TODO: Log here -- clay
-		if s.IgnoreMissing {
-			s.LogMessage("executeMsg", "Drop IgnoreMissing", m)
-		}
-		if s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
-			s.LogMessage("executeMsg", "Drop INMSGQUEUE_HIGH", m)
-		}
-		s.MissingRequestIgnoreCnt++
+	if s.IgnoreMissing {
+		s.LogMessage("executeMsg", "Drop IgnoreMissing", m)
+		return
+	}
+	// Drop the missing message response if it's already in the process list
+	_, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
+	if !valid {
+		s.LogMessage("executeMsg", "replayInvalid", m)
+s.MissingRequestIgnoreCnt++
 		return
 	}
 
@@ -837,12 +845,17 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	ack, ok := mmr.AckResponse.(*messages.Ack)
 
 	// If we don't need this message, we don't have to do everything else.
-	if !ok || ack.Validate(s) == -1 {
+	if !ok {
 		s.LogMessage("executeMsg", "Drop noAck", m)
 		s.MissingRequestIgnoreCnt++
 		return
 	}
 
+	// If we don't need this message, we don't have to do everything else.
+	if ack.Validate(s) == -1 {
+		s.LogMessage("executeMsg", "Drop ack invalid", m)
+		return
+	}
 	ack.Response = true
 	msg := mmr.MsgResponse
 
@@ -996,8 +1009,13 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	TotalHoldingQueueInputs.Inc()
 
 	if s.Commits.Get(m.GetMsgHash().Fixed()) != nil {
-		if m.Validate(s) == 1 {
-			m.SendOut(s, m)
+		valid := m.Validate(s)
+		switch valid {
+		case 1:
+			m.SendOut(s, m) // there was a matching commit so send out the reveal
+		case -1:
+			s.LogMessage("executeMsg", "drop, invalid", m)
+			return
 		}
 	}
 
@@ -1140,10 +1158,12 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	pl := s.ProcessLists.Get(dbs.DBHeight)
 
 	if dbs.DBHeight != s.LLeaderHeight {
+		s.LogMessage("executeMsg", "followerExec", m)
 		m.FollowerExecute(s)
 		return
 	}
 	if len(pl.VMs[dbs.VMIndex].List) > 0 {
+		s.LogMessage("executeMsg", "drop len(pl.VMs[dbs.VMIndex].List) > 0", m)
 		return
 	}
 
@@ -1155,6 +1175,7 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 		TotalHoldingQueueOutputs.Inc()
 		HoldingQueueDBSigOutputs.Inc()
 		delete(s.Holding, m.GetMsgHash().Fixed())
+		s.LogMessage("executeMsg", "drop INTERNAL_REPLAY", m)
 		return
 	}
 
@@ -1449,7 +1470,10 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 	dbslog := consenLogger.WithFields(log.Fields{"func": "SendDBSig"})
 
 	ht := s.GetHighestSavedBlk()
-	if dbheight <= ht || s.EOM {
+	if dbheight <= ht { // if it's in the past, just return.
+		return
+	}
+	if s.EOM { // If we are counting up EOMs don't generate a DBSig .. why ? -- clay
 		return
 	}
 	pl := s.ProcessLists.Get(dbheight)
@@ -1635,6 +1659,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.setCurrentMinute(int(e.Minute))
 		}
 
+		// Start a new minute
 		s.setCurrentMinute(s.CurrentMinute + 1)
 		s.CurrentMinuteStartTime = time.Now().UnixNano()
 		// If an election took place, our lists will be unsorted. Fix that
