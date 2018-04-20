@@ -45,14 +45,21 @@ func (s *State) debugExec() (ret bool) {
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
 	if s.debugExec() {
 		logFileName := s.FactomNodeName + "_" + logName + ".txt"
-		messages.LogMessage(logFileName, comment, msg)
+		t := fmt.Sprintf("%d-:-%d ", s.LeaderPL.DBHeight, s.CurrentMinute)
+
+		messages.LogMessage(logFileName, t+comment, msg)
 	}
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	if s.debugExec() {
 		logFileName := s.FactomNodeName + "_" + logName + ".txt"
-		messages.LogPrintf(logFileName, format, more...)
+		h := 0
+		if s.LeaderPL != nil {
+			h = int(s.LeaderPL.DBHeight)
+		}
+		t := fmt.Sprintf("%d-:-%d ", h, s.CurrentMinute)
+		messages.LogPrintf(logFileName, t+format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
@@ -61,7 +68,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 	if !ok {
-		consenLogger.WithFields(msg.LogFields()).Debug("ExecuteMsg (Replay Invalid)")
+		consenLogger.WithFields(msg.LogFields()).Debug("executeMsg (Replay Invalid)")
 		s.LogMessage("executeMsg", "replayInvalid", msg)
 		return
 	}
@@ -1051,12 +1058,12 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 }
 
 func (s *State) setCurrentMinute(m int) {
-	if m != s.CurrentMinute && m != s.CurrentMinute+1 {
-		s.LogPrintf("dbsig-eom", " Jump s.CurrentMinute = %d, from %d %s", m, s.CurrentMinute, atomic.WhereAmIString(1))
+	if m != s.CurrentMinute && m != s.CurrentMinute+1 && !(m == 0 && s.CurrentMinute == 10) {
+		s.LogPrintf("dbsig-EOM", " Jump s.CurrentMinute = %d, from %d %s", m, s.CurrentMinute, atomic.WhereAmIString(1))
 
 	} else {
 		if m != s.CurrentMinute {
-			s.LogPrintf("dbsig-eom", "s.CurrentMinute = %d from %s", m, atomic.WhereAmIString(1))
+			s.LogPrintf("dbsig-EOM", "s.CurrentMinute = %d from %s", m, atomic.WhereAmIString(1))
 		}
 	}
 	s.CurrentMinute = m
@@ -1102,6 +1109,9 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 
 	//_, vmindex := pl.GetVirtualServers(s.EOMMinute, s.IdentityChainID)
 
+	if eom.DBHeight != s.LLeaderHeight || eom.VMIndex != s.LeaderVMIndex || eom.Minute != byte(s.CurrentMinute) {
+		s.LogPrintf("executeMsg", "EOM has wrong data expected DBH/VM/M %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
+	}
 	eom.DBHeight = s.LLeaderHeight
 	eom.VMIndex = s.LeaderVMIndex
 	// eom.Minute is zerobased, while LeaderMinute is 1 based.  So
@@ -1288,7 +1298,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 	pl := s.ProcessLists.Get(dbheight)
 	pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitChain); e == nil {
-		// save the Commit to match againsttthe Reveal later
+		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
 		var entry interfaces.IMsg
@@ -1408,6 +1418,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, interfaces.IMsg) {
 	dbstate := s.DBStates.Get(int(dbheight - 1))
 	if dbstate == nil && dbheight > 0 {
+		s.LogPrintf("execueMsg", "Can not create DBSig because %d because there is no dbstate", dbheight)
 		return nil, nil
 	}
 	dbs := new(messages.DirectoryBlockSignature)
@@ -1441,11 +1452,12 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 	pl := s.ProcessLists.Get(dbheight)
 	vm := pl.VMs[vmIndex]
 	if vm.Height > 0 {
-		return
+		return // If we already have the DBSIG (it's always in slot 0) then just return
 	}
+
 	leader, lvm := pl.GetVirtualServers(vm.LeaderMinute, s.IdentityChainID)
 	if !leader || lvm != vmIndex {
-		return
+		return // If I'm not a leader or this is not my VM then return
 	}
 
 	if !vm.Signed {
@@ -1462,10 +1474,9 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 				dbs.LeaderExecute(s)
 				vm.Signed = true
 				pl.DBSigAlreadySent = true
-			} else {
-				pl.Ask(vmIndex, 0, 0, 5)
-			}
+			} 
 		}
+		// used to ask here for the message we already made and sent...
 	}
 }
 
@@ -2088,7 +2099,7 @@ func (s *State) GetHighestSavedBlk() uint32 {
 	return v
 }
 
-// This is the highest block signed off, but not necessarily validted.
+// This is the highest block signed off, but not necessarily validated.
 func (s *State) GetHighestCompletedBlk() uint32 {
 	v := s.DBStates.GetHighestCompletedBlk()
 	HighestCompleted.Set(float64(v))
@@ -2166,7 +2177,7 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)

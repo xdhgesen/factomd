@@ -5,6 +5,7 @@ import (
 	"os"
 	"regexp"
 	"sync"
+	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
@@ -65,6 +66,25 @@ func getTraceFile(name string) (f *os.File) {
 	return f
 }
 
+var history [16384][32]byte // Last 16k messages logged
+var h int                   // head of history
+var msgmap map[[32]byte]string = make(map[[32]byte]string)
+
+func addmsg(hash [32]byte, msg string) {
+	remove := history[h] // get the oldest message
+	delete(msgmap, remove)
+	history[h] = hash
+	msgmap[hash] = msg
+	h = (h + 1) % cap(history) // move the head
+}
+
+func getmsg(hash [32]byte) string {
+	rval, ok := msgmap[hash]
+	if !ok {
+		rval = fmt.Sprintf("UnknownMsg: %x", hash[:3])
+	}
+	return rval
+}
 func LogMessage(name string, note string, msg interfaces.IMsg) {
 
 	traceMutex.Lock()
@@ -77,6 +97,7 @@ func LogMessage(name string, note string, msg interfaces.IMsg) {
 	seq := sequence
 	var t byte
 	var rhash, hash, msgString string
+	embeddedHash := ""
 	if msg == nil {
 		t = 0
 		hash = "????????"
@@ -90,28 +111,40 @@ func LogMessage(name string, note string, msg interfaces.IMsg) {
 		if h == nil {
 			hash = "????????"
 		} else {
-			hash = h.String()[:8]
+			hash = h.String()[:6]
 		}
 		h = msg.GetRepeatHash()
 		if h == nil {
 			rhash = "????????"
 		} else {
-			rhash = h.String()[:8]
+			rhash = h.String()[:6]
+		}
+
+		switch t {
+		case constants.ACK_MSG:
+			ack := msg.(*Ack)
+			byte := ack.GetHash().Fixed
+			embeddedHash = fmt.Sprintf(" EmbeddedMsg: %s", getmsg(byte()))
+		case constants.MISSING_MSG_RESPONSE:
+			mm := msg.(*MissingMsgResponse)
+			embeddedHash = fmt.Sprintf(" EmbeddedMsg: %s | %s", mm.MsgResponse.String(), mm.AckResponse.String())
+		case constants.MISSING_DATA:
+			md := msg.(*MissingData)
+			embeddedHash = fmt.Sprintf(" EmbeddedMsg: %s", getmsg(md.RequestHash.Fixed()))
+
+		default:
+			if msg.GetMsgHash() != nil {
+				bytes := msg.GetMsgHash().Fixed()
+				addmsg(bytes, msgString) // Keep message we have seen for a while
+			}
 		}
 	}
-	embeddedHash := ""
 
-	switch t {
-	case constants.ACK_MSG:
-		m := msg.(*Ack)
-		embeddedHash = fmt.Sprintf(" EmbeddedMsg %26v[%2v]:%v", constants.MessageName(m.Type()), m.Type(), m.MessageHash.String()[:8])
-	case constants.MISSING_MSG_RESPONSE:
-		m := msg.(*MissingMsgResponse).MsgResponse
-		embeddedHash = fmt.Sprintf(" EmbeddedMsg %26v[%2v]:%v", constants.MessageName(m.Type()), m.Type(), m.GetHash().String()[:8])
-	}
+	now := time.Now().Local()
 
-	s := fmt.Sprintf("%5v %20s M-%v|R-%v %26s[%2v]:%v {%v}\n", seq, note, hash, rhash, constants.MessageName(byte(t)), t,
-		embeddedHash, msgString)
+	s := fmt.Sprintf("%7v %02d:%02d:%02d %-25s M-%v|R-%v %26s[%2v]:%v%v\n", seq, now.Hour()%24, now.Minute()%60, now.Second()%60,
+		note, hash, rhash, constants.MessageName(byte(t)), t,
+		msgString, embeddedHash)
 	s = addNodeNames(s)
 
 	myfile.WriteString(s)
@@ -145,8 +178,18 @@ func addNodeNames(s string) (rval string) {
 	// as we add text
 	for i := len(hexStr); i > 0; {
 		i--
-		l := s[hexStr[i][0]:hexStr[i][1]]
-		s = s[:hexStr[i][1]] + lookupName(l) + s[hexStr[i][1]:]
+		// if it's a short hex string
+		if hexStr[i][1]-hexStr[i][0] != 64 {
+			l := s[hexStr[i][0]:hexStr[i][1]]
+			s = s[:hexStr[i][1]] + lookupName(l) + s[hexStr[i][1]:]
+		} else {
+			// Shorten 32 byte IDs to [3:6]
+			l := s[hexStr[i][0]:hexStr[i][1]]
+			name := lookupName(l)
+			if name != "" {
+				s = s[:hexStr[i][0]] + s[hexStr[i][0]+6:hexStr[i][0]+12] + name + s[hexStr[i][1]:]
+			}
+		}
 	}
 	return s
 }
@@ -159,7 +202,8 @@ func LogPrintf(name string, format string, more ...interface{}) {
 		return
 	}
 	seq := sequence
-	s := fmt.Sprintf("%5v %s\n", seq, fmt.Sprintf(format, more...))
+	now := time.Now().Local()
+	s := fmt.Sprintf("%7v %02d:%02d:%02d %s\n", seq, now.Hour()%24, now.Minute()%60, now.Second()%60, fmt.Sprintf(format, more...))
 	s = addNodeNames(s)
 	myfile.WriteString(s)
 }
