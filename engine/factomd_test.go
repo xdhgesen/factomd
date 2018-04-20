@@ -336,6 +336,7 @@ func TestAnElection(t *testing.T) {
 		"-net=alot+",
 		"-enablenet=true",
 		"-blktime=10",
+		"-faulttimeout=10",
 		fmt.Sprintf("-count=%d", nodes),
 		"-startdelay=1",
 		"-debuglog=F.*",

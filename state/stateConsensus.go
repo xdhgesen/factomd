@@ -828,6 +828,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 		if s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
 			s.LogMessage("executeMsg", "Drop INMSGQUEUE_HIGH", m)
 		}
+		s.MissingRequestIgnoreCnt++
 		return
 	}
 
@@ -838,6 +839,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	// If we don't need this message, we don't have to do everything else.
 	if !ok || ack.Validate(s) == -1 {
 		s.LogMessage("executeMsg", "Drop noAck", m)
+		s.MissingRequestIgnoreCnt++
 		return
 	}
 
@@ -846,6 +848,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	if msg == nil {
 		s.LogMessage("executeMsg", "Drop nil message", m)
+		s.MissingRequestIgnoreCnt++
 		return
 	}
 
@@ -853,6 +856,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 
 	if pl == nil {
 		s.LogMessage("executeMsg", "Drop No Processlist", m)
+		s.MissingRequestIgnoreCnt++
 		return
 	}
 	_, okm := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
@@ -862,13 +866,12 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	if okm {
 		s.LogMessage("executeMsg", "FollowerExecute3", msg)
 		msg.FollowerExecute(s)
+		s.LogMessage("executeMsg", "FollowerExecute4", ack)
+		ack.FollowerExecute(s)
+		s.MissingResponseAppliedCnt++
+	} else {
+		s.MissingRequestIgnoreCnt++
 	}
-
-	s.LogMessage("executeMsg", "FollowerExecute4", ack)
-	ack.FollowerExecute(s)
-
-	s.MissingResponseAppliedCnt++
-
 }
 
 func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
@@ -932,7 +935,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 	pl := s.ProcessLists.Get(m.DBHeight)
 
 	if pl == nil {
-		s.MissingRequestIgnoreCnt++
+		// s.MissingRequestIgnoreCnt++ // change to mean I got a reply and didn't need it
 		return
 	}
 	FollowerMissingMsgExecutions.Inc()
@@ -961,7 +964,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 	}
 
 	if !sent {
-		s.MissingRequestIgnoreCnt++
+		// s.MissingRequestIgnoreCnt++ // change to mean I got a reply and didn't need it
 	}
 	return
 }
@@ -1474,7 +1477,7 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 				dbs.LeaderExecute(s)
 				vm.Signed = true
 				pl.DBSigAlreadySent = true
-			} 
+			}
 		}
 		// used to ask here for the message we already made and sent...
 	}

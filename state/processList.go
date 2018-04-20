@@ -629,7 +629,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 		vm  int
 	}
 
-	//	msScale := (time.Duration(globals.Params.BlkTime) * time.Second / 10)/60/1000 // one MS based on block time
+	// figure out a scale to adjust the timeouts based on the "block time"
 
 	pending := make(map[plRef]*int64)
 	ticker := make(chan int64, 1)
@@ -678,7 +678,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 	go func() {
 		for {
 			ticker <- s.GetTimestamp().GetTimeMilli()
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond) // Check every 1/10 second
 		}
 	}()
 
@@ -709,14 +709,15 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
 					}
-					*when += 10000 // update when we asked...
+					*when += int64(10000) // update when we asked by 10 seconds...
 					// Maybe when asking for past the end of the list we should not ask again?
 				}
 			} //build a MMRs with all the expired asks.
 
 			for index, mmr := range mmrs {
-				//			s.LogMessage(logname, "sendout", mmr)
+				s.LogMessage(logname, "sendout", mmr)
 				mmr.SendOut(s, mmr)
+				p.State.MissingRequestAskCnt++
 				delete(mmrs, index)
 			} // Send MMRs that were built
 
@@ -748,14 +749,13 @@ func (p *ProcessList) Ask(vmIndex int, height int, delay int64) {
 	// ask for every nil -- probably should remember the bottom nil and save scanning the whole list
 	for i := 0; i < lenVMList; i++ {
 		if vm.List[i] == nil {
-			ask := askRef{plRef{p.DBHeight, vmIndex, height}, now}
+			ask := askRef{plRef{p.DBHeight, vmIndex, height}, now + delay}
 			p.asks <- ask
 		}
 	}
 	// always ask for one past the end as well...Can't hurt ... Famous last words...
-	ask := askRef{plRef{p.DBHeight, vmIndex, lenVMList}, now}
+	ask := askRef{plRef{p.DBHeight, vmIndex, lenVMList}, now + delay}
 	p.asks <- ask
-	p.State.MissingRequestAskCnt++
 
 	return
 }
