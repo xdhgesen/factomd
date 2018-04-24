@@ -164,12 +164,12 @@ var (
 
 	// How often to create coinbase transactions
 	//		:: Default = 25
-	COINBASE_PAYOUT_FREQUENCY = uint32(25)
+	COINBASE_PAYOUT_FREQUENCY = uint32(5)
 
 	// How many blocks before the coinbase does the coinbase
 	// have to appear in the admin block
 	//		:: Default = COINBASE_PAYOUT_FREQUENCY*40
-	COINBASE_DECLARATION = uint32(COINBASE_PAYOUT_FREQUENCY * 40)
+	COINBASE_DECLARATION = uint32(COINBASE_PAYOUT_FREQUENCY * 2)
 
 	// The maximum amount of factoshis to be issued per server per payout
 	// 		:: Default = 6.4*1e8
