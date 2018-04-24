@@ -5,24 +5,23 @@
 package engine
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/exec"
 	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-
-	"bufio"
-	"io"
-	"net"
-	"os"
-	"os/exec"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -49,6 +48,8 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	fmt.Printf("Go compiler version: %s\n", runtime.Version())
 	fmt.Printf("Using build: %s\n", Build)
 	fmt.Printf("Version: %s\n", FactomdVersion)
+	StartTime = time.Now()
+	fmt.Printf("Start time: %s\n", StartTime.String())
 
 	state0 := new(state.State)
 	state0.IsRunning = true

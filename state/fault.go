@@ -155,6 +155,7 @@ func (s *State) FollowerExecuteFullFault(m interfaces.IMsg) {
 func (s *State) Reset() {
 	// We are no longer using Reset
 	// s.ResetRequest = true
+	s.LogPrintf("executeMsg","state.Reset() called!")
 }
 
 // Set to reprocess all messages and states

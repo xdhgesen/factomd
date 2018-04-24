@@ -47,6 +47,20 @@ func (st *State) VerifyAuthoritySignature(msg []byte, sig *[constants.SIGNATURE_
 			return 0, nil
 		}
 	}
+	if st.CurrentMinute == 0 {
+		// Also allow leaders who were demoted if we are in minute 0
+		feds := st.LeaderPL.StartingFedServers
+		for _, fed := range feds {
+			auth, _ := st.GetAuthority(fed.GetChainID())
+			if auth == nil {
+				continue
+			}
+			valid, err := auth.VerifySignature(msg, sig)
+			if err == nil && valid {
+				return 1, nil
+			}
+		}
+	}
 	//fmt.Println("WARNING: A signature failed to validate.")
 
 	return -1, fmt.Errorf("%s", "Signature Key Invalid or not Federated Server Key")
@@ -96,6 +110,20 @@ func (st *State) FastVerifyAuthoritySignature(msg []byte, sig interfaces.IFullSi
 	}
 	//fmt.Println("WARNING: A signature failed to validate.")
 
+	if st.CurrentMinute == 0 {
+		// Also allow leaders who were demoted if we are in minute 0
+		feds := st.LeaderPL.StartingFedServers
+		for _, fed := range feds {
+			auth, _ := st.GetAuthority(fed.GetChainID())
+			if auth == nil {
+				continue
+			}
+			valid, err := auth.VerifySignature(msg, sig.GetSignature())
+			if err == nil && valid {
+				return 1, nil
+			}
+		}
+	}
 	return -1, fmt.Errorf("%s", "Signature Key Invalid or not Federated Server Key")
 }
 
