@@ -91,7 +91,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=10",
+		"-blktime=15",
 		"-faulttimeout=10",
 		"-count=10",
 		"-logPort=37000",
@@ -124,7 +124,7 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("w")
 	WaitBlocks(state0, 1)
 	runCmd("g10")
-	WaitBlocks(state0, 1)
+	WaitBlocks(state0, 2)
 	// Allocate 4 leaders
 	WaitForMinute(state0, 3)
 
