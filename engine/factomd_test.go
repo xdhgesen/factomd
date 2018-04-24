@@ -233,6 +233,11 @@ func TestSetupANetwork(t *testing.T) {
 	WaitBlocks(fn1.State, 2)
 	WaitForMinute(state0, 1)
 
+	PrintOneStatus(0, 0)
+	if GetFnodes()[2].State.Leader {
+		t.Fatalf("FNode02 should not be a leader")
+	}
+
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
