@@ -98,20 +98,23 @@ func (m *Ack) Validate(s interfaces.IState) int {
 		return -1
 	}
 
-	// if this is m ack from the future the current auth set might not validate the sig so ...
-	if m.DBHeight > s.GetLeaderPL().GetDBHeight() {
-		if s.GetHighestAck() < m.DBHeight {
-			s.SetHighestAck(m.DBHeight) // assume the ack isn't lying. this will make us start requesting DBState blocks...
-		}
-		if m.DBHeight-3 > s.GetLeaderPL().GetDBHeight() {
-			s.LogMessage("ackQueue", "Drop ack from future", m)
-			// when we get caught up we will either get a DBState with this message or we will missing message it.
-			// but if it was malicious then we don't want to keep it around filling up queues.
-			return -1
-
-		}
-		return 0 // Can't validate yet
+	if s.GetHighestAck() < m.DBHeight {
+		s.SetHighestAck(m.DBHeight) // assume the ack isn't lying. this will make us start requesting DBState blocks...
 	}
+
+	delta := (int(m.DBHeight)-int(s.GetLeaderPL().GetDBHeight()))*10 + (int(m.Minute) - int(s.GetCurrentMinute()))
+
+	if delta > 30 {
+		s.LogMessage("ackQueue", "Drop ack from future", m)
+		// when we get caught up we will either get a DBState with this message or we will missing message it.
+		// but if it was malicious then we don't want to keep it around filling up queues.
+		return -1
+	}
+
+	if delta > 5 {
+		return 0 // put this in the holding and validate it later
+	}
+
 	if !m.authvalid {
 		// Check signature
 		bytes, err := m.MarshalForSignature()

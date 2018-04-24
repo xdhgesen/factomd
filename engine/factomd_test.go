@@ -91,7 +91,8 @@ func TestSetupANetwork(t *testing.T) {
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=15",
+		"-blktime=10",
+		"-faulttimeout=10",
 		"-count=10",
 		"-logPort=37000",
 		"-port=37001",
@@ -100,7 +101,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-startdelay=1",
 		"-debuglog=F.*",
 		"--stdoutlog=out.txt",
-		"--stderrlog=out.txt",
+		"--stderrlog=err.txt",
 	)
 
 	params := ParseCmdLine(args)
@@ -123,7 +124,7 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("w")
 	WaitBlocks(state0, 1)
 	runCmd("g10")
-	WaitBlocks(state0, 3)
+	WaitBlocks(state0, 1)
 	// Allocate 4 leaders
 	WaitForMinute(state0, 3)
 
@@ -229,7 +230,8 @@ func TestSetupANetwork(t *testing.T) {
 	WaitForMinute(state0, 3)
 	runCmd("x")
 	runCmd("g3")
-	WaitBlocks(fn1.State, 1)
+	WaitBlocks(fn1.State, 2)
+	WaitForMinute(state0, 1)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
