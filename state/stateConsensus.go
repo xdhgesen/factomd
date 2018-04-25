@@ -1369,6 +1369,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 
 		s.IncEntryChains()
 		s.IncEntries()
+
+		delete(s.Holding, myhash.Fixed())
+		s.Commits.Delete(myhash.Fixed())
+
 		return true
 	}
 
@@ -1397,6 +1401,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	s.PutNewEntries(dbheight, myhash, msg.Entry)
 
 	s.IncEntries()
+
+	delete(s.Holding, myhash.Fixed())
+	s.Commits.Delete(myhash.Fixed())
+
 	return true
 }
 
