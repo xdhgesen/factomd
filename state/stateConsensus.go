@@ -261,18 +261,17 @@ emptyLoop:
 
 	if s.RunLeader {
 		s.ReviewHolding()
-		for {
-			for _, msg := range s.XReview {
-				if msg == nil {
-					continue
-				}
-				if msg.GetVMIndex() == s.LeaderVMIndex {
-					process = append(process, msg)
-				}
+
+		for _, msg := range s.XReview {
+			if msg == nil {
+				continue
 			}
-			s.XReview = s.XReview[:0]
-			break
-		} // skip review
+			if msg.GetVMIndex() == s.LeaderVMIndex {
+				process = append(process, msg)
+			}
+		}
+		s.XReview = s.XReview[:0]
+
 	}
 
 	processXReviewTime := time.Since(preProcessXReviewTime)
@@ -345,6 +344,23 @@ func (s *State) ReviewHolding() {
 
 	for k, v := range s.Holding {
 
+		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
+		if re, ok := v.(*messages.RevealEntryMsg); ok {
+			if s.Commits.Get(re.GetHash().Fixed()) != nil {
+				delete(s.Holding, k)
+				re.FollowerExecute(s)
+				re.SendOut(s, re)
+			}
+			// Only reprocess if at the top of a new minute, and if we are a leader.
+			if !processMinute || !s.Leader {
+				//continue // No need for followers to review Reveal Entry messages
+			}
+			// Needs to be our VMIndex as well, or ignore.
+			if re.GetVMIndex() != s.LeaderVMIndex {
+				//	continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+			}
+		}
+
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, k)
@@ -389,6 +405,15 @@ func (s *State) ReviewHolding() {
 					delete(s.Holding, k) // Drop commits with the same entry hash from holding because they are blocked by a previous entry
 					continue
 				}
+				re := s.Holding[ce.GetHash().Fixed()]
+				if re != nil {
+					re.SendOut(s, re)
+					re.FollowerExecute(s)
+				}
+
+				if !s.Leader || ce.VMIndex != s.LeaderVMIndex {
+					//continue
+				}
 			}
 		}
 		// If it is an chainCommit and it has a duplicate hash to an existing entry throw it away here
@@ -401,22 +426,16 @@ func (s *State) ReviewHolding() {
 					delete(s.Holding, k) // Drop commits with the same entry hash from holding because they are blocked by a previous entry
 					continue
 				}
-			}
-		}
-		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
-		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if s.Commits.Get(re.GetHash().Fixed()) != nil {
-				delete(s.Holding, k)
-				re.FollowerExecute(s)
-				re.SendOut(s, re)
-			}
-			// Only reprocess if at the top of a new minute, and if we are a leader.
-			if !processMinute || !s.Leader {
-				continue // No need for followers to review Reveal Entry messages
-			}
-			// Needs to be our VMIndex as well, or ignore.
-			if re.GetVMIndex() != s.LeaderVMIndex {
-				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+				re := s.Holding[ce.GetHash().Fixed()]
+				if re != nil {
+					re.SendOut(s, re)
+					re.FollowerExecute(s)
+					continue
+				}
+
+				if !s.Leader || ce.VMIndex != s.LeaderVMIndex {
+					//continue
+				}
 			}
 		}
 
@@ -588,12 +607,14 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	if pl == nil {
 		// Does this mean it's from the future?
 		// TODO: Should we put the ack back on the inMsgQueue queue here instead of dropping it? -- clay
+		s.Acks[ack.GetHash().Fixed()] = ack
 		return
 	}
 	list := pl.VMs[ack.VMIndex].List
 	if len(list) > int(ack.Height) && list[ack.Height] != nil {
 		// This means we haven't seen the matching message yet?
 		// TODO: Should we put the ack back on the inMsgQueue queue here instead of dropping it? -- clay
+		s.Acks[ack.GetHash().Fixed()] = ack
 		return
 	}
 

@@ -1173,9 +1173,12 @@ func SimControl(listenTo int, listenStdin bool) {
 					}
 				}
 			case 'R' == b[0]:
+
+				newgen := false
 				// load generation
 				if loadGenerator == nil {
 					loadGenerator = NewLoadGenerator()
+					newgen = true
 				}
 
 				nn, err := strconv.Atoi(string(b[1:]))
@@ -1184,7 +1187,9 @@ func SimControl(listenTo int, listenStdin bool) {
 					break
 				}
 				loadGenerator.PerSecond.Store(nn)
-				go loadGenerator.Run()
+				if newgen {
+					go loadGenerator.Run()
+				}
 				os.Stderr.WriteString(fmt.Sprintf("Writing entries at %d per second\n", nn))
 
 			case 'P' == b[0]:
