@@ -22,6 +22,7 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -153,6 +154,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 }
 
 func (s *State) Process() (progress bool) {
+
 	if s.ResetRequest {
 		s.ResetRequest = false
 		s.DoReset()
@@ -189,8 +191,7 @@ func (s *State) Process() (progress bool) {
 		}
 	}
 
-	process := make(chan interfaces.IMsg, 10000)
-	room := func() bool { return len(process) < 9995 }
+	process := []interfaces.IMsg{}
 
 	var vm *VM
 	if s.Leader && s.RunLeader {
@@ -202,7 +203,7 @@ func (s *State) Process() (progress bool) {
 
 	/** Process all the DBStates  that might be pending **/
 
-	for room() {
+	for {
 		ix := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase + 1
 		if ix < 0 || ix >= len(s.DBStatesReceived) {
 			break
@@ -211,7 +212,7 @@ func (s *State) Process() (progress bool) {
 		if msg == nil {
 			break
 		}
-		process <- msg
+		process = append(process, msg)
 		s.DBStatesReceived[ix] = nil
 	}
 
@@ -224,7 +225,6 @@ ackLoop:
 			switch ack.Validate(s) {
 			case -1:
 				s.LogMessage("ackQueue", "Drop Invalid", ack)
-				ack.Validate(s)
 				continue
 			case 0:
 				// toss the ack into holding and we will try again in a bit...
@@ -284,16 +284,14 @@ emptyLoop:
 	if s.RunLeader {
 		s.ReviewHolding()
 
-	skipreview:
 		for {
 			for _, msg := range s.XReview {
-				if !room() {
-					break skipreview
-				}
 				if msg == nil {
 					continue
 				}
-				process <- msg
+				if msg.GetVMIndex() == s.LeaderVMIndex {
+					process = append(process, msg)
+				}
 			}
 			s.XReview = s.XReview[:0]
 			break
@@ -303,17 +301,11 @@ emptyLoop:
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
 	preProcessProcChanTime := time.Now()
-processLoop:
-	for {
-		select {
-		case msg := <-process:
-			newProgress := s.executeMsg(vm, msg)
-			progress = newProgress || progress //
-			s.LogMessage("executeMsg", fmt.Sprintf("From processq : %t", newProgress), msg)
-			s.UpdateState()
-		default:
-			break processLoop
-		}
+	for _, msg := range process {
+		newProgress := s.executeMsg(vm, msg)
+		progress = newProgress || progress //
+		s.LogMessage("executeMsg", fmt.Sprintf("From processq : %t", newProgress), msg)
+		s.UpdateState()
 	} // processLoop for{...}
 
 	processProcChanTime := time.Since(preProcessProcChanTime)
@@ -345,6 +337,7 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // review if this is a leader, and those messages are that leader's
 // responsibility
 func (s *State) ReviewHolding() {
+
 	preReviewHoldingTime := time.Now()
 	if len(s.XReview) > 0 {
 		return
@@ -489,7 +482,11 @@ func (s *State) ReviewHolding() {
 }
 
 // Adds blocks that are either pulled locally from a database, or acquired from peers.
-func (s *State) AddDBState(isNew bool, directoryBlock interfaces.IDirectoryBlock, adminBlock interfaces.IAdminBlock, factoidBlock interfaces.IFBlock, entryCreditBlock interfaces.IEntryCreditBlock,
+func (s *State) AddDBState(isNew bool,
+	directoryBlock interfaces.IDirectoryBlock,
+	adminBlock interfaces.IAdminBlock,
+	factoidBlock interfaces.IFBlock,
+	entryCreditBlock interfaces.IEntryCreditBlock,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
@@ -556,7 +553,6 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteMsg
-
 	if ack != nil {
 		m.SetLeaderChainID(ack.GetLeaderChainID())
 		m.SetMinute(ack.Minute)
@@ -578,6 +574,7 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 //
 // Returns true if it finds a match, puts the message in holding, or invalidates the message
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
+
 	if m.IsLocal() {
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
@@ -592,8 +589,8 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	}
 
 	FollowerEOMExecutions.Inc()
-	// add it to the holding queue in case AddToProcessList may remove it
-	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteEOM
+	TotalHoldingQueueInputs.Inc()
+	s.Holding[m.GetMsgHash().Fixed()] = m
 
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
@@ -626,8 +623,8 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	list := pl.VMs[ack.VMIndex].List
 	if len(list) > int(ack.Height) && list[ack.Height] != nil {
 		// there is already a message in our slot?
-		s.LogPrintf("executeMsg", "drop, len(list)(%d) > int(ack.Height)(%d) && list[ack.Height](%p) != nil", len(list), int(ack.Height), list[ack.Height])
-		s.LogMessage("executeMsg", "found ", list[ack.Height])
+		s.LogMessage("executeMsg", "drop, found a message in our spot", list[ack.Height])
+
 		return
 	}
 
@@ -854,6 +851,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 }
 
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
+
 	if s.inMsgQueue.Length() > constants.INMSGQUEUE_HIGH {
 		s.LogMessage("executeMsg", "Drop INMSGQUEUE_HIGH", m)
 		return
@@ -1047,8 +1045,7 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack == nil {
-		s.LogMessage("executeMsg", "hold, no ack yet", m)
-		s.ProcessLists.GetHolding(m.GetVMIndex())[m.GetMsgHash().Fixed()] = m
+		s.Holding[m.GetMsgHash().Fixed()] = m
 		return
 	}
 
@@ -1351,18 +1348,11 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		h := c.GetHash()
 		s.PutCommit(h, c)
 		var entry interfaces.IMsg
-		for _, hld := range s.ProcessLists.Holding {
-			if hld != nil {
-				entry = hld[h.Fixed()]
-				if entry != nil {
-					entry.FollowerExecute(s)
-					entry.SendOut(s, entry)
-					TotalXReviewQueueInputs.Inc()
-					s.XReview = append(s.XReview, entry)
-					TotalHoldingQueueOutputs.Inc()
-					delete(s.Holding, h.Fixed())
-				}
-			}
+		entry = s.Holding[h.Fixed()]
+		if entry != nil {
+			entry.FollowerExecute(s)
+			TotalHoldingQueueOutputs.Inc()
+			delete(s.Holding, h.Fixed())
 		}
 		return true
 	}
@@ -1383,9 +1373,6 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		entry := s.Holding[h.Fixed()]
 		if entry != nil && entry.Validate(s) == 1 {
 			entry.FollowerExecute(s)
-			entry.SendOut(s, entry)
-			TotalXReviewQueueInputs.Inc()
-			s.XReview = append(s.XReview, entry)
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())
 		}
@@ -1571,7 +1558,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	if s.EOM && int(e.Minute) > s.EOMMinute {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Will Not Process: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
 		s.LogPrintf("dbsig-eom", "ProcessEOM skip EOM for a future minute e.Minute(%d) > s.EOMMinute(%d)", e.Minute, s.EOMMinute)
-
 		return false
 	}
 
@@ -1752,28 +1738,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 			s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(0, s.IdentityChainID)
 
-			if s.Leader {
-				for _, msg := range s.ProcessLists.Holding[s.LeaderVMIndex] {
-					if msg.GetVMIndex() != s.LeaderVMIndex {
-						s.MsgQueue() <- msg
-					}
-					switch msg.Validate(s) {
-					case -1:
-						delete(s.ProcessLists.Holding[s.LeaderVMIndex], msg.GetHash().Fixed())
-					case 1:
-						if _, ok := msg.(*messages.RevealEntryMsg); ok {
-							if s.Commits.Get(msg.GetHash().Fixed()) != nil {
-								s.msgQueue <- msg
-								delete(s.ProcessLists.Holding[s.LeaderVMIndex], msg.GetHash().Fixed())
-							}
-						} else {
-							s.msgQueue <- msg
-							delete(s.ProcessLists.Holding[s.LeaderVMIndex], msg.GetHash().Fixed())
-						}
-					}
-				}
-			}
-
 			s.DBSigProcessed = 0
 
 			// Note about dbsigs.... If we processed the previous minute, then we generate the DBSig for the next block.
@@ -1835,7 +1799,7 @@ func (s *State) CheckForIDChange() {
 		}
 	}
 	if reloadIdentity {
-		config := util.ReadConfig(s.filename)
+		config := util.ReadConfig(s.ConfigFilePath)
 		var err error
 		s.IdentityChainID, err = primitives.NewShaHashFromStr(config.App.IdentityChainID)
 		if err != nil {
@@ -1972,7 +1936,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		valid, err := s.FastVerifyAuthoritySignature(data, dbs.DBSignature, dbs.DBHeight)
 		if err != nil || valid != 1 {
 			plog("Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
-			s.LogPrintf("executeMsg", "Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
 			return false
 		}
 
