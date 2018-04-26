@@ -1323,7 +1323,6 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		var entry interfaces.IMsg
 		entry = s.Holding[h.Fixed()]
 		if entry != nil {
-			entry.FollowerExecute(s)
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())
 		}
@@ -1346,7 +1345,6 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		s.PutCommit(h, c)
 		entry := s.Holding[h.Fixed()]
 		if entry != nil && entry.Validate(s) == 1 {
-			entry.FollowerExecute(s)
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, h.Fixed())
 		}

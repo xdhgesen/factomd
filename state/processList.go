@@ -984,7 +984,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	delete(p.State.Holding, m.GetMsgHash().Fixed())
 
 	if m.Type() == constants.REVEAL_ENTRY_MSG {
-		p.State.Commits.Delete(m.GetMsgHash().Fixed())
+		p.State.Commits.Delete(m.GetHash().Fixed())
 	}
 
 	// Both the ack and the message hash to the same GetHash()
