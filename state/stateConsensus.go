@@ -131,17 +131,19 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			TotalHoldingQueueInputs.Inc()
 			TotalHoldingQueueRecycles.Inc()
 			s.LogMessage("executeMsg", "Add to Holding", msg)
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		} else {
 			s.LogMessage("executeMsg", "drop, IReplay", msg)
 		}
 
-	default:
+	case -1:
+		delete(s.Holding, msg.GetMsgHash().Fixed())
 		if !msg.SentInvalid() {
 			msg.MarkSentInvalid(true)
 			s.LogMessage("executeMsg", "InvalidMsg", msg)
 			s.networkInvalidMsgQueue <- msg
 		}
+	default:
+		s.LogMessage("executeMsg", fmt.Sprintf("Validate() Returned %d", valid), msg)
 	}
 
 	executeMsgTime := time.Since(preExecuteMsgTime)
@@ -222,6 +224,7 @@ ackLoop:
 		case ack := <-s.ackQueue:
 			switch ack.Validate(s) {
 			case -1:
+				delete(s.Acks, ack.GetHash().Fixed())
 				s.LogMessage("ackQueue", "Drop Invalid", ack) // Maybe put it back in the ask queue ? -- clay
 				continue
 			case 0:
@@ -229,7 +232,6 @@ ackLoop:
 				TotalHoldingQueueInputs.Inc()
 				TotalHoldingQueueRecycles.Inc()
 				s.LogMessage("ackQueue", "Add to Holding", ack)
-				s.Holding[ack.GetMsgHash().Fixed()] = ack
 				continue
 			}
 
@@ -444,8 +446,8 @@ func (s *State) ReviewHolding() {
 		if re, ok := v.(*messages.RevealEntryMsg); ok {
 			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
 				s.LogMessage("executeMsg", "review, NoEntryYet(3) delete", v)
-				delete(s.Holding, re.GetHash().Fixed())
-				s.Commits.Delete(re.GetHash().Fixed())
+				delete(s.Holding, k)
+				s.Commits.Delete(k)
 				continue
 			}
 			if s.Commits.Get(re.GetHash().Fixed()) != nil {
@@ -573,7 +575,6 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 	// add it to the holding queue in case AddToProcessList may remove it
 	TotalHoldingQueueInputs.Inc()
 
-	s.Holding[m.GetMsgHash().Fixed()] = m
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack != nil {
@@ -614,7 +615,6 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	// add it to the holding queue in case AddToProcessList may remove it
 	TotalHoldingQueueInputs.Inc()
 	s.LogMessage("executeMsg", "Add to Holding", m)
-	s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteEOM
 
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
@@ -933,7 +933,6 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	ack.FollowerExecute(s)
 
 	s.MissingResponseAppliedCnt++
-
 }
 
 func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
@@ -1056,7 +1055,6 @@ func (s *State) FollowerExecuteCommitEntry(m interfaces.IMsg) {
 func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	FollowerExecutions.Inc()
 	TotalHoldingQueueInputs.Inc()
-	s.Holding[m.GetMsgHash().Fixed()] = m // hold in  FollowerExecuteRevealEntry
 
 	valid := m.Validate(s)
 	switch valid {
@@ -1068,7 +1066,6 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 		return
 	}
 
-	s.Holding[m.GetMsgHash().Fixed()] = m
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack == nil {
@@ -1112,7 +1109,6 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		if s.DebugExec() {
 			s.LogMessage("executeMsg", "Drop replay", m)
 		}
@@ -1196,8 +1192,6 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	m.SetLocal(false)
 	s.FollowerExecuteEOM(m)
 	s.UpdateState()
-	delete(s.Acks, ack.GetHash().Fixed())
-	delete(s.Holding, m.GetMsgHash().Fixed())
 }
 
 func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
@@ -1222,7 +1216,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
 		HoldingQueueDBSigOutputs.Inc()
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		s.LogMessage("executeMsg", "drop INTERNAL_REPLAY", m)
 		return
 	}
@@ -1304,8 +1297,6 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 		// Okay the Reveal has been recorded.  Record this as an entry that cannot be duplicated.
 		s.Replay.IsTSValidAndUpdateState(constants.REVEAL_REPLAY, eh.Fixed(), m.GetTimestamp(), now)
 		TotalCommitsOutputs.Inc()
-		s.Commits.Delete(eh.Fixed()) // delete(s.Commits, eh.Fixed())
-		delete(s.Holding, eh.Fixed())
 	}
 }
 
@@ -1379,8 +1370,6 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 			entry.SendOut(s, entry)
 			TotalXReviewQueueInputs.Inc()
 			s.XReview = append(s.XReview, entry)
-			TotalHoldingQueueOutputs.Inc()
-			delete(s.Holding, h.Fixed())
 		}
 
 		return true
@@ -1405,8 +1394,6 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 			entry.SendOut(s, entry)
 			TotalXReviewQueueInputs.Inc()
 			s.XReview = append(s.XReview, entry)
-			TotalHoldingQueueOutputs.Inc()
-			delete(s.Holding, h.Fixed())
 		}
 		return true
 	}

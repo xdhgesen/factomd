@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
@@ -66,11 +67,18 @@ func (state *State) ValidatorLoop() {
 		var msg interfaces.IMsg
 	loop:
 		for i := 0; i < 10; i++ {
-			for state.Process() {
-			}
-			for state.UpdateState() {
-			}
+			cnt := 0
+			c := true
+			for c && cnt < 10 {
+				cnt++
+				for state.Process() {
+					c = true
+				}
 
+				for state.UpdateState() {
+					c = true
+				}
+			}
 			select {
 			case min := <-state.tickerQueue:
 				timeStruct.timer(state, min)
@@ -115,6 +123,18 @@ func (state *State) ValidatorLoop() {
 				state.ackQueue <- msg //
 			} else {
 				state.LogMessage("msgQueue", "enqueue", msg)
+				if t := msg.Type(); t == constants.EOM_MSG ||
+					t == constants.COMMIT_CHAIN_MSG ||
+					t == constants.COMMIT_ENTRY_MSG ||
+					t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG ||
+					t == constants.FACTOID_TRANSACTION_MSG ||
+					t == constants.REVEAL_ENTRY_MSG ||
+					t == constants.REQUEST_BLOCK_MSG ||
+					t == constants.ADDSERVER_MSG ||
+					t == constants.CHANGESERVER_KEY_MSG ||
+					t == constants.REMOVESERVER_MSG {
+					state.Holding[msg.GetMsgHash().Fixed()] = msg
+				}
 				state.msgQueue <- msg //
 			}
 		}

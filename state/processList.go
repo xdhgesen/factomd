@@ -679,7 +679,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 	go func() {
 		for {
 			ticker <- s.GetTimestamp().GetTimeMilli()
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(20 * time.Millisecond)
 		}
 	}()
 
@@ -710,7 +710,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
 					}
-					*when += 10000 // update when we asked...
+					*when += 1000 // update when we asked...
 					//s.LogPrintf(logname, "mmr ask %d/%d/%d %d", ref.DBH, ref.VM, ref.H, len(pending))
 					// Maybe when asking for past the end of the list we should not ask again?
 				}
@@ -863,7 +863,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 		for j := vm.Height; j < len(vm.List); j++ {
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
-				p.Ask(i, uint32(j), 100) // 100ms delay
+				p.Ask(i, uint32(j), 0) // 100ms delay
 				break VMListLoop
 			}
 
@@ -928,8 +928,9 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				vm.ProcessTime = now
 
 				if msg.Process(p.DBHeight, state) { // Try and Process this entry
+					delete(p.State.Acks, msgHashFixed)
+					delete(p.State.Holding, msg.GetMsgHash().Fixed()) // We successfully executed the message, so take it out of holding if it is there.
 					if msg.Type() == constants.REVEAL_ENTRY_MSG {
-						delete(p.State.Holding, msg.GetMsgHash().Fixed()) // We successfully executed the message, so take it out of holding if it is there.
 						p.State.Commits.Delete(msg.GetMsgHash().Fixed())
 					}
 					p.State.LogMessage("processList", "done", msg)
@@ -945,9 +946,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					// block network replay too since we have already seen this message there is not need to see it again
 					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
 					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
-
-					delete(p.State.Acks, msgHashFixed)
-					delete(p.State.Holding, msgHashFixed)
 
 				} else {
 					p.State.LogMessage("process", fmt.Sprintf("retry %v/%v/%v", p.DBHeight, i, j), msg)
@@ -1024,7 +1022,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 		p.State.LogPrintf("processList", "Drop "+hint)
 		TotalHoldingQueueOutputs.Inc()
 		TotalAcksOutputs.Inc()
-		delete(p.State.Holding, msgHash.Fixed())
 		delete(p.State.Acks, msgHash.Fixed())
 	}
 
@@ -1067,7 +1064,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	TotalHoldingQueueOutputs.Inc()
 	TotalAcksOutputs.Inc()
 	delete(p.State.Acks, msgHash.Fixed())
-	delete(p.State.Holding, msgHash.Fixed())
 
 	// Both the ack and the message hash to the same GetHash()
 	m.SetLocal(false)
