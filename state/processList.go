@@ -43,7 +43,6 @@ type askRef struct {
 	When int64
 }
 
-
 type ProcessList struct {
 	DBHeight uint32 // The directory block height for these lists
 
@@ -643,7 +642,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			pending[ask.plRef] = &when // add the requests to the map
 			s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
 		} // don't update the when if it already existed...
-}
+	}
 
 	addAdd := func(add plRef) {
 		delete(pending, add) // Delete request that was just added to the process list in the map
@@ -710,11 +709,11 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 						mmrs[index] = messages.NewMissingMsg(s, ref.VM, ref.DBH, uint32(ref.H))
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
-			}
+					}
 					*when += 10000 // update when we asked...
 					//s.LogPrintf(logname, "mmr ask %d/%d/%d %d", ref.DBH, ref.VM, ref.H, len(pending))
 					// Maybe when asking for past the end of the list we should not ask again?
-		}
+				}
 			} //build a MMRs with all the expired asks.
 
 			for index, mmr := range mmrs {
@@ -741,9 +740,9 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 
 func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 
-		if vmIndex < 0 {
+	if vmIndex < 0 {
 		panic(errors.New("Old Faulting code"))
-		}
+	}
 
 	now := p.State.GetTimestamp().GetTimeMilli()
 	// Look up the VM
@@ -755,7 +754,7 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 		if vm.List[i] == nil {
 			ask := askRef{plRef{p.DBHeight, vmIndex, height}, now + delay}
 			p.asks <- ask
-	}
+		}
 	}
 	// always ask for one past the end as well...Can't hurt ... Famous last words...
 	ask := askRef{plRef{p.DBHeight, vmIndex, uint32(lenVMList)}, now + delay}
@@ -772,7 +771,7 @@ func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
 
 type foo struct {
 	Syncing, DBSig, EOM, DBSigDone, EOMDone, EOMmax, EOMmin, DBSigMax, DBSigMin bool
-	}
+}
 
 var decodeMap map[foo]string = map[foo]string{
 	//grep "Unexpected state" FNode0*process.txt | awk ' {print substr($0,index($0,"0x"));}' | sort -u
@@ -801,12 +800,13 @@ var decodeMap map[foo]string = map[foo]string{
 	//foo{true, true, false, false, false, false, true, false, true}:    "Start Syncing DBSig",             //0x143
 	//foo{true, false, true, false, false, false, true, false, true}:    "Syncing EOM Start (DBSIG !Done)", //0x145 ***
 	//foo{true, false, true, true, true, false, true, false, true}:      "Syncing EOM ... ",                //0x15d
-			}
+}
+
 func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone bool, EOMDone bool, FedServers int, EOMProcessed int, DBSigProcessed int) string {
 
 	if EOMProcessed > FedServers || EOMProcessed < 0 {
 		p.State.LogPrintf("process", "Unexpected EOMProcessed %v of %v", EOMProcessed, FedServers)
-		}
+	}
 	if DBSigProcessed > FedServers || DBSigProcessed < 0 {
 		p.State.LogPrintf("process", "Unexpected DBSigProcessed %v of %v", DBSigProcessed, FedServers)
 	}
@@ -819,16 +819,16 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 	for i, b := range z {
 		if b {
 			xx = xx | (1 << uint(i))
-				}
-				}
+		}
+	}
 	s, ok := decodeMap[x]
 	if !ok {
 
 		p.State.LogPrintf("process", "Unexpected state 0x%03x %v", xx, x)
 		s = "Unknown"
-			}
+	}
 	return fmt.Sprintf("SyncingStatus: 0x%03x %s", xx, s)
-		}
+}
 
 func (p *ProcessList) GetDBHeight() uint32 {
 	return p.DBHeight
@@ -863,7 +863,16 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 		for j := vm.Height; j < len(vm.List); j++ {
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
-				p.Ask(i, uint32(j), 100) // 100ms delay
+				cnt := 0
+				for k := j; k < vm.Height; k++ {
+					if vm.List[k] == nil {
+						cnt++
+						p.Ask(i, uint32(k), 0) // Ask immediately
+					}
+				}
+				p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
+				//				p.State.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
+
 				break VMListLoop
 			}
 
