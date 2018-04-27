@@ -710,7 +710,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 					} else {
 						mmrs[index].ProcessListHeight = append(mmrs[index].ProcessListHeight, uint32(ref.H))
 					}
-					*when += 1000 // update when we asked...
+					*when += 10000 // update when we asked...
 					//s.LogPrintf(logname, "mmr ask %d/%d/%d %d", ref.DBH, ref.VM, ref.H, len(pending))
 					// Maybe when asking for past the end of the list we should not ask again?
 				}
@@ -863,7 +863,16 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 		for j := vm.Height; j < len(vm.List); j++ {
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
-				p.Ask(i, uint32(j), 0) // 100ms delay
+				cnt := 0
+				for k := j; k < len(vm.List); k++ {
+					if vm.List[k] == nil {
+						cnt++
+						p.Ask(i, uint32(k), 0) // Ask immediately
+					}
+				}
+				p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
+				//				p.State.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
+
 				break VMListLoop
 			}
 
@@ -882,7 +891,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					state.LogMessage("process", "Nil out message", vm.List[j])
 					vm.List[j] = nil
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
-					p.Ask(i, uint32(j), 3000) // 3 second delay
+					p.Ask(i, uint32(j), 300) // 3 second delay
 					break VMListLoop
 				}
 
@@ -921,7 +930,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
-					p.Ask(i, uint32(j), 3000) // 3 second delay
+					p.Ask(i, uint32(j), 300) // 3 second delay
 					// If we ask won't we just get the same thing back?
 					break VMListLoop
 				}

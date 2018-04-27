@@ -67,18 +67,16 @@ func (state *State) ValidatorLoop() {
 		var msg interfaces.IMsg
 	loop:
 		for i := 0; i < 10; i++ {
-			cnt := 0
-			c := true
-			for c && cnt < 10 {
-				cnt++
-				for state.Process() {
-					c = true
-				}
 
-				for state.UpdateState() {
-					c = true
-				}
+			cnt := 0
+			for state.Process() && cnt < 10 {
+				cnt++
 			}
+			cnt = 0
+			for state.UpdateState() && cnt < 10 {
+				cnt++
+			}
+
 			select {
 			case min := <-state.tickerQueue:
 				timeStruct.timer(state, min)
@@ -129,9 +127,7 @@ func (state *State) ValidatorLoop() {
 					t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG ||
 					t == constants.FACTOID_TRANSACTION_MSG ||
 					t == constants.REVEAL_ENTRY_MSG ||
-					t == constants.REQUEST_BLOCK_MSG ||
 					t == constants.ADDSERVER_MSG ||
-					t == constants.CHANGESERVER_KEY_MSG ||
 					t == constants.REMOVESERVER_MSG {
 					state.Holding[msg.GetMsgHash().Fixed()] = msg
 				}
