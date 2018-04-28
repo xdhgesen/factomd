@@ -224,7 +224,7 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 		for i := 0; i < int(constants.NUM_MESSAGES); i++ {
 			prt = prt + fmt.Sprintf("%5d ", i)
 		}
-		prt = prt + "\nRecd:"
+		prt = prt + "\n\nRecd:"
 
 		for i := 0; i < int(constants.NUM_MESSAGES); i++ {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesReceived(i))

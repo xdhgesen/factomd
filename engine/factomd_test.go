@@ -72,6 +72,39 @@ func WaitMinutes(s *state.State, min int) {
 // We can only run 1 simtest!
 var ranSimTest = false
 
+func stallDetect(t *testing.T, s *state.State) {
+
+	//minuteTime := time.Duration(globals.Params.BlkTime) * time.Second / 10
+	//
+	//current := s.CurrentMinute
+	//
+	//// increment expectation based on time
+	//// this doesn't increment while stopped in the debugger
+	//go func() {
+	//	for {
+	//		for s.Elections == nil { // wait till we are started
+	//			time.Sleep(minuteTime)
+	//		}
+	//		// time doesn't pass while we are electing...
+	//		if s.Elections.(*elections.Elections).Electing == -1 {
+	//			current++
+	//		}
+	//		time.Sleep(minuteTime)
+	//	}
+	//}()
+	//
+	//for {
+	//	// If I'm not way behind (2 block + 2 minutes) and I'm online ...
+	//	if s.CurrentMinute < current-22 && !s.GetNetStateOff() {
+	//		t.Fatalf("%s: Stalled at %d-:-%d", s.FactomNodeName, s.LeaderPL.DBHeight, s.CurrentMinute)
+	//	}
+	//	// if my fake clock get behind bring it up to date
+	//	if current < s.CurrentMinute {
+	//		current = s.CurrentMinute
+	//	}
+	//	time.Sleep(minuteTime)
+	//} //forever
+} // stallDetect(){...}
 func TestSetupANetwork(t *testing.T) {
 	if ranSimTest {
 		return
@@ -91,7 +124,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=8",
+		"-blktime=15",
 		"-count=10",
 		"-logPort=37000",
 		"-port=37001",
@@ -243,6 +276,85 @@ func TestSetupANetwork(t *testing.T) {
 	}
 }
 
+func TestLoad(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	runCmd := func(cmd string) {
+		os.Stderr.WriteString("Executing: " + cmd + "\n")
+		os.Stdout.WriteString("Executing: " + cmd + "\n")
+		InputChan <- cmd
+		time.Sleep(100 * time.Millisecond)
+		return
+	}
+
+	args := append([]string{},
+		"-db=Map",
+		"-network=LOCAL",
+		"-enablenet=true",
+		"-blktime=10",
+		"-count=3",
+		"-startdelay=1",
+		"-debuglog=F.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+	)
+
+	params := ParseCmdLine(args)
+	state0 := Factomd(params, false).(*state.State)
+	state0.MessageTally = true
+	time.Sleep(3 * time.Second)
+	StatusEveryMinute(state0)
+	t.Log("Allocated 3 nodes")
+	if len(GetFnodes()) != 3 {
+		t.Fatal("Should have allocated 2 nodes")
+		t.Fail()
+	}
+
+	WaitForMinute(state0, 3)
+	runCmd("g3")
+	WaitBlocks(state0, 1)
+	// Allocate 1 leaders
+	WaitForMinute(state0, 1)
+
+	runCmd("1") // select node 1
+	runCmd("l") // make 1 a leader
+	WaitBlocks(state0, 1)
+	WaitForMinute(state0, 1)
+
+	leadercnt := 0
+	auditcnt := 0
+	for _, fn := range GetFnodes() {
+		s := fn.State
+		if s.Leader {
+			leadercnt++
+		}
+		list := s.ProcessLists.Get(s.LLeaderHeight)
+		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
+			auditcnt++
+		}
+	}
+
+	if leadercnt != 2 {
+		t.Fatalf("found %d leaders, expected 2", leadercnt)
+	}
+
+	runCmd("2")   // select 2
+	runCmd("R80") // Feed load
+	x := state0.NumEntries
+	startt := time.Now()
+	WaitBlocks(state0, 10)
+	y := state0.NumEntries
+	deltat := time.Since(startt)
+	runCmd("R0") // Stop load
+	WaitBlocks(state0, 1)
+
+	fmt.Printf("Wrote at %v entries/sec\n", float64(y-x)/deltat.Seconds())
+
+} // testLoad(){...}
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
 		return
@@ -281,6 +393,10 @@ func TestMakeALeader(t *testing.T) {
 		t.Fail()
 	}
 
+	// start detecting stalls on the nodes ...
+	for _, fn := range GetFnodes() {
+		go stallDetect(t, fn.State)
+	}
 	WaitForMinute(state0, 3)
 	runCmd("g1")
 	WaitBlocks(state0, 1)
@@ -357,7 +473,12 @@ func TestAnElection(t *testing.T) {
 	}
 
 	StatusEveryMinute(state0)
+	// start detecting stalls on the nodes ...
+	for _, fn := range GetFnodes() {
+		go stallDetect(t, fn.State)
+	}
 
+	WaitMinutes(state0, 2)
 	runCmd("g6")
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)

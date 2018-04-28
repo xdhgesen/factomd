@@ -1441,7 +1441,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	}
 	// Handle the case that this is a Entry Chain create
 	// Must be built with CommitChain (i.e. !msg.IsEntry).  Also
-	// cannot have an existing chaing (eb and eb_db == nil)
+	// cannot have an existing chain (eb and eb_db == nil)
 	if !msg.IsEntry && eb == nil && eb_db == nil {
 		// Create a new Entry Block for a new Entry Block Chain
 		eb = entryBlock.NewEBlock()

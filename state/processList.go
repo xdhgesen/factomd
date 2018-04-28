@@ -981,7 +981,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
 					p.State.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
-					p.State.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
 
 					progress = true
 
