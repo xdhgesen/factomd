@@ -168,6 +168,8 @@ type State struct {
 	ackQueue               chan interfaces.IMsg
 	msgQueue               chan interfaces.IMsg
 
+	msgQueueStats *Statistic
+
 	ShutdownChan chan int // For gracefully halting Factom
 	JournalFile  string
 	Journaling   bool
@@ -837,6 +839,8 @@ func (s *State) Init() {
 	s.MissingEntries = make(chan *MissingEntry, 1000)              //Entries I discover are missing from the database
 	s.UpdateEntryHash = make(chan *EntryUpdate, 10000)             //Handles entry hashes and updating Commit maps.
 	s.WriteEntry = make(chan interfaces.IEBEntry, 3000)            //Entries to be written to the database
+
+	s.msgQueueStats = NewStatistic(1000)
 
 	if s.Journaling {
 		f, err := os.Create(s.JournalFile)

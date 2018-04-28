@@ -13,6 +13,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/p2p"
 
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	log "github.com/sirupsen/logrus"
 )
@@ -47,6 +48,9 @@ type FactomMessage struct {
 	PeerHash string
 	AppHash  string
 	AppType  string
+
+	// This is used to track how long it takes a message to get around the system
+	DebugTravel globals.DebugTravel
 }
 
 func (e *FactomMessage) JSONByte() ([]byte, error) {
@@ -112,7 +116,8 @@ func (f *P2PProxy) Send(msg interfaces.IMsg) error {
 	f.bytesOut += len(data)
 	hash := fmt.Sprintf("%x", msg.GetMsgHash().Bytes())
 	appType := fmt.Sprintf("%d", msg.Type())
-	message := FactomMessage{Message: data, PeerHash: msg.GetNetworkOrigin(), AppHash: hash, AppType: appType}
+	message := FactomMessage{Message: data, PeerHash: msg.GetNetworkOrigin(), AppHash: hash, AppType: appType, DebugTravel: msg.GetDebugTimestamp()}
+	message.DebugTravel.Touch("P2PProxy.Send(), enqueue broadcast out")
 	switch {
 	case !msg.IsPeer2Peer():
 		msgLogger.Debug("Sending broadcast message")
@@ -138,6 +143,7 @@ func (f *P2PProxy) Receive() (interfaces.IMsg, error) {
 			switch data.(type) {
 			case FactomMessage:
 				fmessage := data.(FactomMessage)
+				fmessage.DebugTravel.Touch("P2PProxy.Receive(), dequeue BroadcastIn")
 				msg, err := msgsupport.UnmarshalMessage(fmessage.Message)
 
 				if err != nil {
@@ -210,6 +216,9 @@ func (f *P2PProxy) ManageOutChannel() {
 				parcel.Header.TargetPeer = fmessage.PeerHash
 				parcel.Header.AppHash = fmessage.AppHash
 				parcel.Header.AppType = fmessage.AppType
+				// Debug time to track traveling time
+				parcel.DebugTravel = fmessage.DebugTravel
+				parcel.DebugTravel.Touch("P2PProxy.ManageOutChannel(), Enqueue ToNetwork")
 				p2p.BlockFreeChannelSend(f.ToNetwork, parcel)
 			}
 		default:
@@ -224,7 +233,8 @@ func (f *P2PProxy) ManageInChannel() {
 		switch data.(type) {
 		case p2p.Parcel:
 			parcel := data.(p2p.Parcel)
-			message := FactomMessage{Message: parcel.Payload, PeerHash: parcel.Header.TargetPeer, AppHash: parcel.Header.AppHash, AppType: parcel.Header.AppType}
+			message := FactomMessage{Message: parcel.Payload, PeerHash: parcel.Header.TargetPeer, AppHash: parcel.Header.AppHash, AppType: parcel.Header.AppType, DebugTravel: parcel.DebugTravel}
+			message.DebugTravel.Touch("P2P Proxy, dequeue FromNetwork")
 			removed := p2p.BlockFreeChannelSend(f.BroadcastIn, message)
 			BroadInCastQueue.Inc()
 			BroadInCastQueue.Add(float64(-1 * removed))

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
+	"github.com/FactomProject/factomd/common/globals"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,6 +20,9 @@ var parcelLogger = packageLogger.WithField("subpack", "connection")
 type Parcel struct {
 	Header  ParcelHeader
 	Payload []byte
+
+	// Timestamp to track time it takes to travel around the system
+	DebugTravel globals.DebugTravel
 }
 
 // ParcelHeaderSize is the number of bytes in a parcel header

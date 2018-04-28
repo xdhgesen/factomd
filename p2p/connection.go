@@ -465,6 +465,7 @@ func (c *Connection) sendParcel(parcel Parcel) {
 	//}
 	//c.conn.SetWriteDeadline(deadline)
 	encode := c.encoder
+	parcel.DebugTravel.Touch("Connection.sendParcel(), encode")
 	err := encode.Encode(parcel)
 	switch {
 	case nil == err:
@@ -503,6 +504,7 @@ func (c *Connection) processReceives() {
 				c.metrics.BytesReceived += message.Header.Length
 				c.metrics.MessagesReceived += 1
 				message.Header.PeerAddress = c.peer.Address
+				message.DebugTravel.Touch("Connection.processReceives(), decode, enqueue RecieveParcel")
 				c.ReceiveParcel <- &message
 				c.TimeLastpacket = time.Now()
 			default: // error

@@ -476,6 +476,7 @@ func (c *Controller) route() {
 				}
 			}
 			parcel.Header.TargetPeer = bestKey
+
 			c.doDirectedSend(parcel)
 		default: // Check if we're connected to the peer, if not drop message.
 			c.logger.Debugf("Controller.route() Directed Neither Random nor Broadcast: %s Type: %s ", parcel.Header.TargetPeer, parcel.Header.AppType)
@@ -487,6 +488,7 @@ func (c *Controller) route() {
 func (c *Controller) doDirectedSend(parcel Parcel) {
 	connection, present := c.connections[parcel.Header.TargetPeer]
 	if present { // We're still connected to the target
+		parcel.DebugTravel.Touch("Controller.doDirectSend(), enqueue SendChannel")
 		BlockFreeChannelSend(connection.SendChannel, ConnectionParcel{Parcel: parcel})
 	}
 }

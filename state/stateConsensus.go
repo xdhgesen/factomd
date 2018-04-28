@@ -266,6 +266,7 @@ emptyLoop:
 	for {
 		select {
 		case msg := <-s.msgQueue:
+			s.msgQueueStats.AddTime(time.Since(msg.GetDebugTimestamp().DebugTime).Seconds())
 			s.LogMessage("msgQueue", "Execute", msg)
 			if s.executeMsg(vm, msg) && !msg.IsPeer2Peer() {
 				msg.SendOut(s, msg)

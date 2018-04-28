@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -38,6 +39,9 @@ type MessageBase struct {
 	Stalled     bool // This message is currently stalled
 	MarkInvalid bool
 	Sigvalid    bool
+
+	// Debug related
+	DebugTravel globals.DebugTravel
 }
 
 func (m *MessageBase) Resend_(s interfaces.IState, msg interfaces.IMsg, cnt int, delay int) {
@@ -119,8 +123,22 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 		}
 	}
 
+	m.DebugTravel.Start(s.GetFactomNodeName() + "SendOut")
 	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 	s.NetworkOutMsgQueue().Enqueue(msg)
+}
+
+func (m *MessageBase) TouchDebugTravel(me string) {
+	m.DebugTravel.Touch(me)
+}
+
+// Timestamps to track travel time
+func (m *MessageBase) SetDebugTimestamp(dt globals.DebugTravel) {
+	m.DebugTravel = dt
+}
+
+func (m *MessageBase) GetDebugTimestamp() globals.DebugTravel {
+	return m.DebugTravel
 }
 
 func (m *MessageBase) GetNoResend() bool {

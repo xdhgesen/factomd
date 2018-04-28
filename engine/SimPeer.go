@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 )
@@ -21,6 +22,9 @@ var _ = bytes.Compare
 type SimPacket struct {
 	data []byte
 	sent int64 // Time in milliseconds
+
+	// This is used to track how long it takes for a message to travel around the queues
+	DebugTravel globals.DebugTravel
 }
 
 type SimPeer struct {
@@ -124,6 +128,8 @@ func (f *SimPeer) Send(msg interfaces.IMsg) error {
 	}
 	if len(f.BroadcastOut) < 9000 {
 		packet := SimPacket{data: data, sent: time.Now().UnixNano() / 1000000}
+		packet.DebugTravel = msg.GetDebugTimestamp()
+		packet.DebugTravel.Touch("SimPeer.Send(), enqueue BroadcastOut")
 		f.BroadcastOut <- &packet
 	}
 	return nil
@@ -152,11 +158,16 @@ func (f *SimPeer) Receive() (interfaces.IMsg, error) {
 
 	if f.Delayed != nil && now-f.Delayed.sent > f.DelayUse {
 		data := f.Delayed.data
+		debugTravel := f.Delayed.DebugTravel
 		f.Delayed = nil
 		msg, err := msgsupport.UnmarshalMessage(data)
 		if err != nil {
 			fmt.Printf("SimPeer ERROR: %s %x %s\n", err.Error(), data[:8], constants.MessageName(data[0]))
 		}
+
+		// Setting the debug time to track time it takes to travel through queues
+		debugTravel.Touch("SimPeer.Receive()")
+		msg.SetDebugTimestamp(debugTravel)
 
 		f.bytesIn += len(data)
 		f.computeBandwidth()

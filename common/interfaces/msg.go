@@ -5,6 +5,7 @@
 package interfaces
 
 import (
+	"github.com/FactomProject/factomd/common/globals"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -112,6 +113,12 @@ type IMsg interface {
 
 	// Equivalent to String() for logging
 	LogFields() log.Fields
+
+	// These timestamps are on msgbase and can be used to track how long
+	// it takes a message to travel around the qeueues
+	GetDebugTimestamp() globals.DebugTravel
+	SetDebugTimestamp(globals.DebugTravel)
+	TouchDebugTravel(me string)
 }
 
 // Internal Messaging supporting Elections
