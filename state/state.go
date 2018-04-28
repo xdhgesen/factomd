@@ -168,7 +168,7 @@ type State struct {
 	ackQueue               chan interfaces.IMsg
 	msgQueue               chan interfaces.IMsg
 
-	msgQueueStats *Statistic
+	msgQueueStats *DebugTravelStatistics
 
 	ShutdownChan chan int // For gracefully halting Factom
 	JournalFile  string
@@ -840,7 +840,7 @@ func (s *State) Init() {
 	s.UpdateEntryHash = make(chan *EntryUpdate, 10000)             //Handles entry hashes and updating Commit maps.
 	s.WriteEntry = make(chan interfaces.IEBEntry, 3000)            //Entries to be written to the database
 
-	s.msgQueueStats = NewStatistic(1000)
+	s.msgQueueStats = NewDebugTravelStatistics(200, s.FactomNodeName)
 
 	if s.Journaling {
 		f, err := os.Create(s.JournalFile)

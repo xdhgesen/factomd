@@ -123,7 +123,7 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 		}
 	}
 
-	m.DebugTravel.Start(s.GetFactomNodeName() + "SendOut")
+	m.DebugTravel.Start(s.GetFactomNodeName()+"SendOut", msg.Type())
 	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 	s.NetworkOutMsgQueue().Enqueue(msg)
 }
