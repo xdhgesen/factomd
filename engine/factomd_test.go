@@ -91,7 +91,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=8",
+		"-blktime=10",
 		"-count=10",
 		"-logPort=37000",
 		"-port=37001",
@@ -398,8 +398,8 @@ func TestAnElection(t *testing.T) {
 
 	CheckAuthoritySet(leaders, audits, t)
 
-	runCmd("R50")
-	WaitBlocks(state0, 30)
+	//runCmd("R50")
+	//WaitBlocks(state0, 30)
 
 	runCmd(fmt.Sprintf("%d", leaders-1))
 	runCmd("x")

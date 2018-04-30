@@ -54,8 +54,22 @@ func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) 
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, comment, msg)
+
+		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), syncState(s), logName, comment, msg)
 	}
+}
+func syncState(s *State) string {
+	var syncState string
+	if s.Syncing {
+		syncState += "s"
+	}
+	if s.DBSig {
+		syncState += "d"
+	}
+	if s.EOM {
+		syncState += "e"
+	}
+	return syncState
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
@@ -64,7 +78,7 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
+		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), syncState(s), logName, format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
@@ -339,12 +353,11 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // review if this is a leader, and those messages are that leader's
 // responsibility
 func (s *State) ReviewHolding() {
-
-	preReviewHoldingTime := time.Now()
 	if len(s.XReview) > 0 || s.Syncing {
 		return
 	}
 
+	preReviewHoldingTime := time.Now()
 	now := s.GetTimestamp()
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
@@ -369,8 +382,8 @@ func (s *State) ReviewHolding() {
 
 	// Set this flag, so it acts as a constant.  We will set s.LeaderNewMin to false
 	// after processing the Holding Queue.  Ensures we only do this one per minute.
-	processMinute := s.LeaderNewMin // Have we processed this minute
-	s.LeaderNewMin++                // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
+	//	processMinute := s.LeaderNewMin // Have we processed this minute
+	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
 	for k, v := range s.Holding {
 		ack := s.Acks[k]
@@ -501,11 +514,11 @@ func (s *State) ReviewHolding() {
 				s.Commits.Delete(re.GetHash().Fixed())
 				continue
 			}
-			// Only reprocess if at the top of a new minute, and if we are a leader.
-			if processMinute < 10 {
-				continue // No need for followers to review Reveal Entry messages
-			}
-			re.SendOut(s, re)
+			//// Only reprocess if at the top of a new minute, and if we are a leader.
+			//if processMinute < 10 {
+			//	continue // No need for followers to review Reveal Entry messages
+			//}
+			//re.SendOut(s, re)
 			// Needs to be our VMIndex as well, or ignore.
 			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
 				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
