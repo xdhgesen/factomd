@@ -416,6 +416,13 @@ func (s *State) ReviewHolding() {
 			delete(s.Holding, k)
 			continue
 		case 0:
+			switch v.Type() {
+			case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
+				if !s.NoEntryYet(v.GetHash(), nil) {
+					continue
+				}
+			}
+
 			continue
 		}
 
