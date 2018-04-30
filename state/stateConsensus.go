@@ -470,12 +470,12 @@ func (s *State) ReviewHolding() {
 				continue
 			}
 			// Only reprocess if at the top of a new minute, and if we are a leader.
-			if !processMinute || !s.Leader {
+			if !processMinute {
 				continue // No need for followers to review Reveal Entry messages
 			}
 			re.SendOut(s, re)
 			// Needs to be our VMIndex as well, or ignore.
-			if re.GetVMIndex() != s.LeaderVMIndex {
+			if !s.Leader || re.GetVMIndex() != s.LeaderVMIndex {
 				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
 			}
 		}
@@ -1050,6 +1050,8 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 
 	s.Holding[m.GetMsgHash().Fixed()] = m // hold in  FollowerExecuteRevealEntry
 
+	m.SendOut(s, m)
+
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack == nil {
@@ -1060,7 +1062,6 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	//ack.SendOut(s, ack)
 	m.SetLeaderChainID(ack.GetLeaderChainID())
 	m.SetMinute(ack.Minute)
-	m.SendOut(s, m)
 
 	pl := s.ProcessLists.Get(ack.DBHeight)
 	if pl == nil {

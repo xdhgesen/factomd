@@ -88,7 +88,7 @@ func (state *State) ValidatorLoop() {
 			default:
 			}
 
-			for i := 0; i < 1; i++ {
+			for i := 0; i < 1 && cap(state.msgQueue) > len(state.msgQueue)+5; i++ {
 				if ackRoom == 1 || msgRoom == 1 {
 					break // no room
 				}
@@ -115,17 +115,40 @@ func (state *State) ValidatorLoop() {
 					if state.IsReplaying == true {
 						state.ReplayTimestamp = msg.GetTimestamp()
 					}
-					if t := msg.Type(); t == constants.ACK_MSG {
+					switch msg.Type() {
+					case constants.ACK_MSG:
 						state.LogMessage("ackQueue", "enqueue", msg)
 						state.ackQueue <- msg //
-					} else {
-						if t == constants.COMMIT_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.REVEAL_ENTRY_MSG {
-							state.Holding[msg.GetMsgHash().Fixed()] = msg
-						}
-						state.LogMessage("msgQueue", "enqueue", msg)
-
-						state.msgQueue <- msg //
+					case constants.REVEAL_ENTRY_MSG:
+						state.Holding[msg.GetMsgHash().Fixed()] = msg
+					case constants.COMMIT_CHAIN_MSG:
+						state.Holding[msg.GetMsgHash().Fixed()] = msg
+					case constants.COMMIT_ENTRY_MSG:
+						state.Holding[msg.GetMsgHash().Fixed()] = msg
+					case constants.MISSING_MSG_RESPONSE:
 					}
+					state.LogMessage("msgQueue", "enqueue", msg)
+					for i := 0; i < 1000 && state.InMsgQueue().Length() > 50 && cap(state.msgQueue) > len(state.msgQueue)-5; i++ {
+						switch msg.Type() {
+						case constants.MISSING_MSG:
+							if state.InMsgQueue().Length() < constants.INMSGQUEUE_LOW {
+								state.LogMessage("msgQueue", "enqueue", msg)
+								state.msgQueue <- msg //
+							}
+						case constants.MISSING_MSG_RESPONSE:
+							if state.InMsgQueue().Length() < constants.INMSGQUEUE_LOW {
+								state.LogMessage("msgQueue", "enqueue", msg)
+								state.msgQueue <- msg //
+							}
+						default:
+							state.LogMessage("msgQueue", "enqueue", msg)
+							state.msgQueue <- msg //
+						}
+						msg = state.InMsgQueue().Dequeue()
+					}
+
+					state.msgQueue <- msg //
+
 				}
 				ackRoom = cap(state.ackQueue) - len(state.ackQueue)
 				msgRoom = cap(state.msgQueue) - len(state.msgQueue)
