@@ -97,23 +97,27 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		} else if msg.Resend(s) {
 			msg.SendOut(s, msg)
 		}
+		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if !s.NoEntryYet(msg.GetHash(), nil) {
+				return true
+			}
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		}
 
-		switch msg.Type() {
-		case constants.REVEAL_ENTRY_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
-		case constants.COMMIT_ENTRY_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
-		case constants.COMMIT_CHAIN_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		// Cheap tests to direct messages to follower handling
+		// RunLeader means we can run as a leader, Leader means we are one,
+		// Saving means we are between blocks and can't do leader things, and
+		if !s.RunLeader || !s.Leader || s.Saving {
+			msg.FollowerExecute(s)
+			ret = true
+			return
+		}
+
+		// If we already have an ack for a message, we are also done
+		if s.Acks[msg.GetHash().Fixed()] != nil {
+			msg.FollowerExecute(s)
+			ret = true
+			return
 		}
 
 		var vml int
@@ -126,10 +130,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		vmi := msg.GetVMIndex()
 		hkb := s.GetHighestKnownBlock()
 
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving &&
-			vm != nil && int(vm.Height) == vml &&
+		if vm != nil && int(vm.Height) == vml &&
 			(!s.Syncing || !vm.Synced) &&
 			(local || vmi == s.LeaderVMIndex) &&
 			s.LeaderPL.DBHeight+1 >= hkb {
@@ -149,6 +150,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		ret = true
 
 	case 0:
+		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if !s.NoEntryYet(msg.GetHash(), nil) {
+				return true
+			}
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		}
 		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
 		// this check makes sure we don't put them back in holding after just deleting them
 		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
@@ -358,9 +365,6 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 
 	preReviewHoldingTime := time.Now()
-	if len(s.XReview) > 0 || s.Syncing || s.Saving {
-		return
-	}
 
 	now := s.GetTimestamp()
 	if s.ResendHolding == nil {
@@ -389,12 +393,33 @@ func (s *State) ReviewHolding() {
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
+	for k, _ := range s.Acks {
+		v := s.Holding[k]
+		if v != nil {
+			v.FollowerExecute(s)
+		}
+	}
+
+	if len(s.XReview) > 0 || s.Syncing || s.Saving {
+		return
+	}
+
+	// Get the count on processing minutes.
+	processMinute := s.LeaderNewMin
+	s.LeaderNewMin++
+
+	hldcnt := 0
 	for k, v := range s.Holding {
+		hldcnt++
 		ack := s.Acks[k]
 		if ack != nil {
 			s.LogMessage("executeMsg", "Found Ack for this thing in Holding", v)
 			v.FollowerExecute(s)
 			continue
+		}
+		// Only reprocess if at the top of a new minute, and if we are a leader.
+		if processMinute > 10 {
+			continue // No need for followers to review Reveal Entry messages
 		}
 
 		if v.Expire(s) {
@@ -405,6 +430,33 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
+		if int(highest)-int(saved) > 1000 {
+			TotalHoldingQueueOutputs.Inc()
+			delete(s.Holding, k)
+		}
+
+		_, okre := v.(*messages.RevealEntryMsg)
+
+		if hldcnt < 100 && okre {
+			if !s.NoEntryYet(v.GetHash(), s.LeaderTimestamp) {
+				delete(s.Holding, k)
+				continue
+			}
+		}
+
+		if hldcnt > 500 && len(s.Holding) > 500 {
+			if t := v.Type(); t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+				// Always process these.
+			} else if t == constants.MISSING_MSG_RESPONSE {
+				delete(s.Holding, k) // Ignore if we are behind the 8 ball.
+				continue
+			} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
+				// Always process these
+			} else {
+				continue // Dont' review anything else.
+			}
+		}
+
 		switch v.Validate(s) {
 		case -1:
 			s.LogMessage("executeMsg", "invalid from holding", v)
@@ -412,13 +464,6 @@ func (s *State) ReviewHolding() {
 			delete(s.Holding, k)
 			continue
 		case 0:
-			switch v.Type() {
-			case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
-				if !s.NoEntryYet(v.GetHash(), nil) {
-					continue
-				}
-			}
-
 			continue
 		}
 
@@ -430,9 +475,18 @@ func (s *State) ReviewHolding() {
 			}
 		}
 
-		if int(highest)-int(saved) > 1000 {
-			TotalHoldingQueueOutputs.Inc()
-			delete(s.Holding, k)
+		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
+		if okre {
+			if !s.NoEntryYet(v.GetHash(), s.GetLeaderTimestamp()) {
+				delete(s.Holding, v.GetHash().Fixed())
+				s.Commits.Delete(v.GetHash().Fixed())
+				continue
+			}
+
+			// Needs to be our VMIndex as well, or ignore.
+			if v.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
+				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+			}
 		}
 
 		eom, ok := v.(*messages.EOM)
@@ -488,22 +542,6 @@ func (s *State) ReviewHolding() {
 			}
 		}
 
-		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
-		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
-				delete(s.Holding, re.GetHash().Fixed())
-				s.Commits.Delete(re.GetHash().Fixed())
-				continue
-			}
-			// Only reprocess if at the top of a new minute, and if we are a leader.
-			//if processMinute > 10 {
-			//	continue // No need for followers to review Reveal Entry messages
-			//}
-			// Needs to be our VMIndex as well, or ignore.
-			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
-				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
-			}
-		}
 		//TODO: Move this earlier!
 		// We don't reprocess messages if we are a leader, but it ain't ours!
 		if s.LeaderVMIndex != v.GetVMIndex() {

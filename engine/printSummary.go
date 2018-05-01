@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"runtime"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
 )
@@ -27,7 +29,11 @@ var out string // previous status
 func PrintOneStatus(listenTo int, wsapiNode int) {
 	f := fnodes[listenTo]
 	prt := "===SummaryStart===\n\n"
-	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, time.Now().Unix(), time.Now().String(), time.Since(globals.StartTime).String())
+	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s goroutines: %d\n",
+		prt, time.Now().Unix(),
+		time.Now().String(),
+		time.Since(globals.StartTime).String(),
+		runtime.NumGoroutine())
 
 	for i, f := range fnodes {
 		f.Index = i

@@ -124,7 +124,7 @@ func Peers(fnode *FactomNode) {
 		cnt := 0
 		now := fnode.State.GetTimestamp()
 
-		for i := 0; i < 100 && fnode.State.APIQueue().Length() > 0; i++ {
+		for i := 0; i < 100 && fnode.State.InMsgQueue().Length() < 1000 && fnode.State.APIQueue().Length() > 0; i++ {
 			msg := fnode.State.APIQueue().Dequeue()
 
 			if msg == nil {
