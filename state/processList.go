@@ -897,8 +897,6 @@ func (p *ProcessList) DecodeState() string {
 
 }
 
-var nillist map[int]int = make(map[int]int)
-
 // Process messages and update our state.
 func (p *ProcessList) Process(state *State) (progress bool) {
 	dbht := state.GetHighestSavedBlk()
@@ -946,14 +944,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 						p.Ask(i, uint32(k), 10) // Ask 10ms
 					}
 				}
-				if p.State.DebugExec() {
-					if nillist[i] < j {
-						p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
-						nillist[i] = j
-					}
-				}
-
-				//				p.State.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
 				break VMListLoop
 			}
 
