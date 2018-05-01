@@ -104,6 +104,7 @@ func getmsg(hash [32]byte) string {
 	}
 	return rval
 }
+
 func LogMessage(name string, note string, msg interfaces.IMsg) {
 
 	traceMutex.Lock()

@@ -106,7 +106,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
 		if msg.GetResendCnt() == 0 {
-		msg.SendOut(s, msg)
+			msg.SendOut(s, msg)
 		} else if msg.Resend(s) {
 			msg.SendOut(s, msg)
 		}
@@ -371,7 +371,6 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // responsibility
 func (s *State) ReviewHolding() {
 
-	preReviewHoldingTime := time.Now()
 	if len(s.XReview) > 0 || s.Syncing || s.Saving {
 		return
 	}
@@ -402,7 +401,7 @@ func (s *State) ReviewHolding() {
 	// Set this flag, so it acts as a constant.  We will set s.LeaderNewMin to false
 	// after processing the Holding Queue.  Ensures we only do this one per minute.
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
-	s.LeaderNewMin++                // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
+	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
 	for k, v := range s.Holding {
 		ack := s.Acks[k]

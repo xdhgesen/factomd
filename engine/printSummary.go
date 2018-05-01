@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -65,7 +66,10 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 			api = "w"
 		}
 
-		prt = prt + fmt.Sprintf("%3d %1s%1s %s \n", i, in, api, f.State.ShortString())
+		prt = prt + fmt.Sprintf("%3d %1s%1s %s ", i, in, api, f.State.ShortString())
+		s := f.State.LeaderPL.DecodeState()
+		prt += s[strings.Index(s, "0x"):] + "\n"
+
 	}
 
 	if listenTo < len(fnodes) {

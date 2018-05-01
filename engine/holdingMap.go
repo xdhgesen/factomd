@@ -10,13 +10,13 @@ import (
 // if your key is not an interface type you maybe want to
 // hold pointers to keys here instead of copies
 type kv struct {
-	k KeyType
+	k [32]byte
 	v imessage.IMessage
 }
 
 // Define the internal structure
 type FifoMap struct {
-	Map  map[KeyType]*list.Element
+	Map  map[[32]byte]*list.Element
 	List list.List
 }
 
@@ -27,19 +27,19 @@ func NewFifoMap() (m *FifoMap) {
 
 // initialize a map to empty state
 func (m *FifoMap) Init() *FifoMap {
-	m.Map = make(map[KeyType]*list.Element)
+	m.Map = make(map[[32]byte]*list.Element)
 	m.List.Init()
 	return m
 }
 
 // Add a key value pair to the map
-func (m *FifoMap) Add(k KeyType, v imessage.IMessage) {
+func (m *FifoMap) Add(k [32]byte, v imessage.IMessage) {
 	m.List.PushBack(kv{k, v}) // add it to the end of the list
 	m.Map[k] = m.List.Back()  // add the element to the map
 }
 
 // delete a key, return the matching value
-func (m *FifoMap) Delete(k KeyType) (v imessage.IMessage, ok bool) {
+func (m *FifoMap) Delete(k [32]byte) (v imessage.IMessage, ok bool) {
 	e, ok := m.Map[k]
 	if ok {
 		delete(m.Map, k)
@@ -50,7 +50,7 @@ func (m *FifoMap) Delete(k KeyType) (v imessage.IMessage, ok bool) {
 }
 
 // retrieve an element from the map
-func (m *FifoMap) Get(k KeyType) (v imessage.IMessage, ok bool) {
+func (m *FifoMap) Get(k [32]byte) (v imessage.IMessage, ok bool) {
 	e, ok := m.Map[k]
 	if ok {
 		return e.Value.(kv).v, true
@@ -67,7 +67,7 @@ func (m *FifoMap) Len() int {
 }
 
 // Function type to pass to iterator, returns true to continue
-type worker func(m *FifoMap, k KeyType, v imessage.IMessage) bool
+type worker func(m *FifoMap, k [32]byte, v imessage.IMessage) bool
 
 // Execute function w for each element in the map until w returns false or has visited every element
 // Return count of elements visited

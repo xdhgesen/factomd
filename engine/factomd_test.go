@@ -131,7 +131,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-controlpanelport=37002",
 		"-networkport=37003",
 		"-startdelay=1",
-		"-debuglog=F.*",
+		//"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=out.txt",
 	)
@@ -274,15 +274,15 @@ func TestSetupANetwork(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 	PrintOneStatus(0, 0)
-	if state0.LLeaderHeight > 14 {
-		t.Fatal("Failed to shut down factomd via ShutdownChan")
+	if state0.LLeaderHeight > 15 {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight 15 got %d", state0.LLeaderHeight)
 	}
+}
 
 func TestLoad(t *testing.T) {
 	if ranSimTest {
 		return
-
-
+	}
 	ranSimTest = true
 
 	runCmd := func(cmd string) {
@@ -377,7 +377,7 @@ func TestMakeALeader(t *testing.T) {
 		"-db=Map",
 		"-network=LOCAL",
 		"-enablenet=true",
-		"-blktime=15",
+		"-blktime=60",
 		"-count=2",
 		"-startdelay=1",
 		"-debuglog=F.*",
@@ -428,6 +428,7 @@ func TestMakeALeader(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 2", leadercnt)
 	}
 }
+
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return

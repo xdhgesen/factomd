@@ -184,7 +184,6 @@ func DeepStateDisplayCopyDifference(s *State, prev *DisplayState) (*DisplayState
 
 	prt := "===SummaryStart===\n"
 	s.Status = 1
-	prt = prt + fmt.Sprintf("%s \n", s.ShortString())
 	fnodes := make([]*State, 0)
 	fnodes = append(fnodes, s)
 	prt = prt + messageLists(fnodes)
