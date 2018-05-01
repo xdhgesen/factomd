@@ -124,7 +124,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=15",
+		"-blktime=8",
 		"-count=10",
 		"-logPort=37000",
 		"-port=37001",
@@ -186,6 +186,7 @@ func TestSetupANetwork(t *testing.T) {
 		}
 	}
 
+	PrintOneStatus(0, 0)
 	if leadercnt != 4 {
 		t.Fatalf("found %d leaders, expected 4", leadercnt)
 	}
@@ -200,6 +201,7 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("g10")
 
 	fn1 := GetFocus()
+	PrintOneStatus(0, 0)
 	if fn1.State.FactomNodeName != "FNode07" {
 		t.Fatalf("Expected FNode07, but got %s", fn1.State.FactomNodeName)
 	}
@@ -226,6 +228,7 @@ func TestSetupANetwork(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	fn2 := GetFocus()
+	PrintOneStatus(0, 0)
 	if fn2.State.FactomNodeName != "FNode08" {
 		t.Fatalf("Expected FNode08, but got %s", fn1.State.FactomNodeName)
 	}
@@ -271,8 +274,9 @@ func TestSetupANetwork(t *testing.T) {
 	}
 
 	time.Sleep(10 * time.Second)
-	if state0.LLeaderHeight > 14 {
-		t.Fatal("Failed to shut down factomd via ShutdownChan")
+	PrintOneStatus(0, 0)
+	if state0.LLeaderHeight > 15 {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight 15 got %d", state0.LLeaderHeight)
 	}
 }
 
@@ -532,7 +536,6 @@ func TestAnElection(t *testing.T) {
 
 	CheckAuthoritySet(leaders, audits, t)
 
-	// Now swap back...
 	WaitBlocks(state0, 1)
 
 	t.Log("Shutting down the network")
@@ -544,6 +547,11 @@ func TestAnElection(t *testing.T) {
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
 	if state0.LLeaderHeight > 9 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
+	}
+	j := state0.SyncingStateCurrent
+	for range state0.SyncingState {
+		fmt.Println(state0.SyncingState[j])
+		j = (j - 1 + len(state0.SyncingState)) % len(state0.SyncingState)
 	}
 }
 
