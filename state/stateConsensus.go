@@ -54,8 +54,21 @@ func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) 
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, comment, msg)
+		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), syncState(s), logName, comment, msg)
 	}
+}
+func syncState(s *State) string {
+	var syncState string
+	if s.Syncing {
+		syncState += "s"
+	}
+	if s.DBSig {
+		syncState += "d"
+	}
+	if s.EOM {
+		syncState += "e"
+	}
+	return syncState
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
@@ -64,7 +77,7 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
+		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), syncState(s), logName, format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
@@ -93,7 +106,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
 		if msg.GetResendCnt() == 0 {
-			msg.SendOut(s, msg)
+		msg.SendOut(s, msg)
 		} else if msg.Resend(s) {
 			msg.SendOut(s, msg)
 		}
@@ -154,6 +167,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
 			TotalHoldingQueueInputs.Inc()
 			TotalHoldingQueueRecycles.Inc()
+
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		} else {
 			s.LogMessage("executeMsg", "drop, IReplay", msg)
@@ -362,6 +376,7 @@ func (s *State) ReviewHolding() {
 		return
 	}
 
+	preReviewHoldingTime := time.Now()
 	now := s.GetTimestamp()
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
@@ -387,7 +402,7 @@ func (s *State) ReviewHolding() {
 	// Set this flag, so it acts as a constant.  We will set s.LeaderNewMin to false
 	// after processing the Holding Queue.  Ensures we only do this one per minute.
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
-	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
+	s.LeaderNewMin++                // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
 	for k, v := range s.Holding {
 		ack := s.Acks[k]
@@ -458,9 +473,9 @@ func (s *State) ReviewHolding() {
 		}
 
 		// If it is an entryCommit/ChainCommit/RevealEntry and it has a duplicate hash to an existing entry throw it away here
-
 		ce, ok := v.(*messages.CommitEntryMsg)
 		if ok {
+
 			x := s.NoEntryYet(ce.CommitEntry.EntryHash, ce.CommitEntry.GetTimestamp())
 			if !x {
 				TotalHoldingQueueOutputs.Inc()
@@ -473,6 +488,7 @@ func (s *State) ReviewHolding() {
 
 		cc, ok := v.(*messages.CommitChainMsg)
 		if ok {
+
 			x := s.NoEntryYet(cc.CommitChain.EntryHash, cc.CommitChain.GetTimestamp())
 			if !x {
 				TotalHoldingQueueOutputs.Inc()
@@ -497,6 +513,7 @@ func (s *State) ReviewHolding() {
 				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
 			}
 		}
+
 		//TODO: Move this earlier!
 		// We don't reprocess messages if we are a leader, but it ain't ours!
 		if s.LeaderVMIndex != v.GetVMIndex() {
@@ -1068,7 +1085,6 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack == nil {
-		// todo: prevent this log from double logging
 		s.LogMessage("executeMsg", "hold, no ack yet", m)
 		return
 	}
@@ -1101,6 +1117,8 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	pl.PendingChainHeads.Put(msg.Entry.GetChainID().Fixed(), msg)
 	// Okay the Reveal has been recorded.  Record this as an entry that cannot be duplicated.
 	s.Replay.IsTSValidAndUpdateState(constants.REVEAL_REPLAY, msg.Entry.GetHash().Fixed(), msg.Timestamp, s.GetLeaderTimestamp())
+	m.SendOut(s, m)
+
 }
 
 func (s *State) LeaderExecute(m interfaces.IMsg) {
@@ -1207,7 +1225,7 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 		return
 	}
 	if len(pl.VMs[dbs.VMIndex].List) > 0 {
-		s.LogMessage("executeMsg", "drop, slot 0 taken by", pl.VMs[dbs.VMIndex].List[0])
+		s.LogMessage("executeMsg", "drop len(pl.VMs[dbs.VMIndex].List) > 0", m)
 		return
 	}
 
@@ -1266,6 +1284,11 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 	LeaderExecutions.Inc()
 	re := m.(*messages.RevealEntryMsg)
 	eh := re.Entry.GetHash()
+
+	// If we have already recorded a Reveal Entry with this hash in this period, just ignore.
+	if !s.Replay.IsHashUnique(constants.REVEAL_REPLAY, eh.Fixed()) {
+		return
+	}
 
 	ack := s.NewAck(m, nil).(*messages.Ack)
 
@@ -1422,7 +1445,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	}
 	// Handle the case that this is a Entry Chain create
 	// Must be built with CommitChain (i.e. !msg.IsEntry).  Also
-	// cannot have an existing chain (eb and eb_db == nil)
+	// cannot have an existing chaing (eb and eb_db == nil)
 	if !msg.IsEntry && eb == nil && eb_db == nil {
 		// Create a new Entry Block for a new Entry Block Chain
 		eb = entryBlock.NewEBlock()

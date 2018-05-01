@@ -131,7 +131,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-controlpanelport=37002",
 		"-networkport=37003",
 		"-startdelay=1",
-		//		"-debuglog=F.*",
+		"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=out.txt",
 	)
@@ -185,7 +185,6 @@ func TestSetupANetwork(t *testing.T) {
 			auditcnt++
 		}
 	}
-
 	PrintOneStatus(0, 0)
 	if leadercnt != 4 {
 		t.Fatalf("found %d leaders, expected 4", leadercnt)
@@ -275,15 +274,14 @@ func TestSetupANetwork(t *testing.T) {
 
 	time.Sleep(10 * time.Second)
 	PrintOneStatus(0, 0)
-	if state0.LLeaderHeight > 15 {
-		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight 15 got %d", state0.LLeaderHeight)
+	if state0.LLeaderHeight > 14 {
+		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
-}
 
 func TestLoad(t *testing.T) {
 	if ranSimTest {
 		return
-	}
+
 
 	ranSimTest = true
 
@@ -359,6 +357,7 @@ func TestLoad(t *testing.T) {
 	fmt.Printf("Wrote at %v entries/sec\n", float64(y-x)/deltat.Seconds())
 
 } // testLoad(){...}
+
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
 		return
@@ -481,8 +480,8 @@ func TestAnElection(t *testing.T) {
 	for _, fn := range GetFnodes() {
 		go stallDetect(t, fn.State)
 	}
-
 	WaitMinutes(state0, 2)
+
 	runCmd("g6")
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
@@ -518,6 +517,9 @@ func TestAnElection(t *testing.T) {
 
 	CheckAuthoritySet(leaders, audits, t)
 
+	//runCmd("R50")
+	//WaitBlocks(state0, 30)
+
 	runCmd(fmt.Sprintf("%d", leaders-1))
 	runCmd("x")
 	WaitBlocks(state0, 3)
@@ -548,11 +550,13 @@ func TestAnElection(t *testing.T) {
 	if state0.LLeaderHeight > 9 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
+
 	j := state0.SyncingStateCurrent
 	for range state0.SyncingState {
 		fmt.Println(state0.SyncingState[j])
 		j = (j - 1 + len(state0.SyncingState)) % len(state0.SyncingState)
 	}
+
 }
 
 func TestMultiple2Election(t *testing.T) {

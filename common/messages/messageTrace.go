@@ -243,16 +243,16 @@ func LogParcel(name string, note string, msg string) {
 }
 
 // Log a message with a state timestamp
-func StateLogMessage(FactomNodeName string, DBHeight int, CurrentMinute int, logName string, comment string, msg interfaces.IMsg) {
+func StateLogMessage(FactomNodeName string, DBHeight int, CurrentMinute int, syncState string, logName string, comment string, msg interfaces.IMsg) {
 	logFileName := FactomNodeName + "_" + logName + ".txt"
-	t := fmt.Sprintf("%d-:-%d ", DBHeight, CurrentMinute)
+	t := fmt.Sprintf("%d-:-%d%s ", DBHeight, CurrentMinute,syncState)
 	LogMessage(logFileName, t+comment, msg)
 }
 
 // Log a printf with a state timestamp
-func StateLogPrintf(FactomNodeName string, DBHeight int, CurrentMinute int, logName string, format string, more ...interface{}) {
+func StateLogPrintf(FactomNodeName string, DBHeight int, CurrentMinute int, syncState string,  logName string, format string, more ...interface{}) {
 	logFileName := FactomNodeName + "_" + logName + ".txt"
-	t := fmt.Sprintf("%d-:-%d ", DBHeight, CurrentMinute)
+	t := fmt.Sprintf("%d-:-%d%s ", DBHeight, CurrentMinute,syncState)
 	LogPrintf(logFileName, t+format, more...)
 }
 
