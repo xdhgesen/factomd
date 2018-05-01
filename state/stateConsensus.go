@@ -54,8 +54,21 @@ func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) 
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, comment, msg)
+		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), syncState(s), logName, comment, msg)
 	}
+}
+func syncState(s *State) string {
+	var syncState string
+	if s.Syncing {
+		syncState += "s"
+	}
+	if s.DBSig {
+		syncState += "d"
+	}
+	if s.EOM {
+		syncState += "e"
+	}
+	return syncState
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
@@ -64,7 +77,7 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
+		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), syncState(s), logName, format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {

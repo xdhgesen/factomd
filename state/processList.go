@@ -862,10 +862,11 @@ var decodeMap map[foo]string = map[foo]string{
 func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone bool, EOMDone bool, FedServers int, EOMProcessed int, DBSigProcessed int) string {
 
 	if EOMProcessed > FedServers || EOMProcessed < 0 {
+		p.State.LogPrintf("faulting", "Unexpected EOMProcessed %v of %v", EOMProcessed, FedServers)
 		p.State.LogPrintf("process", "Unexpected EOMProcessed %v of %v", EOMProcessed, FedServers)
 	}
 	if DBSigProcessed > FedServers || DBSigProcessed < 0 {
-		p.State.LogPrintf("process", "Unexpected DBSigProcessed %v of %v", DBSigProcessed, FedServers)
+		p.State.LogPrintf("faulting", "Unexpected DBSigProcessed %v of %v", DBSigProcessed, FedServers)
 	}
 
 	var x foo = foo{Syncing, DBSig, EOM, DBSigDone, EOMDone,
@@ -881,9 +882,9 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 	s, ok := decodeMap[x]
 	if !ok {
-
 		p.State.LogPrintf("process", "Unexpected 0x%03x %v", xx, x)
 		s = "Unknown"
+		p.State.LogPrintf("faulting", "Unexpected State 0x%03x %v", xx, x)
 	}
 	// divide processCnt by a big number to make it not change the status string very often
 	return fmt.Sprintf("SyncingStatus: %d-:-%d 0x%03x %25s EOM/DBSIG %02d/%02d of %02d -- %d",
@@ -921,17 +922,17 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
 			state.processCnt++
-			if state.DebugExec() {
-				x := p.decodeState(state.Syncing, state.DBSig, state.EOM, state.DBSigDone, state.EOMDone,
-					len(state.LeaderPL.FedServers), state.EOMProcessed, state.DBSigProcessed)
+			// Do syncing state computation for the control pannel
+			x := p.decodeState(state.Syncing, state.DBSig, state.EOM, state.DBSigDone, state.EOMDone,
+				len(state.LeaderPL.FedServers), state.EOMProcessed, state.DBSigProcessed)
 
-				// Compute a syncing state string and report if it has changed
-				if state.SyncingState[state.SyncingStateCurrent] != x {
-					state.LogPrintf("processStatus", x)
-					state.SyncingStateCurrent = (state.SyncingStateCurrent + 1) % len(state.SyncingState)
-					state.SyncingState[state.SyncingStateCurrent] = x
-				}
+			// Compute a syncing state string and report if it has changed
+			if state.SyncingState[state.SyncingStateCurrent] != x {
+				state.LogPrintf("processStatus", x)
+				state.SyncingStateCurrent = (state.SyncingStateCurrent + 1) % len(state.SyncingState)
+				state.SyncingState[state.SyncingStateCurrent] = x
 			}
+
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
 				cnt := 0
@@ -1206,7 +1207,7 @@ func (p *ProcessList) AddDBSig(serverID interfaces.IHash, sig interfaces.IFullSi
 	dbsig.ChainID = serverID
 	dbsig.Signature = sig
 	found, dbsig.VMIndex = p.GetVirtualServers(0, serverID) //set the vmindex of the dbsig to the vm this server should sign
-	if !found {                                             // Should never happen.
+	if !found { // Should never happen.
 		return
 	}
 	p.DBSignatures = append(p.DBSignatures, *dbsig)

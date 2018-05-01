@@ -796,6 +796,10 @@ func (s *State) GetSalt(ts interfaces.Timestamp) uint32 {
 	return binary.BigEndian.Uint32(c.Bytes())
 }
 
+func (s *State)CheckFileName(name string) bool {
+	return messages.CheckFileName(name)
+}
+
 func (s *State) Init() {
 
 	if s.Salt == nil {
