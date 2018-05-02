@@ -1041,7 +1041,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 		msgResponse := messages.NewMissingMsgResponse(s, pl.System.List[m.SystemHeight], nil)
 		msgResponse.SetOrigin(m.GetOrigin())
 		msgResponse.SetNetworkOrigin(m.GetNetworkOrigin())
-		msgResponse.SendOut(s,msgResponse)
+		msgResponse.SendOut(s, msgResponse)
 		s.MissingRequestReplyCnt++
 		sent = true
 	}
@@ -1054,7 +1054,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 			msgResponse := messages.NewMissingMsgResponse(s, missingmsg, ackMsg)
 			msgResponse.SetOrigin(m.GetOrigin())
 			msgResponse.SetNetworkOrigin(m.GetNetworkOrigin())
-			msgResponse.SendOut(s,msgResponse)
+			msgResponse.SendOut(s, msgResponse)
 			s.MissingRequestReplyCnt++
 			sent = true
 		}
