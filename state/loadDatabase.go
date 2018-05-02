@@ -10,6 +10,8 @@ import (
 
 	"os"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
@@ -18,7 +20,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
-	"sync"
 )
 
 var _ = fmt.Print
@@ -28,6 +29,8 @@ func LoadDatabase(wg *sync.WaitGroup, s *State) {
 
 	wg.Done()
 	wg.Wait()
+
+	time.Sleep(20 * time.Second)
 
 	head, err := s.DB.FetchDBlockHead()
 	if err == nil && head != nil {

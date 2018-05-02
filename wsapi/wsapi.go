@@ -34,7 +34,7 @@ const (
 var Servers map[int]*web.Server
 var ServersMutex sync.Mutex
 
-func Start(state interfaces.IState) {
+func Start(wg *sync.WaitGroup, state interfaces.IState) {
 	RegisterPrometheus()
 	var server *web.Server
 
@@ -50,6 +50,9 @@ func Start(state interfaces.IState) {
 	h := sha256.New()
 	h.Write(httpBasicAuth(rpcUser, rpcPass))
 	state.SetRpcAuthHash(h.Sum(nil)) //set this in the beginning to prevent timing attacks
+
+	wg.Done()
+	wg.Wait()
 
 	if Servers[state.GetPort()] == nil {
 		server = web.NewServer()
