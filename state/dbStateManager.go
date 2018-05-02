@@ -629,7 +629,8 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 
 	for i := len(dbsl.DBStates) - 1; i >= 0; i-- {
 		if dbsl.DBStates[i].SaveStruct != nil {
-			dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
+			dbsl.State.LogPrintf("executeMsg", "Reset dbht %v", dbsl.DBStates[i].DirectoryBlock.GetHeader().GetDBHeight())
+			//dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
 			break
 		}
 	}
@@ -1081,7 +1082,13 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	prt("pl 2st", pl)
 	prt("pln 2st", pln)
 
-	pln2 := list.State.ProcessLists.Get(ht + 2)
+	s := list.State
+	p := s.ProcessLists
+	if p == nil {
+		panic("It is nil!")
+	}
+	ht2 := ht + 2
+	pln2 := p.Get(ht2)
 	pln2.FedServers = append(pln2.FedServers[:0], pln.FedServers...)
 	pln2.AuditServers = append(pln2.AuditServers[:0], pln.AuditServers...)
 

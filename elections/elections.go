@@ -400,7 +400,8 @@ func (e *Elections) ProcessWaiting() {
 }
 
 // Runs the main loop for elections for this instance of factomd
-func Run(s *state.State) {
+func Run(wg *sync.WaitGroup, s *state.State) {
+
 	e := new(Elections)
 	s.Elections = e
 	e.State = s
@@ -412,6 +413,9 @@ func Run(s *state.State) {
 	e.Timeout = time.Duration(FaultTimeout) * time.Second
 	e.RoundTimeout = time.Duration(RoundTimeout) * time.Second
 	e.Waiting = make(chan interfaces.IElectionMsg, 500)
+
+	wg.Done()
+	wg.Wait()
 
 	// Actually run the elections
 	for {
