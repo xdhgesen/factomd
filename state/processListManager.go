@@ -134,7 +134,7 @@ func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
 		} else {
 			prev = lists.Get(dbheight - 1)
 		}
-		pl := lists.Lists[i]
+		pl = lists.Lists[i]
 		if pl != nil {
 			pl.State.LogPrintf("process", "overwrite pl %d", pl.DBHeight)
 		}
