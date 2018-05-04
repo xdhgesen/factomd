@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -20,12 +22,13 @@ var _ = log.Printf
 var _ = fmt.Print
 
 func NetworkProcessorNet(fnode *FactomNode) {
-	go Peers(fnode)
-	go NetworkOutputs(fnode)
-	go InvalidOutputs(fnode)
+
 }
 
-func Peers(fnode *FactomNode) {
+func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
+	wg.Done()
+	wg.Wait()
+
 	saltReplayFilterOn := true
 
 	crossBootIgnore := func(amsg interfaces.IMsg) bool {
@@ -298,7 +301,10 @@ func Peers(fnode *FactomNode) {
 	} // forever {...}
 }
 
-func NetworkOutputs(fnode *FactomNode) {
+func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
+	wg.Done()
+	wg.Wait()
+
 	for {
 		// if len(fnode.State.NetworkOutMsgQueue()) > 500 {
 		// 	fmt.Print(fnode.State.GetFactomNodeName(), "-", len(fnode.State.NetworkOutMsgQueue()), " ")
@@ -384,7 +390,10 @@ func NetworkOutputs(fnode *FactomNode) {
 }
 
 // Just throw away the trash
-func InvalidOutputs(fnode *FactomNode) {
+func InvalidOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
+	wg.Done()
+	wg.Wait()
+
 	for {
 		time.Sleep(1 * time.Millisecond)
 		_ = <-fnode.State.NetworkInvalidMsgQueue()

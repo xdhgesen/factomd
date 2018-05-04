@@ -12,9 +12,13 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
-func (state *State) ValidatorLoop() {
+func (state *State) ValidatorLoop(wg *sync.WaitGroup) {
+	wg.Done()
+	wg.Wait()
+
 	timeStruct := new(Timer)
 	var prev time.Time
 	for {

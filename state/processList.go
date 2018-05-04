@@ -694,13 +694,13 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			if len(ticker) == cap(ticker) {
 				return
 			} // time to die, no one is listening
-
 			ticker <- s.GetTimestamp().GetTimeMilli()
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
 
 	//	s.LogPrintf(logname, "Start PL DBH %d", p.DBHeight)
+
 	lastAskDelay := int64(0)
 	for {
 		// You have to compute this at every cycle as you can change the block time

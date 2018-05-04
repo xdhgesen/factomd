@@ -104,6 +104,10 @@ func (lists *ProcessLists) GetSafe(dbheight uint32) (pl *ProcessList) {
 }
 
 func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
+
+	if lists == nil {
+		panic("lists are nil")
+	}
 	if dbheight < lists.DBHeightBase {
 		return nil
 	}
@@ -130,8 +134,10 @@ func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
 		} else {
 			prev = lists.Get(dbheight - 1)
 		}
+
 		pl = NewProcessList(lists.State, prev, dbheight)
 		lists.Lists[i] = pl
+
 	}
 
 	return pl
