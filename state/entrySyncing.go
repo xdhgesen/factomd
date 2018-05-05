@@ -13,6 +13,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
+	"sync"
 )
 
 func has(s *State, entry interfaces.IHash) bool {
@@ -167,7 +168,10 @@ func (s *State) MakeMissingEntryRequests() {
 	}
 }
 
-func (s *State) GoSyncEntries() {
+func (s *State) GoSyncEntries(wg *sync.WaitGroup) {
+	wg.Done()
+	wg.Wait()
+
 	go s.MakeMissingEntryRequests()
 
 	// Map to track what I know is missing

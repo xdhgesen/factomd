@@ -629,7 +629,8 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 
 	for i := len(dbsl.DBStates) - 1; i >= 0; i-- {
 		if dbsl.DBStates[i].SaveStruct != nil {
-			dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
+			dbsl.State.LogPrintf("executeMsg", "Reset dbht %v", dbsl.DBStates[i].DirectoryBlock.GetHeader().GetDBHeight())
+			//dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
 			break
 		}
 	}

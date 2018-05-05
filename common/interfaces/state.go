@@ -4,6 +4,8 @@
 
 package interfaces
 
+import "sync"
+
 type DBStateSent struct {
 	DBHeight uint32
 	Sent     Timestamp
@@ -241,7 +243,7 @@ type IState interface {
 	Print(a ...interface{}) (n int, err error)
 	Println(a ...interface{}) (n int, err error)
 
-	ValidatorLoop()
+	ValidatorLoop(wg *sync.WaitGroup)
 
 	UpdateECs(IEntryCreditBlock)
 	SetIsReplaying()

@@ -12,9 +12,13 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
-func (state *State) ValidatorLoop() {
+func (state *State) ValidatorLoop(wg *sync.WaitGroup) {
+	wg.Done()
+	wg.Wait()
+
 	timeStruct := new(Timer)
 	var prev time.Time
 	for {
@@ -93,34 +97,50 @@ func (state *State) ValidatorLoop() {
 					break // no room
 				}
 
-				// This doesn't block so it intentionally returns nil, don't log nils
-				msg = state.InMsgQueue().Dequeue()
-				if msg != nil {
-					state.LogMessage("InMsgQueue", "dequeue", msg)
-				}
-				if msg == nil {
+				for i := 0; i < 100; i++ {
 					// This doesn't block so it intentionally returns nil, don't log nils
-					msg = state.InMsgQueue2().Dequeue()
+					msg = state.InMsgQueue().Dequeue()
 					if msg != nil {
-						state.LogMessage("InMsgQueue2", "dequeue", msg)
+						state.LogMessage("InMsgQueue", "dequeue", msg)
 					}
-				}
-
-				// This doesn't block so it intentionally returns nil, don't log nils
-
-				if msg != nil {
-					state.JournalMessage(msg)
-
-					// Sort the messages.
-					if state.IsReplaying == true {
-						state.ReplayTimestamp = msg.GetTimestamp()
+					if msg == nil {
+						// This doesn't block so it intentionally returns nil, don't log nils
+						msg = state.InMsgQueue2().Dequeue()
+						if msg != nil {
+							state.LogMessage("InMsgQueue2", "dequeue", msg)
+						}
 					}
-					if t := msg.Type(); t == constants.ACK_MSG {
-						state.LogMessage("ackQueue", "enqueue", msg)
-						state.ackQueue <- msg //
+
+					// This doesn't block so it intentionally returns nil, don't log nils
+
+					if msg != nil {
+						state.JournalMessage(msg)
+
+						lenHld := len(state.Holding)
+						if len(state.msgQueue) < cap(state.msgQueue)*9/10 && lenHld > 50 {
+							if t := msg.Type(); t == constants.MISSING_MSG_RESPONSE {
+								continue
+							}
+						}
+
+						// Sort the messages.
+						if state.IsReplaying == true {
+							state.ReplayTimestamp = msg.GetTimestamp()
+						}
+						if t := msg.Type(); t == constants.ACK_MSG {
+							state.LogMessage("ackQueue", "enqueue", msg)
+							state.ackQueue <- msg //
+						} else {
+							state.LogMessage("msgQueue", "enqueue", msg)
+							state.msgQueue <- msg //
+						}
+
+						if lenHld < 50 {
+							break
+						}
+
 					} else {
-						state.LogMessage("msgQueue", "enqueue", msg)
-						state.msgQueue <- msg //
+						break
 					}
 				}
 				ackRoom = cap(state.ackQueue) - len(state.ackQueue)
