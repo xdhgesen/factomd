@@ -150,6 +150,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		ret = true
 
 	case 0:
+		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if !s.NoEntryYet(msg.GetHash(), nil) {
+				return true
+			}
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		}
 		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
 		// this check makes sure we don't put them back in holding after just deleting them
 		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
@@ -193,8 +199,8 @@ func (s *State) Process() (progress bool) {
 	}
 
 	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
-	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 	if !s.RunLeader {
+		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			if s.DBFinished == true {
 				s.RunLeader = true
@@ -206,6 +212,7 @@ func (s *State) Process() (progress bool) {
 		}
 
 	} else if s.IgnoreMissing {
+		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			s.IgnoreMissing = false
 		}
@@ -438,6 +445,8 @@ func (s *State) ReviewHolding() {
 				continue
 			} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
 				// Always process these
+			} else {
+				continue // Dont' review anything else.
 			}
 		}
 

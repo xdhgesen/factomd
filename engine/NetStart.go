@@ -520,8 +520,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	startServers(true)
 
-	// Start the webserver
-
 	// Start prometheus on port
 	launchPrometheus(9876)
 	// Start Package's prometheus
@@ -562,17 +560,13 @@ func makeServer(s *state.State) *FactomNode {
 }
 
 func startServers(load bool) {
-
 	for _, fnode := range fnodes {
-
 		wg := new(sync.WaitGroup)
 		wg.Add(1)
-
 		go Peers(wg, fnode)
 
 		wg.Wait()
 	}
-	os.Stderr.WriteString("done with wait 1\n")
 	for _, fnode := range fnodes {
 
 		wg := new(sync.WaitGroup)
@@ -582,7 +576,6 @@ func startServers(load bool) {
 
 		wg.Wait()
 	}
-	os.Stderr.WriteString("done with wait 2 \n")
 	for _, fnode := range fnodes {
 
 		wg := new(sync.WaitGroup)
@@ -593,7 +586,6 @@ func startServers(load bool) {
 		wg.Wait()
 	}
 
-	os.Stderr.WriteString("done with wait 4 \n")
 	for _, fnode := range fnodes {
 
 		wg := new(sync.WaitGroup)
@@ -603,7 +595,6 @@ func startServers(load bool) {
 
 		wg.Wait()
 	}
-	os.Stderr.WriteString("done with wait 5\n")
 	for _, fnode := range fnodes {
 
 		wg := new(sync.WaitGroup)
@@ -613,7 +604,6 @@ func startServers(load bool) {
 
 		wg.Wait()
 	}
-	os.Stderr.WriteString("done with wait 6\n")
 	for _, fnode := range fnodes {
 		wg := new(sync.WaitGroup)
 		wg.Add(1)
@@ -621,7 +611,6 @@ func startServers(load bool) {
 		go elections.Run(wg, fnode.State)
 		wg.Wait()
 	}
-	os.Stderr.WriteString("done with wait 7\n")
 
 	for _, fnode := range fnodes {
 		wg := new(sync.WaitGroup)
@@ -631,14 +620,13 @@ func startServers(load bool) {
 
 		wg.Wait()
 	}
-	os.Stderr.WriteString("done with wait 8\n")
 
+	// Start the webserver
 	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	wsapi.Start(wg, fnodes[0].State)
 	wg.Wait()
 
-	os.Stderr.WriteString("done with wait 9 \n")
 	for _, fnode := range fnodes {
 
 		wg := new(sync.WaitGroup)

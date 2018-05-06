@@ -6,9 +6,8 @@ package state
 
 import (
 	"fmt"
-	"time"
-
 	"sync"
+	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"

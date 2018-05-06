@@ -788,8 +788,10 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 	if delay < 50 {
 		delay = 50
 	}
+
 	// Look up the VM
 	vm := p.VMs[vmIndex]
+
 	if vm.HighestAsk > int(height) {
 		return
 	} // already sent to MMR

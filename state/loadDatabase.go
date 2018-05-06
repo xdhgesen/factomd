@@ -6,11 +6,9 @@ package state
 
 import (
 	"fmt"
-	"time"
-
 	"os"
-
 	"sync"
+	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -29,8 +27,6 @@ func LoadDatabase(wg *sync.WaitGroup, s *State) {
 
 	wg.Done()
 	wg.Wait()
-
-	time.Sleep(20 * time.Second)
 
 	head, err := s.DB.FetchDBlockHead()
 	if err == nil && head != nil {
