@@ -1474,6 +1474,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 		s.PutNewEBlocks(dbheight, chainID, eb)
 		s.PutNewEntries(dbheight, myhash, msg.Entry)
 
+		s.GetDB().StartMultiBatch()
+		s.GetDB().InsertEntryMultiBatch(msg.Entry)
+		s.GetDB().ExecuteMultiBatch()
+
 		s.IncEntryChains()
 		s.IncEntries()
 		return true
@@ -1502,6 +1506,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	// Put it in our list of new Entry Blocks for this Directory Block
 	s.PutNewEBlocks(dbheight, chainID, eb)
 	s.PutNewEntries(dbheight, myhash, msg.Entry)
+
+	s.GetDB().StartMultiBatch()
+	s.GetDB().InsertEntryMultiBatch(msg.Entry)
+	s.GetDB().ExecuteMultiBatch()
 
 	s.IncEntries()
 	return true

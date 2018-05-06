@@ -1310,13 +1310,15 @@ func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
 func (s *State) fillHoldingMap() {
 	// once a second is often enough to rebuild the Ack list exposed to api
 
-	if s.HoldingLast < time.Now().Unix() {
+	delay := int64(len(s.Holding)/500 + 1)
+
+	if s.HoldingLast < time.Now().Unix()+delay {
 
 		localMap := make(map[[32]byte]interfaces.IMsg)
 		for i, msg := range s.Holding {
 			localMap[i] = msg
 		}
-		s.HoldingLast = time.Now().Unix()
+		s.HoldingLast = time.Now().Unix() + 1
 		s.HoldingMutex.Lock()
 		defer s.HoldingMutex.Unlock()
 		s.HoldingMap = localMap
