@@ -8,11 +8,12 @@ import (
 	"fmt"
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 func (state *State) ValidatorLoop(wg *sync.WaitGroup) {
@@ -135,7 +136,7 @@ func (state *State) ValidatorLoop(wg *sync.WaitGroup) {
 							state.msgQueue <- msg //
 						}
 
-						if lenHld < 50 {
+						if lenHld < 2 {
 							break
 						}
 

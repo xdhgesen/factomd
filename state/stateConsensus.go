@@ -357,6 +357,9 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 
 	preReviewHoldingTime := time.Now()
+	if len(s.XReview) > 0 || s.Syncing || s.Saving {
+		return
+	}
 
 	now := s.GetTimestamp()
 	if s.ResendHolding == nil {
@@ -380,11 +383,7 @@ func (s *State) ReviewHolding() {
 	highest := s.GetHighestKnownBlock()
 	saved := s.GetHighestSavedBlk()
 
-	// Set this flag, so it acts as a constant.  We will set s.LeaderNewMin to false
-	// after processing the Holding Queue.  Ensures we only do this one per minute.
-	//	processMinute := s.LeaderNewMin // Have we processed this minute
-	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
-
+	// Process any pending Acks
 	for k, _ := range s.Acks {
 		v := s.Holding[k]
 		if v != nil {
@@ -403,14 +402,9 @@ func (s *State) ReviewHolding() {
 	hldcnt := 0
 	for k, v := range s.Holding {
 		hldcnt++
-		ack := s.Acks[k]
-		if ack != nil {
-			s.LogMessage("executeMsg", "Found Ack for this thing in Holding", v)
-			v.FollowerExecute(s)
-			continue
-		}
+
 		// Only reprocess if at the top of a new minute, and if we are a leader.
-		if processMinute > 10 {
+		if s.Leader && processMinute > 20 {
 			continue // No need for followers to review Reveal Entry messages
 		}
 
@@ -444,8 +438,6 @@ func (s *State) ReviewHolding() {
 				continue
 			} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
 				// Always process these
-			} else {
-				continue // Dont' review anything else.
 			}
 		}
 
