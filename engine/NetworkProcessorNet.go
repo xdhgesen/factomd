@@ -127,11 +127,11 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 		cnt := 0
 		now := fnode.State.GetTimestamp()
 
-		for i := 0; i < 100 && fnode.State.InMsgQueue().Length() < 1000 && fnode.State.APIQueue().Length() > 0; i++ {
+		for i := 0; i < 100 && fnode.State.InMsgQueue().Length() < 1000 && len(fnode.State.Holding) < 1000; i++ {
 			msg := fnode.State.APIQueue().Dequeue()
 
 			if msg == nil {
-				continue
+				break
 			}
 			// TODO: Is this as intended for 'x' command? -- clay
 			if fnode.State.GetNetStateOff() { // drop received message if he is off
@@ -144,17 +144,12 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				continue
 			}
 
-			if fnode.State.GetNetStateOff() {
-				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
-				continue
-			}
-
 			repeatHash := msg.GetRepeatHash()
-			if repeatHash == nil || repeatHash.PFixed() == nil {
-				fnode.State.LogMessage("NetworkInputs", "API drop, Hash Error", msg)
-				fmt.Println("dddd ERROR!", msg.String())
-				continue
-			}
+			//if repeatHash == nil || repeatHash.PFixed() == nil {
+			//	fnode.State.LogMessage("NetworkInputs", "API drop, Hash Error", msg)
+			//	fmt.Println("dddd ERROR!", msg.String())
+			//	continue
+			//}
 
 			cnt++
 			msg.SetOrigin(0)
@@ -182,7 +177,7 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
 				fnode.State.LogMessage("InMsgQueue2", "enqueue", msg)
-				fnode.State.InMsgQueue().Enqueue(msg)
+				fnode.State.InMsgQueue2().Enqueue(msg)
 			} else {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
 				fnode.State.LogMessage("InMsgQueue", "enqueue", msg)
@@ -273,13 +268,15 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				//	fnode.State.Println("In Coming!! ",msg)
 				//}
 
-				var in string
-				if msg.IsPeer2Peer() {
-					in = "P2P In"
-				} else {
-					in = "PeerIn"
+				if fnode.MLog.Enable {
+					var in string
+					if msg.IsPeer2Peer() {
+						in = "P2P In"
+					} else {
+						in = "PeerIn"
+					}
+					fnode.MLog.Add2(fnode, false, peer.GetNameTo(), fmt.Sprintf("%s %d", in, i+1), true, msg)
 				}
-				fnode.MLog.Add2(fnode, false, peer.GetNameTo(), fmt.Sprintf("%s %d", in, i+1), true, msg)
 
 				if !crossBootIgnore(msg) {
 					fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)

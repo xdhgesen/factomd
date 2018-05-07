@@ -1352,22 +1352,22 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		}
 	}
 
-	ecnt := 0
-	for _, e := range d.Entries {
-		// If it's in the DBlock
-		if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
-			exists, err := list.State.DB.DoesKeyExist(databaseOverlay.ENTRY, e.GetHash().Bytes())
-			if !exists || err != nil {
-				ecnt++
-				if err2 := list.State.DB.InsertEntryMultiBatch(e); err != nil {
-					panic(err2.Error())
-				}
-			}
-		} else {
-			list.State.Logf("error", "Error saving entry from dbstate, entry not allowed")
-		}
-	}
-	os.Stderr.WriteString(fmt.Sprintf("Writing %d entries\n", ecnt))
+	//ecnt := 0
+	//for _, e := range d.Entries {
+	//	// If it's in the DBlock
+	//	if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
+	//		exists, err := list.State.DB.DoesKeyExist(databaseOverlay.ENTRY, e.GetHash().Bytes())
+	//		if !exists || err != nil {
+	//			ecnt++
+	//			if err2 := list.State.DB.InsertEntryMultiBatch(e); err != nil {
+	//				panic(err2.Error())
+	//			}
+	//		}
+	//	} else {
+	//		list.State.Logf("error", "Error saving entry from dbstate, entry not allowed")
+	//	}
+	//}
+	//os.Stderr.WriteString(fmt.Sprintf("Writing %d entries\n", ecnt))
 
 	list.State.NumEntries += len(d.Entries)
 	list.State.NumEntryBlocks += len(d.EntryBlocks)

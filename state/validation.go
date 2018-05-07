@@ -114,14 +114,8 @@ func (state *State) ValidatorLoop(wg *sync.WaitGroup) {
 					// This doesn't block so it intentionally returns nil, don't log nils
 
 					if msg != nil {
-						state.JournalMessage(msg)
 
 						lenHld := len(state.Holding)
-						if len(state.msgQueue) < cap(state.msgQueue)*9/10 && lenHld > 50 {
-							if t := msg.Type(); t == constants.MISSING_MSG_RESPONSE {
-								continue
-							}
-						}
 
 						// Sort the messages.
 						if state.IsReplaying == true {
@@ -135,7 +129,7 @@ func (state *State) ValidatorLoop(wg *sync.WaitGroup) {
 							state.msgQueue <- msg //
 						}
 
-						if lenHld < 50 {
+						if lenHld < 2 {
 							break
 						}
 
