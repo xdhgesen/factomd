@@ -520,18 +520,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	startServers(true)
 
-	// Start the webserver
-	wsapi.Start(fnodes[0].State)
-
-	// Start prometheus on port
-	launchPrometheus(9876)
-	// Start Package's prometheus
-	state.RegisterPrometheus()
-	p2p.RegisterPrometheus()
-	leveldb.RegisterPrometheus()
-	RegisterPrometheus()
-
-	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go controlPanel.ServeControlPanel(wg, fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+	wg.Wait()
 
 	SimControl(p.ListenTo, listenToStdin)
 
@@ -569,33 +561,43 @@ func startServers(load bool) {
 		go Peers(wg, fnode)
 
 		wg.Wait()
-		wg = new(sync.WaitGroup)
-		wg.Add(1)
+	}
 
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
 		go NetworkOutputs(wg, fnode)
 
 		wg.Wait()
-		wg = new(sync.WaitGroup)
-		wg.Add(1)
+	}
 
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
 		go InvalidOutputs(wg, fnode)
 
 		wg.Wait()
-		wg = new(sync.WaitGroup)
-		wg.Add(1)
+	}
 
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
 		go state.LoadDatabase(wg, fnode.State)
 
 		wg.Wait()
-		wg = new(sync.WaitGroup)
-		wg.Add(1)
+	}
 
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
 		go fnode.State.GoSyncEntries(wg)
 
 		wg.Wait()
-		wg = new(sync.WaitGroup)
-		wg.Add(1)
+	}
 
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
 		go Timer(wg, fnode.State)
 
 		wg.Wait()
@@ -608,13 +610,29 @@ func startServers(load bool) {
 		go fnode.State.ValidatorLoop(wg)
 
 		wg.Wait()
-		wg = new(sync.WaitGroup)
-		wg.Add(1)
+	}
 
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
 		go elections.Run(wg, fnode.State)
 		wg.Wait()
-		os.Stderr.WriteString("done with wait\n")
 	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	// Start the webserver
+	wsapi.Start(wg, fnodes[0].State)
+	wg.Wait()
+
+	// Start prometheus on port
+	launchPrometheus(9876)
+	// Start Package's prometheus
+	state.RegisterPrometheus()
+	p2p.RegisterPrometheus()
+	leveldb.RegisterPrometheus()
+	RegisterPrometheus()
+
 }
 
 func setupFirstAuthority(s *state.State) {

@@ -17,6 +17,8 @@ import (
 	"time"
 	"unicode"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/identity"
@@ -127,7 +129,10 @@ func SimControl(listenTo int, listenStdin bool) {
 			os.Stderr.WriteString(fmt.Sprintf("Switching to Node %d\n", ListenTo))
 			// Update which node will be displayed on the controlPanel page
 			connectionMetricsChannel := make(chan interface{}, p2p.StandardChannelSize)
-			go controlPanel.ServeControlPanel(fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build)
+			wg := new(sync.WaitGroup)
+			wg.Add(1)
+			go controlPanel.ServeControlPanel(wg, fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build)
+			wg.Wait()
 		} else {
 			switch {
 			case '!' == b[0]:
