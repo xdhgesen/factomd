@@ -655,11 +655,12 @@ func (d *DBState) ValidNext(state *State, next *messages.DBStateMsg) int {
 	dbheight := dirblk.GetHeader().GetDBHeight()
 
 	// If we don't have the previous blocks processed yet, then let's wait on this one.
-	if dbheight > state.GetHighestSavedBlk()+1 {
+	highestSavedBlk := state.GetHighestSavedBlk()
+	if dbheight > highestSavedBlk+1 {
 		return 0
 	}
 
-	if dbheight == 0 && state.GetHighestSavedBlk() == 0 {
+	if dbheight == 0 && highestSavedBlk == 0 {
 		//state.AddStatus(fmt.Sprintf("DBState.ValidNext: rtn 1 genesis block is valid dbht: %d", dbheight))
 		// The genesis block is valid by definition.
 		return 1
@@ -670,7 +671,7 @@ func (d *DBState) ValidNext(state *State, next *messages.DBStateMsg) int {
 	}
 
 	// Don't reload blocks!
-	if dbheight <= state.GetHighestSavedBlk() {
+	if dbheight <= highestSavedBlk {
 		return -1
 	}
 

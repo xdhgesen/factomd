@@ -231,14 +231,17 @@ func (s *State) Process() (progress bool) {
 	/** Process all the DBStates  that might be pending **/
 
 	for {
-		ix := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase + 1
+		highestSavedBlk := s.GetHighestSavedBlk()
+		ix := int(highestSavedBlk) - s.DBStatesReceivedBase + 1
 		if ix < 0 || ix >= len(s.DBStatesReceived) {
 			break
 		}
 		msg := s.DBStatesReceived[ix]
 		if msg == nil {
+			s.LogPrintf("dbstates", "DBStatesReceived[%d] == nil, highestSavedBlk = %d, s.DBStatesReceivedBase=%d ", ix, highestSavedBlk, s.DBStatesReceivedBase)
 			break
 		}
+		s.LogMessage("dbstates", "process", msg)
 		process = append(process, msg)
 		s.DBStatesReceived[ix] = nil
 	}
@@ -761,7 +764,9 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	pdbstate := s.DBStates.Get(int(dbheight - 1))
 
-	switch pdbstate.ValidNext(s, dbstatemsg) {
+	valid := pdbstate.ValidNext(s, dbstatemsg)
+	s.LogMessage("dbstates", fmt.Sprintf("valid=%d", valid), msg)
+	switch valid {
 	case 0:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
 
@@ -879,6 +884,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStates.UpdateState()
 	} else {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
+		s.LogPrintf("dbstates","FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
 		dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false

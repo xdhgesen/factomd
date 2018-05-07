@@ -21,27 +21,25 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 
 	// This is the tread with access to state. It does process and update state
 	go func() {
-		var prev time.Time
-		time.Sleep(1000 * time.Millisecond)
-
-		for {
+	var prev time.Time
+	for {
 			if s.DebugExec() {
-				status := ""
-				now := time.Now()
-				if now.Sub(prev).Minutes() > 1 {
+			status := ""
+			now := time.Now()
+			if now.Sub(prev).Minutes() > 1 {
 					s.LogPrintf("executeMsg", "Timestamp DBh/VMh/h %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
-					pendingEBs := 0
-					pendingEntries := 0
+				pendingEBs := 0
+				pendingEntries := 0
 					pl := s.ProcessLists.Get(s.LLeaderHeight)
-					if pl != nil {
-						pendingEBs = len(pl.NewEBlocks)
-						pendingEntries = len(pl.NewEntries)
-					}
+				if pl != nil {
+					pendingEBs = len(pl.NewEBlocks)
+					pendingEntries = len(pl.NewEntries)
+				}
 					status += fmt.Sprintf("Review %d ", len(s.XReview))
 					status += fmt.Sprintf("Holding %d ", len(s.Holding))
 					status += fmt.Sprintf("Commits %d ", s.Commits.Len())
-					status += fmt.Sprintf("Pending EBs %d ", pendingEBs)         // cope with nil
-					status += fmt.Sprintf("Pending Entries %d ", pendingEntries) // cope with nil
+				status += fmt.Sprintf("Pending EBs %d ", pendingEBs)         // cope with nil
+				status += fmt.Sprintf("Pending Entries %d ", pendingEntries) // cope with nil
 					status += fmt.Sprintf("Acks %d ", len(s.AcksMap))
 					status += fmt.Sprintf("MsgQueue %d ", len(s.msgQueue))
 					status += fmt.Sprintf("InMsgQueue %d ", s.inMsgQueue.Length())
@@ -55,21 +53,21 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 					status += fmt.Sprintf("WriteEntry %d ", len(s.WriteEntry))
 
 					s.LogPrintf("executeMsg", "Status %s", status)
-					prev = now
-				}
+				prev = now
 			}
-
-			// Check if we should shut down.
-			select {
+		}
+		// Check if we should shut down.
+		select {
 			case <-s.ShutdownChan:
 				fmt.Println("Closing the Database on", s.GetFactomNodeName())
 				s.DB.Close()
 				s.StateSaverStruct.StopSaving()
 				fmt.Println(s.GetFactomNodeName(), "closed")
 				s.IsRunning = false
-				return
-			default:
-			}
+			return
+		default:
+		}
+
 			var progress bool // set progress false
 			//for i := 0; progress && i < 100; i++ {
 			for s.Process() {
@@ -80,9 +78,10 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 			}
 			if !progress {
 				// No work? Sleep for a bit
-				time.Sleep(10 * time.Millisecond)
+					time.Sleep(10 * time.Millisecond)
+				}
+
 			}
-		}
 	}()
 
 	// pull in messages from InMsgQueue
@@ -92,7 +91,7 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 			msg := s.InMsgQueue().BlockingDequeue()
 			s.LogMessage("InMsgQueue", "dequeue", msg)
 			inMsgQueue <- msg
-		}
+	}
 	}()
 
 	// pull in messages from InMsgQueue2
@@ -102,7 +101,7 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 			msg := s.InMsgQueue2().BlockingDequeue()
 			s.LogMessage("InMsgQueue2", "dequeue", msg)
 			inMsgQueue2 <- msg
-		}
+}
 	}()
 
 	// generate the EOM messages
@@ -112,17 +111,17 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 			// block till next tick
 			<-s.tickerQueue
 			if s.RunLeader { // don't generate EOM if we are not done loading the DBState messages
-				eom := new(messages.EOM)
-				eom.Timestamp = s.GetTimestamp()
-				eom.ChainID = s.GetIdentityChainID()
-				// best guess info... may be wrong -- just for debug
-				eom.DBHeight = s.LLeaderHeight
-				eom.VMIndex = s.LeaderVMIndex
-				eom.Minute = byte(s.CurrentMinute)
+		eom := new(messages.EOM)
+		eom.Timestamp = s.GetTimestamp()
+		eom.ChainID = s.GetIdentityChainID()
+			// best guess info... may be wrong -- just for debug
+			eom.DBHeight = s.LLeaderHeight
+			eom.VMIndex = s.LeaderVMIndex
+			eom.Minute = byte(s.CurrentMinute)
 
-				eom.Sign(s)
-				eom.SetLocal(true)
-				consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
+		eom.Sign(s)
+		eom.SetLocal(true)
+		consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
 				eomQueue <- eom
 			}
 		}
@@ -150,6 +149,5 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 			s.LogMessage("msgQueue", "enqueue", msg)
 			s.msgQueue <- msg
 		}
-
 	}
 }

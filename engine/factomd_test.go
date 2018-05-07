@@ -319,7 +319,6 @@ func TestLoad(t *testing.T) {
 	runCmd("R0") // Stop load
 
 } // testLoad(){...}
-
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
 		return
@@ -386,7 +385,6 @@ func TestMakeALeader(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 2", leadercnt)
 	}
 }
-
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return
@@ -490,7 +488,6 @@ func TestAnElection(t *testing.T) {
 	if !GetFnodes()[leaders].State.Leader && !GetFnodes()[leaders+1].State.Leader {
 		t.Fatalf("Node %d or %d should be a leader", leaders, leaders+1)
 	}
-
 	CheckAuthoritySet(leaders, audits, t)
 
 	WaitBlocks(state0, 1)
