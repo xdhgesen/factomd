@@ -403,6 +403,13 @@ func (s *State) ReviewHolding() {
 		}
 	}
 
+	for k, _ := range s.Commits.msgmap {
+		m := s.Holding[k]
+		if m != nil {
+			m.SendOut(s, m)
+		}
+	}
+
 	if len(s.XReview) > 0 || s.Syncing || s.Saving {
 		return
 	}
