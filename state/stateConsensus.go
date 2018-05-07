@@ -415,11 +415,6 @@ func (s *State) ReviewHolding() {
 	for k, v := range s.Holding {
 		hldcnt++
 
-		// Only reprocess if at the top of a new minute, and if we are a leader.
-		if processMinute > 10 {
-			continue // No need for followers to review Reveal Entry messages
-		}
-
 		if v.Expire(s) {
 			s.LogMessage("executeMsg", "expire from holding", v)
 			s.ExpireCnt++
@@ -454,6 +449,13 @@ func (s *State) ReviewHolding() {
 				continue // Dont' review anything else.
 			}
 		}
+
+		_ = processMinute
+
+		// Only reprocess if at the top of a new minute, and if we are a leader.
+		//if processMinute > 50 {
+		//	continue // No need for followers to review Reveal Entry messages
+		//}
 
 		switch v.Validate(s) {
 		case -1:
