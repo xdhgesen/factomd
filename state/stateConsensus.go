@@ -373,6 +373,10 @@ func (s *State) ReviewHolding() {
 		return
 	}
 
+	if s.Syncing || s.Saving {
+		return
+	}
+
 	s.Commits.Cleanup(s)
 	s.DB.Trim()
 
@@ -410,12 +414,7 @@ func (s *State) ReviewHolding() {
 	hldcnt := 0
 	for k, v := range s.Holding {
 		hldcnt++
-		ack := s.Acks[k]
-		if ack != nil {
-			s.LogMessage("executeMsg", "Found Ack for this thing in Holding", v)
-			v.FollowerExecute(s)
-			continue
-		}
+
 		// Only reprocess if at the top of a new minute, and if we are a leader.
 		if processMinute > 10 {
 			continue // No need for followers to review Reveal Entry messages
