@@ -22,6 +22,8 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 	// This is the tread with access to state. It does process and update state
 	go func() {
 		var prev time.Time
+		time.Sleep(1000 * time.Millisecond)
+
 		for {
 			if s.DebugExec() {
 				status := ""
