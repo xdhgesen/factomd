@@ -562,12 +562,16 @@ func (s *State) AddDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
+	dbheight := directoryBlock.GetHeader().GetDBHeight()
+
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
 	if dbState == nil {
 		//s.AddStatus(fmt.Sprintf("AddDBState(): Fail dbstate is nil at dbht: %d", directoryBlock.GetHeader().GetDBHeight()))
+		s.LogPrintf("dbstates", "AddDBState(): Fail dbstate is nil at dbht: %d", dbheight)
 		return nil
 	}
+	s.LogPrintf("dbstates", "AddDBState(): at dbht: %d", dbheight)
 
 	ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
 	DBKeyMR := dbState.DirectoryBlock.GetKeyMR().String()
@@ -594,13 +598,12 @@ func (s *State) AddDBState(isNew bool,
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
 			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			defer s.LeaderPL.FactoidBalancesTMutex.Unlock()
+			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesTMutex.Unlock()
 
 			s.LeaderPL.ECBalancesTMutex.Lock()
-			defer s.LeaderPL.ECBalancesTMutex.Unlock()
-
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.ECBalancesTMutex.Unlock()
 		}
 
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -884,7 +887,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStates.UpdateState()
 	} else {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
-		s.LogPrintf("dbstates","FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight)
 		dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false

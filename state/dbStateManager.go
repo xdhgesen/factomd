@@ -1472,7 +1472,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 
 	saved := 0
 	for i, d := range list.DBStates {
-		//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v \n", "DBStateList Update", list.State.FactomNodeName, "Looking at", i, "DBHeight", list.Base+uint32(i))
+		list.State.LogPrintf("dbstates", "UpdateState --- Looking at %10v DBH %10v", i, list.Base+uint32(i))
 
 		// Must process blocks in sequence.  Missing a block says we must stop.
 		if d == nil {
@@ -1480,24 +1480,12 @@ func (list *DBStateList) UpdateState() (progress bool) {
 		}
 
 		if i > 0 {
-			p := list.FixupLinks(list.DBStates[i-1], d)
-			if p && !progress {
-				progress = p
-			}
+			progress = list.FixupLinks(list.DBStates[i-1], d) || progress
 		}
 
-		p := list.ProcessBlocks(d) || progress
-		if p && !progress {
-			progress = p
-		}
-		p = list.SignDB(d) || progress
-		if p && !progress {
-			progress = p
-		}
-		p = list.SaveDBStateToDB(d) || progress
-		if p && !progress {
-			progress = p
-		}
+		progress = list.ProcessBlocks(d) || progress
+		progress = list.SignDB(d) || progress
+		progress = list.SaveDBStateToDB(d) || progress
 
 		// Make sure we move forward the Adminblock state in the process lists
 		list.State.ProcessLists.Get(d.DirectoryBlock.GetHeader().GetDBHeight() + 1)
@@ -1549,7 +1537,7 @@ searchLoop:
 	}
 
 	keep := uint32(3) // How many states to keep around; debugging helps with more.
-	if uint32(cnt) > keep {
+	if uint32(cnt) > keep && (int(list.Complete)-cnt+int(keep)) > 0 {
 		var dbstates []*DBState
 		dbstates = append(dbstates, list.DBStates[cnt-int(keep):]...)
 		list.DBStates = dbstates
