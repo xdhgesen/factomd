@@ -1476,8 +1476,10 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 func (list *DBStateList) UpdateState() (progress bool) {
 	list.Catchup(false)
 
-	saved := 0
-	for i, d := range list.DBStates {
+	if len(list.DBStates) < 2 {
+		return
+	}
+	for i, d := range list.DBStates[1:] {
 		list.State.LogPrintf("dbstates", "UpdateState --- Looking at %10v DBH %10v", i, list.Base+uint32(i))
 
 		// Must process blocks in sequence.  Missing a block says we must stop.
@@ -1485,21 +1487,19 @@ func (list *DBStateList) UpdateState() (progress bool) {
 			return
 		}
 
-		if i > 0 {
-			progress = list.FixupLinks(list.DBStates[i-1], d) || progress
-		}
+		progress = list.FixupLinks(list.DBStates[i], d) || progress // Note that i has -1 built in.
 
-		progress = list.ProcessBlocks(d) || progress
+		p := list.ProcessBlocks(d)
+		if !p {
+			return false
+		}
 		progress = list.SignDB(d) || progress
 		progress = list.SaveDBStateToDB(d) || progress
 
 		// Make sure we move forward the Adminblock state in the process lists
 		list.State.ProcessLists.Get(d.DirectoryBlock.GetHeader().GetDBHeight() + 1)
 
-		if d.Saved {
-			saved = i
-		}
-		if i-saved > 1 {
+		if !d.Saved {
 			break
 		}
 	}
