@@ -234,11 +234,11 @@ func DeepStateDisplayCopyDifference(s *State, prev *DisplayState) (*DisplayState
 	prt = ""
 	prt = prt + "\n" + s.Election0
 	if pl != nil && pl.FedServers != nil {
-		for i, _ := range pl.FedServers {
-			prt = prt + fmt.Sprintf("%4d ", i)
-		}
-		for i, _ := range pl.AuditServers {
-			prt = prt + fmt.Sprintf("%4d ", i)
+	for i, _ := range pl.FedServers {
+		prt = prt + fmt.Sprintf("%4d ", i)
+	}
+	for i, _ := range pl.AuditServers {
+		prt = prt + fmt.Sprintf("%4d ", i)
 		}
 	} else {
 		prt += "No Server Lists"
