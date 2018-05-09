@@ -92,10 +92,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-		if msg.GetResendCnt() == 0 {
-			msg.SendOut(s, msg)
-		} else if msg.Resend(s) {
-			msg.SendOut(s, msg)
+		if !msg.IsLocal() {
+			if msg.GetResendCnt() == 0 {
+				msg.SendOut(s, msg)
+			} else if msg.Resend(s) {
+				msg.SendOut(s, msg)
+			}
 		}
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
@@ -231,14 +233,17 @@ func (s *State) Process() (progress bool) {
 	/** Process all the DBStates  that might be pending **/
 
 	for {
-		ix := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase + 1
+		highestSavedBlk := s.GetHighestSavedBlk()
+		ix := int(highestSavedBlk) - s.DBStatesReceivedBase + 1
 		if ix < 0 || ix >= len(s.DBStatesReceived) {
 			break
 		}
 		msg := s.DBStatesReceived[ix]
 		if msg == nil {
+			s.LogPrintf("dbstates", "DBStatesReceived[%d] == nil, highestSavedBlk = %d, s.DBStatesReceivedBase=%d ", ix, highestSavedBlk, s.DBStatesReceivedBase)
 			break
 		}
+		s.LogMessage("dbstates", "process", msg)
 		process = append(process, msg)
 		s.DBStatesReceived[ix] = nil
 	}
@@ -566,12 +571,16 @@ func (s *State) AddDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
+	dbheight := directoryBlock.GetHeader().GetDBHeight()
+
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
 	if dbState == nil {
 		//s.AddStatus(fmt.Sprintf("AddDBState(): Fail dbstate is nil at dbht: %d", directoryBlock.GetHeader().GetDBHeight()))
+		s.LogPrintf("dbstates", "AddDBState(): Fail dbstate is nil at dbht: %d", dbheight)
 		return nil
 	}
+	s.LogPrintf("dbstates", "AddDBState(): at dbht: %d", dbheight)
 
 	ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
 	DBKeyMR := dbState.DirectoryBlock.GetKeyMR().String()
@@ -598,13 +607,12 @@ func (s *State) AddDBState(isNew bool,
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
 			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			defer s.LeaderPL.FactoidBalancesTMutex.Unlock()
+			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesTMutex.Unlock()
 
 			s.LeaderPL.ECBalancesTMutex.Lock()
-			defer s.LeaderPL.ECBalancesTMutex.Unlock()
-
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.ECBalancesTMutex.Unlock()
 		}
 
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -766,9 +774,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): Saved %d dbht: %d", saved, dbheight))
 
-	pdbstate := s.DBStates.Get(int(dbheight - 1))
+	pdbstate := s.DBStates.Get(int(dbheight) - 1)
 
-	switch pdbstate.ValidNext(s, dbstatemsg) {
+	valid := pdbstate.ValidNext(s, dbstatemsg)
+	s.LogMessage("dbstates", fmt.Sprintf("valid=%d", valid), msg)
+	switch valid {
 	case 0:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
 
@@ -878,7 +888,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	}
 
 	if dbstatemsg.IsInDB == false {
-		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from network at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): Network: dbstate added at ht %d", dbheight)
 		dbstate.ReadyToSave = true
 		dbstate.Locked = false
 		dbstate.Signed = true
@@ -886,9 +896,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStates.UpdateState()
 	} else {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): Local:   dbstate added at ht %d", dbheight)
 		dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false
+		s.DBStates.UpdateState()
 	}
 
 	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Clear SigType follower execute DBState:  !s.SigType(%v)", s.FactomNodeName, s.SigType))
@@ -2251,22 +2263,26 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			defer pl.FactoidBalancesTMutex.Unlock()
 			v, ok = pl.FactoidBalancesT[adr]
+			pl.FactoidBalancesTMutex.Unlock()
+		} else {
+			defer s.LogPrintf("fct", "Oops, no process list")
 		}
 	}
 	if !ok {
 		s.FactoidBalancesPMutex.Lock()
-		defer s.FactoidBalancesPMutex.Unlock()
 		v = s.FactoidBalancesP[adr]
+		s.FactoidBalancesPMutex.Unlock()
 	}
 
+	s.LogPrintf("fct", " GetF(%v,%x) = %v %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("fct", " PutF(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2274,7 +2290,11 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 			defer pl.FactoidBalancesTMutex.Unlock()
 
 			pl.FactoidBalancesT[adr] = v
+
+		} else {
+			s.LogPrintf("fct", "Drop, no process list")
 		}
+
 	} else {
 		s.FactoidBalancesPMutex.Lock()
 		defer s.FactoidBalancesPMutex.Unlock()
@@ -2288,27 +2308,36 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
-			defer pl.ECBalancesTMutex.Unlock()
 			v, ok = pl.ECBalancesT[adr]
+			pl.ECBalancesTMutex.Unlock()
+
+		} else {
+			defer s.LogPrintf("ec", "Oops, no process list")
 		}
 	}
+	ok2 := false
 	if !ok {
 		s.ECBalancesPMutex.Lock()
-		defer s.ECBalancesPMutex.Unlock()
-		v = s.ECBalancesP[adr]
+		v, ok2 = s.ECBalancesP[adr]
+		s.ECBalancesPMutex.Unlock()
 	}
+
+	s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("ec", " PutE(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
 			defer pl.ECBalancesTMutex.Unlock()
 			pl.ECBalancesT[adr] = v
+		} else {
+			s.LogPrintf("ec", "Drop, no process list")
 		}
 	} else {
 		s.ECBalancesPMutex.Lock()

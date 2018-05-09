@@ -68,6 +68,7 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 				return
 			default:
 			}
+
 			var progress bool // set progress false
 			//for i := 0; progress && i < 100; i++ {
 			for s.Process() {
@@ -80,6 +81,7 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 				// No work? Sleep for a bit
 				time.Sleep(10 * time.Millisecond)
 			}
+
 		}
 	}()
 
