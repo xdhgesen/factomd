@@ -158,6 +158,21 @@ func Peers(fnode *FactomNode) {
 			timestamp := msg.GetTimestamp()
 			repeatHashFixed := repeatHash.Fixed()
 
+			{ // debug
+				now := now.GetTimeSeconds() / 60
+				t := timestamp.GetTimeSeconds() / 60
+
+				diff := now - t
+				// Check the timestamp to see if within 12 hours of the system time.  That not valid, we are
+				// just done without any added concerns.
+				if diff > 180 || diff < -180 {
+					fnode.State.LogMessage("NetworkInputs", "API Drop, BLOCK_REPLAY", msg)
+					fnode.State.LogPrintf("NetworkInputs", "now = %v ts = %v, diff %v", now, t, diff)
+					fnode.State.LogPrintf("NetworkInputs", "msg %+v", msg)
+					continue
+				}
+			}
+
 			// Make sure message isn't a FCT transaction in a block
 			_, BRValid := fnode.State.FReplay.Valid(constants.BLOCK_REPLAY, repeatHashFixed, timestamp, now)
 			if !BRValid {
