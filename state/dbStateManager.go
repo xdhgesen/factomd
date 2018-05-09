@@ -1005,12 +1005,13 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
-	list.State.LogPrintf("dbstates", "ProcessBlocks %d", dbht)
+	list.State.LogPrintf("dbstatesProcess", "Process(%d)", dbht)
 
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
+		list.State.LogPrintf("dbstatesProcess", "out early1 %v %v %v", d.Locked, d.IsNew, d.Repeat)
 		return
 	}
 
@@ -1019,6 +1020,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	if dbht > 0 && dbht <= list.ProcessHeight {
 		progress = true
 		d.Repeat = true
+		list.State.LogPrintf("dbstatesProcess", "out early2 %v %v", dbht, list.ProcessHeight)
 		return
 	}
 
@@ -1026,6 +1028,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		pd := list.State.DBStates.Get(int(dbht - 1))
 		if pd != nil && !pd.Saved {
 			//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Previous dbstate (%d) not saved", dbht-1))
+			list.State.LogPrintf("dbstatesProcess", "out early3 previous dbstate (%d) not saved", dbht-1)
 			return
 		}
 	}
@@ -1045,6 +1048,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	pln := list.State.ProcessLists.Get(ht + 1)
 
 	if pl == nil {
+		list.State.LogPrintf("dbstatesProcess", "out early4 no process list")
 		return
 	}
 
@@ -1551,7 +1555,7 @@ searchLoop:
 	}
 
 	keep := uint32(3) // How many states to keep around; debugging helps with more.
-	if uint32(cnt) > keep {
+	if uint32(cnt) > keep && (int(list.Complete)-cnt+int(keep)) > 0 {
 		var dbstates []*DBState
 		dbstates = append(dbstates, list.DBStates[cnt-int(keep):]...)
 		list.DBStates = dbstates

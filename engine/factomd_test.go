@@ -600,7 +600,9 @@ func Test5up(t *testing.T) {
 	CheckAuthoritySet(leaders, audits, t)
 
 	runCmd("R10")
-	WaitBlocks(state0, 30)
+	WaitBlocks(state0, 10)
+	runCmd("R0")
+	WaitMinutes(state0, 2)
 
 	CheckAuthoritySet(leaders, audits, t)
 
@@ -613,7 +615,7 @@ func Test5up(t *testing.T) {
 
 	// Sleep one block
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
-	if state0.LLeaderHeight > 9 {
+	if state0.LLeaderHeight > 13 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 

@@ -93,11 +93,11 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
 		if !msg.IsLocal() {
-			if msg.GetResendCnt() == 0 {
-				msg.SendOut(s, msg)
-			} else if msg.Resend(s) {
-				msg.SendOut(s, msg)
-			}
+		if msg.GetResendCnt() == 0 {
+			msg.SendOut(s, msg)
+		} else if msg.Resend(s) {
+			msg.SendOut(s, msg)
+		}
 		}
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
@@ -245,6 +245,7 @@ func (s *State) Process() (progress bool) {
 		}
 		s.LogMessage("dbstates", "process", msg)
 		process = append(process, msg)
+		s.DBStatesReceived[ix] = nil
 	}
 
 	preAckLoopTime := time.Now()
@@ -563,12 +564,16 @@ func (s *State) AddDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
+	dbheight := directoryBlock.GetHeader().GetDBHeight()
+
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
 	if dbState == nil {
 		//s.AddStatus(fmt.Sprintf("AddDBState(): Fail dbstate is nil at dbht: %d", directoryBlock.GetHeader().GetDBHeight()))
+		s.LogPrintf("dbstates", "AddDBState(): Fail dbstate is nil at dbht: %d", dbheight)
 		return nil
 	}
+	s.LogPrintf("dbstates", "AddDBState(): at dbht: %d", dbheight)
 
 	ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
 	DBKeyMR := dbState.DirectoryBlock.GetKeyMR().String()
@@ -595,13 +600,12 @@ func (s *State) AddDBState(isNew bool,
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
 			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			defer s.LeaderPL.FactoidBalancesTMutex.Unlock()
+			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesTMutex.Unlock()
 
 			s.LeaderPL.ECBalancesTMutex.Lock()
-			defer s.LeaderPL.ECBalancesTMutex.Unlock()
-
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.ECBalancesTMutex.Unlock()
 		}
 
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -2252,22 +2256,26 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			defer pl.FactoidBalancesTMutex.Unlock()
 			v, ok = pl.FactoidBalancesT[adr]
+			pl.FactoidBalancesTMutex.Unlock()
+		} else {
+			defer s.LogPrintf("fct", "Oops, no process list")
 		}
 	}
 	if !ok {
 		s.FactoidBalancesPMutex.Lock()
-		defer s.FactoidBalancesPMutex.Unlock()
 		v = s.FactoidBalancesP[adr]
+		s.FactoidBalancesPMutex.Unlock()
 	}
 
+	s.LogPrintf("fct", " GetF(%v,%x) = %v %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("fct", " PutF(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2275,7 +2283,11 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 			defer pl.FactoidBalancesTMutex.Unlock()
 
 			pl.FactoidBalancesT[adr] = v
+
+		} else {
+			s.LogPrintf("fct", "Drop, no process list")
 		}
+
 	} else {
 		s.FactoidBalancesPMutex.Lock()
 		defer s.FactoidBalancesPMutex.Unlock()
@@ -2289,27 +2301,36 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
-			defer pl.ECBalancesTMutex.Unlock()
 			v, ok = pl.ECBalancesT[adr]
+			pl.ECBalancesTMutex.Unlock()
+
+		} else {
+			defer s.LogPrintf("ec", "Oops, no process list")
 		}
 	}
+	ok2 := false
 	if !ok {
 		s.ECBalancesPMutex.Lock()
-		defer s.ECBalancesPMutex.Unlock()
-		v = s.ECBalancesP[adr]
+		v, ok2 = s.ECBalancesP[adr]
+		s.ECBalancesPMutex.Unlock()
 	}
+
+	s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("ec", " PutE(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
 			defer pl.ECBalancesTMutex.Unlock()
 			pl.ECBalancesT[adr] = v
+		} else {
+			s.LogPrintf("ec", "Drop, no process list")
 		}
 	} else {
 		s.ECBalancesPMutex.Lock()
