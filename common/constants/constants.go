@@ -5,6 +5,7 @@
 package constants
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -39,6 +40,21 @@ const (
 	BOUNCEREPLY_MSG                           // 26	test message
 	MISSING_ENTRY_BLOCKS                      //27
 	ENTRY_BLOCK_RESPONSE                      //28
+	INTERNALADDLEADER                         // 29
+	INTERNALREMOVELEADER                      // 30
+	INTERNALADDAUDIT                          // 31
+	INTERNALREMOVEAUDIT                       // 32
+	INTERNALTIMEOUT                           // 33
+	INTERNALEOMSIG                            // 34
+	INTERNALAUTHLIST                          // 35
+	VOLUNTEERAUDIT                            // 36
+	VOLUNTEERPROPOSAL                         // 37
+	VOLUNTEERLEVELVOTE                        // 38
+	INTERNALSTARTELECTION                     // 39
+	FEDVOTE_MSG_BASE                          // 40
+	SYNC_MSG                                  // 41
+
+	NUM_MESSAGES // Not used, just a counter for the number of messages.
 )
 
 // Entry Credit Block entries
@@ -50,7 +66,120 @@ const (
 	ECIDBalanceIncrease               // 4
 )
 
-const NUM_MESSAGES = 29
+func MessageName(Type byte) string {
+	switch Type {
+	case EOM_MSG:
+		return "EOM"
+	case ACK_MSG:
+		return "Ack"
+	case AUDIT_SERVER_FAULT_MSG:
+		return "Audit Server Fault"
+	case FED_SERVER_FAULT_MSG:
+		return "Fed Server Fault"
+	case FULL_SERVER_FAULT_MSG:
+		return "Full Server Fault"
+	case COMMIT_CHAIN_MSG:
+		return "Commit Chain"
+	case COMMIT_ENTRY_MSG:
+		return "Commit Entry"
+	case DIRECTORY_BLOCK_SIGNATURE_MSG:
+		return "Directory Block Signature"
+	case EOM_TIMEOUT_MSG:
+		return "EOM Timeout"
+	case FACTOID_TRANSACTION_MSG:
+		return "Factoid Transaction"
+	case HEARTBEAT_MSG:
+		return "HeartBeat"
+	case INVALID_ACK_MSG:
+		return "Invalid Ack"
+	case INVALID_DIRECTORY_BLOCK_MSG:
+		return "Invalid Directory Block"
+	case MISSING_MSG:
+		return "Missing Msg"
+	case MISSING_MSG_RESPONSE:
+		return "Missing Msg Response"
+	case MISSING_DATA:
+		return "Missing Data"
+	case DATA_RESPONSE:
+		return "Data Response"
+	case REVEAL_ENTRY_MSG:
+		return "Reveal Entry"
+	case REQUEST_BLOCK_MSG:
+		return "Request Block"
+	case SIGNATURE_TIMEOUT_MSG:
+		return "Signature Timeout"
+	case DBSTATE_MISSING_MSG:
+		return "DBState Missing"
+	case ADDSERVER_MSG:
+		return "ADDSERVER"
+	case CHANGESERVER_KEY_MSG:
+		return "CHANGESERVER_KEY"
+	case REMOVESERVER_MSG:
+		return "REMOVESERVER"
+	case DBSTATE_MSG:
+		return "DBState"
+	case BOUNCE_MSG:
+		return "Bounce Message"
+	case BOUNCEREPLY_MSG:
+		return "Bounce Reply Message"
+	case MISSING_ENTRY_BLOCKS: // 27
+		return "MISSING_ENTRY_BLOCKS"
+	case ENTRY_BLOCK_RESPONSE: // 28
+		return "ENTRY_BLOCK_RESPONSE"
+	case VOLUNTEERAUDIT:
+		return "Volunteer Audit"
+	case VOLUNTEERPROPOSAL:
+		return "Volunteer Proposal"
+	case VOLUNTEERLEVELVOTE:
+		return "Volunteer Level Vote"
+	case INTERNALADDLEADER:
+		return "INTERNALADDLEADER"
+	case INTERNALREMOVELEADER:
+		return "INTERNALREMOVELEADER"
+	case INTERNALADDAUDIT:
+		return "INTERNALADDAUDIT"
+	case INTERNALAUTHLIST: // 35
+		return "INTERNALAUTHLIST"
+	case INTERNALREMOVEAUDIT:
+		return "INTERNALREMOVEAUDIT"
+	case INTERNALTIMEOUT:
+		return "INTERNALTIMEOUT"
+	case INTERNALEOMSIG:
+		return "INTERNALEOMSIG"
+	case FEDVOTE_MSG_BASE:
+		return "FEDVOTE_MSG_BASE"
+	case SYNC_MSG:
+		return "Sync Msg"
+	case INTERNALSTARTELECTION:
+		return "Internal Start Election"
+
+	default:
+		return "Unknown:" + fmt.Sprintf(" %d", Type)
+	}
+}
+
+// Not a constant because custom nets will modify these values
+var (
+	// Coinbase Related Constants
+
+	// How often to create coinbase transactions
+	//		:: Default = 25
+	COINBASE_PAYOUT_FREQUENCY = uint32(25)
+
+	// How many blocks before the coinbase does the coinbase
+	// have to appear in the admin block
+	//		:: Default = COINBASE_PAYOUT_FREQUENCY*40
+	COINBASE_DECLARATION = uint32(COINBASE_PAYOUT_FREQUENCY * 40)
+
+	// The maximum amount of factoshis to be issued per server per payout
+	// 		:: Default = 6.4*1e8
+	COINBASE_PAYOUT_AMOUNT = uint64(6.4 * 1e8)
+
+	// The height at which coinbase transactions will activate.
+	//	 This is useful for updating without needing to take
+	// 	 down the network and giving an update period.
+	COINBASE_ACTIVATION = uint32(140200)
+)
 
 const (
 	// Limits for keeping inputs from flooding our execution
@@ -179,4 +308,37 @@ const (
 	IDENTITY_PENDING_AUDIT_SERVER                  // 5
 	IDENTITY_PENDING_FULL                          // 6
 	IDENTITY_SKELETON                              // 7 - Skeleton Identity
+	IDENTITY_REGISTRATION_CHAIN                    // 8
+)
+
+func IdentityStatusString(i uint8) string {
+	var stat string
+	stat = "Unknown"
+	switch i {
+	case IDENTITY_UNASSIGNED:
+		stat = "Unassigned"
+	case IDENTITY_FEDERATED_SERVER:
+		stat = "Federated Server"
+	case IDENTITY_AUDIT_SERVER:
+		stat = "Audit Server"
+	case IDENTITY_FULL:
+		stat = "Full"
+	case IDENTITY_PENDING_FEDERATED_SERVER:
+		stat = "Pending Federated Server"
+	case IDENTITY_PENDING_AUDIT_SERVER:
+		stat = "Pending Audit Server"
+	case IDENTITY_PENDING_FULL:
+		stat = "Pending Full"
+	case IDENTITY_SKELETON:
+		stat = "Skeleton Identity"
+	case IDENTITY_REGISTRATION_CHAIN:
+		stat = "Registration Chain"
+	}
+	return stat
+}
+
+// Identity Timing
+const (
+	// Time window for identity to require registration: 24hours = 144 blocks
+	IDENTITY_REGISTRATION_BLOCK_WINDOW uint32 = 144
 )

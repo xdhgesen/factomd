@@ -123,7 +123,7 @@ func SetState(state interfaces.IState) {
 		ServersMutex.Lock()
 		defer ServersMutex.Unlock()
 		//todo: Should wait() instead of sleep but that requires plumbing a wait group....
-		for Servers == nil && Servers[state.GetPort()] != nil && Servers[state.GetPort()].Env != nil {
+		for Servers == nil || Servers[state.GetPort()] != nil || Servers[state.GetPort()].Env != nil {
 			ServersMutex.Unlock()
 			time.Sleep(10 * time.Millisecond)
 			ServersMutex.Lock()
