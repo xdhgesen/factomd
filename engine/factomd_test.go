@@ -537,7 +537,7 @@ func Test5up(t *testing.T) {
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=60",
+		"-blktime=6",
 		"-faulttimeout=30",
 		"-enablenet=false",
 		"-debugconsole=localhost",

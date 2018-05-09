@@ -92,10 +92,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-		if msg.GetResendCnt() == 0 {
-			msg.SendOut(s, msg)
-		} else if msg.Resend(s) {
-			msg.SendOut(s, msg)
+		if !msg.IsLocal() {
+			if msg.GetResendCnt() == 0 {
+				msg.SendOut(s, msg)
+			} else if msg.Resend(s) {
+				msg.SendOut(s, msg)
+			}
 		}
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
@@ -243,7 +245,6 @@ func (s *State) Process() (progress bool) {
 		}
 		s.LogMessage("dbstates", "process", msg)
 		process = append(process, msg)
-		s.DBStatesReceived[ix] = nil
 	}
 
 	preAckLoopTime := time.Now()
@@ -762,7 +763,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): Saved %d dbht: %d", saved, dbheight))
 
-	pdbstate := s.DBStates.Get(int(dbheight - 1))
+	pdbstate := s.DBStates.Get(int(dbheight) - 1)
 
 	valid := pdbstate.ValidNext(s, dbstatemsg)
 	s.LogMessage("dbstates", fmt.Sprintf("valid=%d", valid), msg)
@@ -876,7 +877,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	}
 
 	if dbstatemsg.IsInDB == false {
-		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from network at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): Network: dbstate added at ht %d", dbheight)
 		dbstate.ReadyToSave = true
 		dbstate.Locked = false
 		dbstate.Signed = true
@@ -884,10 +885,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStates.UpdateState()
 	} else {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
-		s.LogPrintf("dbstates","FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): Local:   dbstate added at ht %d", dbheight)
 		dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false
+		s.DBStates.UpdateState()
 	}
 
 	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Clear SigType follower execute DBState:  !s.SigType(%v)", s.FactomNodeName, s.SigType))
