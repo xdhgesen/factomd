@@ -1013,7 +1013,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
 		list.State.LogPrintf("dbstatesProcess", "out early1 %v %v %v", d.Locked, d.IsNew, d.Repeat)
-		return
+		return true
 	}
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
@@ -1030,7 +1030,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		if pd != nil && !pd.Saved {
 			//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Previous dbstate (%d) not saved", dbht-1))
 			list.State.LogPrintf("dbstatesProcess", "out early3 previous dbstate (%d) not saved", dbht-1)
-			return
+			return true
 		}
 	}
 
@@ -1050,7 +1050,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	if pl == nil {
 		list.State.LogPrintf("dbstatesProcess", "out early4 no process list")
-		return
+		return false
 	}
 
 	var out bytes.Buffer
@@ -1493,9 +1493,9 @@ func (list *DBStateList) UpdateState() (progress bool) {
 			}
 		}
 
-		p := list.ProcessBlocks(d) || progress
-		if p && !progress {
-			progress = p
+		p := list.ProcessBlocks(d)
+		if !p { // If we cannot process the block, then return what progress we have.
+			return progress
 		}
 		p = list.SignDB(d) || progress
 		if p && !progress {

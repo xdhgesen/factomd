@@ -75,8 +75,10 @@ func (lg *LoadGenerator) Run() {
 			}
 			r := lg.NewRevealEntry(e)
 
-			fnodes[wsapiNode].State.APIQueue().Enqueue(c)
-			fnodes[wsapiNode].State.APIQueue().Enqueue(r)
+			if fnodes[wsapiNode].State.APIQueue().Length() < fnodes[wsapiNode].State.APIQueue().Cap()*9/10 {
+				fnodes[wsapiNode].State.APIQueue().Enqueue(c)
+				fnodes[wsapiNode].State.APIQueue().Enqueue(r)
+			}
 		}
 	}
 }

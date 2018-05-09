@@ -453,7 +453,7 @@ func (s *State) ReviewHolding() {
 			if t := v.Type(); t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 				// Always process these.
 			} else if t == constants.MISSING_MSG_RESPONSE {
-				delete(s.Holding, k) // Ignore if we are behind the 8 ball.
+				//delete(s.Holding, k) // Ignore if we are behind the 8 ball.
 				continue
 			} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
 				// Always process these
@@ -778,11 +778,8 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	valid := pdbstate.ValidNext(s, dbstatemsg)
 	s.LogMessage("dbstates", fmt.Sprintf("valid=%d", valid), msg)
-	switch valid {
-	case 0:
-		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
 
-		// Don't add duplicate dbstate messages.
+	storeDBState := func() {
 		if s.DBStatesReceivedBase < int(s.GetHighestSavedBlk()) {
 			cut := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase
 			if len(s.DBStatesReceived) > cut {
@@ -800,6 +797,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			s.DBStatesReceived = append(s.DBStatesReceived, nil)
 		}
 		s.DBStatesReceived[ix] = dbstatemsg
+	}
+
+	switch valid {
+	case 0:
+		storeDBState()
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
@@ -810,6 +812,8 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		}
 		return
 	}
+
+	storeDBState()
 
 	if dbstatemsg.IsLast { // this is the last DBState in this load
 		s.DBFinished = true // Normal case
