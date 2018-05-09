@@ -38,8 +38,8 @@ const (
 	REMOVESERVER_MSG                          // 24
 	BOUNCE_MSG                                // 25	test message
 	BOUNCEREPLY_MSG                           // 26	test message
-	MISSING_ENTRY_BLOCKS                      // 27
-	ENTRY_BLOCK_RESPONSE                      // 28
+	MISSING_ENTRY_BLOCKS                      //27
+	ENTRY_BLOCK_RESPONSE                      //28
 	INTERNALADDLEADER                         // 29
 	INTERNALREMOVELEADER                      // 30
 	INTERNALADDAUDIT                          // 31
@@ -75,7 +75,6 @@ func NormallyPeer2Peer(t byte) bool {
 	}
 	return false
 }
-
 // Entry Credit Block entries
 const (
 	ECIDServerIndexNumber byte = iota // 0 Must be these values, per the specification
@@ -234,7 +233,6 @@ const (
 	//==================
 	// This is the salt filter on rebooting leaders. How long should the filter last for?
 	CROSSBOOT_SALT_REPLAY_DURATION = time.Minute * 10
-
 	// Wallet
 	//==================
 	// Holds the root seeds for address generation

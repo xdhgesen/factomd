@@ -22,9 +22,8 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 	}
 }
 
-var out string // previous status
-
-func PrintOneStatus(listenTo int, wsapiNode int) {
+func GetSystemStatus(listenTo int, wsapiNode int) string {
+	fnodes := GetFnodes()
 	f := fnodes[listenTo]
 	prt := "===SummaryStart===\n\n"
 	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, time.Now().Unix(), time.Now().String(), time.Since(globals.StartTime).String())
@@ -235,9 +234,7 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 		}
 
 	}
-	prt = prt + "\n" + systemFaults(f)
-
-	prt = prt + faultSummary()
+	prt = prt + "\n"
 
 	lastdiff := ""
 	if verboseAuthoritySet {
@@ -290,7 +287,13 @@ func PrintOneStatus(listenTo int, wsapiNode int) {
 	}
 
 	prt = prt + "===SummaryEnd===\n"
+	return prt
+}
 
+var out string // previous status
+
+func PrintOneStatus(listenTo int, wsapiNode int) {
+	prt := GetSystemStatus(listenTo, wsapiNode)
 	if prt != out {
 		fmt.Println(prt)
 		out = prt
