@@ -57,6 +57,24 @@ const (
 	NUM_MESSAGES // Not used, just a counter for the number of messages.
 )
 
+// Election related messages are full broadcast
+func NormallyFullBroadcast(t byte) bool {
+	switch t {
+	case VOLUNTEERAUDIT, VOLUNTEERPROPOSAL, VOLUNTEERLEVELVOTE:
+		return true
+	}
+	return false
+}
+
+// Election related messages are full broadcast
+func NormallyPeer2Peer(t byte) bool {
+	switch t {
+	case MISSING_MSG, MISSING_DATA, DATA_RESPONSE, MISSING_MSG_RESPONSE, BOUNCE_MSG, BOUNCEREPLY_MSG,
+		MISSING_ENTRY_BLOCKS, ENTRY_BLOCK_RESPONSE, DBSTATE_MSG, DBSTATE_MISSING_MSG:
+		return true
+	}
+	return false
+}
 // Entry Credit Block entries
 const (
 	ECIDServerIndexNumber byte = iota // 0 Must be these values, per the specification
@@ -303,7 +321,7 @@ const (
 	TYPE_COINBASE_DESCRIPTOR        uint8 = 0x0B // 11
 	TYPE_COINBASE_DESCRIPTOR_CANCEL uint8 = 0x0C // 12
 	TYPE_ADD_FACTOID_ADDRESS        uint8 = 0x0D // 13
-	TYPE_ADD_FACTOID_EFFICIENCY     uint8 = 0x0E // 13
+	TYPE_ADD_FACTOID_EFFICIENCY     uint8 = 0x0E // 14
 )
 
 //---------------------------------------------------------------------

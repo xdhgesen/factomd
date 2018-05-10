@@ -46,6 +46,7 @@ func BlockFreeChannelSend(channel chan interface{}, message interface{}) int {
 var (
 	CurrentNetwork                      = TestNet
 	NetworkListenPort                   = "8108"
+	FullBroadcastFlag					= "<FULLBROADCAST>"
 	BroadcastFlag                       = "<BROADCAST>"
 	RandomPeerFlag                      = "<RANDOMPEER>"
 	NodeID                       uint64 = 0           // Random number used for loopback protection
