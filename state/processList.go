@@ -821,8 +821,8 @@ func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
 		p.VMs[vmIndex].List = p.VMs[vmIndex].List[:height]
 		p.VMs[vmIndex].HighestAsk = int(height) // make sure we will ask again for nil's above this height
 		if p.State.DebugExec() {
-			if nillist[i] > height-1 {
-				nillist[i] = height - 1 // Drag the highest nil logged back before this nil
+			if nillist[vmIndex] > int(height-1) {
+				nillist[vmIndex] = int(height - 1) // Drag the highest nil logged back before this nil
 			}
 		}
 
