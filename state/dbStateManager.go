@@ -1267,6 +1267,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		progress = true
 		d.ReadyToSave = false
 		d.Saved = true
+		return
 	}
 
 	if dbheight > 0 {

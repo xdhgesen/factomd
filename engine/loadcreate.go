@@ -54,6 +54,12 @@ func (lg *LoadGenerator) Run() {
 		default:
 
 		}
+
+		// Don't generate load if there is no room on this node.
+		if fnodes[wsapiNode].State.APIQueue().Length() > fnodes[wsapiNode].State.APIQueue().Cap()*9/10 {
+			continue
+		}
+
 		addSend := lg.PerSecond.Load()
 		lg.ToSend += addSend
 		top := lg.ToSend / 10
@@ -62,6 +68,7 @@ func (lg *LoadGenerator) Run() {
 			lg.running.Store(false)
 			return
 		}
+
 		var chain interfaces.IHash = nil
 		for i := 0; i < top; i++ {
 			var c interfaces.IMsg
@@ -75,10 +82,9 @@ func (lg *LoadGenerator) Run() {
 			}
 			r := lg.NewRevealEntry(e)
 
-			if fnodes[wsapiNode].State.APIQueue().Length() < fnodes[wsapiNode].State.APIQueue().Cap()*9/10 {
-				fnodes[wsapiNode].State.APIQueue().Enqueue(c)
-				fnodes[wsapiNode].State.APIQueue().Enqueue(r)
-			}
+			fnodes[wsapiNode].State.APIQueue().Enqueue(c)
+			fnodes[wsapiNode].State.APIQueue().Enqueue(r)
+
 		}
 	}
 }
