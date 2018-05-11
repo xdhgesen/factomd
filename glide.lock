@@ -1,6 +1,8 @@
-hash: fee315cb28853cbabcdc4261c83daf3465a28cf59c2d2f9e10ae9b6f5ddf7166
-updated: 2018-03-16T15:36:47.554093377-05:00
+hash: 8638d8c9095207f6adf3574e4bc6d919dd8ecb3df8268fd13196720698664014
+updated: 2018-05-10T19:31:11.730745585-05:00
 imports:
+- name: github.com/AndreasBriese/bbloom
+  version: 28f7e881ca57bc00e028f9ede9f0d9104cfeef5e
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
   subpackages:
@@ -18,6 +20,16 @@ imports:
   version: f2b1058a82554c0c7c3b8809c5956c38374604d8
   subpackages:
   - base58
+- name: github.com/dgraph-io/badger
+  version: 3ff1bfbb11c02c78c11269096669396c2d2cbbd3
+  subpackages:
+  - options
+  - protos
+  - skl
+  - table
+  - "y"
+- name: github.com/dgryski/go-farm
+  version: 2de33835d10275975374b37b2dcfd22c9020a1f5
 - name: github.com/dustin/go-humanize
   version: bb3d318650d48840a39aa21a027c6630e198e626
 - name: github.com/FactomProject/basen
@@ -38,14 +50,14 @@ imports:
   subpackages:
   - edwards25519
 - name: github.com/FactomProject/factom
-  version: cf230df541757ac86cd945a4a388c6c15914b726
+  version: 391a3dc4edbd926440adb91ceee4eeb84bbaed27
   subpackages:
   - wallet
   - wallet/wsapi
 - name: github.com/FactomProject/factom-cli
-  version: 4702861b7796d370a888ab3a232c37609304ff94
+  version: 03f6d30e277405be2ad0a1bccbb6c04d83189112
 - name: github.com/FactomProject/factom-walletd
-  version: dfab0806bccd0de9ca065d6fcb05ab56fa77c3e4
+  version: 433df8d1eb0c7ca7d66243469ec66368bd387a8d
 - name: github.com/FactomProject/fctwallet
   version: 97e19f8d1e251975480fa6f76eb2d9084b984a14
 - name: github.com/FactomProject/fsnotify
@@ -93,7 +105,7 @@ imports:
 - name: github.com/FactomProject/web
   version: 7daee1bf727fc2cd9142b9a73a797f98b3180756
 - name: github.com/golang/protobuf
-  version: 130e6b02ab059e7b717a096f397c5b60111cae74
+  version: b4deda0973fb4c70b50d226b1af49f3da59f5265
   subpackages:
   - proto
   - ptypes
@@ -114,6 +126,8 @@ imports:
   - pbutil
 - name: github.com/mitchellh/go-testing-interface
   version: a61a99592b77c9ba629d254a693acffaeb4b7e28
+- name: github.com/pkg/errors
+  version: 816c9085562cd7ee03e7f8188a1cfd942858cded
 - name: github.com/prometheus/client_golang
   version: 5cec1d0429b02e4323e042eb04dafdb079ddf568
   subpackages:
@@ -139,14 +153,14 @@ imports:
 - name: github.com/spf13/pflag
   version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
 - name: golang.org/x/crypto
-  version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
+  version: f6b343c37ca80bfa8ea539da67a0b621f84fab1d
   subpackages:
   - pbkdf2
   - ripemd160
   - scrypt
   - ssh/terminal
 - name: golang.org/x/net
-  version: 1087133bc4af3073e18add999345c6ae75918503
+  version: f73e4c9ed3b7ebdd5f699a16a880c2b1994e50dd
   subpackages:
   - context
   - http2
@@ -160,20 +174,12 @@ imports:
   version: 8dbc5d05d6edcc104950cc299a1ce6641235bc86
   subpackages:
   - unix
-  - windows
-- name: golang.org/x/text
-  version: c01e4764d870b77f8abe5096ee19ad20d80e8075
-  subpackages:
-  - secure/bidirule
-  - transform
-  - unicode/bidi
-  - unicode/norm
 - name: google.golang.org/genproto
   version: f676e0f3ac6395ff1a529ae59a6670878a8371a6
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: 16c41925b8363ca5f2a4c829d0c63046789d2322
+  version: 41344da2231b913fa3d983840a57a6b1b7b631a1
   subpackages:
   - balancer
   - codes

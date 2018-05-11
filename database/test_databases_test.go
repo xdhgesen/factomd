@@ -12,6 +12,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/database/badgerdb"
 	"github.com/FactomProject/factomd/database/boltdb"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
@@ -87,6 +88,16 @@ func TestAllDatabases(t *testing.T) {
 	// Level
 	for i := 0; i < 5; i++ {
 		m, err := leveldb.NewLevelDB(dbFilename, true)
+		if err != nil {
+			t.Error(err)
+		}
+		testDB(t, m, i)
+		CleanupTest(t, m)
+	}
+
+	// Badger
+	for i := 0; i < 1; i++ {
+		m, err := badgerdb.NewBadgerDB(dbFilename)
 		if err != nil {
 			t.Error(err)
 		}

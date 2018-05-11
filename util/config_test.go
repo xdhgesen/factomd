@@ -66,6 +66,7 @@ ControlPanelPort                      = 8090
 ; --------------- DBType: LDB | Bolt | Map
 DBType                                = "Map"
 LdbPath                               = "ldb"
+BadgerDBPath                          = "badger"
 BoltDBPath                            = ""
 DataStorePath                         = "data/export/"
 DirectoryBlockInSeconds               = 6

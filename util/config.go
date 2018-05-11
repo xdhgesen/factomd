@@ -24,6 +24,7 @@ type FactomdConfig struct {
 		DBType                                 string
 		LdbPath                                string
 		BoltDBPath                             string
+		BadgerDBPath                           string
 		DataStorePath                          string
 		DirectoryBlockInSeconds                int
 		ExportData                             bool
@@ -115,6 +116,7 @@ ControlPanelPort                      = 8090
 DBType                                = "LDB"
 LdbPath                               = "database/ldb"
 BoltDBPath                            = "database/bolt"
+BadgerDBPath                          = "database/badger"
 DataStorePath                         = "data/export"
 DirectoryBlockInSeconds               = 6
 ExportData                            = false

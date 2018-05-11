@@ -33,6 +33,9 @@ import (
 	"github.com/FactomProject/factomd/wsapi"
 	"github.com/FactomProject/logrustash"
 
+	"path/filepath"
+
+	"github.com/FactomProject/factomd/database/badgerdb"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -56,6 +59,7 @@ type State struct {
 	LogPath           string
 	LdbPath           string
 	BoltDBPath        string
+	BadgerDBPath      string
 	LogLevel          string
 	ConsoleLogLevel   string
 	NodeMode          string
@@ -431,6 +435,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.FactomdVersion = s.FactomdVersion
 	newState.DropRate = s.DropRate
 	newState.LdbPath = s.LdbPath + "/Sim" + number
+	newState.BadgerDBPath = s.BadgerDBPath + "/Sim" + number
 	newState.JournalFile = s.LogPath + "/journal" + number + ".log"
 	newState.Journaling = s.Journaling
 	newState.BoltDBPath = s.BoltDBPath + "/Sim" + number
@@ -667,6 +672,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		cfg.App.LdbPath = cfg.App.HomeDir + networkName + cfg.App.LdbPath
 		cfg.App.BoltDBPath = cfg.App.HomeDir + networkName + cfg.App.BoltDBPath
 		cfg.App.DataStorePath = cfg.App.HomeDir + networkName + cfg.App.DataStorePath
+		cfg.App.BadgerDBPath = cfg.App.HomeDir + networkName + cfg.App.BadgerDBPath
 		cfg.Log.LogPath = cfg.App.HomeDir + networkName + cfg.Log.LogPath
 		cfg.App.ExportDataSubpath = cfg.App.HomeDir + networkName + cfg.App.ExportDataSubpath
 		cfg.App.PeersFile = cfg.App.HomeDir + networkName + cfg.App.PeersFile
@@ -675,6 +681,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.LogPath = cfg.Log.LogPath + s.Prefix
 		s.LdbPath = cfg.App.LdbPath + s.Prefix
 		s.BoltDBPath = cfg.App.BoltDBPath + s.Prefix
+		s.BadgerDBPath = cfg.App.BadgerDBPath + s.Prefix
 		s.LogLevel = cfg.Log.LogLevel
 		s.ConsoleLogLevel = cfg.Log.ConsoleLogLevel
 		s.NodeMode = cfg.App.NodeMode
@@ -742,6 +749,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.LogPath = "database/"
 		s.LdbPath = "database/ldb"
 		s.BoltDBPath = "database/bolt"
+		s.BadgerDBPath = "database/badger"
 		s.LogLevel = "none"
 		s.ConsoleLogLevel = "standard"
 		s.NodeMode = "SERVER"
@@ -912,6 +920,10 @@ func (s *State) Init() {
 		}
 	case "Map":
 		if err := s.InitMapDB(); err != nil {
+			panic(fmt.Sprintf("Error initializing the database: %v", err))
+		}
+	case "Bgr":
+		if err := s.InitBadgerDB(); err != nil {
 			panic(fmt.Sprintf("Error initializing the database: %v", err))
 		}
 	default:
@@ -2233,6 +2245,24 @@ func (s *State) InitLevelDB() error {
 		if err != nil {
 			return err
 		}
+	}
+
+	s.DB = databaseOverlay.NewOverlay(dbase)
+	return nil
+}
+
+func (s *State) InitBadgerDB() error {
+	if s.DB != nil {
+		return nil
+	}
+
+	path := filepath.Join(s.BadgerDBPath, s.Network, "factoid_badger.db")
+	s.Println("Database:", path)
+
+	dbase, err := badgerdb.NewAndCreateBadgerDB(path)
+
+	if err != nil {
+		return err
 	}
 
 	s.DB = databaseOverlay.NewOverlay(dbase)
