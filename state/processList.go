@@ -818,6 +818,8 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 
 func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
 	if !(uint32(len(p.VMs[vmIndex].List)) > height) {
+		stuff := fmt.Sprintf("TrimVMList() %d/%d/%d", p.DBHeight, vmIndex, height)
+		p.State.LogMessage("processList", stuff, p.VMs[vmIndex].List[height])
 		p.VMs[vmIndex].List = p.VMs[vmIndex].List[:height]
 		p.VMs[vmIndex].HighestAsk = int(height) // make sure we will ask again for nil's above this height
 		if p.State.DebugExec() {
