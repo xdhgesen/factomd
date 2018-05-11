@@ -24,7 +24,13 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 func GetSystemStatus(listenTo int, wsapiNode int) string {
 	fnodes := GetFnodes()
+	if fnodes == nil {
+		return ""
+	}
 	f := fnodes[listenTo]
+	if f == nil {
+		return ""
+	}
 	prt := "===SummaryStart===\n\n"
 	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, time.Now().Unix(), time.Now().String(), time.Since(globals.StartTime).String())
 

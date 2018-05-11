@@ -391,7 +391,8 @@ func (b *AdminBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
 			b.ABEntries[i] = new(ServerFault)
 		default:
 			fmt.Printf("AB UNDEFINED ENTRY %x for block %v\n", t, b.GetHeader().GetDBHeight())
-			panic("Undefined Admin Block Entry Type")
+			// panic("Undefined Admin Block Entry Type")
+			b.ABEntries[i] = new(ForwardCompatibleEntry)
 		}
 		err = buf.PopBinaryMarshallable(b.ABEntries[i])
 		if err != nil {
