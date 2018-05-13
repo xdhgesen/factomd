@@ -119,6 +119,7 @@ func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) (msglen 
 			msglen = len(b)
 			msg.SetOrigin(m.GetOrigin())
 			msg.SetNetworkOrigin(m.GetNetworkOrigin())
+			msg.SetMeshOrigin(m.GetMeshOrigin())
 			msg.SetNoResend(false)
 			msg.SendOut(state, msg)
 			state.IncDBStateAnswerCnt()

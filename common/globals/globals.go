@@ -9,6 +9,7 @@ var StartTime time.Time
 type FactomParams struct {
 	AckbalanceHash           bool
 	EnableNet                bool
+	MeshNet                  bool
 	WaitEntries              bool
 	ListenTo                 int
 	Cnt                      int

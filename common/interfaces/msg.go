@@ -5,6 +5,8 @@
 package interfaces
 
 import (
+	"net"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,6 +35,9 @@ type IMsg interface {
 
 	GetNetworkOrigin() string
 	SetNetworkOrigin(string)
+
+	GetMeshOrigin() net.Addr
+	SetMeshOrigin(addr net.Addr)
 
 	// Returns the timestamp for a message
 	GetTimestamp() Timestamp

@@ -25,6 +25,7 @@ func ParseCmdLine(args []string) *FactomParams {
 
 	ackBalanceHashPtr := flag.Bool("balancehash", true, "If false, then don't pass around balance hashes")
 	enablenetPtr := flag.Bool("enablenet", true, "Enable or disable networking")
+	flag.BoolVar(&p.MeshNet, "meshnet", false, "Enable or disable mesh networking")
 	waitEntriesPtr := flag.Bool("waitentries", false, "Wait for Entries to be validated prior to execution of messages")
 	listenToPtr := flag.Int("node", 0, "Node Number the simulator will set as the focus")
 	cntPtr := flag.Int("count", 1, "The number of nodes to generate")

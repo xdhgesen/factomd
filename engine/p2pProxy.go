@@ -14,6 +14,7 @@ import (
 	"github.com/FactomProject/factomd/p2p"
 
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
+	"github.com/FactomProject/factomd/mesh/meshconn"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,6 +48,9 @@ type FactomMessage struct {
 	PeerHash string
 	AppHash  string
 	AppType  string
+
+	MeshSource meshconn.MeshAddr
+	MeshTarget meshconn.MeshAddr
 }
 
 func (e *FactomMessage) JSONByte() ([]byte, error) {
@@ -113,6 +117,7 @@ func (f *P2PProxy) Send(msg interfaces.IMsg) error {
 	hash := fmt.Sprintf("%x", msg.GetMsgHash().Bytes())
 	appType := fmt.Sprintf("%d", msg.Type())
 	message := FactomMessage{Message: data, PeerHash: msg.GetNetworkOrigin(), AppHash: hash, AppType: appType}
+	message.MeshTarget = msg.GetMeshOrigin().(meshconn.MeshAddr)
 	switch {
 	case !msg.IsPeer2Peer():
 		msgLogger.Debug("Sending broadcast message")
@@ -139,6 +144,7 @@ func (f *P2PProxy) Receive() (interfaces.IMsg, error) {
 			case FactomMessage:
 				fmessage := data.(FactomMessage)
 				msg, err := msgsupport.UnmarshalMessage(fmessage.Message)
+				msg.SetMeshOrigin(fmessage.MeshSource)
 
 				if err != nil {
 					proxyLogger.WithField("receive-error", err).Error()
@@ -208,6 +214,7 @@ func (f *P2PProxy) ManageOutChannel() {
 					parcel.Header.Type = p2p.TypeMessage
 				}
 				parcel.Header.TargetPeer = fmessage.PeerHash
+				parcel.Header.MeshTarget = fmessage.MeshTarget
 				parcel.Header.AppHash = fmessage.AppHash
 				parcel.Header.AppType = fmessage.AppType
 				p2p.BlockFreeChannelSend(f.ToNetwork, parcel)
@@ -225,6 +232,8 @@ func (f *P2PProxy) ManageInChannel() {
 		case p2p.Parcel:
 			parcel := data.(p2p.Parcel)
 			message := FactomMessage{Message: parcel.Payload, PeerHash: parcel.Header.TargetPeer, AppHash: parcel.Header.AppHash, AppType: parcel.Header.AppType}
+			message.MeshTarget = parcel.Header.MeshTarget
+			message.MeshSource = parcel.Header.MeshSource
 			removed := p2p.BlockFreeChannelSend(f.BroadcastIn, message)
 			BroadInCastQueue.Inc()
 			BroadInCastQueue.Add(float64(-1 * removed))

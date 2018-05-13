@@ -29,6 +29,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/elections"
+	"github.com/FactomProject/factomd/mesh"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -357,6 +358,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	connectionMetricsChannel := make(chan interface{}, p2p.StandardChannelSize)
 	p2p.NetworkDeadline = time.Duration(p.Deadline) * time.Millisecond
 
+	if p.MeshNet {
+		p.EnableNet = false
+	}
+
 	if p.EnableNet {
 		nodeName := fnodes[0].State.FactomNodeName
 		if 0 < p.NetworkPortOverride {
@@ -386,6 +391,32 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		p2pProxy.StartProxy()
 
 		go networkHousekeeping() // This goroutine executes once a second to keep the proxy apprised of the network status.
+	} else if p.MeshNet {
+		nodeName := fnodes[0].State.FactomNodeName
+		if 0 < p.NetworkPortOverride {
+			networkPort = fmt.Sprintf("%d", p.NetworkPortOverride)
+		}
+
+		ci := p2p.ControllerInit{
+			NodeName:                 nodeName,
+			Port:                     networkPort,
+			PeersFile:                s.PeersFile,
+			Network:                  networkID,
+			Exclusive:                p.Exclusive,
+			ExclusiveIn:              p.ExclusiveIn,
+			SeedURL:                  seedURL,
+			ConfigPeers:              configPeers,
+			CmdLinePeers:             p.Peers,
+			ConnectionMetricsChannel: connectionMetricsChannel,
+		}
+		meshNetwork := mesh.NewMeshPeer(ci).Init()
+		meshNetwork.StartNetwork()
+		p2pProxy = new(P2PProxy).Init(nodeName, "Mesh Network").(*P2PProxy)
+		p2pProxy.FromNetwork = meshNetwork.FromNetwork
+		p2pProxy.ToNetwork = meshNetwork.ToNetwork
+
+		fnodes[0].Peers = append(fnodes[0].Peers, p2pProxy)
+		p2pProxy.StartProxy()
 	}
 
 	networkpattern = p.Net

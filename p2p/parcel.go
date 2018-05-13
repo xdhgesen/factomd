@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
+	"github.com/FactomProject/factomd/mesh/meshconn"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,6 +39,10 @@ type ParcelHeader struct {
 	PeerPort    string // port of the peer , or we are listening on
 	AppHash     string // Application specific message hash, for tracing
 	AppType     string // Application specific message type, for tracing
+
+	// For MeshNet
+	MeshSource meshconn.MeshAddr
+	MeshTarget meshconn.MeshAddr
 }
 
 type ParcelCommandType uint16

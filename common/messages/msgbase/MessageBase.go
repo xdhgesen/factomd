@@ -10,8 +10,11 @@ import (
 	"sync"
 	"time"
 
+	"net"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mesh/meshconn"
 )
 
 type MessageBase struct {
@@ -21,6 +24,8 @@ type MessageBase struct {
 	NetworkOrigin string // Hash of the network peer/connection where the message is from
 	Peer2Peer     bool   // The nature of this message type, not marshalled with the message
 	LocalOnly     bool   // This message is only a local message, is not broadcast and may skip verification
+
+	MeshOrigin meshconn.MeshAddr
 
 	NoResend  bool // Don't resend this message if true.
 	ResendCnt int  // Put a limit on resends
@@ -211,6 +216,14 @@ func (m *MessageBase) GetNetworkOrigin() string {
 
 func (m *MessageBase) SetNetworkOrigin(o string) {
 	m.NetworkOrigin = o
+}
+
+func (m *MessageBase) GetMeshOrigin() net.Addr {
+	return m.MeshOrigin
+}
+
+func (m *MessageBase) SetMeshOrigin(addr net.Addr) {
+	m.MeshOrigin = addr.(meshconn.MeshAddr)
 }
 
 // Returns true if this is a response to a peer to peer

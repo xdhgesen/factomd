@@ -135,6 +135,7 @@ func (m *MissingEntryBlocks) FollowerExecute(state interfaces.IState) {
 
 	resp.SetOrigin(m.GetOrigin())
 	resp.SetNetworkOrigin(m.GetNetworkOrigin())
+	resp.SetMeshOrigin(m.GetMeshOrigin())
 	resp.SendOut(state, resp)
 	state.IncDBStateAnswerCnt()
 
