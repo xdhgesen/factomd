@@ -17,6 +17,8 @@ import (
 
 	"math/rand"
 
+	"time"
+
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/mesh/meshconn"
 	"github.com/FactomProject/factomd/p2p"
@@ -31,7 +33,6 @@ type MeshNetwork struct {
 
 	FromNetwork chan interface{} // Channel to the app for network data
 	ToNetwork   chan interface{} // Parcels from the app for the network
-
 }
 
 func NewMeshPeer(ci p2p.ControllerInit) *MeshNetwork {
@@ -90,6 +91,28 @@ func (m *MeshNetwork) Init() *MeshNetwork {
 func (m *MeshNetwork) StartNetwork() {
 	go m.ManageOutChannel()
 	go m.ManageInChannel()
+	go m.ConnectionStatus()
+}
+
+func (m *MeshNetwork) ConnectionStatus() {
+	ticker := time.NewTicker(time.Second)
+	for range ticker.C {
+		if len(m.Config.ConnectionMetricsChannel) == cap(m.Config.ConnectionMetricsChannel) {
+			continue
+		}
+
+		newMetrics := make(map[string]p2p.ConnectionMetrics)
+		stats := mesh.NewStatus(m.router)
+		for _, s := range stats.Connections {
+			newMetrics[s.Address] = p2p.ConnectionMetrics{
+				PeerAddress:     s.Address,
+				ConnectionState: s.State,
+				ConnectionNotes: s.Info,
+				MomentConnected: time.Now(),
+			}
+		}
+		m.Config.ConnectionMetricsChannel <- newMetrics
+	}
 }
 
 func encode(v interface{}) ([]byte, error) {
