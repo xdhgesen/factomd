@@ -19,7 +19,7 @@ import (
 
 	"time"
 
-	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/mesh/meshconn"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/weaveworks/mesh"
@@ -42,9 +42,35 @@ func NewMeshPeer(ci p2p.ControllerInit) *MeshNetwork {
 	return p
 }
 
+func MustHardwareAddr() string {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		panic(err)
+	}
+	for _, iface := range ifaces {
+		if s := iface.HardwareAddr.String(); s != "" {
+			return s
+		}
+	}
+	panic("no valid network interfaces")
+}
+
 func (m *MeshNetwork) Init() *MeshNetwork {
 	password := "" // No password
-	name := mesh.PeerNameFromBin(primitives.RandomHash().Bytes())
+
+	var name mesh.PeerName
+	var err error
+	if globals.Params.MeshName != "" {
+		name, err = mesh.PeerNameFromString(globals.Params.MeshName)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		name, err = mesh.PeerNameFromString(MustHardwareAddr())
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	nickname := name.String() // MustHostname()
 	m.Config.Port = ":" + m.Config.Port
@@ -133,6 +159,9 @@ func decode(d []byte) (*p2p.Parcel, error) {
 
 // manageOutChannel takes messages from the f.broadcastOut channel and sends them to the network.
 func (f *MeshNetwork) ManageOutChannel() {
+	fmt.Errorf("%s\n", f.send.LocalAddr())
+	fmt.Printf("%s\n", f.send.LocalAddr())
+
 	for {
 		select {
 		case data := <-f.ToNetwork:
@@ -140,6 +169,7 @@ func (f *MeshNetwork) ManageOutChannel() {
 			case p2p.Parcel:
 				parcel := data.(p2p.Parcel)
 				parcel.Header.MeshSource = f.send.LocalAddr().(meshconn.MeshAddr)
+				parcel.Header.Type = p2p.TypeMessage
 				parcel.UpdateHeader()
 				b, err := encode(parcel)
 				if err != nil {
@@ -153,7 +183,10 @@ func (f *MeshNetwork) ManageOutChannel() {
 					i := rand.Intn(len(all))
 					f.send.WriteTo(b, meshconn.MeshAddr{PeerName: all[i].Name, PeerUID: all[i].UID})
 				} else {
-					f.send.WriteTo(b, parcel.Header.MeshTarget)
+					_, err := f.send.WriteTo(b, parcel.Header.MeshTarget)
+					if err != nil {
+						fmt.Printf("**** ERROR: %s\n", err.Error())
+					}
 				}
 			default:
 				f.Logger.Printf("Garbage on f.BrodcastOut. %+v", data)
@@ -180,8 +213,10 @@ func (m *MeshNetwork) ManageInChannel() {
 
 		// m.Logger.Printf("Msg from %s\n", from.String())
 
+		p.Header.TargetPeer = from.String()
 		p.Header.PeerAddress = from.String()
 		p.Header.MeshSource = from.(meshconn.MeshAddr)
+
 		m.FromNetwork <- *p
 	}
 }

@@ -10,6 +10,7 @@ type FactomParams struct {
 	AckbalanceHash           bool
 	EnableNet                bool
 	MeshNet                  bool
+	MeshName                 string
 	WaitEntries              bool
 	ListenTo                 int
 	Cnt                      int

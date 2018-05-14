@@ -144,7 +144,6 @@ func (f *P2PProxy) Receive() (interfaces.IMsg, error) {
 			case FactomMessage:
 				fmessage := data.(FactomMessage)
 				msg, err := msgsupport.UnmarshalMessage(fmessage.Message)
-				msg.SetMeshOrigin(fmessage.MeshSource)
 
 				if err != nil {
 					proxyLogger.WithField("receive-error", err).Error()
@@ -154,6 +153,7 @@ func (f *P2PProxy) Receive() (interfaces.IMsg, error) {
 
 				if nil == err {
 					msg.SetNetworkOrigin(fmessage.PeerHash)
+					msg.SetMeshOrigin(fmessage.MeshSource)
 				}
 				f.bytesIn += len(fmessage.Message)
 				return msg, err
