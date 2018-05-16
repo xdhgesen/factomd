@@ -143,6 +143,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			} else {
 				s.LogMessage("executeMsg", "LeaderExecute", msg)
 				msg.LeaderExecute(s)
+				msg.FollowerExecute(s)
 			}
 		} else {
 			s.LogMessage("executeMsg", "FollowerExecute2", msg)
@@ -1170,7 +1171,6 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		if s.DebugExec() {
 			s.LogMessage("executeMsg", "Drop replay", m)
 		}
@@ -1254,8 +1254,6 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	m.SetLocal(false)
 	s.FollowerExecuteEOM(m)
 	s.UpdateState()
-	delete(s.Acks, ack.GetHash().Fixed())
-	delete(s.Holding, m.GetMsgHash().Fixed())
 }
 
 func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
@@ -1280,7 +1278,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
 		HoldingQueueDBSigOutputs.Inc()
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		s.LogMessage("executeMsg", "drop INTERNAL_REPLAY", m)
 		return
 	}

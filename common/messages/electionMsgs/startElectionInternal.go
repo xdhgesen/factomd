@@ -107,13 +107,13 @@ func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 				trimto += 1
 			}
 		}
-
-		vm.List = vm.List[:trimto]
-		vm.ListAck = vm.ListAck[:trimto]
+		s.LogMessage("processList", fmt.Sprintf("Would have trimed to %d/%d/%d", m.DBHeight, m.VMIndex, trimto), m)
+		//vm.List = vm.List[:trimto]
+		//vm.ListAck = vm.ListAck[:trimto]
 	}
 	post := len(vm.List)
 	if pre != post {
-		fmt.Printf("Trimmed!, VM: %d %s from %d to %d\n", m.VMIndex, s.FactomNodeName, pre, post)
+		s.LogMessage("processList", fmt.Sprintf("Trimed to %d/%d/%d", m.DBHeight, m.VMIndex, post), m)
 	}
 
 	// Send to elections

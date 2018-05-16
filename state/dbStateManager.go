@@ -1257,10 +1257,12 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.
 
-	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
-		return
+	if list.State.DB == nil {
+		return false
 	}
-
+	if !d.Signed || !d.ReadyToSave {
+		return false
+	}
 	// If this is a repeated block, and I have already saved at this height, then we can safely ignore
 	// this dbstate.
 	if d.Repeat == true && uint32(dbheight) <= list.SavedHeight {
@@ -1273,7 +1275,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if dbheight > 0 {
 		dp := list.State.GetDBState(uint32(dbheight - 1))
 		if dp == nil || !dp.Saved {
-			return
+			return false
 		}
 	}
 
@@ -1295,7 +1297,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				d.DirectoryBlock.GetHeader().GetTimestamp())
 		}
 
-		return
+		return true
 	}
 
 	// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
