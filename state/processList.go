@@ -956,10 +956,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if p.State.DebugExec() {
 					if nillist[i] < j {
 						p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
-						if nillist[i] > j-1 {
-							nillist[i] = j - 1 // Drag the highest nil logged back before this nil
-						}
-
+						nillist[i] = j
 					}
 				}
 
@@ -1030,7 +1027,9 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					vm.List[j] = nil  // If we have seen this message, we don't process it again.  Ever.
 					vm.HighestAsk = j // have to be able to ask for this again
 					if p.State.DebugExec() {
-						nillist[i] = j - 1 // Drag the highest nil logged back before this nil
+						if nillist[i] > j-1 {
+							nillist[i] = j - 1 // Drag the highest nil logged back before this nil
+						}
 					}
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					// If we ask won't we just get the same thing back?
