@@ -286,10 +286,11 @@ func (s *State) getACKStatus(hash interfaces.IHash, useOldMsgs bool) (int, inter
 		for _, pl := range s.ProcessLists.Lists {
 			//pl := s.ProcessLists.LastList()
 			if useOldMsgs {
-				a := pl.GetOldAck(hash).(*messages.Ack)
-				if a == nil {
-
+				aa := pl.GetOldAck(hash)
+				if aa == nil {
+					return constants.AckStatusUnknown, hash, nil, nil, nil
 				}
+				a := aa.(*messages.Ack)
 				vmIdx := a.GetVMIndex()
 				if pl.VMs[vmIdx].Height < int(a.Height) {
 					return constants.AckStatusUnknown, hash, nil, nil, nil

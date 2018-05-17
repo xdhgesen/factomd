@@ -555,15 +555,24 @@ func (p *ProcessList) GetOldMsgs(key interfaces.IHash) interfaces.IMsg {
 	}
 	p.oldmsgslock.Lock()
 	defer p.oldmsgslock.Unlock()
-	return p.OldMsgs[key.Fixed()]
+	m, ok := p.OldMsgs[key.Fixed()]
+	if !ok {
+		return nil
+	}
+	return m
 }
+
 func (p *ProcessList) GetOldAck(key interfaces.IHash) interfaces.IMsg {
 	if p == nil {
 		return nil
 	}
 	p.oldackslock.Lock()
 	defer p.oldackslock.Unlock()
-	return p.OldAcks[key.Fixed()]
+	a, ok := p.OldAcks[key.Fixed()]
+	if !ok {
+		return nil
+	}
+	return a
 }
 
 func (p *ProcessList) AddNewEBlocks(key interfaces.IHash, value interfaces.IEntryBlock) {
