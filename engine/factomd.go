@@ -57,16 +57,12 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	state0.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(0))
 	state0.EFactory = new(electionMsgs.ElectionsFactory)
 
-	if true {
-		Params.DebugLogRegEx = "systemStatus.txt"
-		go func() {
-			for {
-				time.Sleep((time.Duration(params.BlkTime) * time.Second) / 10)
-				messages.LogPrintf("systemStatus.txt", "\n%s\n", GetSystemStatus(0, 0))
-			}
-		}()
-
-	}
+	go func() {
+		for {
+			time.Sleep((time.Duration(params.BlkTime) * time.Second) / 10)
+			messages.LogPrintf("systemStatus.txt", "\n%s\n", GetSystemStatus(0, 0))
+		}
+	}()
 
 	go NetStart(state0, params, listenToStdin)
 	return state0
