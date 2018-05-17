@@ -61,7 +61,7 @@ type ProcessList struct {
 	                                            (discard DBlock if > 1/2 have sig differences) */
 	// messages processed in this list
 	OldMsgs     map[[32]byte]interfaces.IMsg
-	oldmsgslock *sync.Mutex
+	oldmsgslock sync.Mutex
 
 	// Chains that are executed, but not processed. There is a small window of a pending chain that the ack
 	// will pass and the chainhead will fail. This covers that window. This is only used by WSAPI,
@@ -69,11 +69,11 @@ type ProcessList struct {
 	PendingChainHeads *SafeMsgMap
 
 	OldAcks     map[[32]byte]interfaces.IMsg
-	oldackslock *sync.Mutex
+	oldackslock sync.Mutex
 
 	// Entry Blocks added within 10 minutes (follower and leader)
 	NewEBlocks     map[[32]byte]interfaces.IEntryBlock
-	neweblockslock *sync.Mutex
+	neweblockslock sync.Mutex
 
 	NewEntriesMutex sync.RWMutex
 	NewEntries      map[[32]byte]interfaces.IEntry
@@ -553,12 +553,17 @@ func (p *ProcessList) GetOldMsgs(key interfaces.IHash) interfaces.IMsg {
 	if p == nil {
 		return nil
 	}
-	if p.oldmsgslock == nil {
-		return nil
-	}
 	p.oldmsgslock.Lock()
 	defer p.oldmsgslock.Unlock()
 	return p.OldMsgs[key.Fixed()]
+}
+func (p *ProcessList) GetOldAck(key interfaces.IHash) interfaces.IMsg {
+	if p == nil {
+		return nil
+	}
+	p.oldackslock.Lock()
+	defer p.oldackslock.Unlock()
+	return p.OldAcks[key.Fixed()]
 }
 
 func (p *ProcessList) AddNewEBlocks(key interfaces.IHash, value interfaces.IEntryBlock) {
@@ -1390,12 +1395,8 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 
 	pl.PendingChainHeads = NewSafeMsgMap("PendingChainHeads", pl.State)
 	pl.OldMsgs = make(map[[32]byte]interfaces.IMsg)
-	pl.oldmsgslock = new(sync.Mutex)
 	pl.OldAcks = make(map[[32]byte]interfaces.IMsg)
-	pl.oldackslock = new(sync.Mutex)
-
 	pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-	pl.neweblockslock = new(sync.Mutex)
 	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 
 	pl.DBSignatures = make([]DBSig, 0)
