@@ -292,7 +292,7 @@ func (s *State) getACKStatus(hash interfaces.IHash, useOldMsgs bool) (int, inter
 				}
 				vmIdx := a.GetVMIndex()
 				if pl.VMs[vmIdx].Height < int(a.Height) {
-					return constants.AckStatusNotConfirmed, hash, nil, nil, nil
+					return constants.AckStatusUnknown, hash, nil, nil, nil
 				}
 
 				m := pl.GetOldMsgs(hash)
