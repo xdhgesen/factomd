@@ -92,28 +92,34 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-		if msg.GetResendCnt() == 0 {
-			msg.SendOut(s, msg)
-		} else if msg.Resend(s) {
-			msg.SendOut(s, msg)
+		if !msg.IsLocal() {
+			if msg.GetResendCnt() == 0 {
+				msg.SendOut(s, msg)
+			} else if msg.Resend(s) {
+				msg.SendOut(s, msg)
+			}
+		}
+		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if !s.NoEntryYet(msg.GetHash(), nil) {
+				return true
+			}
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		}
 
-		switch msg.Type() {
-		case constants.REVEAL_ENTRY_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
-		case constants.COMMIT_ENTRY_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
-		case constants.COMMIT_CHAIN_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		// Cheap tests to direct messages to follower handling
+		// RunLeader means we can run as a leader, Leader means we are one,
+		// Saving means we are between blocks and can't do leader things, and
+		if !s.RunLeader || !s.Leader || s.Saving {
+			msg.FollowerExecute(s)
+			ret = true
+			return
+		}
+
+		// If we already have an ack for a message, we are also done
+		if s.Acks[msg.GetHash().Fixed()] != nil {
+			msg.FollowerExecute(s)
+			ret = true
+			return
 		}
 
 		var vml int
@@ -126,10 +132,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		vmi := msg.GetVMIndex()
 		hkb := s.GetHighestKnownBlock()
 
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving &&
-			vm != nil && int(vm.Height) == vml &&
+		if vm != nil && int(vm.Height) == vml &&
 			(!s.Syncing || !vm.Synced) &&
 			(local || vmi == s.LeaderVMIndex) &&
 			s.LeaderPL.DBHeight+1 >= hkb {
@@ -140,6 +143,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			} else {
 				s.LogMessage("executeMsg", "LeaderExecute", msg)
 				msg.LeaderExecute(s)
+				msg.FollowerExecute(s)
 			}
 		} else {
 			s.LogMessage("executeMsg", "FollowerExecute2", msg)
@@ -149,6 +153,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		ret = true
 
 	case 0:
+		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if !s.NoEntryYet(msg.GetHash(), nil) {
+				return true
+			}
+			s.Holding[msg.GetMsgHash().Fixed()] = msg
+		}
 		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
 		// this check makes sure we don't put them back in holding after just deleting them
 		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
@@ -191,6 +201,7 @@ func (s *State) Process() (progress bool) {
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
 	}
 
+	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 	if !s.RunLeader {
 		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
@@ -202,10 +213,8 @@ func (s *State) Process() (progress bool) {
 				}
 			}
 		}
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 
 	} else if s.IgnoreMissing {
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			s.IgnoreMissing = false
@@ -225,14 +234,17 @@ func (s *State) Process() (progress bool) {
 	/** Process all the DBStates  that might be pending **/
 
 	for {
-		ix := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase + 1
+		highestSavedBlk := s.GetHighestSavedBlk()
+		ix := int(highestSavedBlk) - s.DBStatesReceivedBase + 1
 		if ix < 0 || ix >= len(s.DBStatesReceived) {
 			break
 		}
 		msg := s.DBStatesReceived[ix]
 		if msg == nil {
+			s.LogPrintf("dbstates", "DBStatesReceived[%d] == nil, highestSavedBlk = %d, s.DBStatesReceivedBase=%d ", ix, highestSavedBlk, s.DBStatesReceivedBase)
 			break
 		}
+		s.LogMessage("dbstates", "process", msg)
 		process = append(process, msg)
 		s.DBStatesReceived[ix] = nil
 	}
@@ -358,15 +370,16 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 
 	preReviewHoldingTime := time.Now()
-	if len(s.XReview) > 0 || s.Syncing || s.Saving {
-		return
-	}
 
 	now := s.GetTimestamp()
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
 	}
 	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 100 {
+		return
+	}
+
+	if s.Syncing || s.Saving {
 		return
 	}
 
@@ -389,13 +402,31 @@ func (s *State) ReviewHolding() {
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
-	for k, v := range s.Holding {
-		ack := s.Acks[k]
-		if ack != nil {
-			s.LogMessage("executeMsg", "Found Ack for this thing in Holding", v)
+	for k, _ := range s.Acks {
+		v := s.Holding[k]
+		if v != nil {
 			v.FollowerExecute(s)
-			continue
 		}
+	}
+
+	for k, _ := range s.Commits.msgmap {
+		m := s.Holding[k]
+		if m != nil {
+			m.SendOut(s, m)
+		}
+	}
+
+	if len(s.XReview) > 0 || s.Syncing || s.Saving {
+		return
+	}
+
+	// Get the count on processing minutes.
+	processMinute := s.LeaderNewMin
+	s.LeaderNewMin++
+
+	hldcnt := 0
+	for k, v := range s.Holding {
+		hldcnt++
 
 		if v.Expire(s) {
 			s.LogMessage("executeMsg", "expire from holding", v)
@@ -404,6 +435,40 @@ func (s *State) ReviewHolding() {
 			delete(s.Holding, k)
 			continue
 		}
+
+		if int(highest)-int(saved) > 1000 {
+			TotalHoldingQueueOutputs.Inc()
+			delete(s.Holding, k)
+		}
+
+		_, okre := v.(*messages.RevealEntryMsg)
+
+		if hldcnt < 100 && okre {
+			if !s.NoEntryYet(v.GetHash(), s.LeaderTimestamp) {
+				delete(s.Holding, k)
+				continue
+			}
+		}
+
+		if hldcnt > 500 && len(s.Holding) > 500 {
+			if t := v.Type(); t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+				// Always process these.
+			} else if t == constants.MISSING_MSG_RESPONSE {
+				//delete(s.Holding, k) // Ignore if we are behind the 8 ball.
+				continue
+			} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
+				// Always process these
+			} else {
+				continue // Dont' review anything else.
+			}
+		}
+
+		_ = processMinute
+
+		// Only reprocess if at the top of a new minute, and if we are a leader.
+		//if processMinute > 50 {
+		//	continue // No need for followers to review Reveal Entry messages
+		//}
 
 		switch v.Validate(s) {
 		case -1:
@@ -415,17 +480,20 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		if v.GetResendCnt() == 0 {
-			v.SendOut(s, v)
-		} else {
-			if v.Resend(s) {
-				v.SendOut(s, v)
-			}
-		}
+		v.SendOut(s, v)
 
-		if int(highest)-int(saved) > 1000 {
-			TotalHoldingQueueOutputs.Inc()
-			delete(s.Holding, k)
+		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
+		if okre {
+			if !s.NoEntryYet(v.GetHash(), s.GetLeaderTimestamp()) {
+				delete(s.Holding, v.GetHash().Fixed())
+				s.Commits.Delete(v.GetHash().Fixed())
+				continue
+			}
+
+			// Needs to be our VMIndex as well, or ignore.
+			if v.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
+				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+			}
 		}
 
 		eom, ok := v.(*messages.EOM)
@@ -481,22 +549,6 @@ func (s *State) ReviewHolding() {
 			}
 		}
 
-		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
-		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
-				delete(s.Holding, re.GetHash().Fixed())
-				s.Commits.Delete(re.GetHash().Fixed())
-				continue
-			}
-			// Only reprocess if at the top of a new minute, and if we are a leader.
-			//if processMinute > 10 {
-			//	continue // No need for followers to review Reveal Entry messages
-			//}
-			// Needs to be our VMIndex as well, or ignore.
-			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
-				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
-			}
-		}
 		//TODO: Move this earlier!
 		// We don't reprocess messages if we are a leader, but it ain't ours!
 		if s.LeaderVMIndex != v.GetVMIndex() {
@@ -520,12 +572,16 @@ func (s *State) AddDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
+	dbheight := directoryBlock.GetHeader().GetDBHeight()
+
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
 	if dbState == nil {
 		//s.AddStatus(fmt.Sprintf("AddDBState(): Fail dbstate is nil at dbht: %d", directoryBlock.GetHeader().GetDBHeight()))
+		s.LogPrintf("dbstates", "AddDBState(): Fail dbstate is nil at dbht: %d", dbheight)
 		return nil
 	}
+	s.LogPrintf("dbstates", "AddDBState(): at dbht: %d", dbheight)
 
 	ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
 	DBKeyMR := dbState.DirectoryBlock.GetKeyMR().String()
@@ -552,13 +608,12 @@ func (s *State) AddDBState(isNew bool,
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
 			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			defer s.LeaderPL.FactoidBalancesTMutex.Unlock()
+			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesTMutex.Unlock()
 
 			s.LeaderPL.ECBalancesTMutex.Lock()
-			defer s.LeaderPL.ECBalancesTMutex.Unlock()
-
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.ECBalancesTMutex.Unlock()
 		}
 
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -720,13 +775,12 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): Saved %d dbht: %d", saved, dbheight))
 
-	pdbstate := s.DBStates.Get(int(dbheight - 1))
+	pdbstate := s.DBStates.Get(int(dbheight) - 1)
 
-	switch pdbstate.ValidNext(s, dbstatemsg) {
-	case 0:
-		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
+	valid := pdbstate.ValidNext(s, dbstatemsg)
+	s.LogMessage("dbstates", fmt.Sprintf("valid=%d", valid), msg)
 
-		// Don't add duplicate dbstate messages.
+	storeDBState := func() {
 		if s.DBStatesReceivedBase < int(s.GetHighestSavedBlk()) {
 			cut := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase
 			if len(s.DBStatesReceived) > cut {
@@ -744,6 +798,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			s.DBStatesReceived = append(s.DBStatesReceived, nil)
 		}
 		s.DBStatesReceived[ix] = dbstatemsg
+	}
+
+	switch valid {
+	case 0:
+		storeDBState()
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
@@ -754,6 +813,8 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		}
 		return
 	}
+
+	storeDBState()
 
 	if dbstatemsg.IsLast { // this is the last DBState in this load
 		s.DBFinished = true // Normal case
@@ -839,7 +900,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	}
 
 	if dbstatemsg.IsInDB == false {
-		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from network at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): Network: dbstate added at ht %d", dbheight)
 		dbstate.ReadyToSave = true
 		dbstate.Locked = false
 		dbstate.Signed = true
@@ -847,9 +908,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStates.UpdateState()
 	} else {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
+		s.LogPrintf("dbstates", "FollowerExecuteDBState(): Local:   dbstate added at ht %d", dbheight)
 		dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false
+		s.DBStates.UpdateState()
 	}
 
 	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Clear SigType follower execute DBState:  !s.SigType(%v)", s.FactomNodeName, s.SigType))
@@ -1017,7 +1080,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 		msgResponse := messages.NewMissingMsgResponse(s, pl.System.List[m.SystemHeight], nil)
 		msgResponse.SetOrigin(m.GetOrigin())
 		msgResponse.SetNetworkOrigin(m.GetNetworkOrigin())
-		s.NetworkOutMsgQueue().Enqueue(msgResponse)
+		msgResponse.SendOut(s, msgResponse)
 		s.MissingRequestReplyCnt++
 		sent = true
 	}
@@ -1030,7 +1093,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 			msgResponse := messages.NewMissingMsgResponse(s, missingmsg, ackMsg)
 			msgResponse.SetOrigin(m.GetOrigin())
 			msgResponse.SetNetworkOrigin(m.GetNetworkOrigin())
-			s.NetworkOutMsgQueue().Enqueue(msgResponse)
+			msgResponse.SendOut(s, msgResponse)
 			s.MissingRequestReplyCnt++
 			sent = true
 		}
@@ -1115,7 +1178,6 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		if s.DebugExec() {
 			s.LogMessage("executeMsg", "Drop replay", m)
 		}
@@ -1199,8 +1261,6 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	m.SetLocal(false)
 	s.FollowerExecuteEOM(m)
 	s.UpdateState()
-	delete(s.Acks, ack.GetHash().Fixed())
-	delete(s.Holding, m.GetMsgHash().Fixed())
 }
 
 func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
@@ -1225,7 +1285,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
 		HoldingQueueDBSigOutputs.Inc()
-		delete(s.Holding, m.GetMsgHash().Fixed())
 		s.LogMessage("executeMsg", "drop INTERNAL_REPLAY", m)
 		return
 	}
@@ -1443,6 +1502,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 		s.PutNewEBlocks(dbheight, chainID, eb)
 		s.PutNewEntries(dbheight, myhash, msg.Entry)
 
+		s.GetDB().StartMultiBatch()
+		s.GetDB().InsertEntryMultiBatch(msg.Entry)
+		s.GetDB().ExecuteMultiBatch()
+
 		s.IncEntryChains()
 		s.IncEntries()
 		return true
@@ -1471,6 +1534,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	// Put it in our list of new Entry Blocks for this Directory Block
 	s.PutNewEBlocks(dbheight, chainID, eb)
 	s.PutNewEntries(dbheight, myhash, msg.Entry)
+
+	s.GetDB().StartMultiBatch()
+	s.GetDB().InsertEntryMultiBatch(msg.Entry)
+	s.GetDB().ExecuteMultiBatch()
 
 	s.IncEntries()
 	return true
@@ -2204,22 +2271,26 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			defer pl.FactoidBalancesTMutex.Unlock()
 			v, ok = pl.FactoidBalancesT[adr]
+			pl.FactoidBalancesTMutex.Unlock()
+		} else {
+			defer s.LogPrintf("fct", "Oops, no process list")
 		}
 	}
 	if !ok {
 		s.FactoidBalancesPMutex.Lock()
-		defer s.FactoidBalancesPMutex.Unlock()
 		v = s.FactoidBalancesP[adr]
+		s.FactoidBalancesPMutex.Unlock()
 	}
 
+	s.LogPrintf("fct", " GetF(%v,%x) = %v %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("fct", " PutF(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2227,7 +2298,11 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 			defer pl.FactoidBalancesTMutex.Unlock()
 
 			pl.FactoidBalancesT[adr] = v
+
+		} else {
+			s.LogPrintf("fct", "Drop, no process list")
 		}
+
 	} else {
 		s.FactoidBalancesPMutex.Lock()
 		defer s.FactoidBalancesPMutex.Unlock()
@@ -2241,27 +2316,36 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
-			defer pl.ECBalancesTMutex.Unlock()
 			v, ok = pl.ECBalancesT[adr]
+			pl.ECBalancesTMutex.Unlock()
+
+		} else {
+			defer s.LogPrintf("ec", "Oops, no process list")
 		}
 	}
+	ok2 := false
 	if !ok {
 		s.ECBalancesPMutex.Lock()
-		defer s.ECBalancesPMutex.Unlock()
-		v = s.ECBalancesP[adr]
+		v, ok2 = s.ECBalancesP[adr]
+		s.ECBalancesPMutex.Unlock()
 	}
+
+	s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
 	return v
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("ec", " PutE(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
 			defer pl.ECBalancesTMutex.Unlock()
 			pl.ECBalancesT[adr] = v
+		} else {
+			s.LogPrintf("ec", "Drop, no process list")
 		}
 	} else {
 		s.ECBalancesPMutex.Lock()

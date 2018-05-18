@@ -130,8 +130,10 @@ func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
 		} else {
 			prev = lists.Get(dbheight - 1)
 		}
+
 		pl = NewProcessList(lists.State, prev, dbheight)
 		lists.Lists[i] = pl
+
 	}
 
 	return pl

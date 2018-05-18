@@ -13,6 +13,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
+	"sync"
 )
 
 func has(s *State, entry interfaces.IHash) bool {
@@ -26,12 +27,6 @@ func has(s *State, entry interfaces.IHash) bool {
 	exists, err := s.DB.DoesKeyExist(databaseOverlay.ENTRY, entry.Bytes())
 	if exists {
 		if err != nil {
-			return false
-		}
-
-		entry, err2 := s.DB.FetchEntry(entry)
-		if err2 != nil || entry == nil {
-			panic("Should not happen;  key exists but not entry")
 			return false
 		}
 	}
@@ -167,7 +162,10 @@ func (s *State) MakeMissingEntryRequests() {
 	}
 }
 
-func (s *State) GoSyncEntries() {
+func (s *State) GoSyncEntries(wg *sync.WaitGroup) {
+	wg.Done()
+	wg.Wait()
+
 	go s.MakeMissingEntryRequests()
 
 	// Map to track what I know is missing

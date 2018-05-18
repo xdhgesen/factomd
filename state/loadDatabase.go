@@ -18,12 +18,16 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+	"sync"
 )
 
 var _ = fmt.Print
 
-func LoadDatabase(s *State) {
+func LoadDatabase(wg *sync.WaitGroup, s *State) {
 	var blkCnt uint32
+
+	wg.Done()
+	wg.Wait()
 
 	head, err := s.DB.FetchDBlockHead()
 	if err == nil && head != nil {

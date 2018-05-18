@@ -11,7 +11,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"runtime/debug"
 	"sort"
 	"time"
 
@@ -22,8 +21,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
-
-var _ = debug.PrintStack
 
 var FACTOID_CHAINID_HASH = primitives.NewHash(constants.FACTOID_CHAINID)
 
@@ -90,6 +87,11 @@ func GetMapHash(dbheight uint32, bmap map[[32]byte]int64) interfaces.IHash {
 }
 
 func (fs *FactoidState) GetBalanceHash(includeTemp bool) interfaces.IHash {
+
+	if !fs.State.DBFinished {
+		return primitives.ZeroHash
+	}
+
 	h1 := GetMapHash(fs.DBHeight, fs.State.FactoidBalancesP)
 	h2 := GetMapHash(fs.DBHeight, fs.State.ECBalancesP)
 	h3 := h1

@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -20,12 +22,13 @@ var _ = log.Printf
 var _ = fmt.Print
 
 func NetworkProcessorNet(fnode *FactomNode) {
-	go Peers(fnode)
-	go NetworkOutputs(fnode)
-	go InvalidOutputs(fnode)
+
 }
 
-func Peers(fnode *FactomNode) {
+func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
+	wg.Done()
+	wg.Wait()
+
 	saltReplayFilterOn := true
 
 	crossBootIgnore := func(amsg interfaces.IMsg) bool {
@@ -124,11 +127,11 @@ func Peers(fnode *FactomNode) {
 		cnt := 0
 		now := fnode.State.GetTimestamp()
 
-		for i := 0; i < 100 && fnode.State.APIQueue().Length() > 0; i++ {
+		for i := 0; i < 100 && fnode.State.InMsgQueue().Length() < 1000 && len(fnode.State.Holding) < 1000; i++ {
 			msg := fnode.State.APIQueue().Dequeue()
 
 			if msg == nil {
-				continue
+				break
 			}
 			// TODO: Is this as intended for 'x' command? -- clay
 			if fnode.State.GetNetStateOff() { // drop received message if he is off
@@ -141,17 +144,12 @@ func Peers(fnode *FactomNode) {
 				continue
 			}
 
-			if fnode.State.GetNetStateOff() {
-				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
-				continue
-			}
-
 			repeatHash := msg.GetRepeatHash()
-			if repeatHash == nil || repeatHash.PFixed() == nil {
-				fnode.State.LogMessage("NetworkInputs", "API drop, Hash Error", msg)
-				fmt.Println("dddd ERROR!", msg.String())
-				continue
-			}
+			//if repeatHash == nil || repeatHash.PFixed() == nil {
+			//	fnode.State.LogMessage("NetworkInputs", "API drop, Hash Error", msg)
+			//	fmt.Println("dddd ERROR!", msg.String())
+			//	continue
+			//}
 
 			cnt++
 			msg.SetOrigin(0)
@@ -179,7 +177,7 @@ func Peers(fnode *FactomNode) {
 			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
 				fnode.State.LogMessage("InMsgQueue2", "enqueue", msg)
-				fnode.State.InMsgQueue().Enqueue(msg)
+				fnode.State.InMsgQueue2().Enqueue(msg)
 			} else {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
 				fnode.State.LogMessage("InMsgQueue", "enqueue", msg)
@@ -270,13 +268,15 @@ func Peers(fnode *FactomNode) {
 				//	fnode.State.Println("In Coming!! ",msg)
 				//}
 
-				var in string
-				if msg.IsPeer2Peer() {
-					in = "P2P In"
-				} else {
-					in = "PeerIn"
+				if fnode.MLog.Enable {
+					var in string
+					if msg.IsPeer2Peer() {
+						in = "P2P In"
+					} else {
+						in = "PeerIn"
+					}
+					fnode.MLog.Add2(fnode, false, peer.GetNameTo(), fmt.Sprintf("%s %d", in, i+1), true, msg)
 				}
-				fnode.MLog.Add2(fnode, false, peer.GetNameTo(), fmt.Sprintf("%s %d", in, i+1), true, msg)
 
 				// don't resend peer to peer messages or responses
 				switch msg.Type() {
@@ -303,7 +303,10 @@ func Peers(fnode *FactomNode) {
 	} // forever {...}
 }
 
-func NetworkOutputs(fnode *FactomNode) {
+func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
+	wg.Done()
+	wg.Wait()
+
 	for {
 		// if len(fnode.State.NetworkOutMsgQueue()) > 500 {
 		// 	fmt.Print(fnode.State.GetFactomNodeName(), "-", len(fnode.State.NetworkOutMsgQueue()), " ")
@@ -392,7 +395,10 @@ func NetworkOutputs(fnode *FactomNode) {
 }
 
 // Just throw away the trash
-func InvalidOutputs(fnode *FactomNode) {
+func InvalidOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
+	wg.Done()
+	wg.Wait()
+
 	for {
 		time.Sleep(1 * time.Millisecond)
 		_ = <-fnode.State.NetworkInvalidMsgQueue()

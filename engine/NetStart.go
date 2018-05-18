@@ -25,6 +25,8 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
@@ -516,25 +518,12 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		fnodes[0].State.SetUseTorrent(false)
 	}
 
-	if p.Journal != "" {
-		go LoadJournal(s, p.Journal)
-		startServers(false)
-	} else {
-		startServers(true)
-	}
+	startServers(true)
 
-	// Start the webserver
-	wsapi.Start(fnodes[0].State)
-
-	// Start prometheus on port
-	launchPrometheus(9876)
-	// Start Package's prometheus
-	state.RegisterPrometheus()
-	p2p.RegisterPrometheus()
-	leveldb.RegisterPrometheus()
-	RegisterPrometheus()
-
-	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	go controlPanel.ServeControlPanel(wg, fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+	wg.Wait()
 
 	SimControl(p.ListenTo, listenToStdin)
 
@@ -566,19 +555,84 @@ func makeServer(s *state.State) *FactomNode {
 }
 
 func startServers(load bool) {
-	for i, fnode := range fnodes {
-		if i > 0 {
-			fnode.State.Init()
-		}
-		go NetworkProcessorNet(fnode)
-		if load {
-			go state.LoadDatabase(fnode.State)
-		}
-		go fnode.State.GoSyncEntries()
-		go Timer(fnode.State)
-		go fnode.State.ValidatorLoop()
-		go elections.Run(fnode.State)
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go Peers(wg, fnode)
+
+		wg.Wait()
 	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go NetworkOutputs(wg, fnode)
+
+		wg.Wait()
+	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go InvalidOutputs(wg, fnode)
+
+		wg.Wait()
+	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go state.LoadDatabase(wg, fnode.State)
+
+		wg.Wait()
+	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go fnode.State.GoSyncEntries(wg)
+
+		wg.Wait()
+	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go Timer(wg, fnode.State)
+
+		wg.Wait()
+	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+
+		go fnode.State.ValidatorLoop(wg)
+
+		wg.Wait()
+	}
+
+	for _, fnode := range fnodes {
+		wg := new(sync.WaitGroup)
+		wg.Add(1)
+		go elections.Run(wg, fnode.State)
+		wg.Wait()
+	}
+
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
+	// Start the webserver
+	wsapi.Start(wg, fnodes[0].State)
+	wg.Wait()
+
+	// Start prometheus on port
+	launchPrometheus(9876)
+	// Start Package's prometheus
+	state.RegisterPrometheus()
+	p2p.RegisterPrometheus()
+	leveldb.RegisterPrometheus()
+	RegisterPrometheus()
+
 }
 
 func setupFirstAuthority(s *state.State) {

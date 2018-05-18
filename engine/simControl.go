@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unicode"
@@ -30,10 +31,10 @@ import (
 )
 
 var _ = fmt.Print
-var sortByID bool
-var verboseFaultOutput = false
-var verboseAuthoritySet = false
-var verboseAuthorityDeltas = false
+var SortByID bool
+var VerboseFaultOutput = false
+var VerboseAuthoritySet = false
+var VerboseAuthorityDeltas = false
 var totalServerFaults int
 var lastcmd []string
 var ListenTo int
@@ -129,7 +130,10 @@ func SimControl(listenTo int, listenStdin bool) {
 			os.Stderr.WriteString(fmt.Sprintf("Switching to Node %d\n", ListenTo))
 			// Update which node will be displayed on the controlPanel page
 			connectionMetricsChannel := make(chan interface{}, p2p.StandardChannelSize)
-			go controlPanel.ServeControlPanel(fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build)
+			wg := new(sync.WaitGroup)
+			wg.Add(1)
+			go controlPanel.ServeControlPanel(wg, fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build)
+			wg.Wait()
 		} else {
 			switch {
 			case '!' == b[0]:
@@ -207,8 +211,8 @@ func SimControl(listenTo int, listenStdin bool) {
 					}
 				}
 			case '/' == b[0]:
-				sortByID = !sortByID
-				if sortByID {
+				SortByID = !SortByID
+				if SortByID {
 					os.Stderr.WriteString("Sort Status by Chain IDs\n")
 				} else {
 					os.Stderr.WriteString("Sort Status by Node Name\n")
@@ -463,11 +467,11 @@ func SimControl(listenTo int, listenStdin bool) {
 						os.Stderr.WriteString(fmt.Sprintf("Setting FaultWait of %10s to %d\n", fn.State.FactomNodeName, nnn))
 					}
 				} else {
-					if verboseFaultOutput {
-						verboseFaultOutput = false
+					if VerboseFaultOutput {
+						VerboseFaultOutput = false
 						os.Stderr.WriteString("Vnnn          Set full fault timeout to the given number of seconds. Helps debugging.\n")
 					} else {
-						verboseFaultOutput = true
+						VerboseFaultOutput = true
 						os.Stderr.WriteString("--VerboseFaultOutput On--\n")
 					}
 				}
@@ -501,22 +505,22 @@ func SimControl(listenTo int, listenStdin bool) {
 				}
 
 				if b[1] == 'l' || b[1] == 'L' {
-					if verboseAuthoritySet {
-						verboseAuthoritySet = false
+					if VerboseAuthoritySet {
+						VerboseAuthoritySet = false
 						os.Stderr.WriteString("--VerboseAuthoritySet Off--\n")
 					} else {
-						verboseAuthoritySet = true
+						VerboseAuthoritySet = true
 						os.Stderr.WriteString("--VerboseAuthoritySet On--\n")
 					}
 					break
 				}
 
 				if b[1] == 'd' || b[1] == 'D' {
-					if verboseAuthorityDeltas {
-						verboseAuthorityDeltas = false
+					if VerboseAuthorityDeltas {
+						VerboseAuthorityDeltas = false
 						os.Stderr.WriteString("--VerboseAuthorityDeltas Off--\n")
 					} else {
-						verboseAuthorityDeltas = true
+						VerboseAuthorityDeltas = true
 						os.Stderr.WriteString("--VerboseAuthorityDeltas On--\n")
 					}
 					break

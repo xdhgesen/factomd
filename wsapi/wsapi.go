@@ -34,12 +34,17 @@ const (
 var Servers map[int]*web.Server
 var ServersMutex sync.Mutex
 
-func Start(state interfaces.IState) {
+func Start(wg *sync.WaitGroup, state interfaces.IState) {
 	RegisterPrometheus()
 	var server *web.Server
 
 	ServersMutex.Lock()
 	defer ServersMutex.Unlock()
+
+	defer func() {
+		wg.Done()
+		wg.Wait()
+	}()
 
 	if Servers == nil {
 		Servers = make(map[int]*web.Server)

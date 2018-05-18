@@ -85,7 +85,7 @@ isFnode {
 
 END {	
 	rec
-	samples = 500
+	samples = 501
 	if (rec < samples) samples = rec
 	scale = samples/rec*1.001 # Make sure we get at least our sample count.
 	j = 0
@@ -132,12 +132,11 @@ END {
 		    sThisAllTps[here]=allmintps
 		}
 	}
-	
-	for(i=0;i<samples;i++){
+	for(i=1;i<samples;i++){
 		if (sCnt[i]==0) sCnt[i]=1
 		printf("%8d\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t\n", int(sTs[i]/sCnt[i]), sTotalTps[i]/sCnt[i], sThisTps[i], sTotalAllTps[i]/sCnt[i], sThisAllTps[i])
 	}
-	for(j=samples;j<500;j++){
+	for(j=samples;j<501;j++){
 		i = samples-1
 		printf("%8d\t%8.3f\t%8.3f\t%8.3f\t%8.3f\t\n", int(sTs[i]/sCnt[i]), sTotalTps[i]/sCnt[i], sThisTps[i], sTotalAllTps[i]/sCnt[i], sThisAllTps[i])
 	}

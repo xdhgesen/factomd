@@ -1,6 +1,7 @@
 // Copyright 2017 Factom Foundation
 // Use of this source code is governed by the MIT license
 // that can be found in the LICENSE file.
+//
 
 package state
 
@@ -629,7 +630,8 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 
 	for i := len(dbsl.DBStates) - 1; i >= 0; i-- {
 		if dbsl.DBStates[i].SaveStruct != nil {
-			dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
+			dbsl.State.LogPrintf("executeMsg", "Reset dbht %v", dbsl.DBStates[i].DirectoryBlock.GetHeader().GetDBHeight())
+			//dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
 			break
 		}
 	}
@@ -654,11 +656,12 @@ func (d *DBState) ValidNext(state *State, next *messages.DBStateMsg) int {
 	dbheight := dirblk.GetHeader().GetDBHeight()
 
 	// If we don't have the previous blocks processed yet, then let's wait on this one.
-	if dbheight > state.GetHighestSavedBlk()+1 {
+	highestSavedBlk := state.GetHighestSavedBlk()
+	if dbheight > highestSavedBlk+1 {
 		return 0
 	}
 
-	if dbheight == 0 && state.GetHighestSavedBlk() == 0 {
+	if dbheight == 0 && highestSavedBlk == 0 {
 		//state.AddStatus(fmt.Sprintf("DBState.ValidNext: rtn 1 genesis block is valid dbht: %d", dbheight))
 		// The genesis block is valid by definition.
 		return 1
@@ -669,7 +672,7 @@ func (d *DBState) ValidNext(state *State, next *messages.DBStateMsg) int {
 	}
 
 	// Don't reload blocks!
-	if dbheight <= state.GetHighestSavedBlk() {
+	if dbheight <= highestSavedBlk {
 		return -1
 	}
 
@@ -1003,11 +1006,14 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
+	list.State.LogPrintf("dbstatesProcess", "Process(%d)", dbht)
+
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
-		return
+		list.State.LogPrintf("dbstatesProcess", "out early1 %v %v %v", d.Locked, d.IsNew, d.Repeat)
+		return true
 	}
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
@@ -1015,6 +1021,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	if dbht > 0 && dbht <= list.ProcessHeight {
 		progress = true
 		d.Repeat = true
+		list.State.LogPrintf("dbstatesProcess", "out early2 %v %v", dbht, list.ProcessHeight)
 		return
 	}
 
@@ -1022,7 +1029,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		pd := list.State.DBStates.Get(int(dbht - 1))
 		if pd != nil && !pd.Saved {
 			//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Previous dbstate (%d) not saved", dbht-1))
-			return
+			list.State.LogPrintf("dbstatesProcess", "out early3 previous dbstate (%d) not saved", dbht-1)
+			return true
 		}
 	}
 
@@ -1041,7 +1049,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	pln := list.State.ProcessLists.Get(ht + 1)
 
 	if pl == nil {
-		return
+		list.State.LogPrintf("dbstatesProcess", "out early4 no process list")
+		return false
 	}
 
 	var out bytes.Buffer
@@ -1250,22 +1259,25 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.
 
-	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
-		return
+	if list.State.DB == nil {
+		return false
 	}
-
+	if !d.Signed || !d.ReadyToSave {
+		return false
+	}
 	// If this is a repeated block, and I have already saved at this height, then we can safely ignore
 	// this dbstate.
 	if d.Repeat == true && uint32(dbheight) <= list.SavedHeight {
 		progress = true
 		d.ReadyToSave = false
 		d.Saved = true
+		return
 	}
 
 	if dbheight > 0 {
 		dp := list.State.GetDBState(uint32(dbheight - 1))
 		if dp == nil || !dp.Saved {
-			return
+			return false
 		}
 	}
 
@@ -1287,7 +1299,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				d.DirectoryBlock.GetHeader().GetTimestamp())
 		}
 
-		return
+		return true
 	}
 
 	// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
@@ -1364,16 +1376,24 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			list.State.Logf("error", "Error saving eblock from dbstate, eblock not allowed")
 		}
 	}
-	for _, e := range d.Entries {
-		// If it's in the DBlock
-		if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
-			if err := list.State.DB.InsertEntryMultiBatch(e); err != nil {
-				panic(err.Error())
-			}
-		} else {
-			list.State.Logf("error", "Error saving entry from dbstate, entry not allowed")
-		}
-	}
+
+	//ecnt := 0
+	//for _, e := range d.Entries {
+	//	// If it's in the DBlock
+	//	if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
+	//		exists, err := list.State.DB.DoesKeyExist(databaseOverlay.ENTRY, e.GetHash().Bytes())
+	//		if !exists || err != nil {
+	//			ecnt++
+	//			if err2 := list.State.DB.InsertEntryMultiBatch(e); err != nil {
+	//				panic(err2.Error())
+	//			}
+	//		}
+	//	} else {
+	//		list.State.Logf("error", "Error saving entry from dbstate, entry not allowed")
+	//	}
+	//}
+	//os.Stderr.WriteString(fmt.Sprintf("Writing %d entries\n", ecnt))
+
 	list.State.NumEntries += len(d.Entries)
 	list.State.NumEntryBlocks += len(d.EntryBlocks)
 
@@ -1490,9 +1510,9 @@ func (list *DBStateList) UpdateState() (progress bool) {
 			}
 		}
 
-		p := list.ProcessBlocks(d) || progress
-		if p && !progress {
-			progress = p
+		p := list.ProcessBlocks(d)
+		if !p { // If we cannot process the block, then return what progress we have.
+			return progress
 		}
 		p = list.SignDB(d) || progress
 		if p && !progress {
@@ -1553,7 +1573,7 @@ searchLoop:
 	}
 
 	keep := uint32(3) // How many states to keep around; debugging helps with more.
-	if uint32(cnt) > keep {
+	if uint32(cnt) > keep && (int(list.Complete)-cnt+int(keep)) > 0 {
 		var dbstates []*DBState
 		dbstates = append(dbstates, list.DBStates[cnt-int(keep):]...)
 		list.DBStates = dbstates

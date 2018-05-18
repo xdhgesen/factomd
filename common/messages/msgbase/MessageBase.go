@@ -39,7 +39,6 @@ type MessageBase struct {
 	Sigvalid    bool
 }
 
-
 var mu sync.Mutex // lock for debug struct
 
 type foo struct {
@@ -53,7 +52,7 @@ var places map[string]interfaces.IMsg = make(map[string]interfaces.IMsg)
 var sends, unique, duplicate int
 
 func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
-if msg.GetNoResend() {
+	if msg.GetNoResend() {
 		return
 	}
 	// Local Messages are Not broadcast out.  This is mostly the block signature

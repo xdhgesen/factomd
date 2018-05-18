@@ -1189,8 +1189,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 
 	TotalHoldingQueueOutputs.Inc()
 	TotalAcksOutputs.Inc()
-	delete(p.State.Acks, msgHash.Fixed())
-	delete(p.State.Holding, msgHash.Fixed())
 
 	// Both the ack and the message hash to the same GetHash()
 	m.SetLocal(false)
@@ -1210,15 +1208,12 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	}
 
 	p.State.LogPrintf("executeMsg", "remove from holding M-%v|R-%v", m.GetMsgHash().String()[:6], m.GetRepeatHash().String()[:6])
-	delete(p.State.Holding, msgHash.Fixed())
-	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
-
-	delete(nillist, int(ack.Height)) // Notify if this is ever nil again
-
 	p.AddOldMsgs(m)
 	p.OldAcks[msgHash.Fixed()] = ack
+	delete(p.State.Holding, msgHash.Fixed())
+	delete(p.State.Acks, msgHash.Fixed())
 
 	if p.adds != nil {
 		p.adds <- plRef{p.DBHeight, ack.VMIndex, ack.Height}

@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	s "github.com/FactomProject/factomd/state"
@@ -15,7 +17,10 @@ import (
 
 var _ = (*s.State)(nil)
 
-func Timer(state interfaces.IState) {
+func Timer(wg *sync.WaitGroup, state interfaces.IState) {
+	wg.Done()
+	wg.Wait()
+
 	time.Sleep(2 * time.Second)
 
 	billion := int64(1000000000)

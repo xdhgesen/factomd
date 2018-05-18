@@ -20,6 +20,7 @@ peers.json
 *.gz
 *.swp
 out
+*.svg
 
 # Folders
 _obj
