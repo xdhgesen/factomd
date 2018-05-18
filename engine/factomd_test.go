@@ -20,7 +20,12 @@ func TimeNow(s *state.State) {
 func StatusEveryMinute(s *state.State) {
 	go func() {
 		for {
-			WaitMinutesQuite(s, 1)
+			i := 0
+			newMinute := (s.CurrentMinute + 1) % 10
+			for s.CurrentMinute != newMinute && i < 50 {
+				i++
+				time.Sleep(100 * time.Millisecond)
+			}
 			PrintOneStatus(0, 0)
 		}
 	}()
@@ -415,6 +420,142 @@ func TestAnElection(t *testing.T) {
 	}
 	if !GetFnodes()[leaders].State.Leader && !GetFnodes()[leaders+1].State.Leader {
 		t.Fatalf("Node %d or %d should be a leader", leaders, leaders+1)
+	}
+
+	CheckAuthoritySet(leaders, audits, t)
+
+	WaitBlocks(state0, 1)
+
+	t.Log("Shutting down the network")
+	for _, fn := range GetFnodes() {
+		fn.State.ShutdownChan <- 1
+	}
+
+	// Sleep one block
+	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
+	if state0.LLeaderHeight > 9 {
+		t.Fatal("Failed to shut down factomd via ShutdownChan")
+	}
+
+	j := state0.SyncingStateCurrent
+	for range state0.SyncingState {
+		fmt.Println(state0.SyncingState[j])
+		j = (j - 1 + len(state0.SyncingState)) % len(state0.SyncingState)
+	}
+
+}
+
+func TestMaxElection(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	var (
+		leaders   int = 7
+		audits    int = 3
+		followers int = 0
+		nodes     int = leaders + audits + followers
+	)
+
+	runCmd := func(cmd string) {
+		os.Stderr.WriteString("Executing: " + cmd + "\n")
+		InputChan <- cmd
+		time.Sleep(100 * time.Millisecond)
+		return
+	}
+
+	args := append([]string{},
+		"--db=Map",
+		"--network=LOCAL",
+		"--net=alot+",
+		"--enablenet=true",
+		"--blktime=10",
+		"--faulttimeout=10",
+		"--roundtimeout=5",
+		fmt.Sprintf("--count=%d", nodes),
+		"--startdelay=1",
+		"--debuglog=.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+	)
+	params := ParseCmdLine(args)
+
+	time.Sleep(5 * time.Second) // wait till the control panel is setup
+	state0 := Factomd(params, false).(*state.State)
+	state0.MessageTally = true
+	time.Sleep(5 * time.Second) // wait till the simulation is setup
+
+	t.Log(fmt.Sprintf("Allocated %d nodes", nodes))
+	fnodes := GetFnodes()
+	if len(fnodes) != nodes {
+		t.Fatalf("Should have allocated %d nodes", nodes)
+		t.Fail()
+	}
+
+	StatusEveryMinute(state0)
+	WaitMinutes(state0, 2)
+
+	runCmd(fmt.Sprintf("g%d", nodes)) // get an ID for everyone
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 1)
+
+	// wait till all the id related commits are done
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		fmt.Printf("Waiting for G5 to complete\n")
+		WaitMinutes(state0, 1)
+	}
+	// Allocate leaders
+	runCmd("1")
+	for i := 0; i < leaders-1; i++ {
+		runCmd("l")
+	}
+
+	// Allocate audit servers
+	for i := 0; i < audits; i++ {
+		runCmd("o")
+	}
+
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 2)
+	PrintOneStatus(0, 0)
+
+	CheckAuthoritySet(leaders, audits, t)
+
+	// Take (N-1)/2 leaders off line (not 0, it's used for timing)
+	for i := 1; i < (leaders-1)/2+1; i++ {
+		runCmd(fmt.Sprintf("%d", i))
+		runCmd("x")
+	}
+
+	// wait for elections to fill every back in
+	WaitMinutes(state0, 2)
+	fmt.Printf("Elections completed")
+
+	// wait till the nodes will recover by blocks
+	WaitBlocks(state0, 3)
+	// Take (N-1)/2 leaders off line
+	for i := 1; i < (leaders-1)/2+1; i++ {
+		runCmd(fmt.Sprintf("%d", i))
+		runCmd("x")
+	}
+
+	WaitBlocks(state0, 2)
+	WaitMinutes(state0, 2)
+
+	// PrintOneStatus(0, 0)
+	for i := 1; i < (leaders-1)/2+1; i++ {
+		if GetFnodes()[i].State.Leader {
+			t.Fatalf("Node %d should not be a leader", i)
+		}
 	}
 
 	CheckAuthoritySet(leaders, audits, t)
