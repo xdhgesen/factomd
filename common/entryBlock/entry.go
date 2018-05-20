@@ -171,7 +171,12 @@ func (e *Entry) GetHash() interfaces.IHash {
 
 		h1 := sha512.Sum512(entry)
 		h2 := sha256.Sum256(append(h1[:], entry[:]...))
-		h.SetBytes(h2[:])
+		err = h.SetBytes(h2[:])
+		if err != nil {
+      e.hash = nil
+			fmt.Println("Failed to Marshal Entry ", err.Error())
+			return nil
+		}
 		e.hash = h
 	}
 	return e.hash
