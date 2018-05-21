@@ -324,6 +324,13 @@ func (auth *Authority) Type() int {
 	return -1
 }
 
+func (auth *Authority) GetSigningKey() []byte {
+	if auth == nil {
+		return constants.ZERO_HASH // probably bad we got here but worse to let it cause a panic
+	}
+	return auth.SigningKey[:]
+}
+
 func (auth *Authority) VerifySignature(msg []byte, sig *[constants.SIGNATURE_LENGTH]byte) (bool, error) {
 	//return true, nil // Testing
 	var pub [32]byte
