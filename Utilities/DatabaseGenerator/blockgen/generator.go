@@ -10,6 +10,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/database/badgerdb"
 	"github.com/FactomProject/factomd/database/boltdb"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
@@ -80,6 +81,8 @@ func NewGeneratorState(conf *DBGeneratorConfig, starttime interfaces.Timestamp) 
 		db = boltdb.NewBoltDB(nil, conf.DBPath)
 	case "map":
 		db = new(mapdb.MapDB)
+	case "badger":
+		db, err = badgerdb.NewBadgerDB(conf.DBPath)
 	}
 	if err != nil {
 		panic(err)
