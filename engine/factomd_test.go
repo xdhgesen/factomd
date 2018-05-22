@@ -100,7 +100,7 @@ func TestSetupANetwork(t *testing.T) {
 		"-startdelay=1",
 		"-debuglog=F.*|faulting|duplicate|Network|systemStatus",
 		"--stdoutlog=out.txt",
-		"--stderrlog=out.txt",
+		"--stderrlog=err.txt",
 	)
 
 	params := ParseCmdLine(args)

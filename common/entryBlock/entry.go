@@ -9,6 +9,7 @@ import (
 	"crypto/sha512"
 	"encoding/binary"
 	"fmt"
+	"os"
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -173,7 +174,7 @@ func (e *Entry) GetHash() interfaces.IHash {
 		h2 := sha256.Sum256(append(h1[:], entry[:]...))
 		err = h.SetBytes(h2[:])
 		if err != nil {
-      e.hash = nil
+			e.hash = nil
 			fmt.Println("Failed to Marshal Entry ", err.Error())
 			return nil
 		}
@@ -182,11 +183,16 @@ func (e *Entry) GetHash() interfaces.IHash {
 	return e.hash
 }
 
-func (e *Entry) MarshalBinary() ([]byte, error) {
+func (e *Entry) MarshalBinary() (rval []byte, err error) {
+	defer func(pe *error) {
+		if *pe != nil {
+			fmt.Fprintf(os.Stderr, "Entry.MarshalBinary err:%v", *pe)
+		}
+	}(&err)
 	buf := primitives.NewBuffer(nil)
 
 	// 1 byte Version
-	err := buf.PushByte(byte(e.Version))
+	err = buf.PushByte(byte(e.Version))
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +227,12 @@ func (e *Entry) MarshalBinary() ([]byte, error) {
 
 // MarshalExtIDsBinary marshals the ExtIDs into a []byte containing a series of
 // 2 byte size of each ExtID followed by the ExtID.
-func (e *Entry) MarshalExtIDsBinary() ([]byte, error) {
+func (e *Entry) MarshalExtIDsBinary() (rval []byte, err error) {
+	defer func(pe *error) {
+		if *pe != nil {
+			fmt.Fprintf(os.Stderr, "Entry.MarshalExtIDsBinary err:%v", *pe)
+		}
+	}(&err)
 	buf := new(primitives.Buffer)
 
 	for _, x := range e.ExtIDs {
