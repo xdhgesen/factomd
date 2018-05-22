@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
@@ -141,6 +142,8 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 
 	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 	s.NetworkOutMsgQueue().Enqueue(msg)
+	// Add this to the network replay filter so we don't bother processing any echos
+	s.AddToReplayFilter(constants.NETWORK_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 }
 
 func (m *MessageBase) GetResendCnt() int {
