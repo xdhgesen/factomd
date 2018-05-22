@@ -425,12 +425,11 @@ func (m *FedVoteVolunteerMsg) String() string {
 	if m.LeaderChainID == nil {
 		m.LeaderChainID = primitives.NewZeroHash()
 	}
-	return fmt.Sprintf("%19s %20s %20s ID: %x weight %x serverIdx: %d vmIdx: %d round %d dbheight: %d minute: %d ",
+	return fmt.Sprintf("%19s %20s %20s ID: %x serverIdx: %d vmIdx: %d round %d dbheight: %d minute: %d ",
 		m.Name,
 		"Volunteer Audit",
 		m.TS.String(),
-		m.ServerID.Bytes()[2:5],
-		m.Weight.Bytes()[2:5],
+		m.ServerID.Bytes()[3:6],
 		m.ServerIdx,
 		m.VMIndex,
 		m.Round,

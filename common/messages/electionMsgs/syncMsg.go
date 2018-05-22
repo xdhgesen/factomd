@@ -292,11 +292,10 @@ func (m *SyncMsg) String() string {
 	if m.LeaderChainID == nil {
 		m.LeaderChainID = primitives.NewZeroHash()
 	}
-	return fmt.Sprintf("%s %10s ID: %x WT: %x serverIdx: %d vmIdx: %d round: %d dbheight: %d minute: %d ",
+	return fmt.Sprintf("%s %10s ID: %x serverIdx: %d vmIdx: %d round: %d dbheight: %d minute: %d ",
 		"Sync Message",
 		m.Name,
-		m.ServerID.Bytes()[2:5],
-		m.Weight.Bytes()[2:5],
+		m.ServerID.Bytes()[3:6],
 		m.ServerIdx,
 		m.VMIndex,
 		m.Round,

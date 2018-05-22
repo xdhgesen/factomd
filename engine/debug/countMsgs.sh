@@ -28,7 +28,7 @@ END {
        if (mcount[i] >2) {
           printf("%3d %s\\n", mcount[i], i);
        }
-       if(x++>10) break;
+       if(x++>20) break;
     }
 }
 EOF
