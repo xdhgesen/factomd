@@ -327,6 +327,7 @@ func NetworkOutputs(fnode *FactomNode) {
 			fnode.State.LogMessage("NetworkOutputs", "Drop, simCtrl", msg)
 			continue
 		}
+
 		if msg.GetRepeatHash() == nil {
 			fnode.State.LogMessage("NetworkOutputs", "Drop, no repeat hash", msg)
 			continue
@@ -393,7 +394,6 @@ func NetworkOutputs(fnode *FactomNode) {
 					}
 				}
 			}
-
 		}
 	}
 }

@@ -13,6 +13,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/p2p"
 
@@ -110,6 +111,14 @@ func (f *P2PProxy) Send(msg interfaces.IMsg) error {
 		return err
 	}
 
+	direction := msg.GetNetworkOrigin()
+	switch {
+	case !msg.IsPeer2Peer():
+		direction = "broadcast"
+	case msg.IsPeer2Peer() && 0 == len(direction): // directed, with no direction of who to send it to
+		direction = "randPeer"
+	}
+	messages.LogMessage("p2pSend", direction, msg)
 	msgLogger := f.logger.WithFields(msg.LogFields())
 
 	f.bytesOut += len(data)
