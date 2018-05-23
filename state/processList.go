@@ -992,6 +992,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	if ack.GetHash().Fixed() != m.GetMsgHash().Fixed() {
 		p.State.LogPrintf("executeMsg", "m/ack mismatch m-%x a-%x", m.GetMsgHash().Fixed(), ack.GetHash().Fixed())
 	}
+
 	m.SendOut(p.State, m)
 	ack.SendOut(p.State, ack)
 

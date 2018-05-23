@@ -68,16 +68,24 @@ func (m *MessageBase) StringOfMsgBase() string {
 
 var mu sync.Mutex // lock for debug struct
 
+type Timestamp interfaces.Timestamp
+
+func TimeString(t Timestamp) string {
+	s := t.GetTimeMilli()
+	return fmt.Sprintf("%02d:%02d:%02d.%03d", (s/60/60/1000)%24, (s/60/1000)%60, (s/1000)%60, s%1000)
+}
+
 // keep the last N messages sent by each node
 type msgHistory struct {
 	mu      sync.Mutex // lock for debug struct
+	when    map[[32]byte]Timestamp
 	where   map[[32]byte]string
 	history *([1024][32]byte) // Last 1k messages hashes logged
 	h       int               // head of history
 	msgmap  map[[32]byte]interfaces.IMsg
 }
 
-func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string) {
+func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string, when Timestamp) {
 	f.mu.Lock()
 	if f.history == nil {
 		f.history = new([1024][32]byte)
@@ -85,40 +93,50 @@ func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string) {
 	if f.msgmap == nil {
 		f.msgmap = make(map[[32]byte]interfaces.IMsg)
 		f.where = make(map[[32]byte]string)
+		f.when = make(map[[32]byte]Timestamp)
 	}
 	remove := f.history[f.h] // get the oldest message
 	delete(f.msgmap, remove)
 	delete(f.where, remove)
+	delete(f.when, remove)
 	f.history[f.h] = hash
-	f.where[hash] = where
 	f.msgmap[hash] = msg
+	f.where[hash] = where
+	f.when[hash] = when
 	f.h = (f.h + 1) % cap(f.history) // move the head
 	f.mu.Unlock()
 }
 
-func (f *msgHistory) getmsg(hash [32]byte) (what interfaces.IMsg, where string, ok bool) {
+func (f *msgHistory) getmsg(hash [32]byte) (what interfaces.IMsg, where string, when Timestamp, ok bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.msgmap == nil {
 		f.msgmap = make(map[[32]byte]interfaces.IMsg)
 		f.where = make(map[[32]byte]string)
+		f.when = make(map[[32]byte]Timestamp)
 	}
 	what, ok = f.msgmap[hash]
 	if ok {
 		where = f.where[hash]
+		when = f.when[hash]
+
 	}
-	return what, where, ok
+	return what, where, when, ok
 }
 
 // keep one history per node (should move this to state and save the lookup?)
 var outs map[string]*msgHistory = make(map[string]*msgHistory)
 
 // counts are global to all nodes
-var sends, unique, duplicate int
+var attempts, sends, unique, duplicate int
 
 var logname = "duplicateSend" //"NetworkOutputs" to put then in the common place
 
-func checkForDuplicateSend(s interfaces.IState, msg interfaces.IMsg, whereAmI string) {
+func checkForDuplicateSend(s interfaces.IState, msg interfaces.IMsg) {
+
+	whereAmI := atomic.WhereAmIString(2)
+	//whereAmI := string(debug.Stack()[:])
+
 	mu.Lock()
 	f, ok := outs[s.GetFactomNodeName()]
 	if !ok {
@@ -126,28 +144,30 @@ func checkForDuplicateSend(s interfaces.IState, msg interfaces.IMsg, whereAmI st
 		outs[s.GetFactomNodeName()] = f
 	}
 	mu.Unlock()
+	now := s.GetTimestamp()
 	hash := msg.GetRepeatHash().Fixed()
-	what, where, ok := f.getmsg(hash)
+	what, where, when, ok := f.getmsg(hash)
 	if ok {
 		duplicate++
-		s.LogPrintf(logname, "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:3], sends, duplicate, unique)
-		s.LogPrintf(logname, "Original: %p: %s", what, where)
-		s.LogPrintf(logname, "This:     %p: %s", msg, whereAmI)
+		s.LogPrintf(logname, "Duplicate Send of R-%x (%d attempts, %d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:3], attempts, sends, duplicate, unique)
+		s.LogPrintf(logname, "%s: Original: %p: %s", TimeString(when), what, where)
+		s.LogPrintf(logname, "%s: This:     %p: %s", TimeString(now), msg, whereAmI)
 		s.LogMessage(logname, "Orig Message:", what)
 		s.LogMessage(logname, "This Message:", msg)
 
 	} else {
 		unique++
-		f.addmsg(hash, msg, whereAmI)
+		f.addmsg(hash, msg, whereAmI, now)
 	}
 }
 
 func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
+	attempts++
 	if msg.IsLocal() {
 		//		s.LogMessage("NetworkOutputsCall", "local only", msg)
 		return
 	}
-	if m.ResendCnt > 4 { // If the first send fails, we need to try again
+	if m.ResendCnt > 4 { // Try again up to 4 times
 		return
 	}
 	if msg.GetNoResend() {
@@ -177,7 +197,7 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 
 	// debug code start ............
 	if !msg.IsPeer2Peer() && s.DebugExec() && s.CheckFileName(logname) { // if debug is on and this logfile is enabled
-		checkForDuplicateSend(s, msg, atomic.WhereAmIString(1))
+		checkForDuplicateSend(s, msg)
 	}
 	// debug code end ............
 
