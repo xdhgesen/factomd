@@ -40,8 +40,8 @@ func (vm *VM) ReportMissing(height int, delay int64) {
 		return
 	}
 	now := vm.p.State.GetTimestamp().GetTimeMilli()
-	if delay < 50 {
-		delay = 50 // Floor for delays is 50ms so there is time to merge adjacent requests
+	if delay < 100 {
+		delay = 100 // Floor for delays is 100ms so there is time to merge adjacent requests
 	}
 	lenVMList := len(vm.List)
 	// ask for all missing messages

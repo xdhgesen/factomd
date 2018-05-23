@@ -7,7 +7,8 @@ shift
 ################################
 read -d '' scriptVariable << 'EOF'
 {  fname = substr($0,1,index($0,":"));
-   rest = substr($0,length(fname)+1)
+   rest = substr($0,length(fname)+1); # +1 to exclude the :
+   sub(/^ +/,"",rest); #trim leading spaces if any
    seq =   substr(rest,0,index(rest," "));
    rest = substr(rest,length(seq)+1)
    m = index(rest,"M-")
