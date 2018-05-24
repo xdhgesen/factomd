@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/FactomProject/factomd/CheckAuth"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	// "github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/constants"
@@ -1102,6 +1103,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	pl.SortAuditServers()
 	pl.SortFedServers()
+	checkAuth.CheckAuthSetsMatch("CheckAuthSetsMatch()", pl.State.Elections.GetFedServers(), pl.State.Elections.GetAuditServers(), pl.State.Elections.GetFedServers(), pl.State.Elections.GetAuditServers(), pl.State)
+
 	pln.SortAuditServers()
 	pln.SortFedServers()
 

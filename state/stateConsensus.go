@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FactomProject/factomd/CheckAuth"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
@@ -1555,17 +1556,10 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// debug
 	if s.DebugExec() {
-		var ids string
 		if s.Syncing && s.EOM && !s.EOMDone && s.DBSigDone {
-			p := s.ProcessLists.Get(dbheight)
-			for i, l := range p.FedServers {
-				vm := p.VMs[i]
-				if !vm.Synced {
-					ids = ids + "," + l.GetChainID().String()[6:12]
-				}
-			}
+			ids := s.GetUnSyncedServers(dbheight)
 			if len(ids) > 0 {
-				s.LogPrintf("dbsig-eom", "Waiting for EOMs from %s", ids[1:])
+				s.LogPrintf("dbsig-eom", "Waiting for EOMs from %s", ids)
 			}
 		}
 	}
@@ -1717,6 +1711,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		// If an election took place, our lists will be unsorted. Fix that
 		pl.SortAuditServers()
 		pl.SortFedServers()
+		checkAuth.CheckAuthSetsMatch("StateSORT", s.Elections.GetFedServers(), s.Elections.GetAuditServers(), s.GetFedServers(pl.DBHeight), s.GetAuditServers(pl.DBHeight), s)
 
 		switch {
 		case s.CurrentMinute < 10:
@@ -1820,6 +1815,23 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	return false
 }
 
+// Return a string with tet short IDs for all unsynced VMs
+func (s *State) GetUnSyncedServers(dbheight uint32) string {
+	var ids string
+	p := s.ProcessLists.Get(dbheight)
+	for index, l := range s.GetFedServers(dbheight) {
+		vmIndex := p.ServerMap[s.CurrentMinute][index]
+		vm := p.VMs[vmIndex]
+		if !vm.Synced {
+			ids = ids + "," + l.GetChainID().String()[6:12]
+		}
+	}
+	if len(ids) > 0 {
+		ids = ids[1:] // drop the leading comma
+	}
+	return ids
+}
+
 func (s *State) CheckForIDChange() {
 	var reloadIdentity bool = false
 	if s.AckChange > 0 {
@@ -1852,21 +1864,16 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		consenLogger.WithFields(log.Fields{"func": "ProcessDBSig", "msgheight": dbs.DBHeight, "lheight": s.GetLeaderHeight(), "msg": msg.String()}).Errorf(format, args...)
 	}
 	// debug
+	// debug
 	if s.DebugExec() {
-		var ids string
-		if s.Syncing && s.DBSig && !s.DBSigDone {
-			p := s.ProcessLists.Get(dbheight - 1)
-			for i, l := range p.FedServers {
-				vm := p.VMs[i]
-				if !vm.Synced {
-					ids = ids + "," + l.GetChainID().String()[6:12]
-				}
-			}
+		if s.Syncing && s.DBSig && !s.DBSigDone && s.DBSigDone {
+			ids := s.GetUnSyncedServers(dbheight)
 			if len(ids) > 0 {
-				s.LogPrintf("dbsig-eom", "Waiting for DBSIGs from %s", ids[1:])
+				s.LogPrintf("dbsig-eom", "Waiting for DBSigs from %s", ids)
 			}
 		}
 	}
+
 	// Don't process if syncing an EOM
 	if s.Syncing && !s.DBSig {
 		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Will Not Process: dbht: %d return on s.Syncing(%v) && !s.DBSig(%v)", s.FactomNodeName,

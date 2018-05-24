@@ -10,6 +10,7 @@ import (
 	"os"
 	//"github.com/FactomProject/factomd/state"
 
+	"github.com/FactomProject/factomd/CheckAuth"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
@@ -106,7 +107,7 @@ func (m *FedVoteVolunteerMsg) FollowerExecute(is interfaces.IState) {
 		return
 	}
 
-	elections.CheckAuthSetsMatch("FedVoteVolunteerMsg.FollowerExecute", e, s)
+	checkAuth.CheckAuthSetsMatch("FedVoteVolunteerMsg.FollowerExecute", e.GetFedServers(), e.GetAuditServers(), e.State.GetFedServers(uint32(e.DBHeight)), e.State.GetAuditServers(uint32(e.DBHeight)), e.State)
 
 	// Add the authority set this election involves from the process list
 	// may this should live in the election adapter? It's life mirrors the election ...

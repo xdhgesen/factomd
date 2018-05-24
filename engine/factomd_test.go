@@ -542,7 +542,7 @@ func TestMultiple2Election(t *testing.T) {
 	for s.CurrentMinute != 0 {
 		runtime.Gosched()
 	}
-	for vm.Height == 0 {
+	for vm.Height != 0 {
 		runtime.Gosched()
 	}
 	runCmd("x")

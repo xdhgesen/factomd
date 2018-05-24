@@ -7,6 +7,7 @@ package electionMsgs
 import (
 	"fmt"
 
+	"github.com/FactomProject/factomd/CheckAuth"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
@@ -141,8 +142,6 @@ func (m *TimeoutInternal) ElectionProcess(is interfaces.IState, elect interfaces
 
 		e.Electing = state.MakeMap(nfeds, uint32(m.DBHeight))[e.Minute][e.VMIndex]
 
-		elections.CheckAuthSetsMatch("TimeoutInternal.ElectionProcess", e, s)
-
 		e.FedID = e.Federated[e.Electing].GetChainID()
 
 		// Reset this value when we start an election
@@ -157,6 +156,7 @@ func (m *TimeoutInternal) ElectionProcess(is interfaces.IState, elect interfaces
 		}
 		e.LogPrintf("election", "**** Start an Election for %d[%x] as vm %d for %s at %d-:-%d round %d ****", e.Electing, e.FedID.Bytes()[3:6], e.VMIndex, etype, e.DBHeight, e.Minute, e.Round)
 		e.LogPrintf("faulting", "**** Start an Election for %d[%x] as vm %d for %s at %d-:-%d round %d ****", e.Electing, e.FedID.Bytes()[3:6], e.VMIndex, etype, e.DBHeight, e.Minute, e.Round)
+		checkAuth.CheckAuthSetsMatch("StartElection", e.GetFedServers(), e.GetAuditServers(), s.GetFedServers(uint32(e.DBHeight)), s.GetAuditServers(uint32(e.DBHeight)), s)
 
 		// Begin a new Election for a specific vm/min/height
 		m.InitiateElectionAdapter(is) // <-- Election Started

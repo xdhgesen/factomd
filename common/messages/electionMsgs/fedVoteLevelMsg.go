@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/FactomProject/factomd/CheckAuth"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -85,7 +86,7 @@ func NewFedVoteLevelMessage(signer interfaces.IHash, vol FedVoteVolunteerMsg) *F
 func (m *FedVoteLevelMsg) ElectionProcess(is interfaces.IState, elect interfaces.IElections) {
 	e := elect.(*elections.Elections)
 
-	elections.CheckAuthSetsMatch("FedVoteLevelMsg.ElectionProcess()", e, e.State.(*state.State))
+	checkAuth.CheckAuthSetsMatch("FedVoteLevelMsg.ElectionProcess()", e.GetFedServers(), e.GetAuditServers(), e.State.GetFedServers(uint32(e.DBHeight)), e.State.GetAuditServers(uint32(e.DBHeight)), e.State)
 
 	/******  Election Adapter Control   ******/
 	/**	Controlling the inner election state**/
@@ -114,7 +115,7 @@ func (m *FedVoteLevelMsg) processIfCommitted(is interfaces.IState, elect interfa
 	}
 	e := elect.(*elections.Elections)
 
-	elections.CheckAuthSetsMatch("processIfCommitted()", e, e.State.(*state.State))
+	checkAuth.CheckAuthSetsMatch("processIfCommitted()", e.GetFedServers(), e.GetAuditServers(), e.State.GetFedServers(uint32(e.DBHeight)), e.State.GetAuditServers(uint32(e.DBHeight)), e.State)
 
 	// This block of code is only called ONCE per election
 	if !e.Adapter.IsElectionProcessed() {
@@ -205,7 +206,7 @@ func (m *FedVoteLevelMsg) FollowerExecute(is interfaces.IState) {
 	//		ProcessInState is not marshalled, so only we can pass this to ourselves
 	//		allowing the election adapter to ensure only once behavior
 	if m.ProcessInState {
-		elections.CheckAuthSetsMatch("FedVoteLevelMsg.FollowerExecute", e, s)
+		checkAuth.CheckAuthSetsMatch("FedVoteLevelMsg.FollowerExecute", e.GetFedServers(), e.GetAuditServers(), e.State.GetFedServers(uint32(e.DBHeight)), e.State.GetAuditServers(uint32(e.DBHeight)), e.State)
 
 		fmt.Println("LeaderSwapState", s.GetFactomNodeName(), m.DBHeight, m.Minute)
 

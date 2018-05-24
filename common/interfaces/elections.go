@@ -3,6 +3,8 @@ package interfaces
 type IElections interface {
 	String() string
 	AdapterStatus() string
+	GetFedServers() []IServer
+	GetAuditServers() []IServer
 }
 
 type IElectionAdapter interface {

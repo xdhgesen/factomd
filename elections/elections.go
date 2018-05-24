@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FactomProject/factomd/CheckAuth"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
-	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util/atomic"
 )
@@ -69,6 +69,13 @@ func (e *Elections) ComparisonMinute() int {
 	return int(e.Minute)
 }
 
+func (e *Elections) GetFedServers() []interfaces.IServer {
+	return e.Federated
+}
+func (e *Elections) GetAuditServers() []interfaces.IServer {
+	return e.Audit
+}
+
 func (e *Elections) AddFederatedServer(server interfaces.IServer) int {
 	// Already a leader
 	if idx := e.GetFedServerIndex(server); idx != -1 {
@@ -80,6 +87,7 @@ func (e *Elections) AddFederatedServer(server interfaces.IServer) int {
 
 	e.Federated = append(e.Federated, server)
 	Sort(e.Federated)
+	checkAuth.CheckAuthSetsMatch("Elections.AddFederatedServer()", e.Federated, e.Audit, e.State.GetFedServers(uint32(e.DBHeight)), e.State.GetAuditServers(uint32(e.DBHeight)), e.State)
 
 	return e.GetFedServerIndex(server)
 }
@@ -307,84 +315,6 @@ func (e *Elections) LogPrintf(logName string, format string, more ...interface{}
 		t := fmt.Sprintf("%d-:-%d ", h, s.CurrentMinute)
 		messages.LogPrintf(logFileName, t+format, more...)
 	}
-}
-
-// Check that the process list and Election Authority Sets match
-func CheckAuthSetsMatch(caller string, e *Elections, s *state.State) {
-
-	pl := s.ProcessLists.Get(uint32(e.DBHeight))
-	var s_fservers, s_aservers []interfaces.IServer
-	if pl == nil {
-		s_fservers = make([]interfaces.IServer, 0)
-		s_aservers = make([]interfaces.IServer, 0)
-	} else {
-		s_fservers = pl.FedServers
-		s_aservers = pl.AuditServers
-	}
-
-	e_fservers := e.Federated
-	e_aservers := e.Audit
-
-	printAll := func(format string, more ...interface{}) {
-		fmt.Printf(s.FactomNodeName+":"+caller+":"+format+"\n", more...)
-		e.LogPrintf("election", caller+":"+format, more...)
-		s.LogPrintf("executeMsg", caller+":"+format, more...)
-	}
-
-	var dummy state.Server = state.Server{primitives.ZeroHash, "dummy", false, primitives.ZeroHash}
-
-	// Force the lists to be the same size by adding Dummy
-	for len(s_fservers) > len(e_fservers) {
-		e_fservers = append(e_fservers, &dummy)
-	}
-
-	for len(s_fservers) < len(e_fservers) {
-		s_fservers = append(s_fservers, &dummy)
-	}
-
-	for len(s_aservers) > len(e_aservers) {
-		e_aservers = append(e_aservers, &dummy)
-	}
-
-	for len(s_aservers) < len(e_aservers) {
-		s_aservers = append(s_aservers, &dummy)
-	}
-
-	var mismatch1 bool
-	for i, f := range s_fservers {
-		if e_fservers[i].GetChainID() != f.GetChainID() {
-			printAll("Process List FedSet is not the same as Election FedSet at %d", i)
-			mismatch1 = true
-		}
-	}
-	if mismatch1 {
-		printAll("Federated %d", len(s_fservers))
-		printAll("idx election process")
-		for i, _ := range s_fservers {
-			printAll("%3d  %x  %x", i, e_fservers[i].GetChainID().Bytes()[3:6], s_fservers[i].GetChainID().Bytes()[3:6])
-		}
-		printAll("")
-	}
-
-	var mismatch2 bool
-	for i, f := range s_aservers {
-		if e_aservers[i].GetChainID() != f.GetChainID() {
-			printAll("Process List AudSet is not the same as Election AudSet at %d", i)
-			mismatch2 = true
-		}
-	}
-	if mismatch2 {
-		printAll("Audit %d", len(s_aservers))
-		printAll("idx election process")
-		for i, _ := range s_aservers {
-			printAll("%3d  %x  %x", i, e_aservers[i].GetChainID().Bytes()[3:6], s_aservers[i].GetChainID().Bytes()[3:6])
-		}
-		printAll("")
-	}
-
-	//if !mismatch1 && !mismatch2 {
-	//	printAll("AuthSet Matched!")
-	//}
 }
 
 // ProcessWaiting drains all waiting messages into the input
