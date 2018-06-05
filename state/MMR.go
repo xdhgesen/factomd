@@ -40,30 +40,25 @@ func (vm *VM) ReportMissing(height int, delay int64) {
 		return
 	}
 	now := vm.p.State.GetTimestamp().GetTimeMilli()
-	if delay < 100 {
-		delay = 100 // Floor for delays is 100ms so there is time to merge adjacent requests
+	if delay < 50 {
+		delay = 50 // Floor for delays is 50ms so there is time to merge adjacent requests
 	}
 	lenVMList := len(vm.List)
 	// ask for all missing messages
 	var i int
 	for i = vm.HighestAsk; i < lenVMList; i++ {
 		if vm.List[i] == nil {
-			vm.p.ReportMissing(vm.VmIndex, i, now+delay)
-			vm.HighestAsk = i // We have asked for all nils up to this height
+			vm.p.State.Ask(int(vm.p.DBHeight), vm.VmIndex, i, now+delay) // send it to the state
+			vm.HighestAsk = i                                            // We have asked for all nils up to this height
 		}
 	}
 
 	// if we are asking above the current list
-	if height > vm.HighestAsk {
-		vm.p.ReportMissing(vm.VmIndex, height, now+delay)
+	if height >= lenVMList {
+		vm.p.State.Ask(int(vm.p.DBHeight), vm.VmIndex, height, now+delay) // send it to the state
 		vm.HighestAsk = height // We have asked for all nils up to this height
 	}
 
-}
-
-// Ask processList for an MMR for this height with delay ms before asking the network
-func (p *ProcessList) ReportMissing(vmIndex int, height int, when int64) {
-	p.State.Ask(int(p.DBHeight), vmIndex, height, when) // send it to the state
 }
 
 func (s *State) Ask(DBHeight int, vmIndex int, height int, when int64) {
