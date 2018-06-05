@@ -88,19 +88,14 @@ func TestStringEC(t *testing.T) {
 	ec.UnmarshalBinary(ecbytes)
 
 	got := fmt.Sprintf("%v\n", ec.String())
-	expected := ` CommitEntry
-   Version              0
-   MilliTime            01538b7fe6fd
-   EntryHash            249f6e
-   Credits              1
-   ECPubKey             17ef7a
-   Sig                  c38e2f
-
-`
+	expected := "ehash[249f6e] Credits[1] PublicKey[17ef7a] Sig[c38e2f]\n"
 	if got != expected {
 		t.Errorf("Entry Commit comparison failed")
 	}
 }
+
+//ehash[249f6e] Credits[1] PublicKey[17ef7a] Sig[c38e2f]\n
+//ehash[249f6e] Credits[1] PublicKey[17ef7a] Sig[c38e2f]
 
 func TestCommitEntryMarshalUnmarshalStatic(t *testing.T) {
 	ce := NewCommitEntry()
