@@ -525,8 +525,8 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 5", leadercnt)
 	}
 
-	runCmd("S300")
-	runCmd("R10")
+	runCmd("S0")
+	runCmd("R0")
 	WaitBlocks(state0, 10)
 	runCmd("R0")
 	WaitBlocks(state0, 2)

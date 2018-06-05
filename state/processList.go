@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
-
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -811,6 +810,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 			// Try an process this message
 			msg := thisMsg
 			// If the block is not yet being written to disk (22 minutes old...)
+			// dif >2 means the second pass sync is not complete so don't process yet.
+			// this prevent you from becoming a leader when you don't have complete identities
 			if (vm.LeaderMinute < 2 && diff <= 3) || diff <= 2 {
 				// If we can't process this entry (i.e. returns false) then we can't process any more.
 				p.NextHeightToProcess[i] = j + 1 // unused...
@@ -963,25 +964,23 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	if len(vm.List) > int(ack.Height) && vm.List[ack.Height] != nil {
 		if vm.List[ack.Height].GetMsgHash().IsSameAs(msgHash) {
 			p.State.LogPrintf("processList", "Drop duplicate")
-			toss("2")
+			toss("Drop duplicate")
 			return
 		}
 
 		p.State.LogMessage("processList", "drop from pl", vm.List[ack.Height])
-		vm.List[ack.Height] = m // remove the old message
-
-		return
+		p.State.LogMessage("processList", "drop from pl", vm.ListAck[ack.Height])
+		// the code below will blindly overwrite the old message/ack
 	}
 
 	// From this point on, we consider the transaction recorded.  If we detect it has already been
 	// recorded, then we still treat it as if we recorded it.
 
 	vm.heartBeat = 0 // We have heard from this VM
-
-	TotalHoldingQueueOutputs.Inc()
-	TotalAcksOutputs.Inc()
-	delete(p.State.Acks, msgHash.Fixed())
-	delete(p.State.Holding, msgHash.Fixed())
+	// Both the ack and the message hash to the same GetHash()
+	if ack.GetHash().Fixed() != m.GetMsgHash().Fixed() {
+		p.State.LogPrintf("executeMsg", "m/ack mismatch m-%x a-%x", m.GetMsgHash().Fixed(), ack.GetHash().Fixed())
+	}
 
 	// Both the ack and the message hash to the same GetHash()
 	m.SetLocal(false)
@@ -992,7 +991,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	if ack.GetHash().Fixed() != m.GetMsgHash().Fixed() {
 		p.State.LogPrintf("executeMsg", "m/ack mismatch m-%x a-%x", m.GetMsgHash().Fixed(), ack.GetHash().Fixed())
 	}
-
 	m.SendOut(p.State, m)
 	ack.SendOut(p.State, ack)
 
@@ -1002,10 +1000,13 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	}
 
 	p.State.LogPrintf("executeMsg", "remove from holding M-%v|R-%v", m.GetMsgHash().String()[:6], m.GetRepeatHash().String()[:6])
+	TotalHoldingQueueOutputs.Inc()
+	TotalAcksOutputs.Inc()
 	delete(p.State.Holding, msgHash.Fixed())
 	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
+
 	p.AddOldMsgs(m)
 	p.OldAcks[msgHash.Fixed()] = ack
 
@@ -1182,7 +1183,6 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 	pl.PendingChainHeads = NewSafeMsgMap("PendingChainHeads", pl.State)
 	pl.OldMsgs = make(map[[32]byte]interfaces.IMsg)
 	pl.OldAcks = make(map[[32]byte]interfaces.IMsg)
-
 	pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
 	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 
