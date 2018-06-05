@@ -89,7 +89,7 @@ func time2sec(t) {
     cnt = match($0,/([0-9]+\\/[0-9]\\/[0-9]+)+/,ary);
     list = substr($0,RSTART,RLENGTH);
     n = split(list,ary,", ");
-        v = ary[1];
+    v = ary[1];
 #	print list, n, v
     peer = substr($1,1,index($1,"_")-1)
 #    print "MMR", v, peer,$1;
@@ -122,12 +122,11 @@ END {
      if(i in firstMR) { fr = firstMR[i]-ask;} else {fr = "NA";}
      if(i in lastMR)  { lr = lastMR[i]-ask;}  else {lr = "NA";}
      delete peerCnt
-    
      replies = countMR[i]+0
      PROCINFO["sorted_in"] ="@ind_str_asc";
      peerStr = ""
      if(i in peers) {
-    
+       
         for(j in peers[i]) {
 #          print "<"i"><"j">["peers[i][j]"]";
           peerStr = peerStr " "  j "-" peers[i][j];
