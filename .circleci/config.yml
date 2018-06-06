@@ -126,6 +126,10 @@ jobs:
           command: go test $(glide nv) -vet=off -v -cover -coverprofile=coverage.out
 
       - run:
+          name: Test Making a Leader 
+          command: cd engine/ && go test -run TestMakerALeader
+
+      - run:
           name: Coveralls!
           no_output_timeout: 2400
           command: goveralls -coverprofile=coverage.out -service=circle-ci -repotoken=$COVERALLS_TOKEN

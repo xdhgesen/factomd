@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -110,7 +111,7 @@ func TestSetupANetwork(t *testing.T) {
 		"--controlpanelport=37002",
 		"--networkport=37003",
 		"--startdelay=1",
-		"-debuglog=F.*",
+		"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 	)
@@ -569,33 +570,35 @@ func TestMultiple2Election(t *testing.T) {
 	)
 
 	params := ParseCmdLine(args)
-	state0 := Factomd(params, false).(*state.State)
-	state0.MessageTally = true
-	time.Sleep(10 * time.Second)
-	StatusEveryMinute(state0)
+	_ = Factomd(params, false).(*state.State)
+	time.Sleep(1 * time.Second)
+
+	state := GetFnodes()[2].State
+	state.MessageTally = true
+	StatusEveryMinute(state)
 	t.Log("Allocated 7 nodes")
 	if len(GetFnodes()) != 7 {
 		t.Fatal("Should have allocated 7 nodes")
 		t.Fail()
 	}
 
-	WaitForMinute(state0, 3)
+	WaitForMinute(state, 1)
 	runCmd("g7")
-	WaitBlocks(state0, 1)
+	WaitBlocks(state, 1)
 	// Allocate 1 leaders
-	WaitForMinute(state0, 1)
+	WaitForMinute(state, 1)
 
 	runCmd("0")
 	runCmd("l") // leaders
 	runCmd("l") // leaders
 	runCmd("l") // leaders
-	runCmd("o") // Audit
-	runCmd("o") // Audit
 	runCmd("l") // leaders
 	runCmd("l") // leaders
+	runCmd("o") // Audit
+	runCmd("o") // Audit
 
-	WaitBlocks(state0, 1)
-	WaitForMinute(state0, 2)
+	WaitBlocks(state, 2)
+	WaitForMinute(state, 1)
 
 	leadercnt := 0
 	auditcnt := 0
@@ -614,40 +617,54 @@ func TestMultiple2Election(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 5", leadercnt)
 	}
 
-	runCmd("5")
-	s := GetFnodes()[5].State
-	WaitForMinute(state0, 9)
-	// wait till minute flips
-	for s.CurrentMinute != 0 {
-		runtime.Gosched()
-	}
-	runCmd("x")
+	var wait sync.WaitGroup
+	wait.Add(2)
 
-	// wait for after dbsig is sent but before EOM... hopefully
-	runCmd("6")
-	s = GetFnodes()[6].State
-	pl := s.ProcessLists.Get(s.LLeaderHeight)
-	vm := pl.VMs[s.LeaderVMIndex]
-	for s.CurrentMinute != 0 {
-		runtime.Gosched()
+	// wait till after EOM 9 but before DBSIG
+	stop0 := func() {
+		s := GetFnodes()[0].State
+		WaitForMinute(state, 9)
+		// wait till minute flips
+		for s.CurrentMinute != 0 {
+			runtime.Gosched()
+		}
+		s.SetNetStateOff(true)
+		wait.Done()
+		fmt.Println("Stopped FNode0")
 	}
-	for vm.Height != 0 {
-		runtime.Gosched()
+
+	// wait for after DBSIG is sent but before EOM0
+	stop1 := func() {
+		s := GetFnodes()[1].State
+		for s.CurrentMinute != 0 {
+			runtime.Gosched()
+		}
+		pl := s.ProcessLists.Get(s.LLeaderHeight)
+		vm := pl.VMs[s.LeaderVMIndex]
+		for s.CurrentMinute == 0 && vm.Height == 0 {
+			runtime.Gosched()
+		}
+		s.SetNetStateOff(true)
+		wait.Done()
+		fmt.Println("Stopped FNode01")
 	}
-	runCmd("x")
+
+	go stop0()
+	go stop1()
+	wait.Wait()
+	fmt.Println("Caused Elections")
 
 	//runCmd("E")
 	//runCmd("F")
 	//runCmd("0")
 	//runCmd("p")
-	WaitBlocks(state0, 3)
-
+	WaitBlocks(state, 3)
 	// bring them back
 	runCmd("5")
 	runCmd("x")
 	runCmd("6")
 	runCmd("x")
-	WaitBlocks(state0, 2)
+	WaitBlocks(state, 2)
 
 	leadercnt = 0
 	auditcnt = 0
