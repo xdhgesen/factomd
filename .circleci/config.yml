@@ -127,7 +127,7 @@ jobs:
 
       - run:
           name: Test Making a Leader 
-          command: cd engine/ && go test -run TestMakerALeader
+          command: cd engine/ && go test -run TestMakeALeader
 
       - run:
           name: Coveralls!

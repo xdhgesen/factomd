@@ -1103,7 +1103,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	pl.SortAuditServers()
 	pl.SortFedServers()
-	checkAuth.CheckAuthSetsMatch("CheckAuthSetsMatch()", pl.State.Elections.GetFedServers(), pl.State.Elections.GetAuditServers(), pl.State.Elections.GetFedServers(), pl.State.Elections.GetAuditServers(), pl.State)
+	if pl != nil && pl.State != nil && pl.State.Elections != nil {
+		checkAuth.CheckAuthSetsMatch("CheckAuthSetsMatch()", pl.State.Elections.GetFedServers(), pl.State.Elections.GetAuditServers(), pl.FedServers, pl.AuditServers, pl.State)
+	}
 
 	pln.SortAuditServers()
 	pln.SortFedServers()
