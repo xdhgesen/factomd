@@ -16,67 +16,59 @@ func GetId(f interfaces.IServer) string {
 // Check that the process list and Election Authority Sets match
 func CheckAuthSetsMatch(caller string, eFeds []interfaces.IServer, eAuds []interfaces.IServer, sFeds []interfaces.IServer, sAuds []interfaces.IServer, s interfaces.IState) {
 
-	var s_fservers, s_aservers []interfaces.IServer
 	if sFeds == nil {
-		s_fservers = make([]interfaces.IServer, 0)
-		s_aservers = make([]interfaces.IServer, 0)
-	} else {
-		s_fservers = sFeds
-		s_aservers = sAuds
+		sFeds = make([]interfaces.IServer, 0)
+		sAuds = make([]interfaces.IServer, 0)
 	}
-
-	e_fservers := eFeds
-	e_aservers := eAuds
-
 	printAll := func(format string, more ...interface{}) {
 		s.LogPrintf("election", caller+":"+format, more...)
 	}
 
 	// Force the lists to be the same size by adding Dummy
-	for len(s_fservers) > len(e_fservers) {
-		e_fservers = append(e_fservers, nil)
+	for len(sFeds) > len(eFeds) {
+		eFeds = append(eFeds, nil)
 	}
 
-	for len(s_fservers) < len(e_fservers) {
-		s_fservers = append(s_fservers, nil)
+	for len(sFeds) < len(eFeds) {
+		sFeds = append(sFeds, nil)
 	}
 
-	for len(s_aservers) > len(e_aservers) {
-		e_aservers = append(e_aservers, nil)
+	for len(sAuds) > len(eAuds) {
+		eAuds = append(eAuds, nil)
 	}
 
-	for len(s_aservers) < len(e_aservers) {
-		s_aservers = append(s_aservers, nil)
+	for len(sAuds) < len(eAuds) {
+		sAuds = append(sAuds, nil)
 	}
 
 	var mismatch1 bool
-	for i, f := range s_fservers {
-		if e_fservers[i].GetChainID() != f.GetChainID() {
+	for i := range sFeds {
+		if eFeds[i] == nil || sFeds[i] == nil || eFeds[i].GetChainID() != sFeds[i].GetChainID() {
 			printAll("Process List FedSet is not the same as Election FedSet at %d", i)
 			mismatch1 = true
 		}
 	}
 	if mismatch1 {
-		printAll("Federated %d", len(s_fservers))
+		printAll("Federated %d", len(sFeds))
 		printAll("idx election process")
-		for i, _ := range s_fservers {
-			printAll("%3d  %s  %s", i, GetId(e_fservers[i]), GetId(s_fservers[i]))
+		for i, _ := range sFeds {
+			printAll("%3d  %s  %s", i, GetId(eFeds[i]), GetId(sFeds[i]))
 		}
 		printAll("")
 	}
 
 	var mismatch2 bool
-	for i, f := range s_aservers {
-		if e_aservers[i].GetChainID() != f.GetChainID() {
+	for i := range sAuds {
+		if eAuds[i] == nil || sAuds[i] == nil || eAuds[i].GetChainID() != sAuds[i].GetChainID() {
 			printAll("Process List AudSet is not the same as Election AudSet at %d", i)
 			mismatch2 = true
 		}
 	}
 	if mismatch2 {
-		printAll("Audit %d", len(s_aservers))
+		printAll("Audit %d", len(sAuds))
 		printAll("idx election process")
-		for i, _ := range s_aservers {
-			printAll("%3d  %s  %s", i, GetId(e_aservers[i]), GetId(s_aservers[i]))
+		for i, _ := range sAuds {
+			printAll("%3d  %s  %s", i, GetId(eAuds[i]), GetId(sAuds[i]))
 		}
 		printAll("")
 	}
