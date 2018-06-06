@@ -1004,7 +1004,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				last := vm.ListAck[vm.Height-1]
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
-					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
+					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, err from createHash", p.DBHeight, i, j), vm.List[j])
 					vm.List[j] = nil
 					vm.HighestAsk = j // have to be able to ask for this again
 					if p.State.DebugExec() {
@@ -1054,7 +1054,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				msgHashFixed := msg.GetMsgHash().Fixed()
 
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
-					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
+					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY 2", p.DBHeight, i, j), thisMsg)
 					vm.List[j] = nil  // If we have seen this message, we don't process it again.  Ever.
 					vm.HighestAsk = j // have to be able to ask for this again
 					if p.State.DebugExec() {
