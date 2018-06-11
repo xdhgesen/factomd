@@ -21,6 +21,7 @@ type MessageBase struct {
 	NetworkOrigin string // Hash of the network peer/connection where the message is from
 	Peer2Peer     bool   // The nature of this message type, not marshalled with the message
 	LocalOnly     bool   // This message is only a local message, is not broadcast and may skip verification
+	FullBroadcast bool   // This is used for messages with no missing message support e.g. election related messages
 
 	NoResend  bool // Don't resend this message if true.
 	ResendCnt int  // Put a limit on resends
@@ -37,6 +38,31 @@ type MessageBase struct {
 	Stalled     bool // This message is currently stalled
 	MarkInvalid bool
 	Sigvalid    bool
+}
+
+func (m *MessageBase) StringOfMsgBase() string {
+
+	rval := fmt.Sprintf("origin %s(%d), LChain=%x resendCnt=%d", m.NetworkOrigin, m.Origin, m.LeaderChainID.Bytes()[3:6], m.ResendCnt)
+	if m.LocalOnly {
+		rval += " local"
+	}
+	if m.Peer2Peer {
+		rval += " p2p"
+	}
+	if m.FullBroadcast {
+		rval += " FullBroadcast"
+	}
+	if m.NoResend {
+		rval += "noResend"
+	}
+	if m.MarkInvalid {
+		rval += "MarkInvalid"
+	}
+	if m.Stalled {
+		rval += "Stalled"
+	}
+
+	return rval
 }
 
 var mu sync.Mutex // lock for debug struct
@@ -116,6 +142,9 @@ func checkForDuplicateSend(s interfaces.IState, msg interfaces.IMsg, whereAmI st
 }
 
 func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
+	if msg.IsLocal() {
+		return // don't send local messages
+	}
 	// Are we ever modifying a message?
 	if m.ResendCnt > 4 { // If the first send fails, we need to try again
 		return
@@ -139,9 +168,7 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 			//			s.LogPrintf("NetworkOutputsCall", "too full
 			return
 		}
-
 	}
-
 	m.ResendCnt++
 	m.resend = now
 	sends++
@@ -188,18 +215,7 @@ func (m *MessageBase) SentInvalid() bool {
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
 func (m *MessageBase) Resend(s interfaces.IState) (rtn bool) {
 	return true
-	if m.ResendCnt > 4 { // Only send four times ...
-		return false
-	}
-	now := s.GetTimestamp().GetTimeMilli()
-	if m.resend == 0 {
-		m.resend = now
-		return false
-	}
-	if now-m.resend > 2000 && s.NetworkOutMsgQueue().Length() < s.NetworkOutMsgQueue().Cap()*99/100 {
-		return true
-	}
-	return false
+
 }
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
@@ -217,7 +233,6 @@ func (m *MessageBase) Expire(s interfaces.IState) (rtn bool) {
 func (m *MessageBase) IsStalled() bool {
 	return m.Stalled
 }
-
 func (m *MessageBase) SetStall(b bool) {
 	m.Stalled = b
 }
@@ -266,6 +281,13 @@ func (m *MessageBase) SetLocal(v bool) {
 	m.LocalOnly = v
 }
 
+func (m *MessageBase) IsFullBroadcast() bool {
+	return m.FullBroadcast
+}
+
+func (m *MessageBase) SetFullBroadcast(v bool) {
+	m.FullBroadcast = v
+}
 func (m *MessageBase) GetLeaderChainID() interfaces.IHash {
 	if m.LeaderChainID == nil {
 		m.LeaderChainID = primitives.NewZeroHash()

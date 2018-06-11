@@ -62,7 +62,7 @@ type ProcessList struct {
 	                                            (discard DBlock if > 1/2 have sig differences) */
 	// messages processed in this list
 	OldMsgs     map[[32]byte]interfaces.IMsg
-	oldmsgslock *sync.Mutex
+	oldmsgslock sync.Mutex
 
 	// Chains that are executed, but not processed. There is a small window of a pending chain that the ack
 	// will pass and the chainhead will fail. This covers that window. This is only used by WSAPI,
@@ -70,11 +70,11 @@ type ProcessList struct {
 	PendingChainHeads *SafeMsgMap
 
 	OldAcks     map[[32]byte]interfaces.IMsg
-	oldackslock *sync.Mutex
+	oldackslock sync.Mutex
 
 	// Entry Blocks added within 10 minutes (follower and leader)
 	NewEBlocks     map[[32]byte]interfaces.IEntryBlock
-	neweblockslock *sync.Mutex
+	neweblockslock sync.Mutex
 
 	NewEntriesMutex sync.RWMutex
 	NewEntries      map[[32]byte]interfaces.IEntry
@@ -105,6 +105,9 @@ type ProcessList struct {
 	asks chan askRef   // Requests to ask for missing messages
 	adds chan plRef    // notices of slots filled in the process list
 	done chan struct{} // Notice that this DBHeight is done
+	// debug -- highest nil seen and reported in processlist
+	nilListMutex sync.Mutex
+	nilList      map[int]int
 }
 
 var _ interfaces.IProcessList = (*ProcessList)(nil)
@@ -554,12 +557,26 @@ func (p *ProcessList) GetOldMsgs(key interfaces.IHash) interfaces.IMsg {
 	if p == nil {
 		return nil
 	}
-	if p.oldmsgslock == nil {
-		return nil
-	}
 	p.oldmsgslock.Lock()
 	defer p.oldmsgslock.Unlock()
-	return p.OldMsgs[key.Fixed()]
+	m, ok := p.OldMsgs[key.Fixed()]
+	if !ok {
+		return nil
+	}
+	return m
+}
+
+func (p *ProcessList) GetOldAck(key interfaces.IHash) interfaces.IMsg {
+	if p == nil {
+		return nil
+	}
+	p.oldackslock.Lock()
+	defer p.oldackslock.Unlock()
+	a, ok := p.OldAcks[key.Fixed()]
+	if !ok {
+		return nil
+	}
+	return a
 }
 
 func (p *ProcessList) AddNewEBlocks(key interfaces.IHash, value interfaces.IEntryBlock) {
@@ -694,13 +711,13 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			if len(ticker) == cap(ticker) {
 				return
 			} // time to die, no one is listening
+
 			ticker <- s.GetTimestamp().GetTimeMilli()
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
 
 	//	s.LogPrintf(logname, "Start PL DBH %d", p.DBHeight)
-
 	lastAskDelay := int64(0)
 	for {
 		// You have to compute this at every cycle as you can change the block time
@@ -730,6 +747,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			addAdd(add)
 
 		case now := <-ticker:
+			p.State.GetLeaderHeight()
 			addAllAsks()     // process all pending asks before any adds
 			addAllAdds()     // process all pending add before any ticks
 			readAllTickers() // drain the ticker channel
@@ -764,6 +782,7 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 		case <-done:
 			addAllAsks() // process all pending asks before any adds
 			addAllAdds() // process all pending add before any ticks
+
 			if len(pending) != 0 {
 				s.LogPrintf(logname, "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
 				s.LogPrintf("executeMsg", "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
@@ -777,7 +796,6 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 } // func  makeMMRs() {...}
 
 func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
-
 	if p.asks == nil { // If it is nil, there is no makemmrs
 		return
 	}
@@ -803,22 +821,32 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 		if vm.List[i] == nil {
 			ask := askRef{plRef{p.DBHeight, vmIndex, uint32(i)}, now + delay}
 			p.asks <- ask
-
 		}
 	}
 
 	if p.asks != nil { // If it is nil, there is no makemmrs
-		// always ask for one past the end as well...Can't hurt ... Famous last words...
-		ask := askRef{plRef{p.DBHeight, vmIndex, uint32(lenVMList)}, now + delay}
-		p.asks <- ask
-		vm.HighestAsk = int(lenVMList) + 1 // We have asked for all nils up to this height
+	// always ask for one past the end as well...Can't hurt ... Famous last words...
+	ask := askRef{plRef{p.DBHeight, vmIndex, uint32(lenVMList)}, now + delay}
+	p.asks <- ask
+
+	vm.HighestAsk = int(lenVMList) + 1 // We have asked for all nils up to this height
+
 	}
 	return
 }
 
 func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
 	if !(uint32(len(p.VMs[vmIndex].List)) > height) {
+		p.State.LogMessage("processList", fmt.Sprintf("TrimVMList() %d/%d/%d", p.DBHeight, vmIndex, height), p.VMs[vmIndex].List[height])
 		p.VMs[vmIndex].List = p.VMs[vmIndex].List[:height]
+		p.VMs[vmIndex].HighestAsk = int(height) // make sure we will ask again for nil's above this height
+		if p.State.DebugExec() {
+			p.nilListMutex.Lock()
+			if p.nilList[vmIndex] > int(height-1) {
+				p.nilList[vmIndex] = int(height - 1) // Drag the highest nil logged back before this nil
+			}
+			p.nilListMutex.Unlock()
+		}
 	}
 }
 func (p *ProcessList) GetDBHeight() uint32 {
@@ -853,8 +881,6 @@ var decodeMap map[foo]string = map[foo]string{
 	foo{false, false, false, true, false, false, true, false, true}:  "Normal",                    //0x148
 	foo{true, false, true, true, false, false, true, false, true}:    "Syncing EOM Start",         //0x14d
 
-	// old code used to also hit these states some of which are problematic as they allow both DBSIG and EOM concurrently
-	//foo{true, true, false, true, false, false, true, true, false}:     "Stop Syncing DBSig",              //0x0cb
 	//foo{true, false, false, false, false, false, false, false, false}: "Sync Only??",                     //0x100 ***
 	//foo{true, false, true, true, false, false, false, false, true}:   "Syncing EOM ... ",                 //0x10d
 	//foo{true, true, false, false, false, false, true, false, true}:    "Start Syncing DBSig",             //0x143
@@ -894,7 +920,7 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 }
 
-var nillist map[int]int = make(map[int]int)
+var extraDebug bool = false
 
 // Process messages and update our state.
 func (p *ProcessList) Process(state *State) (progress bool) {
@@ -935,6 +961,9 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					state.SyncingState[state.SyncingStateCurrent] = x
 				}
 			}
+			if extraDebug {
+				p.State.LogMessage("process", fmt.Sprintf("Consider %v/%v/%v", p.DBHeight, i, j), vm.List[j])
+			}
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
 				cnt := 0
@@ -945,10 +974,12 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					}
 				}
 				if p.State.DebugExec() {
-					if nillist[i] < j {
+					p.nilListMutex.Lock()
+					if p.nilList[i] < j {
 						p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
-						nillist[i] = j
+						p.nilList[i] = j
 					}
+					p.nilListMutex.Unlock()
 				}
 
 				//				p.State.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
@@ -967,8 +998,16 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				last := vm.ListAck[vm.Height-1]
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
-					state.LogMessage("process", "Nil out message", vm.List[j])
+					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
 					vm.List[j] = nil
+					vm.HighestAsk = j // have to be able to ask for this again
+					if p.State.DebugExec() {
+						p.nilListMutex.Lock()
+						if p.nilList[i] > j-1 {
+							p.nilList[i] = j - 1 // Drag the highest nil logged back before this nil
+						}
+						p.nilListMutex.Unlock()
+					}
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					break VMListLoop
@@ -978,6 +1017,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				// expected serialHash (generated above)
 				if !expectedSerialHash.IsSameAs(thisAck.SerialHash) {
 					p.State.Reset() // This currently does nothing.. see comments in reset
+					p.State.LogPrintf("process", "reset")
 					return
 				}
 			}
@@ -1008,9 +1048,16 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				msgHashFixed := msg.GetMsgHash().Fixed()
 
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
-					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
+					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
-					p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
+					vm.HighestAsk = j // have to be able to ask for this again
+					if p.State.DebugExec() {
+						p.nilListMutex.Lock()
+						if p.nilList[i] > j-1 {
+							p.nilList[i] = j - 1 // Drag the highest nil logged back before this nil
+						}
+						p.nilListMutex.Unlock()
+					}
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					// If we ask won't we just get the same thing back?
 					break VMListLoop
@@ -1024,7 +1071,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 						p.State.Commits.Delete(msg.GetMsgHash().Fixed())
 					}
 
-					p.State.LogMessage("processList", "done", msg)
+					//					p.State.LogMessage("processList", "done", msg)
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
 					p.State.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
@@ -1048,6 +1095,9 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 			} else {
 				// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
 				// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, state.EntryDBHeightComplete))
+				if extraDebug {
+					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", state.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
+				}
 				break VMListLoop
 			}
 		}
@@ -1182,6 +1232,11 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
+	if p.State.DebugExec() {
+		p.nilListMutex.Lock()
+		delete(p.nilList, int(ack.Height)) // Notify if this is ever nil again
+		p.nilListMutex.Unlock()
+	}
 	p.AddOldMsgs(m)
 	p.OldAcks[msgHash.Fixed()] = ack
 
@@ -1355,12 +1410,9 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 
 	pl.PendingChainHeads = NewSafeMsgMap("PendingChainHeads", pl.State)
 	pl.OldMsgs = make(map[[32]byte]interfaces.IMsg)
-	pl.oldmsgslock = new(sync.Mutex)
 	pl.OldAcks = make(map[[32]byte]interfaces.IMsg)
-	pl.oldackslock = new(sync.Mutex)
 
 	pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-	pl.neweblockslock = new(sync.Mutex)
 	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 
 	pl.DBSignatures = make([]DBSig, 0)
@@ -1395,6 +1447,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.adds = nil
 		pl.done = nil
 	}
+	pl.nilList = make(map[int]int)
 	return pl
 }
 

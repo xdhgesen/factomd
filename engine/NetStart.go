@@ -167,6 +167,9 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		s.StateSaverStruct.FastBootLocation = p.FastLocation
 	}
 
+	s.CheckChainHeads.CheckChainHeads = p.CheckChainHeads
+	s.CheckChainHeads.Fix = p.FixChainHeads
+
 	fmt.Println(">>>>>>>>>>>>>>>>")
 	fmt.Println(">>>>>>>>>>>>>>>> Net Sim Start!")
 	fmt.Println(">>>>>>>>>>>>>>>>")

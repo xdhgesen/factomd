@@ -297,6 +297,7 @@ type IState interface {
 	AddAuthorityDelta(changeString string)
 
 	GetAuthorities() []IAuthority
+	GetAuthorityInterface(chainid IHash) IAuthority
 	GetLeaderPL() IProcessList
 	GetLLeaderHeight() uint32
 	GetEntryDBHeightComplete() uint32

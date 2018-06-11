@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"runtime"
-
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
 )
@@ -171,7 +170,6 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		list = list + fmt.Sprintf(" %3d", f.State.InMsgQueue().Length())
 	}
 	prt = prt + fmt.Sprintf(fmtstr, "InMsgQueue", list)
-
 	list = ""
 	for _, f := range pnodes {
 		list = list + fmt.Sprintf(" %3d", f.State.InMsgQueue2().Length())
@@ -253,7 +251,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 
 		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesReceived(i))
-		}
+	}
 		prt = prt + "\nSent:"
 		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesSent(i))

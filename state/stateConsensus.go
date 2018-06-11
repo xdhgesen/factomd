@@ -68,6 +68,8 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
+	//
+	// 	s.LogMessage("executeMsg", "Execute", msg)
 
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
@@ -92,15 +94,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-		if !msg.IsLocal() {
-		if msg.GetResendCnt() == 0 {
-			msg.SendOut(s, msg)
-		} else if msg.Resend(s) {
-			msg.SendOut(s, msg)
-		}
+		if !msg.IsLocal() && !msg.IsPeer2Peer() {
+			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
 		}
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
+				s.LogMessage("executeMsg", "Entry Exists", msg)
 				return true
 			}
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
@@ -110,6 +109,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		// RunLeader means we can run as a leader, Leader means we are one,
 		// Saving means we are between blocks and can't do leader things, and
 		if !s.RunLeader || !s.Leader || s.Saving {
+			s.LogMessage("executeMsg", "FollowerExecute0", msg)
 			msg.FollowerExecute(s)
 			ret = true
 			return
@@ -117,6 +117,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 		// If we already have an ack for a message, we are also done
 		if s.Acks[msg.GetHash().Fixed()] != nil {
+			s.LogMessage("executeMsg", "FollowerExecute1", msg)
 			msg.FollowerExecute(s)
 			ret = true
 			return
@@ -256,9 +257,9 @@ ackLoop:
 		case ack := <-s.ackQueue:
 			switch ack.Validate(s) {
 			case -1:
-				s.LogMessage("ackQueue", "Drop Invalid", ack) // Maybe put it back in the ask queue ? -- clay
+				s.LogMessage("ackQueue", "Drop Invalid", ack)
 				continue
-			case 0:
+			case 0: // ACk's are only "unknown status" if they are far in the future.
 				// toss the ack into holding and we will try again in a bit...
 				TotalHoldingQueueInputs.Inc()
 				TotalHoldingQueueRecycles.Inc()
@@ -267,10 +268,10 @@ ackLoop:
 			}
 
 			if s.IgnoreMissing {
-				now := s.GetTimestamp().GetTimeSeconds() //todo: Do we really need to do this every loop?
+				now := s.GetTimestamp().GetTimeSeconds()
 				if now-ack.GetTimestamp().GetTimeSeconds() < 60*15 {
 					s.LogMessage("ackQueue", "Execute", ack)
-					s.executeMsg(vm, ack)
+					s.executeMsg(vm, ack) // Execute ack from ackQueue
 					progress = true
 				} else {
 					s.LogMessage("ackQueue", "Drop Too Old", ack)
@@ -297,9 +298,7 @@ emptyLoop:
 		select {
 		case msg := <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
-			if s.executeMsg(vm, msg) && !msg.IsPeer2Peer() {
-				msg.SendOut(s, msg)
-			}
+			progress = s.executeMsg(vm, msg) || progress
 		default:
 			break emptyLoop
 		}
@@ -806,6 +805,13 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	if dbstatemsg.IsLast { // this is the last DBState in this load
 		s.DBFinished = true // Normal case
+		// Attempted hack to fix a set where one leader was ahead of the others.
+		//if s.Leader {
+		//	dbstatemsg.SetLocal(false) // we are going to send it out to catch everyone up
+		//	dbstatemsg.SetPeer2Peer(false)
+		//	dbstatemsg.SetFullBroadcast(true)
+		//	dbstatemsg.SendOut(s, dbstatemsg)
+		//}
 	}
 	/**************************
 	for int(s.ProcessLists.DBHeightBase)+len(s.ProcessLists.Lists) > int(dbheight+1) {
@@ -1293,7 +1299,7 @@ func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
 	s.LeaderExecute(m)
 
 	if re := s.Holding[cc.GetHash().Fixed()]; re != nil {
-		re.SendOut(s, m) // If I was waiting on the commit, go ahead and send out the reveal
+		re.SendOut(s, re) // If I was waiting on the commit, go ahead and send out the reveal
 	}
 }
 
@@ -1309,7 +1315,7 @@ func (s *State) LeaderExecuteCommitEntry(m interfaces.IMsg) {
 	s.LeaderExecute(m)
 
 	if re := s.Holding[ce.GetHash().Fixed()]; re != nil {
-		re.SendOut(s, m) // If I was waiting on the commit, go ahead and send out the reveal
+		re.SendOut(s, re) // If I was waiting on the commit, go ahead and send out the reveal
 	}
 }
 
