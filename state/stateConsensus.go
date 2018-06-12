@@ -268,7 +268,7 @@ ackLoop:
 			}
 
 			if s.IgnoreMissing {
-				now := s.GetTimestamp().GetTimeSeconds()
+				now := s.GetTimestamp().GetTimeSeconds() //todo: Do we really need to do this every loop?
 				if now-ack.GetTimestamp().GetTimeSeconds() < 60*15 {
 					s.LogMessage("ackQueue", "Execute", ack)
 					s.executeMsg(vm, ack) // Execute ack from ackQueue
@@ -367,6 +367,10 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // responsibility
 func (s *State) ReviewHolding() {
 
+	if s.Syncing || s.Saving {
+		return
+	}
+
 	preReviewHoldingTime := time.Now()
 
 	now := s.GetTimestamp()
@@ -374,10 +378,6 @@ func (s *State) ReviewHolding() {
 		s.ResendHolding = now
 	}
 	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 100 {
-		return
-	}
-
-	if s.Syncing || s.Saving {
 		return
 	}
 

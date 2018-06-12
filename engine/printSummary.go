@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"runtime"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
+	"runtime"
 )
 
 func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
@@ -251,7 +251,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 
 		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesReceived(i))
-	}
+		}
 		prt = prt + "\nSent:"
 		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesSent(i))
