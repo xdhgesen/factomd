@@ -7,13 +7,16 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
-	"runtime"
 )
 
 func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 	if *listenTo < 0 || *listenTo >= len(fnodes) {
 		return
+	}
+	// set everyone's ID
+	for i, f := range fnodes {
+		f.Index = i
 	}
 
 	for *summary == value {
@@ -26,15 +29,17 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 func GetSystemStatus(listenTo int, wsapiNode int) string {
 	fnodes := GetFnodes()
 	f := fnodes[listenTo]
+	s := f.State
 	prt := "===SummaryStart===\n\n"
-	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s goroutines: %d\n",
-		prt, time.Now().Unix(),
-		time.Now().String(),
-		time.Since(globals.StartTime).String(),
-		runtime.NumGoroutine())
+	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, time.Now().Unix(), time.Now().Format("2006-01-02 15:04:05"), time.Since(globals.StartTime).String())
 
-	for i, f := range fnodes {
-		f.Index = i
+	var stateProcessCnt, processListProcessCnt, stateUpdateState, validatorLoopSleepCnt int64
+
+	for _, f := range fnodes {
+		stateProcessCnt += f.State.StateProcessCnt
+		processListProcessCnt += s.ProcessListProcessCnt
+		stateUpdateState += s.StateUpdateState
+		validatorLoopSleepCnt += s.ValidatorLoopSleepCnt
 	}
 
 	var pnodes []*FactomNode

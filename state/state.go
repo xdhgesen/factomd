@@ -383,10 +383,14 @@ type State struct {
 	NumFCTTrans    int // Number of Factoid Transactions in this block
 
 	// debug message about state status rolling queue for ControlPanel
-	pstate              string
-	SyncingState        [256]string
-	SyncingStateCurrent int
-	processCnt          int64 // count of attempts to process .. so we can see if the thread is running
+	pstate                string
+	SyncingState          [256]string
+	SyncingStateCurrent   int
+	processCnt            int64 // count of attempts to process .. so we can see if the thread is running
+	ProcessListProcessCnt int64 // count of attempts to process .. so we can see if the thread is running
+	StateProcessCnt       int64
+	StateUpdateState      int64
+	ValidatorLoopSleepCnt int64
 
 	MMRInfo // fields for MMR processing
 }
@@ -932,7 +936,6 @@ func (s *State) Init() {
 			Fix:       s.CheckChainHeads.Fix,
 		})
 	}
-
 	if s.ExportData {
 		s.DB.SetExportData(s.ExportDataSubpath)
 	}
@@ -1780,6 +1783,7 @@ func (s *State) GetDirectoryBlockByHeight(height uint32) interfaces.IDirectoryBl
 }
 
 func (s *State) UpdateState() (progress bool) {
+	s.StateUpdateState++
 	dbheight := s.GetHighestSavedBlk()
 	plbase := s.ProcessLists.DBHeightBase
 	if dbheight == 0 {

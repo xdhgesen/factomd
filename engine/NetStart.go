@@ -25,13 +25,12 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
 
-	"sync"
-
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/elections"
 	log "github.com/sirupsen/logrus"
+	"sync"
 )
 
 var _ = fmt.Print
@@ -169,7 +168,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	s.CheckChainHeads.CheckChainHeads = p.CheckChainHeads
 	s.CheckChainHeads.Fix = p.FixChainHeads
-
 	fmt.Println(">>>>>>>>>>>>>>>>")
 	fmt.Println(">>>>>>>>>>>>>>>> Net Sim Start!")
 	fmt.Println(">>>>>>>>>>>>>>>>")
@@ -524,6 +522,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	startServers(true)
 
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+
 	SimControl(p.ListenTo, listenToStdin)
 
 }
@@ -561,7 +560,6 @@ func startServers(load bool) {
 
 		wg.Wait()
 	}
-
 	for _, fnode := range fnodes {
 		wg := new(sync.WaitGroup)
 		wg.Add(1)
@@ -569,7 +567,6 @@ func startServers(load bool) {
 
 		wg.Wait()
 	}
-
 	for _, fnode := range fnodes {
 		wg := new(sync.WaitGroup)
 		wg.Add(1)
@@ -631,7 +628,6 @@ func startServers(load bool) {
 	p2p.RegisterPrometheus()
 	leveldb.RegisterPrometheus()
 	RegisterPrometheus()
-
 }
 
 func setupFirstAuthority(s *state.State) {
