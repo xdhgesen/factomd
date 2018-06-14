@@ -356,7 +356,7 @@ func TestMakeALeader(t *testing.T) {
 		"--startdelay=1",
 		//"--debuglog=F.*",
 		"--stdoutlog=out.txt",
-		"--stderrlog=out.txt",
+		"--stderrlog=err.txt",
 		"--checkheads=false",
 	)
 
@@ -518,13 +518,8 @@ func TestAnElection(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 
-	j := state0.SyncingStateCurrent
-	for range state0.SyncingState {
-		fmt.Println(state0.SyncingState[j])
-		j = (j - 1 + len(state0.SyncingState)) % len(state0.SyncingState)
 	}
 
-}
 func Test5up(t *testing.T) {
 	if ranSimTest {
 		return
@@ -751,10 +746,12 @@ func TestMultiple3Election(t *testing.T) {
 		"--network=LOCAL",
 		"--enablenet=true",
 		"--blktime=15",
+		"--faulttimeout=8",
+		"--roundtimeout=4",
 		"--count=12",
 		"--startdelay=1",
 		"--net=alot+",
-		//"--debuglog=F.*",
+		//"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		//"--debugconsole=localhost:8093",
