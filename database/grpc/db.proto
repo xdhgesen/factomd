@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package databaseGrpc;
+
+// Interface exported by the server.
+service databaseGrpc {
+    // A simple RPC.
+    //
+    // Searches the DB for the key and returns the value found.
+    rpc Retrieve(DBKey) returns (DBValue) {}
+
+    // A server-to-client streaming RPC.
+    //
+    // Retrieves the entries contained by the dbkey as a stream
+    rpc RetrieveAllEntries(DBKey) returns (stream DBValue) {}
+}
+
+// DBKey is a key in the leveldb. Using a type is optional to specify what type the
+// value is. E.g: 'entry', 'dblock', etc
+message DBKey {
+    string key_type = 1;
+    bytes bucket = 2;
+    bytes key = 3;
+}
+
+// DBValue is a returned value from a database access
+message DBValue {
+    string val_type = 1;
+    bytes value = 2;
+    bytes containedIn = 3;
+    int32 sequence = 4;
+    string error = 5;
+}
