@@ -627,11 +627,14 @@ func (p *ProcessList) TrimVMList(h uint32, vmIndex int) {
 			if p.VMs[vmIndex].HighestNil > height {
 				p.VMs[vmIndex].HighestNil = height // Drag report limit back
 			}
+
 		}
+
 		// make sure we will ask again for nil's above this height
 		if p.VMs[vmIndex].HighestAsk > height {
 			p.VMs[vmIndex].HighestAsk = height // Drag Ask limit back
 		}
+
 	} else {
 		p.State.LogPrintf("process", "Attempt to trim higher than list list=%d h=%d", len(p.VMs[vmIndex].List), height)
 
@@ -737,6 +740,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
+			s.ProcessListProcessCnt++
+
 			s.processCnt++
 			if s.DebugExec() {
 				x := p.decodeState(s.Syncing, s.DBSig, s.EOM, s.DBSigDone, s.EOMDone,
@@ -1136,14 +1141,14 @@ func (p *ProcessList) Reset() bool {
  * Support
  ************************************************/
 
-func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uint32) *ProcessList {
+func NewProcessList(s interfaces.IState, previous *ProcessList, dbheight uint32) *ProcessList {
 	// We default to the number of Servers previous.   That's because we always
 	// allocate the FUTURE directoryblock, not the current or previous...
 
-	state.AddStatus(fmt.Sprintf("PROCESSLISTS.NewProcessList at height %d", dbheight))
+	s.AddStatus(fmt.Sprintf("PROCESSLISTS.NewProcessList at height %d", dbheight))
 	pl := new(ProcessList)
 
-	pl.State = state.(*State)
+	pl.State = s.(*State)
 
 	// Make a copy of the previous FedServers
 	pl.FedServers = make([]interfaces.IServer, 0)
@@ -1158,7 +1163,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.AuditServers = append(pl.AuditServers, previous.AuditServers...)
 		for _, auditServer := range pl.AuditServers {
 			auditServer.SetOnline(false)
-			if state.GetIdentityChainID().IsSameAs(auditServer.GetChainID()) {
+			if s.GetIdentityChainID().IsSameAs(auditServer.GetChainID()) {
 				// Always consider yourself "online"
 				auditServer.SetOnline(true)
 			}
@@ -1168,11 +1173,11 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		}
 		pl.SortFedServers()
 	} else {
-		pl.AddFedServer(state.GetNetworkBootStrapIdentity()) // Our default fed server, dependent on network type
+		pl.AddFedServer(s.GetNetworkBootStrapIdentity()) // Our default fed server, dependent on network type
 		// pl.AddFedServer(primitives.Sha([]byte("FNode0"))) // Our default for now fed server on LOCAL network
 	}
 
-	now := state.GetTimestamp()
+	now := s.GetTimestamp()
 	// We just make lots of VMs as they have nearly no impact if not used.
 	pl.VMs = make([]*VM, 65)
 	for i := 0; i < 65; i++ {

@@ -19,7 +19,7 @@ func main() {
 	params := ParseCmdLine(os.Args[1:])
 
 	//  Go Optimizations...
-	runtime.GOMAXPROCS(runtime.NumCPU()) // TODO: should be *2 to use hyperthreadding? -- clay
+	runtime.GOMAXPROCS(runtime.NumCPU() * 2) // TODO: should be *2 to use hyperthreadding? -- clay
 
 	fmt.Printf("Arguments\n %+v\n", params)
 

@@ -105,8 +105,12 @@ func TestSetupANetwork(t *testing.T) {
 		"--roundtimeout=4",
 		"--count=10",
 
+		"--logPort=37000",
+		"--port=37001",
+		"--controlpanelport=37002",
+		"--networkport=37003",
 		"--startdelay=1",
-		//"--debuglog=.*",
+		"--debuglog=.*|graph|system|faulting",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -277,7 +281,7 @@ func TestLoad(t *testing.T) {
 		"-blktime=10",
 		"-count=3",
 		"-startdelay=1",
-		"-debuglog=F.*",
+		//"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 	)
@@ -352,7 +356,7 @@ func TestMakeALeader(t *testing.T) {
 		"--startdelay=1",
 		//"--debuglog=F.*",
 		"--stdoutlog=out.txt",
-		"--stderrlog=out.txt",
+		"--stderrlog=err.txt",
 		"--checkheads=false",
 	)
 
@@ -514,13 +518,8 @@ func TestAnElection(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 
-	j := state0.SyncingStateCurrent
-	for range state0.SyncingState {
-		fmt.Println(state0.SyncingState[j])
-		j = (j - 1 + len(state0.SyncingState)) % len(state0.SyncingState)
-	}
-
 }
+
 func Test5up(t *testing.T) {
 	if ranSimTest {
 		return
@@ -661,7 +660,7 @@ func TestMultiple2Election(t *testing.T) {
 		"--count=10",
 		"--startdelay=1",
 		"--net=alot+",
-		"--debuglog=.*",
+		//"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -743,17 +742,19 @@ func TestMultiple3Election(t *testing.T) {
 	}
 
 	args := append([]string{},
-		"-db=Map",
-		"-network=LOCAL",
-		"-enablenet=true",
-		"-blktime=15",
-		"-count=12",
-		"-startdelay=1",
-		"-net=alot+",
-		"-debuglog=F.*",
-		"--stdoutlog=../out.txt",
-		"--stderrlog=../out.txt",
-		"-debugconsole=localhost:8093",
+		"--db=Map",
+		"--network=LOCAL",
+		"--enablenet=true",
+		"--blktime=15",
+		"--faulttimeout=8",
+		"--roundtimeout=4",
+		"--count=12",
+		"--startdelay=1",
+		"--net=alot+",
+		//"-debuglog=F.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+		//"--debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 
@@ -843,14 +844,14 @@ func TestMultiple7Election(t *testing.T) {
 	}
 
 	args := append([]string{},
-		"-db=Map",
-		"-network=LOCAL",
-		"-enablenet=true",
-		"-blktime=60",
-		"-faulttimeout=60",
-		"-count=25",
-		"-startdelay=1",
-		"-net=alot+",
+		"--db=Map",
+		"--network=LOCAL",
+		"--enablenet=true",
+		"--blktime=60",
+		"--faulttimeout=60",
+		"--count=25",
+		"--startdelay=1",
+		"--net=alot+",
 		//"-debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
