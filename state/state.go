@@ -847,8 +847,8 @@ func (s *State) Init() {
 	s.inMsgQueue2 = NewInMsgQueue(constants.INMSGQUEUE_HIGH + 100) //incoming message queue for Factom application messages
 	s.electionsQueue = NewElectionQueue(10000)                     //incoming message queue for Factom application messages
 	s.apiQueue = NewAPIQueue(100)                                  //incoming message queue from the API
-	s.ackQueue = make(chan interfaces.IMsg, 100)                   //queue of Leadership messages
-	s.msgQueue = make(chan interfaces.IMsg, 400)                   //queue of Follower messages
+	s.ackQueue = make(chan interfaces.IMsg, 10000)                 //queue of Leadership messages
+	s.msgQueue = make(chan interfaces.IMsg, 10000)                 //queue of Follower messages
 	s.ShutdownChan = make(chan int, 1)                             //Channel to gracefully shut down.
 	s.MissingEntries = make(chan *MissingEntry, 1000)              //Entries I discover are missing from the database
 	s.UpdateEntryHash = make(chan *EntryUpdate, 10000)             //Handles entry hashes and updating Commit maps.
