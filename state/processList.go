@@ -711,9 +711,9 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 }
 
-var nillist map[int]int = make(map[int]int)
+var extraDebug bool = false
 
-// Process messages and update our s.
+// Process messages and update our state.
 func (p *ProcessList) Process(s *State) (progress bool) {
 	dbht := s.GetHighestSavedBlk()
 	if dbht >= p.DBHeight {
@@ -754,7 +754,9 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 					s.SyncingState[s.SyncingStateCurrent] = x
 				}
 			}
-
+			if extraDebug {
+				p.State.LogMessage("process", fmt.Sprintf("Consider %v/%v/%v", p.DBHeight, i, j), vm.List[j])
+			}
 			if vm.List[j] == nil {
 				//s.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
 				cnt := 0
@@ -764,10 +766,10 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 						vm.ReportMissing(k, 0)
 					}
 				}
-				if p.State.DebugExec() {
-					if nillist[i] < j {
-						p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
-						nillist[i] = j
+				if s.DebugExec() {
+					if vm.HighestNil < j {
+						s.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
+						vm.HighestNil = j
 					}
 				}
 

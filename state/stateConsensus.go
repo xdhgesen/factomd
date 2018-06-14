@@ -44,6 +44,7 @@ var debugExec_flag bool
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
+
 func (s *State) DebugExec() (ret bool) {
 	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
 
@@ -71,6 +72,8 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
+	//
+	// 	s.LogMessage("executeMsg", "Execute", msg)
 
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
@@ -98,7 +101,6 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		if !msg.IsLocal() && !msg.IsPeer2Peer() {
 			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
 		}
-
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
 				delete(s.Holding, msg.GetHash().Fixed())
@@ -136,10 +138,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		vmi := msg.GetVMIndex()
 		hkb := s.GetHighestKnownBlock()
 
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving &&
-			vm != nil && int(vm.Height) == vml &&
+		if vm != nil && int(vm.Height) == vml &&
 			(!s.Syncing || !vm.Synced) &&
 			(local || vmi == s.LeaderVMIndex) &&
 			s.LeaderPL.DBHeight+1 >= hkb {
@@ -191,6 +190,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 }
 
 func (s *State) Process() (progress bool) {
+
 	s.StateProcessCnt++
 	if s.ResetRequest {
 		s.ResetRequest = false
@@ -209,7 +209,6 @@ func (s *State) Process() (progress bool) {
 
 	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
-
 	if !s.RunLeader {
 		if now-s.StartDelay > s.StartDelayLimit {
 			if s.DBFinished == true {
@@ -386,6 +385,7 @@ func (s *State) ReviewHolding() {
 	if s.Syncing || s.Saving {
 		return
 	}
+
 	s.Commits.Cleanup(s)
 	s.DB.Trim()
 
@@ -431,6 +431,7 @@ func (s *State) ReviewHolding() {
 			delete(s.Holding, k)
 			continue
 		}
+
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
 			delete(s.Holding, k)
@@ -476,6 +477,7 @@ func (s *State) ReviewHolding() {
 		}
 
 		v.SendOut(s, v)
+
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if okre {
 			if !s.NoEntryYet(v.GetHash(), s.GetLeaderTimestamp()) {
@@ -543,22 +545,6 @@ func (s *State) ReviewHolding() {
 			}
 		}
 
-		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
-		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
-				delete(s.Holding, re.GetHash().Fixed())
-				s.Commits.Delete(re.GetHash().Fixed())
-				continue
-			}
-			// Only reprocess if at the top of a new minute, and if we are a leader.
-			//if processMinute > 10 {
-			//	continue // No need for followers to review Reveal Entry messages
-			//}
-			// Needs to be our VMIndex as well, or ignore.
-			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
-				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
-			}
-		}
 		//TODO: Move this earlier!
 		// We don't reprocess messages if we are a leader, but it ain't ours!
 		if s.LeaderVMIndex != v.GetVMIndex() {
@@ -583,6 +569,7 @@ func (s *State) AddDBState(isNew bool,
 	entries []interfaces.IEBEntry) *DBState {
 
 	dbheight := directoryBlock.GetHeader().GetDBHeight()
+
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
 	if dbState == nil {
@@ -784,9 +771,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): Saved %d dbht: %d", saved, dbheight))
 
-	pdbstate := s.DBStates.Get(int(dbheight - 1))
+	pdbstate := s.DBStates.Get(int(dbheight) - 1)
 
-	switch pdbstate.ValidNext(s, dbstatemsg) {
+	valid := pdbstate.ValidNext(s, dbstatemsg)
+	s.LogMessage("dbstates", fmt.Sprintf("valid=%d", valid), msg)
+	switch valid {
 	case 0:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
 
@@ -1503,6 +1492,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 		// Put it in our list of new Entry Blocks for this Directory Block
 		s.PutNewEBlocks(dbheight, chainID, eb)
 		s.PutNewEntries(dbheight, myhash, msg.Entry)
+
 		s.GetDB().StartMultiBatch()
 		s.GetDB().InsertEntryMultiBatch(msg.Entry)
 		s.GetDB().ExecuteMultiBatch()
@@ -1535,6 +1525,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	// Put it in our list of new Entry Blocks for this Directory Block
 	s.PutNewEBlocks(dbheight, chainID, eb)
 	s.PutNewEntries(dbheight, myhash, msg.Entry)
+
 	s.GetDB().StartMultiBatch()
 	s.GetDB().InsertEntryMultiBatch(msg.Entry)
 	s.GetDB().ExecuteMultiBatch()
@@ -2295,12 +2286,12 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-
 			pl.FactoidBalancesT[adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
 		} else {
 			s.LogPrintf("fct", "Drop, no process list")
 		}
+
 	} else {
 		s.FactoidBalancesPMutex.Lock()
 		s.FactoidBalancesP[adr] = v
@@ -2327,6 +2318,7 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		v, ok2 = s.ECBalancesP[adr]
 		s.ECBalancesPMutex.Unlock()
 	}
+
 	s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
 	return v
 

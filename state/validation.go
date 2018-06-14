@@ -137,8 +137,26 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 		// block waiting for a message to process
 		select {
 		case msg = <-eomQueue:
-		case msg = <-inMsgQueue:
-		case msg = <-inMsgQueue2:
+		default:
+		}
+		if msg == nil {
+			select {
+			case msg = <-inMsgQueue:
+			default:
+			}
+		}
+		if msg == nil {
+			select {
+			case msg = <-inMsgQueue2:
+			default:
+			}
+		}
+		if msg == nil {
+			select {
+			case msg = <-eomQueue:
+			case msg = <-inMsgQueue:
+			case msg = <-inMsgQueue2:
+			}
 		}
 		// Sort the messages.
 		if s.IsReplaying == true {
