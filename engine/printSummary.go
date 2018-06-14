@@ -41,6 +41,8 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		stateUpdateState += s.StateUpdateState
 		validatorLoopSleepCnt += s.ValidatorLoopSleepCnt
 	}
+	downscale := int64(5000 * len(fnodes))
+	prt += fmt.Sprintf("P=%8d PL=%8d US=%8d Z=%8d", stateProcessCnt/downscale, processListProcessCnt/downscale, stateUpdateState/downscale, validatorLoopSleepCnt/downscale)
 
 	var pnodes []*FactomNode
 	pnodes = append(pnodes, fnodes...)

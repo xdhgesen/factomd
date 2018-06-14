@@ -80,6 +80,7 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 			if !progress {
 				// No work? Sleep for a bit
 				time.Sleep(10 * time.Millisecond)
+				s.ValidatorLoopSleepCnt++
 			}
 
 		}

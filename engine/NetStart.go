@@ -520,11 +520,25 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	}
 
 	startServers(true)
-
+	if fnodes[0].State.DebugExec() && messages.CheckFileName("graphData.txt") {
+		go printGraphData("graphData.txt", 30)
+	}
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
 
 	SimControl(p.ListenTo, listenToStdin)
 
+}
+
+func printGraphData(filename string, period int) {
+	downscale := int64(1)
+	messages.LogPrintf(filename, "%8s:\t%9s\t%9s\t%9s\t%9s\t%9s", "Node", "Dbh-:-min", "ProcessCnt", "ListPCnt", "UpdateState", "SleepCnt")
+	for {
+		for _, f := range fnodes {
+			s := f.State
+			messages.LogPrintf(filename, "%8s:\t%9s\t%9d\t%9d\t%9d\t%9d", s.FactomNodeName, fmt.Sprintf("%d-:-%d", s.LLeaderHeight, s.CurrentMinute), s.StateProcessCnt/downscale, s.ProcessListProcessCnt/downscale, s.StateUpdateState/downscale, s.ValidatorLoopSleepCnt/downscale)
+		}
+		time.Sleep(time.Duration(period) * time.Second)
+	} // for ever ...
 }
 
 //**********************************************************************
