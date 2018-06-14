@@ -740,6 +740,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
+			s.ProcessListProcessCnt++
+
 			s.processCnt++
 			if s.DebugExec() {
 				x := p.decodeState(s.Syncing, s.DBSig, s.EOM, s.DBSigDone, s.EOMDone,
