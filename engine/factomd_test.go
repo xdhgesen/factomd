@@ -743,17 +743,17 @@ func TestMultiple3Election(t *testing.T) {
 	}
 
 	args := append([]string{},
-		"-db=Map",
-		"-network=LOCAL",
-		"-enablenet=true",
-		"-blktime=15",
-		"-count=12",
-		"-startdelay=1",
-		"-net=alot+",
-		"-debuglog=F.*",
-		"--stdoutlog=../out.txt",
-		"--stderrlog=../out.txt",
-		"-debugconsole=localhost:8093",
+		"--db=Map",
+		"--network=LOCAL",
+		"--enablenet=true",
+		"--blktime=15",
+		"--count=12",
+		"--startdelay=1",
+		"--net=alot+",
+		"--debuglog=F.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+		"--debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 
