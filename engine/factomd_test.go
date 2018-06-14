@@ -110,7 +110,7 @@ func TestSetupANetwork(t *testing.T) {
 		"--controlpanelport=37002",
 		"--networkport=37003",
 		"--startdelay=1",
-		"--debuglog=graph|system|faulting",
+		"--debuglog=.*|graph|system|faulting",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -518,7 +518,7 @@ func TestAnElection(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 
-	}
+}
 
 func Test5up(t *testing.T) {
 	if ranSimTest {
