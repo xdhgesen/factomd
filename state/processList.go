@@ -130,7 +130,10 @@ type VM struct {
 	// vm.WhenFaulted serves as a bool flag (if > 0, the vm is currently considered faulted)
 	FaultFlag   int                  // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
 	ProcessTime interfaces.Timestamp // Last time we made progress on this VM
+	VmIndex     int                  // the index of this MV
 	HighestAsk  int                  // highest ask sent to MMR for this VM
+	HighestNil  int                  // Debug highest nil reported
+	p           *ProcessList         // processList this VM part of
 }
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
@@ -829,18 +832,23 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 	return
 }
 
-func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
-	if !(uint32(len(p.VMs[vmIndex].List)) > height) {
-		p.State.LogMessage("processList", fmt.Sprintf("TrimVMList() %d/%d/%d", p.DBHeight, vmIndex, height), p.VMs[vmIndex].List[height])
+func (p *ProcessList) TrimVMList(h uint32, vmIndex int) {
+	height := int(h)
+	if len(p.VMs[vmIndex].List) < height {
+		p.State.LogPrintf("processList", "TrimVMList() %d/%d/%d", p.DBHeight, vmIndex, height)
 		p.VMs[vmIndex].List = p.VMs[vmIndex].List[:height]
-		p.VMs[vmIndex].HighestAsk = int(height) // make sure we will ask again for nil's above this height
 		if p.State.DebugExec() {
-			p.nilListMutex.Lock()
-			if p.nilList[vmIndex] > int(height-1) {
-				p.nilList[vmIndex] = int(height - 1) // Drag the highest nil logged back before this nil
+			if p.VMs[vmIndex].HighestNil > height {
+				p.VMs[vmIndex].HighestNil = height // Drag report limit back
 			}
-			p.nilListMutex.Unlock()
 		}
+		// make sure we will ask again for nil's above this height
+		if p.VMs[vmIndex].HighestAsk > height {
+			p.VMs[vmIndex].HighestAsk = height // Drag Ask limit back
+		}
+	} else {
+		p.State.LogPrintf("process", "Attempt to trim higher than list list=%d h=%d", len(p.VMs[vmIndex].List), height)
+
 	}
 }
 func (p *ProcessList) GetDBHeight() uint32 {
@@ -914,8 +922,6 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 }
 
-var nillist map[int]int = make(map[int]int)
-
 // Process messages and update our state.
 func (p *ProcessList) Process(state *State) (progress bool) {
 	dbht := state.GetHighestSavedBlk()
@@ -964,10 +970,10 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 						p.Ask(i, uint32(k), 10) // Ask 10ms
 					}
 				}
-				if p.State.DebugExec() {
-					if nillist[i] < j {
-						p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
-						nillist[i] = j
+				if state.DebugExec() {
+					if vm.HighestNil < j {
+						state.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
+						vm.HighestNil = j
 					}
 				}
 
@@ -989,6 +995,12 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if err != nil {
 					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
 					vm.List[j] = nil
+					if vm.HighestNil > j {
+						vm.HighestNil = j // Drag report limit back
+					}
+					if vm.HighestAsk > j {
+						vm.HighestAsk = j // Drag Ask limit back
+					}
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					break VMListLoop
@@ -1031,8 +1043,13 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
-					vm.HighestAsk = j // have to be able to ask for this again
-					
+					if vm.HighestNil > j {
+						vm.HighestNil = j // Drag report limit back
+					}
+					if vm.HighestAsk > j {
+						vm.HighestAsk = j // Drag Ask limit back
+					}
+
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					// If we ask won't we just get the same thing back?
 					break VMListLoop
@@ -1070,9 +1087,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 			} else {
 				// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
 				// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, state.EntryDBHeightComplete))
-				if extraDebug {
-					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", state.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
-				}
+				p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", state.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
 				break VMListLoop
 			}
 		}
@@ -1372,6 +1387,8 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.VMs[i].Synced = true
 		pl.VMs[i].WhenFaulted = 0
 		pl.VMs[i].ProcessTime = now
+		pl.VMs[i].VmIndex = i
+		pl.VMs[i].p = pl
 	}
 
 	pl.DBHeight = dbheight

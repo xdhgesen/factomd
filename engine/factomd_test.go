@@ -105,7 +105,7 @@ func TestSetupANetwork(t *testing.T) {
 		"--roundtimeout=4",
 		"--count=10",
 		"--startdelay=1",
-		//"--debuglog=.*|faulting|duplicate|Network|systemStatus",
+		"--debuglog=.*|faulting|duplicate|Network|systemStatus",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 	)
@@ -481,7 +481,6 @@ func TestAnElection(t *testing.T) {
 
 	CheckAuthoritySet(leaders, audits, t)
 
-
 	runCmd(fmt.Sprintf("%d", leaders-1))
 	runCmd("x")
 	WaitBlocks(state0, 3)
@@ -549,7 +548,7 @@ func Test5up(t *testing.T) {
 		"--enablenet=true",
 		"--blktime=8",
 		"--faulttimeout=8",
-                "--roundtimeout=4",
+		"--roundtimeout=4",
 		"--enablenet=false",
 		//"--debugconsole=localhost",
 		"--startdelay=5",

@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"runtime"
 	"runtime/debug"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -60,7 +59,7 @@ func (h *Hash) MarshalText() (rval []byte, err error) {
 			fmt.Fprintf(os.Stderr, "Hash.MarshalText err:%v", *pe)
 		}
 	}(&err)
-if h == nil {
+	if h == nil {
 		fmt.Fprintf(os.Stderr, "Marshall nil Hash")
 	}
 	return []byte(hex.EncodeToString(h[:])), nil
@@ -131,7 +130,7 @@ func CreateHash(entities ...interfaces.BinaryMarshallable) (h interfaces.IHash, 
 		}
 		sha.Write(data)
 	}
-	h := new(Hash)
+	h = new(Hash)
 	h.SetBytes(sha.Sum(nil))
 	return h, nil
 }

@@ -473,7 +473,7 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-			v.SendOut(s, v)
+		v.SendOut(s, v)
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if okre {
 			if !s.NoEntryYet(v.GetHash(), s.GetLeaderTimestamp()) {
@@ -980,10 +980,10 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 		s.LogMessage("executeMsg", "FollowerExecute3", msg)
 		msg.FollowerExecute(s)
 
-	s.LogMessage("executeMsg", "FollowerExecute4", ack)
-	ack.FollowerExecute(s)
+		s.LogMessage("executeMsg", "FollowerExecute4", ack)
+		ack.FollowerExecute(s)
 
-	s.MissingResponseAppliedCnt++
+		s.MissingResponseAppliedCnt++
 
 	}
 }
@@ -2253,16 +2253,14 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			defer pl.FactoidBalancesTMutex.Unlock()
 			v, ok = pl.FactoidBalancesT[adr]
 			pl.FactoidBalancesTMutex.Unlock()
 		} else {
-			defer s.LogPrintf("fct", "Oops, no process list")
+			s.LogPrintf("fct", "Oops, no process list")
 		}
 	}
 	if !ok {
 		s.FactoidBalancesPMutex.Lock()
-		defer s.FactoidBalancesPMutex.Unlock()
 		v = s.FactoidBalancesP[adr]
 		s.FactoidBalancesPMutex.Unlock()
 	}
@@ -2279,16 +2277,15 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			defer pl.FactoidBalancesTMutex.Unlock()
-
 			pl.FactoidBalancesT[adr] = v
+			pl.FactoidBalancesTMutex.Unlock()
 		} else {
 			s.LogPrintf("fct", "Drop, no process list")
 		}
 	} else {
 		s.FactoidBalancesPMutex.Lock()
-		defer s.FactoidBalancesPMutex.Unlock()
 		s.FactoidBalancesP[adr] = v
+		s.FactoidBalancesPMutex.Unlock()
 	}
 }
 
@@ -2298,12 +2295,11 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
-			defer pl.ECBalancesTMutex.Unlock()
 			v, ok = pl.ECBalancesT[adr]
 			pl.ECBalancesTMutex.Unlock()
 
 		} else {
-			defer s.LogPrintf("ec", "Oops, no process list")
+			s.LogPrintf("ec", "Oops, no process list")
 		}
 	}
 	ok2 := false
@@ -2324,15 +2320,15 @@ func (s *State) PutE(rt bool, adr [32]byte, v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
-			defer pl.ECBalancesTMutex.Unlock()
 			pl.ECBalancesT[adr] = v
+			pl.ECBalancesTMutex.Unlock()
 		} else {
 			s.LogPrintf("ec", "Drop, no process list")
 		}
 	} else {
 		s.ECBalancesPMutex.Lock()
-		defer s.ECBalancesPMutex.Unlock()
 		s.ECBalancesP[adr] = v
+		s.ECBalancesPMutex.Unlock()
 	}
 }
 

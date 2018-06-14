@@ -40,6 +40,7 @@ type MessageBase struct {
 	MarkInvalid bool
 	Sigvalid    bool
 }
+
 func (m *MessageBase) StringOfMsgBase() string {
 
 	rval := fmt.Sprintf("origin %s(%d), LChain=%x resendCnt=%d", m.NetworkOrigin, m.Origin, m.LeaderChainID.Bytes()[3:6], m.ResendCnt)
@@ -65,8 +66,6 @@ func (m *MessageBase) StringOfMsgBase() string {
 	return rval
 }
 
-
-
 var mu sync.Mutex // lock for debug struct
 
 // keep the last N messages sent by each node
@@ -77,6 +76,7 @@ type msgHistory struct {
 	h       int               // head of history
 	msgmap  map[[32]byte]interfaces.IMsg
 }
+
 func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string) {
 	f.mu.Lock()
 	if f.history == nil {
@@ -95,6 +95,7 @@ func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string) {
 	f.h = (f.h + 1) % cap(f.history) // move the head
 	f.mu.Unlock()
 }
+
 func (f *msgHistory) getmsg(hash [32]byte) (what interfaces.IMsg, where string, ok bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -145,6 +146,9 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	if msg.IsLocal() {
 		return // don't send local messages
 	}
+	if msg.GetNoResend() {
+		return // don't send no resend messages messages
+	}
 	// Are we ever modifying a message?
 	if m.ResendCnt > 4 { // If the first send fails, we need to try again
 		return
@@ -153,26 +157,24 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 
 	if m.ResendCnt > 0 && !msg.IsPeer2Peer() { // If the first send fails, we need to try again
 		if now-m.resend < 2000 {
-			//			s.LogPrintf("NetworkOutputsCall", "too soon")
+			s.LogPrintf("NetworkOutputsCall", "too soon")
 			return
 		}
 		if s.NetworkOutMsgQueue().Length() > s.NetworkOutMsgQueue().Cap()*99/100 {
-			//			s.LogPrintf("NetworkOutputsCall", "too full
+			s.LogPrintf("NetworkOutputsCall", "too full")
 			return
 		}
 	}
-			s.LogPrintf("NetworkOutputsCall", "too soon")
-	m.resend = now
-	sends++
 
-			s.LogPrintf("NetworkOutputsCall", "too full")
-	//	whereAmIString := atomic.WhereAmIString(1)
-	//	hash := msg.GetRepeatHash().Fixed()
-	//	mu.Lock()
 	m1, m2 := fmt.Sprintf("%p", m), fmt.Sprintf("%p", msg)
 
 	if m1 != m2 {
 		panic("mismatch")
+	}
+
+	m.ResendCnt++
+	m.resend = now
+	sends++
 	// debug code start ............
 	if !msg.IsPeer2Peer() && s.DebugExec() && s.CheckFileName(logname) { // if debug is on and this logfile is enabled
 		checkForDuplicateSend(s, msg, atomic.WhereAmIString(1))
@@ -183,6 +185,7 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	// Add this to the network replay filter so we don't bother processing any echos
 	s.AddToReplayFilter(constants.NETWORK_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 }
+
 func (m *MessageBase) GetResendCnt() int {
 	return m.ResendCnt
 }
@@ -214,9 +217,7 @@ func (m *MessageBase) SentInvalid() bool {
 }
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
-func (m *MessageBase) Resend(s interfaces.IState) (rtn bool) {
-		return true
-}
+func (m *MessageBase) Resend(s interfaces.IState) bool { return true }
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
 func (m *MessageBase) Expire(s interfaces.IState) (rtn bool) {
@@ -233,6 +234,7 @@ func (m *MessageBase) Expire(s interfaces.IState) (rtn bool) {
 func (m *MessageBase) IsStalled() bool {
 	return m.Stalled
 }
+
 func (m *MessageBase) SetStall(b bool) {
 	m.Stalled = b
 }
@@ -288,6 +290,7 @@ func (m *MessageBase) IsFullBroadcast() bool {
 func (m *MessageBase) SetFullBroadcast(v bool) {
 	m.FullBroadcast = v
 }
+
 func (m *MessageBase) GetLeaderChainID() interfaces.IHash {
 	if m.LeaderChainID == nil {
 		m.LeaderChainID = primitives.NewZeroHash()
