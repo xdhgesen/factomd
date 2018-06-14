@@ -240,7 +240,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesReceived(i))
 		}
 		prt = prt + "\nSent:"
-		for i := 0; i < NumMsgTypes/2; i++ {
+		for i := 0; i < int(constants.NUM_MESSAGES); i++ {
 			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesSent(i))
 		}
 		prt = prt + "\nType:"

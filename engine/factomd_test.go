@@ -22,10 +22,10 @@ func StatusEveryMinute(s *state.State) {
 	go func() {
 		for {
 			newMinute := (s.CurrentMinute + 1) % 10
-			timeout := globals.Params.BlkTime * 80 // timeout if a minutes takes twice as long as expected
+			timeout := 8 // timeout if a minutes takes twice as long as expected
 			for s.CurrentMinute != newMinute && timeout > 0 {
-				time.Sleep(time.Duration(globals.Params.BlkTime/40) * time.Millisecond) // wake up and about 4 times per minute
-				timeout--
+				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute				timeout--
 			}
 			if timeout <= 0 {
 				fmt.Println("Stalled !!!")
@@ -104,10 +104,12 @@ func TestSetupANetwork(t *testing.T) {
 		"--faulttimeout=8",
 		"--roundtimeout=4",
 		"--count=10",
+
 		"--startdelay=1",
-		"--debuglog=.*|faulting|duplicate|Network|systemStatus",
+		//"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
+		"--checkheads=false",
 	)
 
 	params := ParseCmdLine(args)
@@ -253,7 +255,6 @@ func TestSetupANetwork(t *testing.T) {
 	}
 
 }
-
 func TestLoad(t *testing.T) {
 	if ranSimTest {
 		return
@@ -326,6 +327,7 @@ func TestLoad(t *testing.T) {
 	runCmd("R0") // Stop load
 
 } // testLoad(){...}
+
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
 		return
@@ -519,7 +521,6 @@ func TestAnElection(t *testing.T) {
 	}
 
 }
-
 func Test5up(t *testing.T) {
 	if ranSimTest {
 		return
@@ -636,6 +637,7 @@ func Test5up(t *testing.T) {
 	}
 
 }
+
 func TestMultiple2Election(t *testing.T) {
 	if ranSimTest {
 		return
@@ -647,7 +649,6 @@ func TestMultiple2Election(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
@@ -660,38 +661,38 @@ func TestMultiple2Election(t *testing.T) {
 		"--count=10",
 		"--startdelay=1",
 		"--net=alot+",
-		//"--debuglog=F.*",
+		"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
-		//"--debugconsole=localhost:8093",
 		"--checkheads=false",
+		//		"-debugconsole=localhost:8093",
 	)
 
 	params := ParseCmdLine(args)
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
-	time.Sleep(3 * time.Second)
+	time.Sleep(10 * time.Second)
 	StatusEveryMinute(state0)
-	t.Log("Allocated 10 nodes")
-	if len(GetFnodes()) != 10 {
-		t.Fatal("Should have allocated 10 nodes")
+	t.Log("Allocated 7 nodes")
+	if len(GetFnodes()) != 7 {
+		t.Fatal("Should have allocated 7 nodes")
 		t.Fail()
 	}
 
 	WaitForMinute(state0, 3)
-	runCmd("g15")
+	runCmd("g7")
 	WaitBlocks(state0, 1)
 	// Allocate 1 leaders
 	WaitForMinute(state0, 1)
 
-	runCmd("1")              // select node 1
-	for i := 0; i < 6; i++ { // 1, 2, 3, 4, 5, 6
-		runCmd("l") // leaders
-	}
-
-	for i := 0; i < 2; i++ { // 8, 9
-		runCmd("o") // leaders
-	}
+	runCmd("0")
+	runCmd("l") // leaders
+	runCmd("l") // leaders
+	runCmd("l") // leaders
+	runCmd("o") // Audit
+	runCmd("o") // Audit
+	runCmd("l") // leaders
+	runCmd("l") // leaders
 
 	WaitBlocks(state0, 1)
 	WaitForMinute(state0, 2)
@@ -709,21 +710,15 @@ func TestMultiple2Election(t *testing.T) {
 		}
 	}
 
-	if leadercnt != 7 {
-		t.Fatalf("found %d leaders, expected 7", leadercnt)
+	if leadercnt != 5 {
+		t.Fatalf("found %d leaders, expected 5", leadercnt)
 	}
 
-	runCmd("1")
-	runCmd("x")
-	runCmd("2")
-	runCmd("x")
-
-	runCmd("s")
-	runCmd("E")
-	runCmd("F")
-	runCmd("0")
-	runCmd("p")
-	WaitBlocks(state0, 3)
+	runCmd("S300")
+	runCmd("R10")
+	WaitBlocks(state0, 10)
+	runCmd("R0")
+	WaitBlocks(state0, 2)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
@@ -748,19 +743,17 @@ func TestMultiple3Election(t *testing.T) {
 	}
 
 	args := append([]string{},
-		"--db=Map",
-		"--network=LOCAL",
-		"--enablenet=true",
-		"--blktime=15",
-		"--faulttimeout=8",
-		"--roundtimeout=4",
-		"--count=12",
-		"--startdelay=1",
-		"--net=alot+",
-		//"--debuglog=F.*",
-		"--stdoutlog=out.txt",
-		"--stderrlog=err.txt",
-		//"--debugconsole=localhost:8093",
+		"-db=Map",
+		"-network=LOCAL",
+		"-enablenet=true",
+		"-blktime=15",
+		"-count=12",
+		"-startdelay=1",
+		"-net=alot+",
+		"-debuglog=F.*",
+		"--stdoutlog=../out.txt",
+		"--stderrlog=../out.txt",
+		"-debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 

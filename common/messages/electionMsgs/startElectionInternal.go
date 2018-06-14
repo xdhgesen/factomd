@@ -82,7 +82,6 @@ func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	// TODO: This is incase a leader sends out ack 10, but not 9. We need to trim back to 8 because 9 does not exist
 	// TODO: Do not trim EOMs or DBsigs, as they may not be processed until certain conditions.
 
-	// this trim stuff was badly ordered and failed even the simple tests cases so it is removed.
 	//end := len(vm.List)
 	//if end > vm.Height {
 	//	for _, msg := range vm.List[vm.Height:] {

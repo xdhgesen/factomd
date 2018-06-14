@@ -98,6 +98,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		if !msg.IsLocal() && !msg.IsPeer2Peer() {
 			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
 		}
+
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
 				delete(s.Holding, msg.GetHash().Fixed())
@@ -206,8 +207,9 @@ func (s *State) Process() (progress bool) {
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
 	}
 
-	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
+	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
+
 	if !s.RunLeader {
 		if now-s.StartDelay > s.StartDelayLimit {
 			if s.DBFinished == true {
@@ -541,6 +543,22 @@ func (s *State) ReviewHolding() {
 			}
 		}
 
+		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
+		if re, ok := v.(*messages.RevealEntryMsg); ok {
+			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
+				delete(s.Holding, re.GetHash().Fixed())
+				s.Commits.Delete(re.GetHash().Fixed())
+				continue
+			}
+			// Only reprocess if at the top of a new minute, and if we are a leader.
+			//if processMinute > 10 {
+			//	continue // No need for followers to review Reveal Entry messages
+			//}
+			// Needs to be our VMIndex as well, or ignore.
+			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
+				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+			}
+		}
 		//TODO: Move this earlier!
 		// We don't reprocess messages if we are a leader, but it ain't ours!
 		if s.LeaderVMIndex != v.GetVMIndex() {
@@ -2277,6 +2295,7 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
+
 			pl.FactoidBalancesT[adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
 		} else {

@@ -141,7 +141,6 @@ func checkForDuplicateSend(s interfaces.IState, msg interfaces.IMsg, whereAmI st
 		f.addmsg(hash, msg, whereAmI)
 	}
 }
-
 func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	if msg.IsLocal() {
 		return // don't send local messages
@@ -171,15 +170,16 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	if m1 != m2 {
 		panic("mismatch")
 	}
-
 	m.ResendCnt++
 	m.resend = now
 	sends++
+
 	// debug code start ............
 	if !msg.IsPeer2Peer() && s.DebugExec() && s.CheckFileName(logname) { // if debug is on and this logfile is enabled
 		checkForDuplicateSend(s, msg, atomic.WhereAmIString(1))
 	}
 	// debug code end ............
+
 	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 	s.NetworkOutMsgQueue().Enqueue(msg)
 	// Add this to the network replay filter so we don't bother processing any echos
@@ -234,7 +234,6 @@ func (m *MessageBase) Expire(s interfaces.IState) (rtn bool) {
 func (m *MessageBase) IsStalled() bool {
 	return m.Stalled
 }
-
 func (m *MessageBase) SetStall(b bool) {
 	m.Stalled = b
 }
@@ -290,7 +289,6 @@ func (m *MessageBase) IsFullBroadcast() bool {
 func (m *MessageBase) SetFullBroadcast(v bool) {
 	m.FullBroadcast = v
 }
-
 func (m *MessageBase) GetLeaderChainID() interfaces.IHash {
 	if m.LeaderChainID == nil {
 		m.LeaderChainID = primitives.NewZeroHash()
