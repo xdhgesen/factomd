@@ -105,9 +105,6 @@ type ProcessList struct {
 	asks chan askRef   // Requests to ask for missing messages
 	adds chan plRef    // notices of slots filled in the process list
 	done chan struct{} // Notice that this DBHeight is done
-	// debug -- highest nil seen and reported in processlist
-	nilListMutex sync.Mutex
-	nilList      map[int]int
 }
 
 var _ interfaces.IProcessList = (*ProcessList)(nil)
@@ -747,7 +744,6 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			addAdd(add)
 
 		case now := <-ticker:
-			p.State.GetLeaderHeight()
 			addAllAsks()     // process all pending asks before any adds
 			addAllAdds()     // process all pending add before any ticks
 			readAllTickers() // drain the ticker channel
@@ -824,14 +820,12 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 		}
 	}
 
-	if p.asks != nil { // If it is nil, there is no makemmrs
 	// always ask for one past the end as well...Can't hurt ... Famous last words...
 	ask := askRef{plRef{p.DBHeight, vmIndex, uint32(lenVMList)}, now + delay}
 	p.asks <- ask
 
 	vm.HighestAsk = int(lenVMList) + 1 // We have asked for all nils up to this height
 
-	}
 	return
 }
 
@@ -920,7 +914,7 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 }
 
-var extraDebug bool = false
+var nillist map[int]int = make(map[int]int)
 
 // Process messages and update our state.
 func (p *ProcessList) Process(state *State) (progress bool) {
@@ -961,9 +955,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					state.SyncingState[state.SyncingStateCurrent] = x
 				}
 			}
-			if extraDebug {
-				p.State.LogMessage("process", fmt.Sprintf("Consider %v/%v/%v", p.DBHeight, i, j), vm.List[j])
-			}
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
 				cnt := 0
@@ -974,12 +965,10 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					}
 				}
 				if p.State.DebugExec() {
-					p.nilListMutex.Lock()
-					if p.nilList[i] < j {
+					if nillist[i] < j {
 						p.State.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
-						p.nilList[i] = j
+						nillist[i] = j
 					}
-					p.nilListMutex.Unlock()
 				}
 
 				//				p.State.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
@@ -1000,14 +989,6 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 				if err != nil {
 					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
 					vm.List[j] = nil
-					vm.HighestAsk = j // have to be able to ask for this again
-					if p.State.DebugExec() {
-						p.nilListMutex.Lock()
-						if p.nilList[i] > j-1 {
-							p.nilList[i] = j - 1 // Drag the highest nil logged back before this nil
-						}
-						p.nilListMutex.Unlock()
-					}
 					//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					break VMListLoop
@@ -1051,13 +1032,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					vm.HighestAsk = j // have to be able to ask for this again
-					if p.State.DebugExec() {
-						p.nilListMutex.Lock()
-						if p.nilList[i] > j-1 {
-							p.nilList[i] = j - 1 // Drag the highest nil logged back before this nil
-						}
-						p.nilListMutex.Unlock()
-					}
+					
 					p.Ask(i, uint32(j), 3000) // 3 second delay
 					// If we ask won't we just get the same thing back?
 					break VMListLoop
@@ -1232,11 +1207,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
-	if p.State.DebugExec() {
-		p.nilListMutex.Lock()
-		delete(p.nilList, int(ack.Height)) // Notify if this is ever nil again
-		p.nilListMutex.Unlock()
-	}
 	p.AddOldMsgs(m)
 	p.OldAcks[msgHash.Fixed()] = ack
 
@@ -1447,7 +1417,6 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.adds = nil
 		pl.done = nil
 	}
-	pl.nilList = make(map[int]int)
 	return pl
 }
 

@@ -38,6 +38,10 @@ func RandomHash() interfaces.IHash {
 }
 
 func (c *Hash) Copy() interfaces.IHash {
+	if c == nil {
+		fmt.Fprintf(os.Stderr, "Copy nil Hash")
+		return nil
+	}
 	h := new(Hash)
 	err := h.SetBytes(c.Bytes())
 	if err != nil {
@@ -56,6 +60,9 @@ func (h *Hash) MarshalText() (rval []byte, err error) {
 			fmt.Fprintf(os.Stderr, "Hash.MarshalText err:%v", *pe)
 		}
 	}(&err)
+if h == nil {
+		fmt.Fprintf(os.Stderr, "Marshall nil Hash")
+	}
 	return []byte(hex.EncodeToString(h[:])), nil
 }
 
@@ -67,6 +74,9 @@ func (h *Hash) IsZero() bool {
 // the hexadecimal string of a byte-reversed hash, but any missing characters
 // result in zero padding at the end of the ShaHash.
 func NewShaHashFromStr(hash string) (*Hash, error) {
+	if len(hash) != 2*constants.HASH_LENGTH {
+		fmt.Fprintf(os.Stderr, "Hash String wrong size!")
+	}
 	h := new(Hash)
 	err := h.UnmarshalText([]byte(hash))
 	if err != nil {
@@ -87,7 +97,6 @@ func (h *Hash) UnmarshalText(b []byte) error {
 func (h *Hash) Fixed() [constants.HASH_LENGTH]byte {
 	// Might change the error produced by IHash in FD-398
 	if h == nil {
-		runtime.Breakpoint()
 		panic("nil Hash")
 	}
 	return *h
@@ -109,13 +118,12 @@ func (h *Hash) Bytes() (rval []byte) {
 	return h.GetBytes()
 }
 
-func (Hash) GetHash() interfaces.IHash {
-	return nil
-}
+//func (Hash) GetHash() interfaces.IHash {
+//	return nil
+//}
 
 func CreateHash(entities ...interfaces.BinaryMarshallable) (h interfaces.IHash, err error) {
 	sha := sha256.New()
-	h = new(Hash)
 	for _, entity := range entities {
 		data, err := entity.MarshalBinary()
 		if err != nil {
@@ -123,8 +131,9 @@ func CreateHash(entities ...interfaces.BinaryMarshallable) (h interfaces.IHash, 
 		}
 		sha.Write(data)
 	}
+	h := new(Hash)
 	h.SetBytes(sha.Sum(nil))
-	return
+	return h, nil
 }
 
 func (h *Hash) MarshalBinary() (rval []byte, err error) {
@@ -144,7 +153,7 @@ func (h *Hash) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	}()
 	copy(h[:], p)
 	newData = p[constants.HASH_LENGTH:]
-	return
+	return newData, nil
 }
 
 func (h *Hash) UnmarshalBinary(p []byte) (err error) {
@@ -156,6 +165,9 @@ func (h *Hash) UnmarshalBinary(p []byte) (err error) {
 // reflected in the source hash.  You have to do a SetBytes to change the source
 // value.
 func (h *Hash) GetBytes() []byte {
+	if h == nil {
+		return nil
+	}
 	newHash := make([]byte, constants.HASH_LENGTH)
 	copy(newHash, h[:])
 
@@ -181,7 +193,7 @@ func NewShaHash(newHash []byte) (*Hash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &sh, err
+	return &sh, nil
 }
 
 // Create a Sha512[:256] Hash from a byte array
@@ -196,8 +208,9 @@ func Sha512Half(p []byte) (h *Hash) {
 
 // Convert a hash into a string with hex encoding
 func (h *Hash) String() string {
+	// Maybe should return "-nil-" and check over in the HexToHash for "-nil-"?
 	if h == nil {
-		return hex.EncodeToString(nil)
+		return ""
 	} else {
 		return hex.EncodeToString(h[:])
 	}

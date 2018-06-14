@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -39,7 +40,6 @@ type MessageBase struct {
 	MarkInvalid bool
 	Sigvalid    bool
 }
-
 func (m *MessageBase) StringOfMsgBase() string {
 
 	rval := fmt.Sprintf("origin %s(%d), LChain=%x resendCnt=%d", m.NetworkOrigin, m.Origin, m.LeaderChainID.Bytes()[3:6], m.ResendCnt)
@@ -65,6 +65,8 @@ func (m *MessageBase) StringOfMsgBase() string {
 	return rval
 }
 
+
+
 var mu sync.Mutex // lock for debug struct
 
 // keep the last N messages sent by each node
@@ -75,7 +77,6 @@ type msgHistory struct {
 	h       int               // head of history
 	msgmap  map[[32]byte]interfaces.IMsg
 }
-
 func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string) {
 	f.mu.Lock()
 	if f.history == nil {
@@ -94,7 +95,6 @@ func (f *msgHistory) addmsg(hash [32]byte, msg interfaces.IMsg, where string) {
 	f.h = (f.h + 1) % cap(f.history) // move the head
 	f.mu.Unlock()
 }
-
 func (f *msgHistory) getmsg(hash [32]byte) (what interfaces.IMsg, where string, ok bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -129,7 +129,7 @@ func checkForDuplicateSend(s interfaces.IState, msg interfaces.IMsg, whereAmI st
 	what, where, ok := f.getmsg(hash)
 	if ok {
 		duplicate++
-		s.LogPrintf(logname, "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:4], sends, duplicate, unique)
+		s.LogPrintf(logname, "Duplicate Send of R-%x (%d sends, %d duplicates, %d unique)", msg.GetRepeatHash().Bytes()[:3], sends, duplicate, unique)
 		s.LogPrintf(logname, "Original: %p: %s", what, where)
 		s.LogPrintf(logname, "This:     %p: %s", msg, whereAmI)
 		s.LogMessage(logname, "Orig Message:", what)
@@ -151,15 +151,7 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	}
 	now := s.GetTimestamp().GetTimeMilli()
 
-	comment := fmt.Sprintf("Enqueue %v %v", m.ResendCnt, now-m.resend)
-	s.LogMessage("NetworkOutputsCall", comment, msg)
-
-	if m.ResendCnt > 1 { // If the first send fails, we need to try again
-		//block := s.GetHighestKnownBlock()
-		//blk := s.GetHighestSavedBlk()
-		//if block-blk > 4 {
-		//	return // don't resend when we are behind by more than a block
-		//}
+	if m.ResendCnt > 0 && !msg.IsPeer2Peer() { // If the first send fails, we need to try again
 		if now-m.resend < 2000 {
 			//			s.LogPrintf("NetworkOutputsCall", "too soon")
 			return
@@ -169,19 +161,28 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 			return
 		}
 	}
-	m.ResendCnt++
+			s.LogPrintf("NetworkOutputsCall", "too soon")
 	m.resend = now
 	sends++
 
+			s.LogPrintf("NetworkOutputsCall", "too full")
+	//	whereAmIString := atomic.WhereAmIString(1)
+	//	hash := msg.GetRepeatHash().Fixed()
+	//	mu.Lock()
+	m1, m2 := fmt.Sprintf("%p", m), fmt.Sprintf("%p", msg)
+
+	if m1 != m2 {
+		panic("mismatch")
 	// debug code start ............
-	if s.DebugExec() /* && s.CheckFileName(logname)*/ { // if debug is on and this logfile is enabled
+	if !msg.IsPeer2Peer() && s.DebugExec() && s.CheckFileName(logname) { // if debug is on and this logfile is enabled
 		checkForDuplicateSend(s, msg, atomic.WhereAmIString(1))
 	}
 	// debug code end ............
-	s.LogMessage("NetworkOutputs", comment, msg)
+	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 	s.NetworkOutMsgQueue().Enqueue(msg)
+	// Add this to the network replay filter so we don't bother processing any echos
+	s.AddToReplayFilter(constants.NETWORK_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 }
-
 func (m *MessageBase) GetResendCnt() int {
 	return m.ResendCnt
 }
@@ -214,8 +215,7 @@ func (m *MessageBase) SentInvalid() bool {
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
 func (m *MessageBase) Resend(s interfaces.IState) (rtn bool) {
-	return true
-
+		return true
 }
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.

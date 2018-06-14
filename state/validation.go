@@ -43,6 +43,7 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 					status += fmt.Sprintf("Acks %d ", len(s.AcksMap))
 					status += fmt.Sprintf("MsgQueue %d ", len(s.msgQueue))
 					status += fmt.Sprintf("InMsgQueue %d ", s.inMsgQueue.Length())
+                                        status += fmt.Sprintf("InMsgQueue2 %d ", state.inMsgQueue2.Length())
 					status += fmt.Sprintf("APIQueue   %d ", s.apiQueue.Length())
 					status += fmt.Sprintf("AckQueue %d ", len(s.ackQueue))
 					status += fmt.Sprintf("TimerMsgQueue %d ", len(s.timerMsgQueue))
