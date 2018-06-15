@@ -238,39 +238,53 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 	if f.State.MessageTally {
 		prt = prt + "\nType:"
 		NumMsgTypes := int(constants.NUM_MESSAGES)
-		for i := 0; i < NumMsgTypes/2; i++ {
-			prt = prt + fmt.Sprintf("%5d ", i)
+		for i := 0; i < NumMsgTypes/3; i++ {
+			prt = prt + fmt.Sprintf("%8s(%2d) ", constants.ShortMessageName(byte(i)), i)
 		}
 		prt = prt + "\nRecd:"
 
-		for i := 0; i < NumMsgTypes/2; i++ {
-			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesReceived(i))
+		for i := 0; i < NumMsgTypes/3; i++ {
+			prt = prt + fmt.Sprintf("%12d ", f.State.GetMessageTalliesReceived(i))
 		}
 		prt = prt + "\nSent:"
-		for i := 0; i < int(constants.NUM_MESSAGES); i++ {
-			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesSent(i))
+		for i := 0; i < NumMsgTypes/3; i++ {
+			prt = prt + fmt.Sprintf("%12d ", f.State.GetMessageTalliesSent(i))
 		}
-		prt = prt + "\nType:"
-		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
-			prt = prt + fmt.Sprintf("%5d ", i)
+		prt = prt + "\n\nType:"
+		for i := NumMsgTypes / 3; i < 2*NumMsgTypes/3; i++ {
+			prt = prt + fmt.Sprintf("%8s(%2d) ", constants.ShortMessageName(byte(i)), i)
 		}
 		prt = prt + "\nRecd:"
 
-		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
-			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesReceived(i))
+		for i := NumMsgTypes / 3; i < 2*NumMsgTypes/3; i++ {
+			prt = prt + fmt.Sprintf("%12d ", f.State.GetMessageTalliesReceived(i))
 		}
 		prt = prt + "\nSent:"
-		for i := NumMsgTypes / 2; i < NumMsgTypes; i++ {
-			prt = prt + fmt.Sprintf("%5d ", f.State.GetMessageTalliesSent(i))
+		for i := NumMsgTypes / 3; i < 2*NumMsgTypes/3; i++ {
+			prt = prt + fmt.Sprintf("%12d ", f.State.GetMessageTalliesSent(i))
+		}
+
+		prt = prt + "\n\nType:"
+		for i := 2 * NumMsgTypes / 3; i < NumMsgTypes; i++ {
+			prt = prt + fmt.Sprintf("%8s(%2d) ", constants.ShortMessageName(byte(i)), i)
+	}
+		prt = prt + "\nRecd:"
+
+		for i := 2 * NumMsgTypes / 3; i < NumMsgTypes; i++ {
+			prt = prt + fmt.Sprintf("%12d ", f.State.GetMessageTalliesReceived(i))
+		}
+		prt = prt + "\nSent:"
+		for i := 2 * NumMsgTypes / 3; i < NumMsgTypes; i++ {
+			prt = prt + fmt.Sprintf("%12d ", f.State.GetMessageTalliesSent(i))
 		}
 
 	}
-	prt = prt + "\n" + SystemFaults(f)
+	prt = prt + "\n" + systemFaults(f)
 
-	prt = prt + FaultSummary()
+	prt = prt + faultSummary()
 
 	lastdiff := ""
-	if VerboseAuthoritySet {
+	if verboseAuthoritySet {
 		lastdelta := pnodes[0].State.GetAuthoritySetString()
 		for i, f := range pnodes {
 			prt = prt + "\n"
@@ -308,7 +322,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		prt = prt + "\n"
 	}
 
-	if VerboseAuthorityDeltas {
+	if verboseAuthorityDeltas {
 		prt = prt + "AuthorityDeltas:"
 
 		for _, f := range pnodes {

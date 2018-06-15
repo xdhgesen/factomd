@@ -93,7 +93,6 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd := func(cmd string) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
@@ -260,6 +259,7 @@ func TestSetupANetwork(t *testing.T) {
 	}
 
 }
+
 func TestLoad(t *testing.T) {
 	if ranSimTest {
 		return
@@ -271,18 +271,17 @@ func TestLoad(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
 	args := append([]string{},
-		"-db=Map",
-		"-network=LOCAL",
-		"-enablenet=true",
-		"-blktime=10",
-		"-count=3",
-		"-startdelay=1",
-		//"-debuglog=F.*",
+		"--db=Map",
+		"--network=LOCAL",
+		"--enablenet=true",
+		"--blktime=60",
+		"--count=2",
+		"--startdelay=1",
+		"--debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 	)
@@ -344,7 +343,6 @@ func TestMakeALeader(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
@@ -353,6 +351,8 @@ func TestMakeALeader(t *testing.T) {
 		"--network=LOCAL",
 		"--enablenet=true",
 		"--blktime=10",
+		"--faulttimeout=10",
+		"--roundtimeout=5",
 		"--count=2",
 		"--startdelay=1",
 		//"--debuglog=F.*",
@@ -400,7 +400,6 @@ func TestMakeALeader(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 2", leadercnt)
 	}
 }
-
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return
@@ -418,7 +417,6 @@ func TestAnElection(t *testing.T) {
 	runCmd := func(cmd string) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
@@ -430,7 +428,7 @@ func TestAnElection(t *testing.T) {
 		"--blktime=10",
 		"--faulttimeout=8",
 		"--roundtimeout=4",
-		fmt.Sprintf("-count=%d", nodes),
+		fmt.Sprintf("--count=%d", nodes),
 		"--startdelay=1",
 		//"--debuglog=F.*",
 		"--stdoutlog=out.txt",
@@ -488,6 +486,7 @@ func TestAnElection(t *testing.T) {
 	runCmd("w") // point the control panel at 2
 
 	CheckAuthoritySet(leaders, audits, t)
+
 
 	runCmd(fmt.Sprintf("%d", leaders-1))
 	runCmd("x")
@@ -662,7 +661,7 @@ func TestDBsigEOMElection(t *testing.T) {
 		"--count=7",
 		"--startdelay=1",
 		"--net=alot+",
-		"--debuglog=.*",
+		//"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -762,9 +761,9 @@ func TestDBsigEOMElection(t *testing.T) {
 	//runCmd("p")
 	WaitBlocks(state, 3)
 	// bring them back
-	runCmd("5")
+	runCmd("0")
 	runCmd("x")
-	runCmd("6")
+	runCmd("1")
 	runCmd("x")
 	WaitBlocks(state, 2)
 
@@ -804,24 +803,23 @@ func TestMultiple2Election(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
 	args := append([]string{},
-		"-db=Map",
-		"-network=LOCAL",
-		"-enablenet=true",
-		"-blktime=15",
+		"--db=Map",
+		"--network=LOCAL",
+		"--enablenet=true",
+		"--blktime=8",
 		"--faulttimeout=8",
 		"--roundtimeout=4",
-		"-count=10",
-		"-startdelay=1",
-		"-net=alot+",
-		"-debuglog=F.*",
-		"--stdoutlog=../out.txt",
-		"--stderrlog=../out.txt",
-		"-debugconsole=localhost:8093",
+		"--count=10",
+		"--startdelay=1",
+		"--net=alot+",
+		//"--debuglog=F.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+		//"--debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 
@@ -901,7 +899,6 @@ func TestMultiple3Election(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
@@ -912,13 +909,13 @@ func TestMultiple3Election(t *testing.T) {
 		"--blktime=15",
 		"--faulttimeout=8",
 		"--roundtimeout=4",
-		"-count=12",
-		"-startdelay=1",
-		"-net=alot+",
-		"-debuglog=F.*",
-		"--stdoutlog=../out.txt",
-		"--stderrlog=../out.txt",
-		"-debugconsole=localhost:8093",
+		"--count=12",
+		"--startdelay=1",
+		"--net=alot+",
+		//"--debuglog=F.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+		//"--debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 
@@ -1003,7 +1000,6 @@ func TestMultiple7Election(t *testing.T) {
 		os.Stderr.WriteString("Executing: " + cmd + "\n")
 		os.Stdout.WriteString("Executing: " + cmd + "\n")
 		InputChan <- cmd
-		time.Sleep(100 * time.Millisecond)
 		return
 	}
 
@@ -1016,7 +1012,7 @@ func TestMultiple7Election(t *testing.T) {
 		"--count=25",
 		"--startdelay=1",
 		"--net=alot+",
-		//"-debuglog=F.*",
+		//"--debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		//"--debugconsole=localhost:8093",
