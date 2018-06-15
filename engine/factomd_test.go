@@ -291,8 +291,8 @@ func TestLoad(t *testing.T) {
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
 	StatusEveryMinute(state0)
-	t.Log("Allocated 3 nodes")
-	if len(GetFnodes()) != 3 {
+	t.Log("Allocated 2 nodes")
+	if len(GetFnodes()) != 2 {
 		t.Fatal("Should have allocated 2 nodes")
 		t.Fail()
 	}
