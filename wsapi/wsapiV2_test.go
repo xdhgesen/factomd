@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"testing"
 
 	"time"
@@ -92,7 +93,10 @@ func TestHandleV2GetRaw(t *testing.T) {
 
 	//initializing server
 	state := testHelper.CreateAndPopulateTestState()
-	Start(state)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	Start(&wg, state)
+	wg.Wait()
 
 	for i, v := range toTest {
 		data := new(HashRequest)
