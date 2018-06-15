@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
-
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -789,7 +788,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				last := vm.ListAck[vm.Height-1]
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
-					s.LogMessage("process", "Nil out message", vm.List[j])
+					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
 					vm.List[j] = nil
 					if vm.HighestNil > j {
 						vm.HighestNil = j // Drag report limit back
@@ -886,7 +885,10 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 			} else {
 				s.LogMessage("process", "Waiting on saving", msg)
 				// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
-				// s.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, s.EntryDBHeightComplete))
+				// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, state.EntryDBHeightComplete))
+				if extraDebug {
+					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", state.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
+				}
 				break VMListLoop
 			}
 		}
@@ -1021,6 +1023,7 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
+
 	p.AddOldMsgs(m)
 	p.OldAcks[msgHash.Fixed()] = ack
 
@@ -1197,7 +1200,6 @@ func NewProcessList(s interfaces.IState, previous *ProcessList, dbheight uint32)
 	pl.PendingChainHeads = NewSafeMsgMap("PendingChainHeads", pl.State)
 	pl.OldMsgs = make(map[[32]byte]interfaces.IMsg)
 	pl.OldAcks = make(map[[32]byte]interfaces.IMsg)
-
 	pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
 	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 

@@ -106,13 +106,12 @@ func TestSetupANetwork(t *testing.T) {
 		"--faulttimeout=8",
 		"--roundtimeout=4",
 		"--count=10",
-
 		"--logPort=37000",
 		"--port=37001",
 		"--controlpanelport=37002",
 		"--networkport=37003",
 		"--startdelay=1",
-		"--debuglog=.*|graph|system|faulting",
+		//"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -401,6 +400,7 @@ func TestMakeALeader(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 2", leadercnt)
 	}
 }
+
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return
@@ -630,7 +630,6 @@ func Test5up(t *testing.T) {
 	if state0.LLeaderHeight > 13 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
-
 	j := state0.SyncingStateCurrent
 	for range state0.SyncingState {
 		fmt.Println(state0.SyncingState[j])
@@ -794,7 +793,6 @@ func TestDBsigEOMElection(t *testing.T) {
 	}
 
 }
-
 func TestMultiple2Election(t *testing.T) {
 	if ranSimTest {
 		return
@@ -811,19 +809,19 @@ func TestMultiple2Election(t *testing.T) {
 	}
 
 	args := append([]string{},
-		"--db=Map",
-		"--network=LOCAL",
-		"--enablenet=true",
-		"--blktime=8",
+		"-db=Map",
+		"-network=LOCAL",
+		"-enablenet=true",
+		"-blktime=15",
 		"--faulttimeout=8",
 		"--roundtimeout=4",
-		"--count=10",
-		"--startdelay=1",
-		"--net=alot+",
-		//"--debuglog=.*",
-		"--stdoutlog=out.txt",
-		"--stderrlog=err.txt",
-		//"-debugconsole=localhost:8093",
+		"-count=10",
+		"-startdelay=1",
+		"-net=alot+",
+		"-debuglog=F.*",
+		"--stdoutlog=../out.txt",
+		"--stderrlog=../out.txt",
+		"-debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 
@@ -914,13 +912,13 @@ func TestMultiple3Election(t *testing.T) {
 		"--blktime=15",
 		"--faulttimeout=8",
 		"--roundtimeout=4",
-		"--count=12",
-		"--startdelay=1",
-		"--net=alot+",
-		//"-debuglog=F.*",
-		"--stdoutlog=out.txt",
-		"--stderrlog=err.txt",
-		//"--debugconsole=localhost:8093",
+		"-count=12",
+		"-startdelay=1",
+		"-net=alot+",
+		"-debuglog=F.*",
+		"--stdoutlog=../out.txt",
+		"--stderrlog=../out.txt",
+		"-debugconsole=localhost:8093",
 		"--checkheads=false",
 	)
 

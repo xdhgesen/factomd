@@ -44,7 +44,6 @@ var debugExec_flag bool
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
-
 func (s *State) DebugExec() (ret bool) {
 	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
 
@@ -103,6 +102,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		if !msg.IsLocal() && !msg.IsPeer2Peer() {
 			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
 		}
+
 		if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
 				delete(s.Holding, msg.GetHash().Fixed())
@@ -387,7 +387,6 @@ func (s *State) ReviewHolding() {
 	if s.Syncing || s.Saving {
 		return
 	}
-
 	s.Commits.Cleanup(s)
 	s.DB.Trim()
 
@@ -467,7 +466,6 @@ func (s *State) ReviewHolding() {
 		//if processMinute > 50 {
 		//	continue // No need for followers to review Reveal Entry messages
 		//}
-
 		switch v.Validate(s) {
 		case -1:
 			s.LogMessage("executeMsg", "invalid from holding", v)
@@ -479,7 +477,6 @@ func (s *State) ReviewHolding() {
 		}
 
 		v.SendOut(s, v)
-
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if okre {
 			if !s.NoEntryYet(v.GetHash(), s.GetLeaderTimestamp()) {
@@ -571,7 +568,6 @@ func (s *State) AddDBState(isNew bool,
 	entries []interfaces.IEBEntry) *DBState {
 
 	dbheight := directoryBlock.GetHeader().GetDBHeight()
-
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
 	if dbState == nil {
@@ -1498,7 +1494,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 		s.GetDB().StartMultiBatch()
 		s.GetDB().InsertEntryMultiBatch(msg.Entry)
 		s.GetDB().ExecuteMultiBatch()
-
 		s.IncEntryChains()
 		s.IncEntries()
 		return true
@@ -1531,7 +1526,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) bool {
 	s.GetDB().StartMultiBatch()
 	s.GetDB().InsertEntryMultiBatch(msg.Entry)
 	s.GetDB().ExecuteMultiBatch()
-
 	s.IncEntries()
 	return true
 }
@@ -2288,12 +2282,12 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
+
 			pl.FactoidBalancesT[adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
 		} else {
 			s.LogPrintf("fct", "Drop, no process list")
 		}
-
 	} else {
 		s.FactoidBalancesPMutex.Lock()
 		s.FactoidBalancesP[adr] = v
@@ -2320,7 +2314,6 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		v, ok2 = s.ECBalancesP[adr]
 		s.ECBalancesPMutex.Unlock()
 	}
-
 	s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
 	return v
 

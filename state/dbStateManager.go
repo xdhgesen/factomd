@@ -1016,7 +1016,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
 	list.State.LogPrintf("dbstatesProcess", "Process(%d)", dbht)
-
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
@@ -1382,7 +1381,6 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			list.State.Logf("error", "Error saving eblock from dbstate, eblock not allowed")
 		}
 	}
-
 	//ecnt := 0
 	//for _, e := range d.Entries {
 	//	// If it's in the DBlock
@@ -1399,7 +1397,6 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	//	}
 	//}
 	//os.Stderr.WriteString(fmt.Sprintf("Writing %d entries\n", ecnt))
-
 	list.State.NumEntries += len(d.Entries)
 	list.State.NumEntryBlocks += len(d.EntryBlocks)
 
@@ -1579,7 +1576,7 @@ searchLoop:
 	}
 
 	keep := uint32(3) // How many states to keep around; debugging helps with more.
-	if uint32(cnt) > keep && (int(list.Complete)-cnt+int(keep)) > 0 {
+	if uint32(cnt) > keep {
 		var dbstates []*DBState
 		dbstates = append(dbstates, list.DBStates[cnt-int(keep):]...)
 		list.DBStates = dbstates
