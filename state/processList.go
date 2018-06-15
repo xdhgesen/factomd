@@ -887,7 +887,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
 				// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, state.EntryDBHeightComplete))
 				if extraDebug {
-					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", state.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
+					s.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", s.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
 				}
 				break VMListLoop
 			}
