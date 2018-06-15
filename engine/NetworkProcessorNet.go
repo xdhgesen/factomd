@@ -112,6 +112,12 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 			if msg == nil {
 				continue
 			}
+			if msg.GetHash() == nil {
+				fnode.State.LogMessage("badMsgs", "Nil hash from APIQueue", msg)
+				continue
+			}
+
+
 			if fnode.State.GetNetStateOff() { // drop received message if he is off
 				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
 				continue // Toss any inputs from API
@@ -119,6 +125,11 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 
 			if fnode.State.InMsgQueue().Length() > constants.INMSGQUEUE_HIGH {
 				fnode.State.LogMessage("NetworkInputs", "API Drop, Too Full", msg)
+				continue
+			}
+
+			if fnode.State.GetNetStateOff() {
+				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
 				continue
 			}
 
