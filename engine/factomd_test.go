@@ -279,7 +279,8 @@ func TestMakeALeader(t *testing.T) {
 		"-db=Map",
 		"-network=LOCAL",
 		"-enablenet=true",
-		"-blktime=60",
+		"-blktime=10",
+
 		"-count=2",
 		"-startdelay=1",
 		"-debuglog=F.*",
@@ -326,6 +327,7 @@ func TestMakeALeader(t *testing.T) {
 		t.Fatalf("found %d leaders, expected 2", leadercnt)
 	}
 }
+
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return
@@ -660,9 +662,9 @@ func TestMultiple2Election(t *testing.T) {
 	//runCmd("p")
 	WaitBlocks(state, 3)
 	// bring them back
-	runCmd("5")
+	runCmd("1")
 	runCmd("x")
-	runCmd("6")
+	runCmd("0")
 	runCmd("x")
 	WaitBlocks(state, 2)
 
