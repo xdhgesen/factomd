@@ -123,10 +123,21 @@ func TestLoadAcksMap(t *testing.T) {
 func TestCalculateTransactionRate(t *testing.T) {
 	s := testHelper.CreateAndPopulateTestState()
 	to, _ := s.CalculateTransactionRate()
-	time.Sleep(3 * time.Second)
 
-	s.FactoidTrans = 333
+	// because ValidatorLoop() is running we have to stream the transaction in over time
+	// or the validator may run CalculateTransactionRate() after we set the transaction count
+	// causing the next instant TPS to be 0
+	// dump pretend transactions into the state for 4 seconds
+	go func() {
+		for i := 0; i < 100*4; i++ {
+			s.FactoidTrans++
+			time.Sleep(time.Second / (100 - 1))
+		}
+	}()
+
+	time.Sleep(3 * time.Second)
 	to2, i := s.CalculateTransactionRate()
+	fmt.Printf("%v %v\n", to, to2)
 	if to >= to2 {
 		t.Errorf("Rate should be higher than %f, found %f", to, to2)
 	}

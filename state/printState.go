@@ -77,7 +77,7 @@ func PrintState(state *State) {
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "serverPrt", state.serverPrt)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "starttime", state.starttime)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "transCnt", state.transCnt)
-	str = fmt.Sprintf("%s %35s = %+v\n", str, "lasttime", state.lasttime)
+	str = fmt.Sprintf("%s %35s = %+v\n", str, "Lasttime", state.Lasttime)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "tps", state.tps)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "DBStateAskCnt", state.DBStateAskCnt)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "DBStateAnsCnt", state.DBStateAppliedCnt)
