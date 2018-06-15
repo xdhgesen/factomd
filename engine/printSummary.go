@@ -31,10 +31,13 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 	f := fnodes[listenTo]
 	s := f.State
 	prt := "===SummaryStart===\n\n"
-	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, time.Now().Unix(), time.Now().Format("2006-01-02 15:04:05"), time.Since(globals.StartTime).String())
+	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s goroutines: %d\n", 
+   prt, time.Now().Unix(), time.Now().Format("2006-01-02 15:04:05"), time.Since(globals.StartTime).String(),runtime.NumGoroutine())
 
 	var stateProcessCnt, processListProcessCnt, stateUpdateState, validatorLoopSleepCnt int64
-
+for i, f := range fnodes {
+		f.Index = i
+	}
 	for _, f := range fnodes {
 		stateProcessCnt += f.State.StateProcessCnt
 		processListProcessCnt += s.ProcessListProcessCnt
