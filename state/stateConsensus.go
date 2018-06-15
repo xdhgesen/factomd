@@ -477,14 +477,14 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-			v.SendOut(s, v)
+		v.SendOut(s, v)
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if okre {
 			if !s.NoEntryYet(v.GetHash(), s.GetLeaderTimestamp()) {
 				delete(s.Holding, v.GetHash().Fixed())
 				s.Commits.Delete(v.GetHash().Fixed())
 				continue
-		}
+			}
 
 			// Needs to be our VMIndex as well, or ignore.
 			if v.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
@@ -986,12 +986,12 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 		s.LogMessage("executeMsg", "FollowerExecute3", msg)
 		msg.FollowerExecute(s)
 
-	s.LogMessage("executeMsg", "FollowerExecute4", ack)
-	ack.FollowerExecute(s)
+		s.LogMessage("executeMsg", "FollowerExecute4", ack)
+		ack.FollowerExecute(s)
 
-	s.MissingResponseAppliedCnt++
+		s.MissingResponseAppliedCnt++
 
-}
+	}
 }
 
 func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
@@ -1610,7 +1610,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// debug
 	if s.DebugExec() {
-		var ids string
 		if s.Syncing && s.EOM && !s.EOMDone && s.DBSigDone {
 			ids := s.GetUnSyncedServers(dbheight)
 			if len(ids) > 0 {
@@ -2285,6 +2284,8 @@ func (s *State) GetHighestKnownBlock() uint32 {
 	return s.HighestKnown
 }
 
+var debugLogFETransactions bool = false
+
 func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 	ok := false
 	if rt {
@@ -2294,7 +2295,7 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 			v, ok = pl.FactoidBalancesT[adr]
 			pl.FactoidBalancesTMutex.Unlock()
 		} else {
-			s.LogPrintf("fct", "Oops, no process list")
+			//			s.LogPrintf("fct", "Oops, no process list")
 		}
 	}
 	if !ok {
@@ -2303,14 +2304,18 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 		s.FactoidBalancesPMutex.Unlock()
 	}
 
-	s.LogPrintf("fct", " GetF(%v,%x) = %v %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
+	if debugLogFETransactions {
+		s.LogPrintf("fct", " GetF(%v,%x) = %v %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
+	}
 	return v
 
 }
 
 // If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
-	s.LogPrintf("fct", " PutF(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
+	if debugLogFETransactions {
+		s.LogPrintf("fct", " PutF(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
+	}
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2319,7 +2324,9 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 			pl.FactoidBalancesT[adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
 		} else {
-			s.LogPrintf("fct", "Drop, no process list")
+			if debugLogFETransactions {
+				s.LogPrintf("fct", "Drop, no process list")
+			}
 		}
 	} else {
 		s.FactoidBalancesPMutex.Lock()
@@ -2338,7 +2345,9 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 			pl.ECBalancesTMutex.Unlock()
 
 		} else {
-			s.LogPrintf("ec", "Oops, no process list")
+			if debugLogFETransactions {
+				s.LogPrintf("ec", "Oops, no process list")
+			}
 		}
 	}
 	ok2 := false
@@ -2347,14 +2356,16 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 		v, ok2 = s.ECBalancesP[adr]
 		s.ECBalancesPMutex.Unlock()
 	}
-	s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
+	if debugLogFETransactions {
+		s.LogPrintf("ec", " GetE(%v,%x) = t-%v p-%v - %v %s", rt, adr[3:6], ok, ok2, v, atomic.WhereAmIString(1))
+	}
 	return v
 
 }
 
 // If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
-	s.LogPrintf("ec", " PutE(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
+	//	s.LogPrintf("ec", " PutE(%v,%x,%v) %s", rt, adr[3:6], v, atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2362,7 +2373,7 @@ func (s *State) PutE(rt bool, adr [32]byte, v int64) {
 			pl.ECBalancesT[adr] = v
 			pl.ECBalancesTMutex.Unlock()
 		} else {
-			s.LogPrintf("ec", "Drop, no process list")
+			//			s.LogPrintf("ec", "Drop, no process list")
 		}
 	} else {
 		s.ECBalancesPMutex.Lock()

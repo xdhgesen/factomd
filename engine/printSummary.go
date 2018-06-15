@@ -267,7 +267,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		prt = prt + "\n\nType:"
 		for i := 2 * NumMsgTypes / 3; i < NumMsgTypes; i++ {
 			prt = prt + fmt.Sprintf("%8s(%2d) ", constants.ShortMessageName(byte(i)), i)
-	}
+		}
 		prt = prt + "\nRecd:"
 
 		for i := 2 * NumMsgTypes / 3; i < NumMsgTypes; i++ {
@@ -279,12 +279,12 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		}
 
 	}
-	prt = prt + "\n" + systemFaults(f)
+	prt = prt + "\n" + SystemFaults(f)
 
-	prt = prt + faultSummary()
+	prt = prt + FaultSummary()
 
 	lastdiff := ""
-	if verboseAuthoritySet {
+	if VerboseAuthoritySet {
 		lastdelta := pnodes[0].State.GetAuthoritySetString()
 		for i, f := range pnodes {
 			prt = prt + "\n"
@@ -322,7 +322,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		prt = prt + "\n"
 	}
 
-	if verboseAuthorityDeltas {
+	if VerboseAuthorityDeltas {
 		prt = prt + "AuthorityDeltas:"
 
 		for _, f := range pnodes {
