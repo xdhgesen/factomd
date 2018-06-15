@@ -3,6 +3,8 @@ package testHelper
 //A package for functions used multiple times in tests that aren't useful in production code.
 
 import (
+	"sync"
+
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
@@ -36,13 +38,19 @@ func CreateEmptyTestState() *state.State {
 	s.Init()
 	s.Network = "LOCAL"
 	s.CheckChainHeads.CheckChainHeads = false
-	state.LoadDatabase(s)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	state.LoadDatabase(&wg, s)
+	wg.Wait()
 	return s
 }
 
 func CreateAndPopulateTestState() *state.State {
 	s := createAndPopulateTestState()
-	go s.ValidatorLoop()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go s.ValidatorLoop(&wg)
+	wg.Wait()
 	time.Sleep(30 * time.Millisecond)
 
 	return s
@@ -51,7 +59,10 @@ func CreateAndPopulateTestState() *state.State {
 func CreatePopulateAndExecuteTestState() *state.State {
 	s := createAndPopulateTestState()
 	ExecuteAllBlocksFromDatabases(s)
-	go s.ValidatorLoop()
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go s.ValidatorLoop(&wg)
+	wg.Wait()
 	time.Sleep(30 * time.Millisecond)
 
 	return s
@@ -82,7 +93,10 @@ func createAndPopulateTestState() *state.State {
 		panic(err)
 	}*/
 	s.SetFactoshisPerEC(1)
-	state.LoadDatabase(s)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	state.LoadDatabase(&wg, s)
+	wg.Wait()
 	s.UpdateState()
 
 	return s
