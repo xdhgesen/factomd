@@ -278,10 +278,10 @@ func TestLoad(t *testing.T) {
 		"--db=Map",
 		"--network=LOCAL",
 		"--enablenet=true",
-		"--blktime=60",
+		"--blktime=10",
 		"--count=2",
 		"--startdelay=1",
-		"--debuglog=F.*",
+		//"--debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 	)
@@ -327,8 +327,9 @@ func TestLoad(t *testing.T) {
 
 	runCmd("2")   // select 2
 	runCmd("R30") // Feed load
-	WaitBlocks(state0, 50)
+	WaitBlocks(state0, 30)
 	runCmd("R0") // Stop load
+	WaitBlocks(state0, 1)
 
 } // testLoad(){...}
 
