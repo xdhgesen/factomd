@@ -72,8 +72,10 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
-	//
-	// 	s.LogMessage("executeMsg", "Execute", msg)
+	if msg.GetHash() == nil {
+		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
+		return false
+	}
 
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
