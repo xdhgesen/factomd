@@ -152,6 +152,7 @@ func newServer() *databaseGrpcServer {
 
 func main() {
 	flag.Parse()
+	log.Infof("Running server on port %d", *port)
 	server := newServer()
 	var raw interfaces.IDatabase
 	var err error
@@ -199,5 +200,5 @@ func main() {
 }
 
 func usage() {
-	fmt.Printf("grpcserver -dbtype level -dbpath=PATH/TO/DB")
+	fmt.Printf("grpcserver -dbtype level -path=PATH/TO/DB")
 }
