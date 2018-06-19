@@ -29,6 +29,9 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 
 func GetSystemStatus(listenTo int, wsapiNode int) string {
 	fnodes := GetFnodes()
+	if len(fnodes) == 0 {
+		return "Waiting..."
+	}
 	f := fnodes[listenTo]
 	s := f.State
 	prt := "===SummaryStart===\n\n"
