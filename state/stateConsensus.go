@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -37,18 +36,12 @@ var _ = (*hash.Hash32)(nil)
 //
 // Returns true if some message was processed.
 //***************************************************************
-
-var once sync.Once
-var debugExec_flag bool
-
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
-func (s *State) DebugExec() (ret bool) {
-	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
 
-	//return s.FactomNodeName == "FNode0"
-	return debugExec_flag
+func (s *State) DebugExec() (ret bool) {
+	return globals.Params.DebugLogRegEx != ""
 }
 
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
@@ -112,7 +105,6 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			}
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		}
-
 		// Cheap tests to direct messages to follower handling
 		// RunLeader means we can run as a leader, Leader means we are one,
 		// Saving means we are between blocks and can't do leader things, and
@@ -122,7 +114,6 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			ret = true
 			return
 		}
-
 		// If we already have an ack for a message, we are also done
 		if s.Acks[msg.GetHash().Fixed()] != nil {
 			s.LogMessage("executeMsg", "FollowerExecute1", msg)
@@ -1884,6 +1875,7 @@ func (s *State) GetUnSyncedServers(dbheight uint32) string {
 	}
 	return ids
 }
+
 func (s *State) CheckForIDChange() {
 	var reloadIdentity bool = false
 	if s.AckChange > 0 {
