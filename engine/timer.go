@@ -10,6 +10,8 @@ import (
 
 	"sync"
 
+	"os"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	s "github.com/FactomProject/factomd/state"
 )
@@ -52,9 +54,18 @@ func Timer(wg *sync.WaitGroup, state interfaces.IState) {
 				wait = next - now
 				next += tenthPeriod
 			}
+			if wait > 100000000 {
+				for j := 0; j < 100; j++ {
+					time.Sleep(time.Duration(wait / 100))
+					if j > 50 && state.(*s.State).Syncing {
+						os.Stderr.WriteString(state.GetFactomNodeName() + " Send now!\n")
+						break
+					}
+				}
+			}
 			time.Sleep(time.Duration(wait))
 
-			// Delay some number of milliseconds.
+			// Delay some number of milliseconds.  Tests for clocks that are off by some period.
 			time.Sleep(time.Duration(state.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
 
 			state.TickerQueue() <- i

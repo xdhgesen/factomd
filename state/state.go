@@ -2418,6 +2418,7 @@ func (s *State) SetStringQueues() {
 	X := "_"
 	W := "_"
 	N := "_"
+	S := "_"
 	list := s.ProcessLists.Get(s.LLeaderHeight)
 	if found {
 		L = "L"
@@ -2440,8 +2441,11 @@ func (s *State) SetStringQueues() {
 	} else if s.IgnoreMissing {
 		W = "I"
 	}
+	if s.Syncing {
+		S = "S"
+	}
 
-	stype := fmt.Sprintf("%1s%1s%1s%1s", L, X, W, N)
+	stype := fmt.Sprintf("%1s%1s%1s%1s%1s", L, X, W, N, S)
 
 	keyMR := primitives.NewZeroHash().Bytes()
 	var d interfaces.IDirectoryBlock
@@ -2463,7 +2467,7 @@ func (s *State) SetStringQueues() {
 
 	totalTPS, instantTPS := s.CalculateTransactionRate()
 
-	str := fmt.Sprintf("%10s[%6x] %4s%4s %2d/%2d %2d.%01d%% %2d.%03d",
+	str := fmt.Sprintf("%10s[%6x] %4s %4s %2d/%2d %2d.%01d%% %2d.%03d",
 		s.FactomNodeName,
 		s.IdentityChainID.Bytes()[3:6],
 		stype,

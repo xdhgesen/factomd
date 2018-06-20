@@ -763,9 +763,9 @@ func TestDBsigEOMElection(t *testing.T) {
 	//runCmd("p")
 	WaitBlocks(state, 3)
 	// bring them back
-	runCmd("5")
+	runCmd("0")
 	runCmd("x")
-	runCmd("6")
+	runCmd("1")
 	runCmd("x")
 	WaitBlocks(state, 2)
 

@@ -117,7 +117,6 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				continue
 			}
 
-
 			if fnode.State.GetNetStateOff() { // drop received message if he is off
 				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
 				continue // Toss any inputs from API
@@ -163,7 +162,10 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 
 			//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, msg)
 			fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
-			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if t := msg.Type();
+			//t == constants.MISSING_MSG ||
+			t == constants.MISSING_MSG_RESPONSE ||
+				t == constants.REVEAL_ENTRY_MSG {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
 				fnode.State.LogMessage("InMsgQueue2", "enqueue", msg)
 				fnode.State.InMsgQueue2().Enqueue(msg)
@@ -275,7 +277,10 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 
 				if !crossBootIgnore(msg) {
 					fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
-					if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+					if t := msg.Type();
+					//t == constants.MISSING_MSG ||
+					t == constants.MISSING_MSG_RESPONSE ||
+						t == constants.REVEAL_ENTRY_MSG {
 						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue2", msg)
 						fnode.State.LogMessage("InMsgQueue2", fromPeer+", enqueue", msg)
 						fnode.State.InMsgQueue2().Enqueue(msg)
