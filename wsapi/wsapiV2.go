@@ -247,7 +247,7 @@ func HandleV2EntryCreditBlock(state interfaces.IState, params interface{}) (inte
 		return nil, NewBlockNotFoundError()
 	}
 
-	return ECBlockToResp(block)
+	return ECBlockToAPIResp(block)
 }
 
 func HandleV2ECBlockByHeight(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
@@ -270,10 +270,10 @@ func HandleV2ECBlockByHeight(state interfaces.IState, params interface{}) (inter
 		return nil, NewBlockNotFoundError()
 	}
 
-	return ECBlockToResp(block)
+	return ECBlockToAPIResp(block)
 }
 
-func ECBlockToResp(block interfaces.IEntryCreditBlock) (interface{}, *primitives.JSONError) {
+func ECBlockToAPIResp(block interfaces.IEntryCreditBlock) (interface{}, *primitives.JSONError) {
 	raw, err := block.MarshalBinary()
 	if err != nil {
 		return nil, NewInternalError()
@@ -325,7 +325,7 @@ func HandleV2FactoidBlock(state interfaces.IState, params interface{}) (interfac
 		return nil, NewBlockNotFoundError()
 	}
 
-	return fBlockToResp(block)
+	return FBlockToAPIResp(block)
 }
 
 // Cached response for genesis fblock
@@ -360,7 +360,7 @@ func HandleV2FBlockByHeight(state interfaces.IState, params interface{}) (interf
 		return nil, NewBlockNotFoundError()
 	}
 
-	resp, jerr := fBlockToResp(block)
+	resp, jerr := FBlockToAPIResp(block)
 	if err != nil {
 		return nil, jerr
 	}
@@ -373,7 +373,7 @@ func HandleV2FBlockByHeight(state interfaces.IState, params interface{}) (interf
 	return resp, nil
 }
 
-func fBlockToResp(block interfaces.IFBlock) (interface{}, *primitives.JSONError) {
+func FBlockToAPIResp(block interfaces.IFBlock) (interface{}, *primitives.JSONError) {
 	raw, err := block.MarshalBinary()
 	if err != nil {
 		return nil, NewInternalError()
@@ -434,7 +434,7 @@ func HandleV2AdminBlock(state interfaces.IState, params interface{}) (interface{
 		return nil, NewBlockNotFoundError()
 	}
 
-	return aBlockToResp(block)
+	return ABlockToAPIResp(block)
 }
 
 func HandleV2ABlockByHeight(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
@@ -457,10 +457,10 @@ func HandleV2ABlockByHeight(state interfaces.IState, params interface{}) (interf
 		return nil, NewBlockNotFoundError()
 	}
 
-	return aBlockToResp(block)
+	return ABlockToAPIResp(block)
 }
 
-func aBlockToResp(block interfaces.IAdminBlock) (interface{}, *primitives.JSONError) {
+func ABlockToAPIResp(block interfaces.IAdminBlock) (interface{}, *primitives.JSONError) {
 	raw, err := block.MarshalBinary()
 	if err != nil {
 		return nil, NewInternalError()

@@ -471,7 +471,7 @@ func Test_ecBlockToResp(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			got, got1 := ECBlockToResp(tt.args.block)
+			got, got1 := ECBlockToAPIResp(tt.args.block)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ecBlockToResp() got = %v, want %v", got, tt.want)
 			}

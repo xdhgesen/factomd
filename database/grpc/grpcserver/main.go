@@ -11,11 +11,16 @@ import (
 
 	"strings"
 
+	"encoding/binary"
+
+	"encoding/json"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/boltdb"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
+	"github.com/FactomProject/factomd/wsapi"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,9 +47,20 @@ func getHash(key *pb.DBKey) (interfaces.IHash, error) {
 	return nil, fmt.Errorf("Key must be 32 bytes, found %d", len(key.Key))
 }
 
+func getUint32(key *pb.DBKey) (uint32, error) {
+	if len(key.Key) == 4 {
+		return binary.BigEndian.Uint32(key.Key), nil
+	}
+	return 0, fmt.Errorf("Key must be 4 bytes, found %d", len(key.Key))
+}
+
 func marshalDBResponse(marshallable interfaces.BinaryMarshallable, err error) ([]byte, error) {
 	if err != nil {
 		return []byte{}, err
+	}
+
+	if marshallable == nil {
+		return nil, fmt.Errorf("Not found")
 	}
 	return marshallable.MarshalBinary()
 }
@@ -53,20 +69,168 @@ func (db *databaseGrpcServer) Retrieve(ctx context.Context, key *pb.DBKey) (*pb.
 	var err error
 	h := &pb.EmptyUnmarshaler{}
 	var hash interfaces.IHash
+	var data []byte
+	var height uint32
+
 	switch strings.ToLower(key.KeyType) {
 	case "entry", "ent":
-		var data []byte
 		hash, err = getHash(key)
 		if err == nil {
 			data, err = marshalDBResponse(db.Overlay.FetchEntry(hash))
 			h.Data = data
 		}
+	case "eblock":
+		hash, err = getHash(key)
+		if err == nil {
+			data, err = marshalDBResponse(db.Overlay.FetchEBlock(hash))
+		}
+
+		h.Data = data
+	case "dblock":
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchDBlockByHeight(height))
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchDBlock(hash))
+			}
+		}
+
+		h.Data = data
+	case "ecblock":
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchECBlockByHeight(height))
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchECBlock(hash))
+			}
+		}
+
+		h.Data = data
+	case "fblock":
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchFBlockByHeight(height))
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchFBlock(hash))
+			}
+		}
+
+		h.Data = data
+	case "ablock":
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchABlockByHeight(height))
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				data, err = marshalDBResponse(db.Overlay.FetchABlock(hash))
+			}
+		}
+
+		h.Data = data
+
+		//
+		// To avoid having to reimplment all marshal functions for all blockchain structures,
+		// adding a '#' will return the api equivalent
+		//
+	case "#ecblock":
+		var block interfaces.IEntryCreditBlock
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				block, err = db.Overlay.FetchECBlockByHeight(height)
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				block, err = db.Overlay.FetchECBlock(hash)
+			}
+		}
+
+		resp, jerr := wsapi.ECBlockToAPIResp(block)
+		if jerr != nil {
+			err = fmt.Errorf("%#v", jerr)
+		} else {
+			data, _ = json.Marshal(resp)
+			if len(data) == 0 {
+				err = fmt.Errorf("No data found")
+			}
+		}
+		h.Data = data
+	case "#fblock":
+		var block interfaces.IFBlock
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				block, err = db.Overlay.FetchFBlockByHeight(height)
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				block, err = db.Overlay.FetchFBlock(hash)
+			}
+		}
+
+		resp, jerr := wsapi.FBlockToAPIResp(block)
+		if jerr != nil {
+			err = fmt.Errorf("%#v", jerr)
+		} else {
+			data, _ = json.Marshal(resp)
+			if len(data) == 0 {
+				err = fmt.Errorf("No data found")
+			}
+		}
+		h.Data = data
+	case "#ablock":
+		var block interfaces.IAdminBlock
+		if len(key.Key) == 4 {
+			height, err = getUint32(key)
+			if err == nil {
+				block, err = db.Overlay.FetchABlockByHeight(height)
+			}
+		} else {
+			hash, err = getHash(key)
+			if err == nil {
+				block, err = db.Overlay.FetchABlock(hash)
+			}
+		}
+
+		resp, jerr := wsapi.ABlockToAPIResp(block)
+		if jerr != nil {
+			err = fmt.Errorf("%#v", jerr)
+		} else {
+			data, _ = json.Marshal(resp)
+			if len(data) == 0 {
+				err = fmt.Errorf("No data found")
+			}
+		}
+		h.Data = data
 	default:
 		// Default resorts to raw key lookup
 		_, err = db.Raw.Get(key.Bucket, key.Key, h)
 	}
+
+	errStr := ""
+	if err != nil {
+		errStr = err.Error()
+	}
 	return &pb.DBValue{
 		Value: h.Data,
+		Error: errStr,
 	}, err
 }
 
