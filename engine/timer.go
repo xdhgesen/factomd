@@ -10,8 +10,6 @@ import (
 
 	"sync"
 
-	"os"
-
 	"github.com/FactomProject/factomd/common/interfaces"
 	s "github.com/FactomProject/factomd/state"
 )
@@ -58,7 +56,6 @@ func Timer(wg *sync.WaitGroup, state interfaces.IState) {
 				for j := 0; j < 100; j++ {
 					time.Sleep(time.Duration(wait / 100))
 					if j > 50 && state.(*s.State).Syncing {
-						os.Stderr.WriteString(state.GetFactomNodeName() + " Send now!\n")
 						break
 					}
 				}
