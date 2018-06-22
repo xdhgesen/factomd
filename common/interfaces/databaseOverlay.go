@@ -262,6 +262,9 @@ type DBOverlay interface {
 	FetchKeyValueStore(key []byte, dst BinaryMarshallable) (BinaryMarshallable, error)
 	SaveDatabaseEntryHeight(height uint32) error
 	FetchDatabaseEntryHeight() (uint32, error)
+
+	//*************************************RAW*************************************//
+	FetchBucketAndKey(bucket []byte, key []byte, dst BinaryMarshallable) (BinaryMarshallable, error)
 }
 
 type ISCDatabaseOverlay interface {

@@ -6,7 +6,7 @@ type EmptyUnmarshaler struct {
 }
 
 func (e *EmptyUnmarshaler) UnmarshalBinary(data []byte) (err error) {
-	e.Data = data
+	e.UnmarshalBinaryData(data)
 	return
 }
 

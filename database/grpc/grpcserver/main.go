@@ -281,11 +281,14 @@ func (db *databaseGrpcServer) RetrieveAllEntries(key *pb.DBKey, stream pb.Databa
 		entryHashes := eb.GetEntryHashes()
 		eblockKeyMr, _ := eb.KeyMR()
 		container := eblockKeyMr.Bytes()
+		chainid := eb.GetChainID().Bytes()
 		for i, ent := range entryHashes {
 			if ent.IsMinuteMarker() {
 				continue
 			}
-			val, err := db.Overlay.FetchEntry(ent)
+			val := new(pb.EmptyUnmarshaler)
+			_, err = db.Overlay.FetchBucketAndKey(chainid, ent.Bytes(), val)
+			//val, err := db.Overlay.FetchEntry(ent)
 			if err != nil {
 				stream.Send(&pb.DBValue{
 					Error: err.Error(),
@@ -296,6 +299,7 @@ func (db *databaseGrpcServer) RetrieveAllEntries(key *pb.DBKey, stream pb.Databa
 				})
 			} else {
 				data, _ := val.MarshalBinary()
+				//fmt.Printf("Data: %x\n", data)
 				stream.Send(&pb.DBValue{
 					Value:       data,
 					ValType:     "entry",
@@ -315,6 +319,7 @@ func newServer() *databaseGrpcServer {
 }
 
 func main() {
+	go StartProfiler()
 	flag.Parse()
 	log.Infof("Running server on port %d", *port)
 	server := newServer()

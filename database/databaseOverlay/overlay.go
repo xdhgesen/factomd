@@ -642,3 +642,7 @@ func (db *Overlay) SetChainHeads(primaryIndexes, chainIDs []interfaces.IHash) er
 
 	return db.PutInBatch(batch)
 }
+
+func (db *Overlay) FetchBucketAndKey(bucket []byte, key []byte, dst interfaces.BinaryMarshallable) (interfaces.BinaryMarshallable, error) {
+	return db.DB.Get(bucket, key, dst)
+}

@@ -26,6 +26,7 @@ func (db *Overlay) FetchKeyValueStore(key []byte, dst interfaces.BinaryMarshalla
 	if err != nil {
 		return nil, err
 	}
+
 	if block == nil {
 		return nil, nil
 	}
