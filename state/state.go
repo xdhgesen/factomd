@@ -852,8 +852,8 @@ func (s *State) Init() {
 	s.inMsgQueue2 = NewInMsgQueue(constants.INMSGQUEUE_HIGH + 100) //incoming message queue for Factom application messages
 	s.electionsQueue = NewElectionQueue(10000)                     //incoming message queue for Factom application messages
 	s.apiQueue = NewAPIQueue(100)                                  //incoming message queue from the API
-	s.ackQueue = make(chan interfaces.IMsg, 100)                   //queue of Leadership messages
-	s.msgQueue = make(chan interfaces.IMsg, 400)                   //queue of Follower messages
+	s.ackQueue = make(chan interfaces.IMsg, 10000)                 //queue of Leadership messages
+	s.msgQueue = make(chan interfaces.IMsg, 10000)                 //queue of Follower messages
 	s.ShutdownChan = make(chan int, 1)                             //Channel to gracefully shut down.
 	s.MissingEntries = make(chan *MissingEntry, 1000)              //Entries I discover are missing from the database
 	s.UpdateEntryHash = make(chan *EntryUpdate, 10000)             //Handles entry hashes and updating Commit maps.
@@ -2418,6 +2418,7 @@ func (s *State) SetStringQueues() {
 	X := "_"
 	W := "_"
 	N := "_"
+	S := "_"
 	list := s.ProcessLists.Get(s.LLeaderHeight)
 	if found {
 		L = "L"
@@ -2440,8 +2441,11 @@ func (s *State) SetStringQueues() {
 	} else if s.IgnoreMissing {
 		W = "I"
 	}
+	if s.Syncing {
+		S = "S"
+	}
 
-	stype := fmt.Sprintf("%1s%1s%1s%1s", L, X, W, N)
+	stype := fmt.Sprintf("%1s%1s%1s%1s%1s", L, X, W, N, S)
 
 	keyMR := primitives.NewZeroHash().Bytes()
 	var d interfaces.IDirectoryBlock
@@ -2463,7 +2467,7 @@ func (s *State) SetStringQueues() {
 
 	totalTPS, instantTPS := s.CalculateTransactionRate()
 
-	str := fmt.Sprintf("%10s[%6x] %4s%4s %2d/%2d %2d.%01d%% %2d.%03d",
+	str := fmt.Sprintf("%10s[%6x] %4s %4s %2d/%2d %2d.%01d%% %2d.%03d",
 		s.FactomNodeName,
 		s.IdentityChainID.Bytes()[3:6],
 		stype,

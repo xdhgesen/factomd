@@ -116,6 +116,7 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				fnode.State.LogMessage("badMsgs", "Nil hash from APIQueue", msg)
 				continue
 			}
+
 			if fnode.State.GetNetStateOff() { // drop received message if he is off
 				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
 				continue // Toss any inputs from API
@@ -161,7 +162,10 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 
 			//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, msg)
 			fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
-			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+			if t := msg.Type();
+			//t == constants.MISSING_MSG ||
+			t == constants.MISSING_MSG_RESPONSE ||
+				t == constants.REVEAL_ENTRY_MSG {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
 				fnode.State.LogMessage("InMsgQueue2", "enqueue", msg)
 				fnode.State.InMsgQueue2().Enqueue(msg)
@@ -203,10 +207,6 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 					fnode.State.TallyReceived(int(msg.Type())) //TODO: Do we want to count dropped message?
 				}
 
-				if msg.GetHash() == nil {
-					fnode.State.LogMessage("badMsgs", "Nil hash from Peer", msg)
-					continue
-				}
 				if fnode.State.GetNetStateOff() { // drop received message if he is off
 					fnode.State.LogMessage("NetworkInputs", fromPeer+" Drop, X'd by simCtrl", msg)
 					continue // Toss any inputs from this peer
@@ -274,9 +274,13 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				case constants.MISSING_DATA, constants.MISSING_MSG, constants.MISSING_MSG_RESPONSE, constants.DBSTATE_MISSING_MSG, constants.DATA_RESPONSE:
 					msg.SetNoResend(true)
 				}
+
 				if !crossBootIgnore(msg) {
 					fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
-					if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+					if t := msg.Type();
+					//t == constants.MISSING_MSG ||
+					t == constants.MISSING_MSG_RESPONSE ||
+						t == constants.REVEAL_ENTRY_MSG {
 						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue2", msg)
 						fnode.State.LogMessage("InMsgQueue2", fromPeer+", enqueue", msg)
 						fnode.State.InMsgQueue2().Enqueue(msg)
@@ -358,6 +362,7 @@ func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
 					if fnode.State.MessageTally {
 						fnode.State.TallySent(int(msg.Type()))
 					}
+
 				}
 			} else {
 				fnode.State.LogMessage("NetworkOutputs", "Drop, no peers", msg)
