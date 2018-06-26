@@ -25,12 +25,13 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/elections"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 var _ = fmt.Print
@@ -567,73 +568,51 @@ func makeServer(s *state.State) *FactomNode {
 }
 
 func startServers(load bool) {
+	wg := new(sync.WaitGroup)
+	wg.Add(1) // Add this thread as the final gate to everyone running
+
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go Peers(wg, fnode)
-
-		wg.Wait()
 	}
+
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go NetworkOutputs(wg, fnode)
-
-		wg.Wait()
 	}
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go InvalidOutputs(wg, fnode)
-
-		wg.Wait()
 	}
 
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go state.LoadDatabase(wg, fnode.State)
-
-		wg.Wait()
 	}
 
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go fnode.State.GoSyncEntries(wg)
-
-		wg.Wait()
 	}
 
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go Timer(wg, fnode.State)
-
-		wg.Wait()
 	}
 
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
-
 		go fnode.State.ValidatorLoop(wg)
-
-		wg.Wait()
 	}
 
 	for _, fnode := range fnodes {
-		wg := new(sync.WaitGroup)
 		wg.Add(1)
 		go elections.Run(wg, fnode.State)
-		wg.Wait()
 	}
 
-	wg := new(sync.WaitGroup)
 	wg.Add(1)
 	// Start the webserver
-	wsapi.Start(wg, fnodes[0].State)
-	wg.Wait()
+	go wsapi.Start(wg, fnodes[0].State)
 
 	// Start prometheus on port
 	launchPrometheus(9876)
@@ -642,6 +621,10 @@ func startServers(load bool) {
 	p2p.RegisterPrometheus()
 	leveldb.RegisterPrometheus()
 	RegisterPrometheus()
+
+	wg.Done() // let it all run!
+	wg.Wait() // Ok, wait till its all run past thier inits
+
 }
 
 func setupFirstAuthority(s *state.State) {

@@ -10,6 +10,8 @@ import (
 
 	"os"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
@@ -18,7 +20,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
-	"sync"
 )
 
 var _ = fmt.Print
@@ -26,9 +27,7 @@ var _ = fmt.Print
 func LoadDatabase(wg *sync.WaitGroup, s *State) {
 	var blkCnt uint32
 
-	wg.Done()
-	wg.Wait()
-
+	waited := false // wait for other threads after we send the first DBState
 	head, err := s.DB.FetchDBlockHead()
 	if err == nil && head != nil {
 		blkCnt = head.GetHeader().GetDBHeight()
@@ -65,13 +64,20 @@ func LoadDatabase(wg *sync.WaitGroup, s *State) {
 					dbstate.IsLast = true // this is the last DBState in this load
 					// this will cause s.DBFinished to go true
 				}
-				s.InMsgQueue().Enqueue(msg)
+				s.LogMessage("msgQueue", "enqueue_from_db", msg)
+
 				msg.SetLocal(true)
-				if s.InMsgQueue().Length() > constants.INMSGQUEUE_MED {
-					for s.InMsgQueue().Length() > constants.INMSGQUEUE_LOW {
-						time.Sleep(10 * time.Millisecond)
-					}
+				s.msgQueue <- msg
+				if !waited {
+					waited = true
+					wg.Done()
+					wg.Wait()
 				}
+				//if s.InMsgQueue().Length() > constants.INMSGQUEUE_MED {
+				//	for s.InMsgQueue().Length() > constants.INMSGQUEUE_LOW {
+				//		time.Sleep(10 * time.Millisecond)
+				//	}
+				//}
 			} else {
 				// os.Stderr.WriteString(fmt.Sprintf("%20s Last Block in database: %d\n", s.FactomNodeName, i))
 				break
@@ -99,7 +105,13 @@ func LoadDatabase(wg *sync.WaitGroup, s *State) {
 		dbstate, _ := msg.(*messages.DBStateMsg)
 		dbstate.IsLast = true // this is the last DBState in this load
 		// this will cause s.DBFinished to go true
-		s.InMsgQueue().Enqueue(msg)
+		s.LogMessage("msgQueue", "enqueue_from_db", msg)
+		s.msgQueue <- msg
+		if !waited {
+			waited = true
+			wg.Done()
+			wg.Wait()
+		}
 	}
 	s.Println(fmt.Sprintf("Loaded %d directory blocks on %s", blkCnt, s.FactomNodeName))
 }
