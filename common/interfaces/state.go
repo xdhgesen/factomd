@@ -5,7 +5,7 @@
 package interfaces
 
 import "sync"
-
+import "github.com/FactomProject/factomd/activations"
 type DBStateSent struct {
 	DBHeight uint32
 	Sent     Timestamp
