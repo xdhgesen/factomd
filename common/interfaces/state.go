@@ -4,8 +4,12 @@
 
 package interfaces
 
-import "sync"
-import "github.com/FactomProject/factomd/activations"
+import (
+	"sync"
+
+	"github.com/FactomProject/factomd/activations"
+)
+
 type DBStateSent struct {
 	DBHeight uint32
 	Sent     Timestamp
@@ -331,4 +335,7 @@ type IState interface {
 	DebugExec() bool
 	CheckFileName(string) bool
 	AddToReplayFilter(mask int, hash [32]byte, timestamp Timestamp, systemtime Timestamp) bool
+
+	// Activations
+	IsActive(id activations.ActivationType) bool
 }

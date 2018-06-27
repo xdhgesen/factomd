@@ -116,6 +116,8 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				fnode.State.LogMessage("badMsgs", "Nil hash from APIQueue", msg)
 				continue
 			}
+
+
 			if fnode.State.GetNetStateOff() { // drop received message if he is off
 				fnode.State.LogMessage("NetworkInputs", "API drop, X'd by simCtrl", msg)
 				continue // Toss any inputs from API
@@ -274,6 +276,7 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				case constants.MISSING_DATA, constants.MISSING_MSG, constants.MISSING_MSG_RESPONSE, constants.DBSTATE_MISSING_MSG, constants.DATA_RESPONSE:
 					msg.SetNoResend(true)
 				}
+
 				if !crossBootIgnore(msg) {
 					fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
 					if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
@@ -358,6 +361,7 @@ func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
 					if fnode.State.MessageTally {
 						fnode.State.TallySent(int(msg.Type()))
 					}
+
 				}
 			} else {
 				fnode.State.LogMessage("NetworkOutputs", "Drop, no peers", msg)

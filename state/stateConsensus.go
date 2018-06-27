@@ -21,6 +21,8 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
 
+	"sort"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -279,7 +281,7 @@ ackLoop:
 			}
 
 			s.LogMessage("ackQueue", "Execute2", ack)
-			progress = s.executeMsg(vm, ack) || progress
+			process = append(process, ack)
 
 		default:
 			break ackLoop
@@ -293,7 +295,7 @@ ackLoop:
 
 	// Process inbound messages
 emptyLoop:
-	for {
+	for len(s.AckQueue()) < 10 {
 		select {
 		case msg := <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
@@ -309,26 +311,70 @@ emptyLoop:
 	// Reprocess any stalled messages, but not so much compared inbound messages
 	// Process last first
 
-	if s.RunLeader {
-		s.ReviewHolding()
-		for {
-			for _, msg := range s.XReview {
-				if msg == nil {
-					continue
-				}
-				if msg.GetVMIndex() == s.LeaderVMIndex {
-					process = append(process, msg)
-				}
+	s.ReviewHolding()
+	for len(s.AckQueue()) < 10 {
+		for _, msg := range s.XReview {
+			if msg == nil {
+				continue
 			}
-			s.XReview = s.XReview[:0]
-			break
-		} // skip review
-	}
+			if msg.GetVMIndex() == s.LeaderVMIndex {
+				process = append(process, msg)
+			}
+		}
+		s.XReview = s.XReview[:0]
+		break
+	} // skip review
 
 	processXReviewTime := time.Since(preProcessXReviewTime)
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
 	preProcessProcChanTime := time.Now()
+
+	// Sort by timestamp.  Did experiment with sorting by message type, but it doesn't help.
+	sort.Slice(process, func(i, j int) bool {
+		//switch process[j].Type() {
+		//case constants.EOM_MSG:
+		//	if process[i].Type() == constants.EOM_MSG {
+		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
+		//	}
+		//	return true
+		//case constants.ACK_MSG:
+		//	if process[i].Type() == constants.EOM_MSG {
+		//		return false
+		//	}
+		//	if process[i].Type() == constants.ACK_MSG {
+		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
+		//	}
+		//	return true
+		//case constants.DBSTATE_MSG:
+		//	if process[i].Type() == constants.EOM_MSG || process[i].Type() == constants.ACK_MSG {
+		//		return false
+		//	}
+		//	if process[i].Type() == constants.DBSTATE_MSG {
+		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
+		//	}
+		//	return true
+		//case constants.COMMIT_CHAIN_MSG:
+		//	if process[i].Type() == constants.EOM_MSG || process[i].Type() == constants.ACK_MSG || process[i].Type() == constants.DBSTATE_MSG {
+		//		return false
+		//	}
+		//	if process[i].Type() == constants.EOM_MSG {
+		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
+		//	}
+		//	return true
+		//}
+		process[i].ComputeVMIndex(s)
+		process[j].ComputeVMIndex(s)
+		if s.Leader && process[j].GetVMIndex() == s.LeaderVMIndex {
+			if process[i].GetVMIndex() != s.LeaderVMIndex {
+				return true
+			}
+			return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
+		}
+
+		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
+	})
+
 	for _, msg := range process {
 		newProgress := s.executeMsg(vm, msg)
 		progress = newProgress || progress //
@@ -366,13 +412,17 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 // responsibility
 func (s *State) ReviewHolding() {
 
+	if len(s.XReview) > 0 || s.Syncing || s.Saving {
+		return
+	}
+
 	preReviewHoldingTime := time.Now()
 
 	now := s.GetTimestamp()
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
 	}
-	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 100 {
+	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 10 {
 		return
 	}
 
@@ -398,15 +448,21 @@ func (s *State) ReviewHolding() {
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
-	for k, _ := range s.Acks {
-		v := s.Holding[k]
-		if v != nil {
-			v.FollowerExecute(s)
+	if s.Leader {
+		//	vm := s.LeaderPL.VMs[s.LeaderVMIndex]
+		for k, v := range s.Holding {
+			v.ComputeVMIndex(s)
+			if v.GetVMIndex() == s.LeaderVMIndex && s.Acks[k] == nil {
+				s.XReview = append(s.XReview, v)
+			}
 		}
 	}
 
-	if len(s.XReview) > 0 || s.Syncing || s.Saving {
-		return
+	for k, _ := range s.Acks {
+		v := s.Holding[k]
+		if v != nil {
+			//a.FollowerExecute(s)
+		}
 	}
 
 	// Get the count on processing minutes.
@@ -432,25 +488,27 @@ func (s *State) ReviewHolding() {
 
 		_, okre := v.(*messages.RevealEntryMsg)
 
-		if hldcnt < 100 && okre {
+		if okre {
 			if !s.NoEntryYet(v.GetHash(), s.LeaderTimestamp) {
 				delete(s.Holding, k)
 				continue
 			}
 		}
 
-		if hldcnt > 500 && len(s.Holding) > 500 {
-			if t := v.Type(); t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
-				// Always process these.
-			} else if t == constants.MISSING_MSG_RESPONSE {
-				delete(s.Holding, k) // Ignore if we are behind the 8 ball.
-				continue
-			} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
-				// Always process these
-			} else {
-				continue // Dont' review anything else.
-			}
-		}
+		// Remove short cicuits because they hurt us more than they help.
+
+		//if hldcnt > 500 && len(s.Holding) > 500 {
+		//	if t := v.Type(); t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
+		//		// Always process these.
+		//	} else if t == constants.MISSING_MSG_RESPONSE {
+		//		delete(s.Holding, k) // Ignore if we are behind the 8 ball.
+		//		continue
+		//	} else if t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
+		//		// Always process these
+		//	} else {
+		//		continue // Dont' review anything else.
+		//	}
+		//}
 
 		_ = processMinute
 
@@ -465,7 +523,7 @@ func (s *State) ReviewHolding() {
 			delete(s.Holding, k)
 			continue
 		case 0:
-			continue
+			//continue
 		}
 
 		v.SendOut(s, v)
@@ -476,7 +534,7 @@ func (s *State) ReviewHolding() {
 				s.Commits.Delete(v.GetHash().Fixed())
 				continue
 			}
-
+			v.ComputeVMIndex(s)
 			// Needs to be our VMIndex as well, or ignore.
 			if v.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
 				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
@@ -546,6 +604,7 @@ func (s *State) ReviewHolding() {
 		s.XReview = append(s.XReview, v)
 		TotalHoldingQueueOutputs.Inc()
 	}
+
 	reviewHoldingTime := time.Since(preReviewHoldingTime)
 	TotalReviewHoldingTime.Add(float64(reviewHoldingTime.Nanoseconds()))
 }
@@ -1237,10 +1296,8 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	m.SetLocal(false)
 	ack.SendOut(s, ack)
 	m.SendOut(s, m)
-	s.FollowerExecuteEOM(m)
+	s.executeMsg(vm, m)
 	s.UpdateState()
-	delete(s.Acks, ack.GetHash().Fixed())
-	delete(s.Holding, m.GetMsgHash().Fixed())
 }
 
 func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
@@ -1664,7 +1721,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.EOMDone = false
 			s.Syncing = false
 			s.EOMProcessed = 0
-			s.SendHeartBeat() // Only do this once
+			s.SendHeartBeat()
 			s.LogPrintf("dbsig-eom", "ProcessEOM complete for %d", e.Minute)
 		}
 		return true

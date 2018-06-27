@@ -10,7 +10,6 @@ import (
 
 	"sync"
 
-	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	s "github.com/FactomProject/factomd/state"
 )
@@ -41,11 +40,6 @@ func Timer(wg *sync.WaitGroup, state interfaces.IState) {
 
 	for {
 		for i := 0; i < 10; i++ {
-			// Don't stuff messages into the system if the
-			// Leader is behind.
-			for j := 0; j < 10 && len(state.AckQueue()) > 1000; j++ {
-				time.Sleep(time.Millisecond * 10)
-			}
 
 			now = time.Now().UnixNano()
 			if now > next {
@@ -58,12 +52,17 @@ func Timer(wg *sync.WaitGroup, state interfaces.IState) {
 				wait = next - now
 				next += tenthPeriod
 			}
-			time.Sleep(time.Duration(wait))
-			for state.InMsgQueue().Length() > constants.INMSGQUEUE_HIGH {
-				time.Sleep(100 * time.Millisecond)
+			if wait > 100000000 {
+				for j := 0; j < 100; j++ {
+					time.Sleep(time.Duration(wait / 100))
+					if j > 50 && state.(*s.State).Syncing {
+						break
+					}
+				}
 			}
+			time.Sleep(time.Duration(wait))
 
-			// Delay some number of milliseconds.
+			// Delay some number of milliseconds.  Tests for clocks that are off by some period.
 			time.Sleep(time.Duration(state.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
 
 			state.TickerQueue() <- i
