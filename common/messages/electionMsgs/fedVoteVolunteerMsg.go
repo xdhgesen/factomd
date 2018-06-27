@@ -12,6 +12,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
@@ -422,10 +423,17 @@ func (m *FedVoteVolunteerMsg) MarshalForSignature() (data []byte, err error) {
 }
 
 func (m *FedVoteVolunteerMsg) String() string {
+	vmheight := uint32(0)
+	if m.Ack != nil { // Ensure a nil/bad message doesn't panic
+		a, ok := m.Ack.(*messages.Ack)
+		if ok {
+			vmheight = a.Height
+		}
+	}
 	if m.LeaderChainID == nil {
 		m.LeaderChainID = primitives.NewZeroHash()
 	}
-	return fmt.Sprintf("%19s %20s %20s ID: %x weight %x serverIdx: %d vmIdx: %d round %d dbheight: %d minute: %d ",
+	return fmt.Sprintf("%19s %20s %20s ID: %x weight %x auditIdx: %d vmIdx: %d fedIdx: %d round %d dbheight: %d minute: %d vmheight: %d",
 		m.Name,
 		"Volunteer Audit",
 		m.TS.String(),
@@ -433,7 +441,9 @@ func (m *FedVoteVolunteerMsg) String() string {
 		m.Weight.Bytes()[:3],
 		m.ServerIdx,
 		m.VMIndex,
+		m.FedIdx,
 		m.Round,
 		m.DBHeight,
-		m.Minute)
+		m.Minute,
+		vmheight)
 }
