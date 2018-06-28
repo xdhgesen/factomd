@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"sort"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -20,8 +21,6 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
-
-	"sort"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -185,9 +184,32 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 }
 
+type stat struct {
+	routine string
+	log     string
+	s       *State
+	comment string
+	count   int
+	start   time.Time
+}
+
+func (s *stat) startStat(name string) {
+	s.count = 0
+	s.comment = name
+	s.start = time.Now()
+}
+
+func (s *stat) countStat() { s.count++ }
+func (s *stat) reportStat() {
+	if s.count != 0 {
+		s.s.LogPrintf(s.log, "%s:%s %d in %v", s.routine, s.comment, s.count, time.Since(s.start))
+	}
+}
+
 func (s *State) Process() (progress bool) {
 
-	s.StateProcessCnt++
+	stat := stat{"process", "sort", s, "junk", 0, time.Now()}
+
 	if s.ResetRequest {
 		s.ResetRequest = false
 		s.DoReset()
@@ -233,8 +255,9 @@ func (s *State) Process() (progress bool) {
 	}
 
 	/** Process all the DBStates  that might be pending **/
-
+	stat.startStat("dbstate")
 	for {
+		stat.countStat()
 		highestSavedBlk := s.GetHighestSavedBlk()
 		ix := int(highestSavedBlk) - s.DBStatesReceivedBase + 1
 		if ix < 0 || ix >= len(s.DBStatesReceived) {
@@ -247,13 +270,18 @@ func (s *State) Process() (progress bool) {
 		}
 		s.LogMessage("dbstates", "process", msg)
 		process = append(process, msg)
+		s.LogMessage("sort", fmt.Sprintf("dbs %d", len(process)), msg)
 		s.DBStatesReceived[ix] = nil
 	}
+	stat.reportStat()
 
 	preAckLoopTime := time.Now()
 	// Process acknowledgements if we have some.
+
+	stat.startStat("ackloop")
 ackLoop:
 	for {
+		stat.countStat()
 		select {
 		case ack := <-s.ackQueue:
 			switch ack.Validate(s) {
@@ -273,6 +301,7 @@ ackLoop:
 				if now-ack.GetTimestamp().GetTimeSeconds() < 60*15 {
 					s.LogMessage("ackQueue", "Execute", ack)
 					s.executeMsg(vm, ack) // Execute ack from ackQueue
+					s.LogMessage("sort", fmt.Sprintf("execAck %d", len(process)), ack)
 					progress = true
 				} else {
 					s.LogMessage("ackQueue", "Drop Too Old", ack)
@@ -280,13 +309,15 @@ ackLoop:
 				continue
 			}
 
-			s.LogMessage("ackQueue", "Execute2", ack)
+			s.LogMessage("ackQueue", "addProcess", ack)
 			process = append(process, ack)
+			s.LogMessage("sort", fmt.Sprintf("ack %d", len(process)), ack)
 
 		default:
 			break ackLoop
 		}
 	}
+	stat.reportStat()
 
 	ackLoopTime := time.Since(preAckLoopTime)
 	TotalAckLoopTime.Add(float64(ackLoopTime.Nanoseconds()))
@@ -294,16 +325,20 @@ ackLoop:
 	preEmptyLoopTime := time.Now()
 
 	// Process inbound messages
+	stat.startStat("msgLoop")
 emptyLoop:
 	for len(s.AckQueue()) < 10 {
+		stat.countStat()
 		select {
 		case msg := <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
 			progress = s.executeMsg(vm, msg) || progress
+			s.LogMessage("sort", fmt.Sprintf("execMsg %d", len(process)), msg)
 		default:
 			break emptyLoop
 		}
 	}
+	stat.reportStat()
 	emptyLoopTime := time.Since(preEmptyLoopTime)
 	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
 
@@ -312,57 +347,32 @@ emptyLoop:
 	// Process last first
 
 	s.ReviewHolding()
+	stat.startStat("xreview")
 	for len(s.AckQueue()) < 10 {
+		stat.countStat()
 		for _, msg := range s.XReview {
 			if msg == nil {
 				continue
 			}
 			if msg.GetVMIndex() == s.LeaderVMIndex {
 				process = append(process, msg)
+				s.LogMessage("sort", fmt.Sprintf("hold %d", len(process)), msg)
 			}
 		}
 		s.XReview = s.XReview[:0]
 		break
 	} // skip review
+	stat.reportStat()
 
 	processXReviewTime := time.Since(preProcessXReviewTime)
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
 	preProcessProcChanTime := time.Now()
 
+	stat.startStat("sort")
 	// Sort by timestamp.  Did experiment with sorting by message type, but it doesn't help.
 	sort.Slice(process, func(i, j int) bool {
-		//switch process[j].Type() {
-		//case constants.EOM_MSG:
-		//	if process[i].Type() == constants.EOM_MSG {
-		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
-		//	}
-		//	return true
-		//case constants.ACK_MSG:
-		//	if process[i].Type() == constants.EOM_MSG {
-		//		return false
-		//	}
-		//	if process[i].Type() == constants.ACK_MSG {
-		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
-		//	}
-		//	return true
-		//case constants.DBSTATE_MSG:
-		//	if process[i].Type() == constants.EOM_MSG || process[i].Type() == constants.ACK_MSG {
-		//		return false
-		//	}
-		//	if process[i].Type() == constants.DBSTATE_MSG {
-		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
-		//	}
-		//	return true
-		//case constants.COMMIT_CHAIN_MSG:
-		//	if process[i].Type() == constants.EOM_MSG || process[i].Type() == constants.ACK_MSG || process[i].Type() == constants.DBSTATE_MSG {
-		//		return false
-		//	}
-		//	if process[i].Type() == constants.EOM_MSG {
-		//		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
-		//	}
-		//	return true
-		//}
+		stat.countStat()
 		process[i].ComputeVMIndex(s)
 		process[j].ComputeVMIndex(s)
 		if s.Leader && process[j].GetVMIndex() == s.LeaderVMIndex {
@@ -374,13 +384,21 @@ emptyLoop:
 
 		return process[i].GetTimestamp().GetTimeMilli() < process[j].GetTimestamp().GetTimeMilli()
 	})
+	stat.reportStat()
 
+	if len(process) != 0 || len(s.ackQueue) != 0 {
+		s.LogPrintf("sort", "execute process=%d ackqueue = %d", len(process), len(s.ackQueue))
+	}
+
+	stat.startStat("execute")
 	for _, msg := range process {
+		stat.countStat()
 		newProgress := s.executeMsg(vm, msg)
 		progress = newProgress || progress //
 		s.LogMessage("executeMsg", fmt.Sprintf("From processq : %t", newProgress), msg)
 		s.UpdateState()
 	} // processLoop for{...}
+	stat.reportStat()
 
 	processProcChanTime := time.Since(preProcessProcChanTime)
 	TotalProcessProcChanTime.Add(float64(processProcChanTime.Nanoseconds()))

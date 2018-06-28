@@ -71,13 +71,33 @@ func (s *State) ValidatorLoop(wg *sync.WaitGroup) {
 
 			var progress bool // set progress false
 			//for i := 0; progress && i < 100; i++ {
-			for s.Process() {
-				progress = true
+
+			{
+				count := 0
+				start := time.Now()
+				for s.Process() {
+					s.StateProcessCnt++
+					count++
+					progress = true
+				}
+				if count != 0 {
+					s.LogPrintf("sort", "process %d in %v", count, time.Since(start))
+				}
 			}
-			for s.UpdateState() {
-				progress = true
+			{
+				count := 0
+				start := time.Now()
+				for s.UpdateState() {
+					s.StateUpdateState++
+					count++
+					progress = true
+				}
+				if count != 0 {
+					s.LogPrintf("sort", "update %d in %v", count, time.Since(start))
+				}
 			}
 			if !progress {
+				s.LogPrintf("sort", "sleep")
 				// No work? Sleep for a bit
 				time.Sleep(10 * time.Millisecond)
 				s.ValidatorLoopSleepCnt++

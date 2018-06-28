@@ -385,15 +385,15 @@ type State struct {
 	NumFCTTrans    int // Number of Factoid Transactions in this block
 
 	// debug message about state status rolling queue for ControlPanel
-	pstate              string
-	SyncingState        [256]string
-	SyncingStateCurrent int
-	processCnt          int64 // count of attempts to process .. so we can see if the thread is running
+	pstate                string
+	SyncingState          [256]string
+	SyncingStateCurrent   int
+	processCnt            int64 // count of attempts to process .. so we can see if the thread is running
 	ProcessListProcessCnt int64 // count of attempts to process .. so we can see if the thread is running
 	StateProcessCnt       int64
 	StateUpdateState      int64
 	ValidatorLoopSleepCnt int64
-	reportedActivations [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
+	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 
 	MMRInfo // fields for MMR processing
 }
@@ -1788,7 +1788,6 @@ func (s *State) GetDirectoryBlockByHeight(height uint32) interfaces.IDirectoryBl
 }
 
 func (s *State) UpdateState() (progress bool) {
-	s.StateUpdateState++
 	dbheight := s.GetHighestSavedBlk()
 	plbase := s.ProcessLists.DBHeightBase
 	if dbheight == 0 {
@@ -2344,7 +2343,7 @@ func (s *State) SummaryHeader() string {
 			s.NumFCTTrans)
 	}
 
-	str := fmt.Sprintf(" %s\n %10s %6s %12s %5s %4s %6s %10s %8s %5s %4s %20s %14s %10s %-8s %-9s %16s %9s %9s %s\n",
+	str := fmt.Sprintf(" %s\n %10s %6s %12s %5s %4s %6s %10s %8s %5s %4s %20s %14s %10s %-8s %-9s %16s %10s %13s  - %s\n",
 		sum,
 		"Node",
 		"ID   ",
@@ -2364,7 +2363,7 @@ func (s *State) SummaryHeader() string {
 		"API:Fct/EC/E",
 		"tps t/i",
 		"DBH-:-M",
-		"BH")
+		"BHash")
 
 	return str
 }

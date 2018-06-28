@@ -873,7 +873,7 @@ func TestDBsigEOMElection(t *testing.T) {
 	WaitForMinute(state, 1)
 
 	runCmd("0")
-		runCmd("l") // leaders
+	runCmd("l") // leaders
 	runCmd("l") // leaders
 	runCmd("l") // leaders
 	runCmd("l") // leaders
@@ -1197,13 +1197,13 @@ func TestMultiple7Election(t *testing.T) {
 		"--db=Map",
 		"--network=LOCAL",
 		"--enablenet=false",
-		"--blktime=8",
-		"--faulttimeout=2",
+		"--blktime=60",
+		"--faulttimeout=5",
 		"--roundtimeout=2",
 		"--count=25",
 		"--startdelay=1",
 		"--net=alot+",
-		//"--debuglog=F.*",
+		"--debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		//"--debugconsole=localhost:8093",
@@ -1223,17 +1223,27 @@ func TestMultiple7Election(t *testing.T) {
 
 	WaitForMinute(state0, 3)
 	runCmd("g30")
+
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		fmt.Printf("Waiting for G30 to complete\n")
+		WaitMinutes(state0, 1)
+	}
 	WaitBlocks(state0, 1)
 	// Allocate 1 leaders
 	WaitForMinute(state0, 1)
 	runCmd("1")               // select node 1
-	for i := 0; i < 14; i++ { // 1, 2, 3, 4, 5, 6
-		time.Sleep(100 * time.Millisecond)
+	for i := 0; i < 14; i++ { // 1, 2, 3, ...13
 		runCmd("l") // leaders
 	}
 
-	for i := 0; i < 10; i++ { // 8, 9
-		time.Sleep(100 * time.Millisecond)
+	for i := 0; i < 10; i++ { // 14, 15, ...24
 		runCmd("o") // leaders
 	}
 
