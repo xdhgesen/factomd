@@ -100,6 +100,15 @@ func (db *databaseGrpcServer) Retrieve(ctx context.Context, key *pb.DBKey) (*pb.
 		}
 
 		h.Data = data
+	case "dblock_keymr":
+		height, err = getUint32(key)
+		if err == nil {
+			var dblock interfaces.IDirectoryBlock
+			dblock, err = db.Overlay.FetchDBlockByHeight(height)
+			if err != nil {
+				h.Data = dblock.GetKeyMR().Bytes()
+			}
+		}
 	case "ecblock":
 		if len(key.Key) == 4 {
 			height, err = getUint32(key)
@@ -282,35 +291,51 @@ func (db *databaseGrpcServer) RetrieveAllEntries(key *pb.DBKey, stream pb.Databa
 		eblockKeyMr, _ := eb.KeyMR()
 		container := eblockKeyMr.Bytes()
 		chainid := eb.GetChainID().Bytes()
-		for i, ent := range entryHashes {
+		returnChannel := make(chan *pb.DBValue, 100)
+		go db.retrieve_entries(entryHashes, chainid, container, returnChannel)
+		for _, ent := range entryHashes {
 			if ent.IsMinuteMarker() {
 				continue
 			}
-			val := new(pb.EmptyUnmarshaler)
-			_, err = db.Overlay.FetchBucketAndKey(chainid, ent.Bytes(), val)
-			//val, err := db.Overlay.FetchEntry(ent)
-			if err != nil {
-				stream.Send(&pb.DBValue{
-					Error: err.Error(),
-				})
-			} else if val == nil {
-				stream.Send(&pb.DBValue{
-					Error: fmt.Sprintf("Entry %x not found", ent.Fixed()),
-				})
-			} else {
-				data, _ := val.MarshalBinary()
-				//fmt.Printf("Data: %x\n", data)
-				stream.Send(&pb.DBValue{
-					Value:       data,
-					ValType:     "entry",
-					Sequence:    int32(i),
-					ContainedIn: container,
-				})
+
+			select {
+			case v := <-returnChannel:
+				stream.Send(v)
 			}
 		}
 	}
 
 	return nil
+}
+
+func (db *databaseGrpcServer) retrieve_entries(entryHashes []interfaces.IHash, chainid []byte, container []byte, returnChannel chan *pb.DBValue) {
+	var err error
+	for i, ent := range entryHashes {
+		if ent.IsMinuteMarker() {
+			continue
+		}
+		val := new(pb.EmptyUnmarshaler)
+		_, err = db.Overlay.FetchBucketAndKey(chainid, ent.Bytes(), val)
+		//val, err := db.Overlay.FetchEntry(ent)
+		if err != nil {
+			returnChannel <- &pb.DBValue{
+				Error: err.Error(),
+			}
+		} else if val == nil {
+			returnChannel <- &pb.DBValue{
+				Error: fmt.Sprintf("Entry %x not found", ent.Fixed()),
+			}
+		} else {
+			data, _ := val.MarshalBinary()
+			//fmt.Printf("Data: %x\n", data)
+			returnChannel <- &pb.DBValue{
+				Value:       data,
+				ValType:     "entry",
+				Sequence:    int32(i),
+				ContainedIn: container,
+			}
+		}
+	}
 }
 
 func newServer() *databaseGrpcServer {
