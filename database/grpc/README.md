@@ -4,12 +4,16 @@ Ability to access raw database from other languages.
 
 # Running the GRPC Server
 
+**Run `glide install` in the `factomd` directory before continuing**
+
 The grpc server opens a factomd database and exposes grpc functions for a client. To run the server:
  - You may provide a different path
 
 ```
-go run *.go -path=$HOME/.factom/m2/main-database/ldb/MAIN/factoid_level.db -port 10000
+go run grpcserver/*.go -path=$HOME/.factom/m2/main-database/ldb/MAIN/factoid_level.db -port 10000
 ```
+
+You can also use `go install` to avoid needing to run from this directory. 
 
 ## GRPC Code Gen
 
