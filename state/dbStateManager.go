@@ -639,8 +639,28 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 
 	for i := len(dbsl.DBStates) - 1; i >= 0; i-- {
 		if dbsl.DBStates[i].SaveStruct != nil {
-			dbsl.State.LogPrintf("executeMsg", "Reset dbht %v", dbsl.DBStates[i].DirectoryBlock.GetHeader().GetDBHeight())
-			//dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
+			dbh := dbsl.DBStates[i].DirectoryBlock.GetHeader().GetDBHeight()
+			dbsl.State.LogPrintf("executeMsg", "Reset to dbht %v", dbh)
+			//			dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
+			s := dbsl.State
+			ss := dbsl.DBStates[i].SaveStruct
+
+			s.LogPrintf("fct_transactions", "Loading %d EC balances from DBH %d", len(ss.FactoidBalancesP), dbh)
+			s.FactoidBalancesPMutex.Lock()
+			s.FactoidBalancesP = make(map[[32]byte]int64, len(ss.FactoidBalancesP))
+			for k := range ss.FactoidBalancesP {
+				s.FactoidBalancesP[k] = ss.FactoidBalancesP[k]
+			}
+			s.FactoidBalancesPMutex.Unlock()
+
+			s.LogPrintf("ec_transactions", "Loading %d EC balances from DBH %d", len(ss.ECBalancesP), dbh)
+			s.ECBalancesPMutex.Lock()
+			s.ECBalancesP = make(map[[32]byte]int64, len(ss.ECBalancesP))
+			for k := range ss.ECBalancesP {
+				s.ECBalancesP[k] = ss.ECBalancesP[k]
+			}
+			s.ECBalancesPMutex.Unlock()
+
 			break
 		}
 	}
@@ -1015,7 +1035,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
-	list.State.LogPrintf("dbstatesProcess", "Process(%d)", dbht)
+	list.State.LogPrintf("dbstatesProcess", "Process(%d) %v %v %v", dbht, d.Locked, d.IsNew, d.Repeat)
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.

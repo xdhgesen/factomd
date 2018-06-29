@@ -12,7 +12,9 @@ import (
 
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 // Because we have to go back to a previous state should the network be partitioned and we are on a separate
@@ -952,11 +954,15 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	}
 
 	ss.FactoidBalancesP, err = PopBalanceMap(buf)
+	messages.LogPrintf("fnode0_fct.txt", "Loaded %d FCT balances from dbh %d at %s ", len(ss.FactoidBalancesP), ss.DBHeight, atomic.WhereAmIString(0))
+
 	if err != nil {
 		return
 	}
 
 	ss.ECBalancesP, err = PopBalanceMap(buf)
+	messages.LogPrintf("fnode0_ec.txt", "Loaded %d EC balances from dbh %d at %s", len(ss.ECBalancesP), ss.DBHeight, atomic.WhereAmIString(0))
+
 	if err != nil {
 		return
 	}
