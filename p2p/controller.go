@@ -623,7 +623,7 @@ func (c *Controller) fillOutgoingSlots(openSlots int) {
 		if newPeers >= openSlots {
 			break
 		}
-		if c.connections.ConnectedTo(peer.Address) {
+		if !c.connections.ConnectedTo(peer.Address) {
 			c.logger.Debugf("newPeers: %d < openSlots: %d We think we are not already connected to: %s so dialing.", newPeers, openSlots, peer.AddressPort())
 			newPeers = newPeers + 1
 			c.DialPeer(peer, false)
