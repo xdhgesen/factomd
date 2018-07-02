@@ -37,7 +37,7 @@ type MsgLog struct {
 	msgCnt    int
 	msgPerSec int
 
-	// The last period (msg rate over the last period, so msg changes can be seen)
+	// The last period (Msg rate over the last period, so Msg changes can be seen)
 	Period     int64
 	Startp     interfaces.Timestamp
 	MsgCntp    int

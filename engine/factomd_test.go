@@ -20,6 +20,8 @@ func TimeNow(s *state.State) {
 	fmt.Printf("%s:%d/%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
 }
 
+var statusMsg string
+
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
 	go func() {
@@ -31,6 +33,7 @@ func StatusEveryMinute(s *state.State) {
 				time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 				timeout--
 			}
+			fmt.Printf("Status: %s\n", statusMsg)
 			if timeout <= 0 {
 				fmt.Println("Stalled !!!", timeout, sleepTime, newMinute, s.CurrentMinute)
 			}
@@ -48,10 +51,14 @@ func WaitBlocks(s *state.State, blks int) {
 	fmt.Printf("WaitBlocks(%d)\n", blks)
 	TimeNow(s)
 	newBlock := int(s.LLeaderHeight) + blks
+	statusMsg = fmt.Sprintf("WaitBlocks %d-:-0", newBlock)
+	sleepTime := (time.Duration(globals.Params.BlkTime) * 1000 / 10) / 4 // Figure out how long to sleep in milliseconds
 	for int(s.LLeaderHeight) < newBlock {
-		time.Sleep(time.Second)
+		time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 	}
 	TimeNow(s)
+	statusMsg = fmt.Sprintf("WaitBlocks done %d-:-0", newBlock)
+
 }
 
 // Wait to a given minute.  If we are == to the minute or greater, then
@@ -59,16 +66,18 @@ func WaitBlocks(s *state.State, blks int) {
 func WaitForMinute(s *state.State, min int) {
 	fmt.Printf("WaitForMinute(%d)\n", min)
 	TimeNow(s)
+	statusMsg = fmt.Sprintf("WaitForMinute ?-:-%d", min)
+	sleepTime := (time.Duration(globals.Params.BlkTime) * 1000 / 10) / 4 // Figure out how long to sleep in milliseconds
 	if s.CurrentMinute >= min {
 		for s.CurrentMinute > 0 {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
 	}
-
 	for min > s.CurrentMinute {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 	}
 	TimeNow(s)
+	statusMsg = fmt.Sprintf("WaitForMinute done ?-:-%d", min)
 }
 
 // Wait some number of minutes
@@ -86,9 +95,36 @@ func WaitMinutesQuite(s *state.State, min int) {
 
 func WaitMinutes(s *state.State, min int) {
 	fmt.Printf("WaitMinutes(%d)\n", min)
+	statusMsg = fmt.Sprintf("WaitMinutes ?-:-%d", min)
 	TimeNow(s)
 	WaitMinutesQuite(s, min)
 	TimeNow(s)
+	statusMsg = fmt.Sprintf("WaitMinutes done ?-:-%d", min)
+}
+
+func WaitForNoCommits() {
+	fnodes := GetFnodes()
+	state0 := fnodes[0].State
+
+	fmt.Printf("WaitForNoCommits\n")
+	statusMsg = fmt.Sprintf("WaitForNoCommits")
+
+	WaitMinutes(state0, 1)
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		WaitMinutes(state0, 1)
+
+	}
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 1)
+	statusMsg = fmt.Sprintf("WaitForNoCommits Done")
+
 }
 
 // We can only run 1 simtest!
@@ -468,21 +504,10 @@ func TestActivationHeightElection(t *testing.T) {
 	WaitMinutes(state0, 2)
 
 	runCmd(fmt.Sprintf("g%d", nodes))
-	WaitMinutes(state0, 5)
-	for {
-		pendingCommits := 0
-		for _, s := range fnodes {
-			pendingCommits += s.State.Commits.Len()
-		}
-		if pendingCommits == 0 {
-			break
-		}
-		fmt.Printf("Waiting for G command to complete\n")
-		WaitMinutes(state0, 1)
+	fmt.Printf("Waiting for g command to complete\n")
+	WaitForNoCommits()
+	fmt.Printf("Completed g command\n")
 
-	}
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
 	// Allocate leaders
 	runCmd("1")
 	for i := 0; i < leaders-1; i++ {
@@ -582,6 +607,7 @@ func TestActivationHeightElection(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 }
+
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return
@@ -635,21 +661,10 @@ func TestAnElection(t *testing.T) {
 	WaitMinutes(state0, 2)
 
 	runCmd("g6")
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
+	fmt.Printf("Waiting for g command to complete\n")
+	WaitForNoCommits()
+	fmt.Printf("Completed g command\n")
 
-	for {
-		pendingCommits := 0
-		for _, s := range fnodes {
-			pendingCommits += s.State.Commits.Len()
-		}
-		if pendingCommits == 0 {
-			break
-		}
-		fmt.Printf("Waiting for G5 to complete\n")
-		WaitMinutes(state0, 1)
-
-	}
 	// Allocate leaders
 	runCmd("1")
 	for i := 0; i < leaders-1; i++ {
@@ -758,20 +773,9 @@ func Test5line(t *testing.T) {
 	WaitMinutes(state0, 2)
 
 	runCmd(fmt.Sprintf("g%d", nodes))
-	for {
-		pendingCommits := 0
-		for _, s := range fnodes {
-			pendingCommits += s.State.Commits.Len()
-		}
-		if pendingCommits == 0 {
-			break
-		}
-		fmt.Printf("Waiting for G to complete\n")
-		WaitMinutes(state0, 1)
-
-	}
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
+	fmt.Printf("Waiting for g command to complete\n")
+	WaitForNoCommits()
+	fmt.Printf("Completed g command \n")
 
 	// Allocate leaders
 	runCmd("1")

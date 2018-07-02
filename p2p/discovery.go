@@ -212,7 +212,7 @@ func (d *Discovery) filterForUniqueIPAdresses(peers []Peer) (filtered []Peer) {
 // We want peers from diverse networks.  So,method is this:
 //	-- generate list of candidates (if exclusive, only special peers)
 //	-- sort candidates by distance
-//  -- if num canddiates is less than desired set, return all candidates
+//  -- if num candidates is less than desired set, return all candidates
 //  -- Otherwise,repeatedly take candidates at the 0%, %25, %50, %75, %100 points in the list
 //  -- remove each candidate from the list.
 //  -- continue until there are no candidates left, or we have our set.

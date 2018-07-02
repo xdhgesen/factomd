@@ -135,7 +135,7 @@ func (lg *LoadGenerator) NewCommitChain(entry *entryBlock.Entry) *messages.Commi
 
 	commit.Sign(lg.ECKey.Key[:])
 
-	// form msg
+	// form Msg
 	msg.CommitChain = commit
 	msg.Sign(lg.ECKey)
 
@@ -158,7 +158,7 @@ func (lg *LoadGenerator) NewCommitEntry(entry *entryBlock.Entry) *messages.Commi
 	commit.ECPubKey = &b32
 	commit.Sign(lg.ECKey.Key[:])
 
-	// form msg
+	// form Msg
 	msg.CommitEntry = commit
 	msg.Sign(lg.ECKey)
 

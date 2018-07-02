@@ -160,7 +160,7 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				continue
 			}
 
-			//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, msg)
+			//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, Msg)
 			fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
 			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
@@ -242,9 +242,9 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 
 				//_, bv := fnode.State.Replay.Valid(constants.INTERNAL_REPLAY, hash, timestamp, now)
 				//if !bv {
-				//	fnode.State.LogMessage("NetworkInputs", fromPeer+" Drop, BLOCK_REPLAY", msg)
+				//	fnode.State.LogMessage("NetworkInputs", fromPeer+" Drop, BLOCK_REPLAY", Msg)
 				//	RepeatMsgs.Inc()
-				//	//fnode.MLog.add2(fnode, false, peer.GetNameTo(), "PeerIn", false, msg)
+				//	//fnode.MLog.add2(fnode, false, peer.GetNameTo(), "PeerIn", false, Msg)
 				//	continue
 				//}
 
@@ -252,12 +252,12 @@ func Peers(wg *sync.WaitGroup, fnode *FactomNode) {
 				if !rv {
 					fnode.State.LogMessage("NetworkInputs", fromPeer+" Drop, NETWORK_REPLAY", msg)
 					RepeatMsgs.Inc()
-					//fnode.MLog.add2(fnode, false, peer.GetNameTo(), "PeerIn", false, msg)
+					//fnode.MLog.add2(fnode, false, peer.GetNameTo(), "PeerIn", false, Msg)
 					continue
 				}
 
 				//if state.GetOut() {
-				//	fnode.State.Println("In Coming!! ",msg)
+				//	fnode.State.Println("In Coming!! ",Msg)
 				//}
 
 				if fnode.MLog.Enable {
@@ -302,7 +302,7 @@ func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
 		// if len(fnode.State.NetworkOutMsgQueue()) > 500 {
 		// 	fmt.Print(fnode.State.GetFactomNodeName(), "-", len(fnode.State.NetworkOutMsgQueue()), " ")
 		// }
-		//msg := <-fnode.State.NetworkOutMsgQueue()
+		//Msg := <-fnode.State.NetworkOutMsgQueue()
 		msg := fnode.State.NetworkOutMsgQueue().BlockingDequeue()
 		NetworkOutTotalDequeue.Inc()
 		fnode.State.LogMessage("NetworkOutputs", "Dequeue", msg)
@@ -326,7 +326,7 @@ func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
 			continue
 		}
 
-		//_, ok := msg.(*messages.Ack)
+		//_, ok := Msg.(*messages.Ack)
 		//if ok {
 		//// We don't care about the result, but we do want to log that we have
 		//// seen this message before, because we might have generated the message
@@ -334,8 +334,8 @@ func NetworkOutputs(wg *sync.WaitGroup, fnode *FactomNode) {
 		//	// Add the ack to our replay filter
 		//	fnode.State.Replay.IsTSValidAndUpdateState(
 		//		constants.NETWORK_REPLAY,
-		//		msg.GetRepeatHash().Fixed(),
-		//		msg.GetTimestamp(),
+		//		Msg.GetRepeatHash().Fixed(),
+		//		Msg.GetTimestamp(),
 		//		fnode.State.GetTimestamp())
 		//}
 

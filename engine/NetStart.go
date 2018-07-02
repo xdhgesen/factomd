@@ -12,6 +12,8 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	. "github.com/FactomProject/factomd/common/globals"
@@ -25,13 +27,11 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
 
-	"strings"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/elections"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 var _ = fmt.Print
@@ -510,8 +510,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	var colors []string = []string{"95cde5", "b01700", "db8e3c", "ffe35f"}
 
-	for i, s := range fnodes {
-		fmt.Printf("%d {color:#%v, shape:dot, label:%v}\n", i, colors[i%len(colors)], s.State.FactomNodeName)
+	if len(fnodes) > 1 {
+		for i, s := range fnodes {
+			fmt.Printf("%d {color:#%v, shape:dot, label:%v}\n", i, colors[i%len(colors)], s.State.FactomNodeName)
+		}
 	}
 	// Initate dbstate plugin if enabled. Only does so for first node,
 	// any more nodes on sim control will use default method

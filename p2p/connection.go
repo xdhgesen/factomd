@@ -13,6 +13,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 
 	log "github.com/sirupsen/logrus"
@@ -407,7 +408,7 @@ func (c *Connection) processSends() {
 	conloop:
 		for ConnectionOnline == c.state && len(c.SendChannel) > 0 {
 			// This was blocking. By checking the length of the channel before entering, this does not block.
-			// The problem was this routine was blocked on a closed connection. Idealling we do want to block
+			// The problem was this routine was blocked on a closed connection. Ideally we do want to block
 			// on a 0 length channel, and this is still possible if use a select and close the channel when we
 			// close the connection.
 			message := <-c.SendChannel
@@ -466,6 +467,8 @@ func (c *Connection) sendParcel(parcel Parcel) {
 
 	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
 	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline * 500))
+
+	messages.LogMessage("networkoutmsg",fmt.Sprintf("sent from %s to %s ", c.conn.LocalAddr().String(),parcel.Header.PeerAddress ), parcel.Msg)
 
 	encode := c.encoder
 	err := encode.Encode(parcel)
@@ -674,7 +677,7 @@ func (c *Connection) pingPeer() {
 			parcel.Header.Type = TypePing
 			c.timeLastPing = time.Now()
 			c.attempts++
-			BlockFreeChannelSend(c.SendChannel, ConnectionParcel{Parcel: *parcel})
+			BlockFreeChannelSend(c.SendChannel, ConnectionParcel{Parcel: *parcel}) // ping
 		}
 	}
 }

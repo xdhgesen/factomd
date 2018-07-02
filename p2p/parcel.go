@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash/crc32"
 
+	"github.com/FactomProject/factomd/common/interfaces"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -19,6 +20,7 @@ var parcelLogger = packageLogger.WithField("subpack", "connection")
 type Parcel struct {
 	Header  ParcelHeader
 	Payload []byte
+	Msg interfaces.IMsg // for debugging keep a copy of the message this parcel represents
 }
 
 // ParcelHeaderSize is the number of bytes in a parcel header
