@@ -441,6 +441,13 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		for i := 0; (i+13)*2 < p.Cnt; i += 13 {
 			AddSimPeer(fnodes, i%p.Cnt, (i+7)%p.Cnt)
 		}
+	case "line":
+		n := len(fnodes)
+		for i := 0; i < n; i++ {
+			AddSimPeer(fnodes, i, (i-1+n)%n)
+			AddSimPeer(fnodes, i, (i+1)%n)
+		}
+
 	case "alot":
 		n := len(fnodes)
 		for i := 0; i < n; i++ {

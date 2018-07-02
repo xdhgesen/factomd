@@ -23,18 +23,18 @@ func TimeNow(s *state.State) {
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
 	go func() {
+		sleepTime := (time.Duration(globals.Params.BlkTime) * 1000 / 10) / 4 // Figure out how long to sleep in milliseconds
 		for {
 			newMinute := (s.CurrentMinute + 1) % 10
 			timeout := 8 // timeout if a minutes takes twice as long as expected
 			for s.CurrentMinute != newMinute && timeout > 0 {
-				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+				time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 				timeout--
 			}
 			if timeout <= 0 {
-				fmt.Println("Stalled !!!")
+				fmt.Println("Stalled !!!", timeout, sleepTime, newMinute, s.CurrentMinute)
 			}
-			// Make all the nodes update thier status
+			// Make all the nodes update their status
 			for _, n := range GetFnodes() {
 				n.State.SetString()
 			}
@@ -700,6 +700,108 @@ func TestAnElection(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 
+}
+
+// test 5 nodes in a line network config
+func Test5line(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	var (
+		leaders   int = 3
+		audits    int = 0
+		followers int = 2
+		nodes     int = leaders + audits + followers
+	)
+
+	runCmd := func(cmd string) {
+		os.Stderr.WriteString("Executing: " + cmd + "\n")
+		InputChan <- cmd
+		time.Sleep(100 * time.Millisecond)
+		return
+	}
+
+	args := append([]string{},
+
+		"--network=LOCAL",
+		"--net=line",
+		"--blktime=8",
+		"--faulttimeout=2",
+		"--roundtimeout=2",
+		"--enablenet=false",
+		//"--debugconsole=localhost",
+		"--startdelay=5",
+		fmt.Sprintf("-count=%d", nodes),
+		"--debuglog=.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+		"--disablemmr",
+	)
+	params := ParseCmdLine(args)
+
+	time.Sleep(5 * time.Second) // wait till the control panel is setup
+	state0 := Factomd(params, false).(*state.State)
+	state0.MessageTally = true
+	time.Sleep(5 * time.Second) // wait till the simulation is setup
+
+	t.Log(fmt.Sprintf("Allocated %d nodes", nodes))
+	fnodes := GetFnodes()
+	if len(fnodes) != nodes {
+		t.Fatalf("Should have allocated %d nodes", nodes)
+		t.Fail()
+	}
+
+	StatusEveryMinute(state0)
+	WaitMinutes(state0, 2)
+
+	runCmd(fmt.Sprintf("g%d", nodes))
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		fmt.Printf("Waiting for G to complete\n")
+		WaitMinutes(state0, 1)
+
+	}
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 1)
+
+	// Allocate leaders
+	runCmd("1")
+	for i := 0; i < leaders-1; i++ {
+		runCmd("l")
+	}
+
+	// Allocate audit servers
+	for i := 0; i < audits; i++ {
+		runCmd("o")
+	}
+
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 2)
+	PrintOneStatus(0, 0)
+
+	CheckAuthoritySet(leaders, audits, t)
+
+	WaitBlocks(state0, 10)
+
+	t.Log("Shutting down the network")
+	for _, fn := range GetFnodes() {
+		fn.State.ShutdownChan <- 1
+	}
+
+	// Sleep one block
+	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
+	if state0.LLeaderHeight > 13 {
+		t.Fatal("Failed to shut down factomd via ShutdownChan")
+	}
 }
 
 func Test5up(t *testing.T) {
