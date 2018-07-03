@@ -639,28 +639,7 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 
 	for i := len(dbsl.DBStates) - 1; i >= 0; i-- {
 		if dbsl.DBStates[i].SaveStruct != nil {
-			dbh := dbsl.DBStates[i].DirectoryBlock.GetHeader().GetDBHeight()
-			dbsl.State.LogPrintf("executeMsg", "Reset to dbht %v", dbh)
-			//			dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
-			s := dbsl.State
-			ss := dbsl.DBStates[i].SaveStruct
-
-			s.LogPrintf("fct_transactions", "Loading %d EC balances from DBH %d", len(ss.FactoidBalancesP), dbh)
-			s.FactoidBalancesPMutex.Lock()
-			s.FactoidBalancesP = make(map[[32]byte]int64, len(ss.FactoidBalancesP))
-			for k := range ss.FactoidBalancesP {
-				s.FactoidBalancesP[k] = ss.FactoidBalancesP[k]
-			}
-			s.FactoidBalancesPMutex.Unlock()
-
-			s.LogPrintf("ec_transactions", "Loading %d EC balances from DBH %d", len(ss.ECBalancesP), dbh)
-			s.ECBalancesPMutex.Lock()
-			s.ECBalancesP = make(map[[32]byte]int64, len(ss.ECBalancesP))
-			for k := range ss.ECBalancesP {
-				s.ECBalancesP[k] = ss.ECBalancesP[k]
-			}
-			s.ECBalancesPMutex.Unlock()
-
+			dbsl.DBStates[i].SaveStruct.RestoreFactomdState(dbsl.State)
 			break
 		}
 	}
