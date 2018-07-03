@@ -67,5 +67,5 @@ type FactomParams struct {
 	CheckChainHeads          bool // Run checkchain() heads on boot
 	FixChainHeads            bool // Only matters if CheckChainHeads == true
 	// --noMMR very bad for networks larger than --broadcastnum because it will cause stalls.
-	NoMMR                    bool // suppress MMR processing for diagnostic use
+	NoMMR bool // suppress MMR processing for diagnostic use
 }

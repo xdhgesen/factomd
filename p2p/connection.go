@@ -468,7 +468,7 @@ func (c *Connection) sendParcel(parcel Parcel) {
 	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
 	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline * 500))
 
-	messages.LogMessage("networkoutmsg",fmt.Sprintf("sent from %s to %s ", c.conn.LocalAddr().String(),parcel.Header.PeerAddress ), parcel.Msg)
+	messages.LogMessage("networkoutmsg", fmt.Sprintf("sent from %s to %s ", c.conn.LocalAddr().String(), parcel.Header.PeerAddress), parcel.Msg)
 
 	encode := c.encoder
 	err := encode.Encode(parcel)
