@@ -104,10 +104,6 @@ type ProcessList struct {
 	asks chan askRef   // Requests to ask for missing messages
 	adds chan plRef    // notices of slots filled in the process list
 	done chan struct{} // Notice that this DBHeight is done
-
-	// debug -- highest nil seen and reported in processlist
-	nilListMutex sync.Mutex
-	nilList      map[int]int
 }
 
 var _ interfaces.IProcessList = (*ProcessList)(nil)
@@ -711,13 +707,13 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			if len(ticker) == cap(ticker) {
 				return
 			} // time to die, no one is listening
-
 			ticker <- s.GetTimestamp().GetTimeMilli()
 			time.Sleep(20 * time.Millisecond)
 		}
 	}()
 
 	//	s.LogPrintf(logname, "Start PL DBH %d", p.DBHeight)
+
 	lastAskDelay := int64(0)
 	for {
 		// You have to compute this at every cycle as you can change the block time
@@ -747,9 +743,6 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 			addAdd(add)
 
 		case now := <-ticker:
-
-			p.State.GetLeaderHeight()
-
 			addAllAsks()     // process all pending asks before any adds
 			addAllAdds()     // process all pending add before any ticks
 			readAllTickers() // drain the ticker channel
@@ -784,11 +777,6 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 		case <-done:
 			addAllAsks() // process all pending asks before any adds
 			addAllAdds() // process all pending add before any ticks
-			// this causes a race with the main thread checking for nil and then sending to the channel
-			//p.asks = nil // nil all the channel pointers so no one will use them
-			//p.adds = nil
-			//p.done = nil
-
 			if len(pending) != 0 {
 				s.LogPrintf(logname, "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
 				s.LogPrintf("executeMsg", "End PL DBH %d with %d still outstanding %v", p.DBHeight, len(pending), pending)
@@ -812,10 +800,8 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 	if delay < 50 {
 		delay = 50
 	}
-
 	// Look up the VM
 	vm := p.VMs[vmIndex]
-
 	if vm.HighestAsk > int(height) {
 		return
 	} // already sent to MMR
@@ -827,6 +813,7 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 		if vm.List[i] == nil {
 			ask := askRef{plRef{p.DBHeight, vmIndex, uint32(i)}, now + delay}
 			p.asks <- ask
+
 		}
 	}
 
@@ -834,9 +821,7 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 		// always ask for one past the end as well...Can't hurt ... Famous last words...
 		ask := askRef{plRef{p.DBHeight, vmIndex, uint32(lenVMList)}, now + delay}
 		p.asks <- ask
-
 		vm.HighestAsk = int(lenVMList) + 1 // We have asked for all nils up to this height
-
 	}
 	return
 }
@@ -887,6 +872,8 @@ var decodeMap map[foo]string = map[foo]string{
 	foo{false, false, false, true, false, false, true, false, true}:  "Normal",                    //0x148
 	foo{true, false, true, true, false, false, true, false, true}:    "Syncing EOM Start",         //0x14d
 
+	// old code used to also hit these states some of which are problematic as they allow both DBSIG and EOM concurrently
+	//foo{true, true, false, true, false, false, true, true, false}:     "Stop Syncing DBSig",              //0x0cb
 	//foo{true, false, false, false, false, false, false, false, false}: "Sync Only??",                     //0x100 ***
 	//foo{true, false, true, true, false, false, false, false, true}:   "Syncing EOM ... ",                 //0x10d
 	//foo{true, true, false, false, false, false, true, false, true}:    "Start Syncing DBSig",             //0x143
@@ -1077,7 +1064,7 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 						p.State.Commits.Delete(msg.GetMsgHash().Fixed())
 					}
 
-					//					p.State.LogMessage("processList", "done", msg)
+					p.State.LogMessage("processList", "done", msg)
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
 					p.State.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
@@ -1453,9 +1440,6 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.adds = nil
 		pl.done = nil
 	}
-
-	pl.nilList = make(map[int]int)
-
 	return pl
 }
 
