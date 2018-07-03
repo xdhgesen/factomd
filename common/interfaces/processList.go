@@ -36,7 +36,7 @@ type IProcessList interface {
 	IncrementDiffSigTally()
 	CheckDiffSigTally() bool
 	//	Ask(vmIndex int, height int) int
-	TrimVMList(height uint32, vmIndex int)
+	//TrimVMList(height int, vmIndex int)
 	//Process(state IState) (progress bool)
 	//AddToProcessList(ack IMsg, m IMsg)
 	ContainsDBSig(serverID IHash) bool

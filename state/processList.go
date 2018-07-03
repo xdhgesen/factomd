@@ -617,20 +617,20 @@ func (p *ProcessList) CheckDiffSigTally() bool {
 	return true
 }
 
-func (p *ProcessList) TrimVMList(height uint32, vmIndex int) {
-	if !(uint32(len(p.VMs[vmIndex].List)) > height) {
+func (p *ProcessList) TrimVMList(height int, vmIndex int) {
+	if !(len(p.VMs[vmIndex].List) > height) {
 		p.State.LogMessage("processList", fmt.Sprintf("TrimVMList() %d/%d/%d", p.DBHeight, vmIndex, height), p.VMs[vmIndex].List[height])
 		p.VMs[vmIndex].List = p.VMs[vmIndex].List[:height]
-		p.VMs[vmIndex].HighestAsk = int(height) // make sure we will ask again for nil's above this height
-		if p.State.DebugExec() {
-			p.nilListMutex.Lock()
-			if p.nilList[vmIndex] > int(height-1) {
-				p.nilList[vmIndex] = int(height - 1) // Drag the highest nil logged back before this nil
-			}
-			p.nilListMutex.Unlock()
+		vm := p.VMs[vmIndex]
+		if vm.HighestNil > height {
+			vm.HighestNil = height // Drag report limit back
+		}
+		if vm.HighestAsk > height {
+			vm.HighestAsk = height // Drag Ask limit back
 		}
 	}
 }
+
 func (p *ProcessList) GetDBHeight() uint32 {
 	return p.DBHeight
 }
@@ -704,6 +704,8 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 }
 
+var extraDebug bool = false
+
 // Process messages and update our state.
 func (p *ProcessList) Process(s *State) (progress bool) {
 	dbht := s.GetHighestSavedBlk()
@@ -760,7 +762,6 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 						s.LogPrintf("process", "%d nils  at  %v/%v/%v", cnt, p.DBHeight, i, j)
 						vm.HighestNil = j
 					}
-					p.nilListMutex.Unlock()
 				}
 
 				//				s.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
@@ -882,7 +883,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
 				// s.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, s.EntryDBHeightComplete))
 				if extraDebug {
-					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", state.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
+					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", s.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
 				}
 				break VMListLoop
 			}

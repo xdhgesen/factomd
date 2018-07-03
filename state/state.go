@@ -1850,7 +1850,7 @@ func (s *State) AddFedServer(dbheight uint32, hash interfaces.IHash) int {
 	return s.ProcessLists.Get(dbheight).AddFedServer(hash)
 }
 
-func (s *State) TrimVMList(dbheight uint32, height uint32, vmIndex int) {
+func (s *State) TrimVMList(dbheight uint32, height int, vmIndex int) {
 	s.ProcessLists.Get(dbheight).TrimVMList(height, vmIndex)
 }
 
