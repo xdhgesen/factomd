@@ -11,6 +11,7 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var (
@@ -25,7 +26,7 @@ var (
 )
 
 // Check a filename and see if logging is on for that filename
-// If it never ben see then check with the regex. If it has been seen then just look it up in the map
+// If it has never been see then check with the regex. If it has been seen then just look it up in the map
 // assumes traceMutex is locked already
 func CheckFileName(name string) bool {
 	traceMutex.Lock()
@@ -47,6 +48,13 @@ func checkFileName(name string) bool {
 			panic(err)
 		}
 		enabled = make(map[string]bool) // create a clean cache of enabled files
+		files = make(map[string]*os.File)
+		// create entries for stdout and stderr. used the testing
+		enabled["/dev/stdout"] = true
+		enabled["/dev/stderr"] = true
+		files["/dev/stdout"] = os.Stdout
+		files["/dev/stderr"] = os.Stderr
+
 		TestRegex = theRegex
 		globals.LastDebugLogRegEx = globals.Params.DebugLogRegEx
 	}
@@ -106,14 +114,80 @@ func getmsg(hash [32]byte) string {
 	}
 	return rval
 }
-func LogMessage(name string, note string, msg interfaces.IMsg) {
+
+var findHex *regexp.Regexp
+
+// Look up the hex string in the map of names...
+func LookupName(s string) string {
+	n, ok := globals.FnodeNames[s]
+	if ok {
+		return "<" + n + ">"
+	}
+	return ""
+}
+
+// Look thru a string and annotate the string with names based on any hex strings
+func addNodeNames(s string) (rval string) {
+	var err error
+	if findHex == nil {
+		findHex, err = regexp.Compile("[A-Fa-f0-9]{6,}")
+		if err != nil {
+			panic(err)
+		}
+	}
+	hexStr := findHex.FindAllStringIndex(s, -1)
+	if hexStr == nil {
+		return s
+	}
+	// loop thru the matches last to first and add the name. Start with the last so the positions don't change
+	// as we add text
+	for i := len(hexStr); i > 0; {
+		i--
+		// if it's a short hex string
+		if hexStr[i][1]-hexStr[i][0] != 64 {
+			l := s[hexStr[i][0]:hexStr[i][1]]
+			s = s[:hexStr[i][1]] + LookupName(l) + s[hexStr[i][1]:]
+		} else {
+			// Shorten 32 byte IDs to [3:6]
+			l := s[hexStr[i][0]:hexStr[i][1]]
+			name := LookupName(l)
+			if name != "" {
+				s = s[:hexStr[i][0]] + s[hexStr[i][0]+6:hexStr[i][0]+12] + name + s[hexStr[i][1]:]
+			}
+		}
+	}
+	return s
+}
+
+// use a map to keep a set of reported whereAmI strings...
+var LogMessageCallers map[string]uint32 = make(map[string]uint32)
+
+// Last argument is always the message to log, returns the printed string
+func LogMessage(name string, format string, more ...interface{}) (rval string) {
 
 	traceMutex.Lock()
 	defer traceMutex.Unlock()
 	myfile := getTraceFile(name)
 	if myfile == nil {
-		return
+		return ""
 	}
+
+	//convert the last argument to a message and remove it from more
+	i := len(more) - 1
+	msgI := more[i]
+	msg, ok := msgI.(interfaces.IMsg)
+	if !ok {
+		caller := atomic.WhereAmIString(1)
+		if LogMessageCallers[caller] == 0 {
+			rval = fmt.Sprintf("LogMessage() called without a message from %s", caller)
+			fmt.Fprintln(os.Stderr, rval)
+			LogMessageCallers[caller] = 1
+		}
+		return rval
+	}
+
+	more = more[0:i] // remove the message
+
 	sequence++
 	seq := sequence
 	embeddedHash := ""
@@ -172,70 +246,29 @@ func LogMessage(name string, note string, msg interfaces.IMsg) {
 
 	now := time.Now().Local()
 
+	note := fmt.Sprintf(format, more...)
 	s := fmt.Sprintf("%7v %02d:%02d:%02d.%03d %-25s M-%v|R-%v|H-%v|%p %26s[%2v]:%v%v %v\n", seq, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000,
 		note, mhash, rhash, hash, msg, constants.MessageName(byte(t)), t,
 		msgString, embeddedHash, to)
 	s = addNodeNames(s)
 
 	myfile.WriteString(s)
-}
-
-var findHex *regexp.Regexp
-
-// Look up the hex string in the map of names...
-func LookupName(s string) string {
-	n, ok := globals.FnodeNames[s]
-	if ok {
-		return "<" + n + ">"
-	}
-	return ""
-}
-
-// Look thru a string and annotate the string with names based on any hex strings
-func addNodeNames(s string) (rval string) {
-	var err error
-	if findHex == nil {
-		findHex, err = regexp.Compile("[A-Fa-f0-9]{6,}")
-		if err != nil {
-			panic(err)
-		}
-	}
-	hexStr := findHex.FindAllStringIndex(s, -1)
-	if hexStr == nil {
-		return s
-	}
-	// loop thru the matches last to first and add the name. Start with the last so the positions don't change
-	// as we add text
-	for i := len(hexStr); i > 0; {
-		i--
-		// if it's a short hex string
-		if hexStr[i][1]-hexStr[i][0] != 64 {
-			l := s[hexStr[i][0]:hexStr[i][1]]
-			s = s[:hexStr[i][1]] + LookupName(l) + s[hexStr[i][1]:]
-		} else {
-			// Shorten 32 byte IDs to [3:6]
-			l := s[hexStr[i][0]:hexStr[i][1]]
-			name := LookupName(l)
-			if name != "" {
-				s = s[:hexStr[i][0]] + s[hexStr[i][0]+6:hexStr[i][0]+12] + name + s[hexStr[i][1]:]
-			}
-		}
-	}
 	return s
 }
 
-func LogPrintf(name string, format string, more ...interface{}) {
+func LogPrintf(name string, format string, more ...interface{}) string {
 	traceMutex.Lock()
 	defer traceMutex.Unlock()
 	myfile := getTraceFile(name)
 	if myfile == nil {
-		return
+		return ""
 	}
 	seq := sequence
 	now := time.Now().Local()
 	s := fmt.Sprintf("%7v %02d:%02d:%02d.%03d %s\n", seq, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000, fmt.Sprintf(format, more...))
 	s = addNodeNames(s)
 	myfile.WriteString(s)
+	return s
 }
 
 // stringify it in the caller to avoid having to deal with the import loop

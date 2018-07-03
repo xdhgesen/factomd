@@ -750,7 +750,7 @@ func Test5line(t *testing.T) {
 		//"--debugconsole=localhost",
 		"--startdelay=5",
 		fmt.Sprintf("-count=%d", nodes),
-		"--debuglog=.*",
+		"--debuglog=faulting|network|system",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--disablemmr",
