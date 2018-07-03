@@ -44,7 +44,6 @@ var debugExec_flag bool
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
-
 func (s *State) DebugExec() (ret bool) {
 	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
 
@@ -99,18 +98,10 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		msg.SendOut(s, msg)
 
 		switch msg.Type() {
-		case constants.REVEAL_ENTRY_MSG:
+		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
 			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
-		case constants.COMMIT_ENTRY_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				return true
-			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
-		case constants.COMMIT_CHAIN_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
+				delete(s.Holding, msg.GetHash().Fixed())
+				s.Commits.Delete(msg.GetHash().Fixed())
 				return true
 			}
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
@@ -381,6 +372,11 @@ func (s *State) ReviewHolding() {
 
 	highest := s.GetHighestKnownBlock()
 	saved := s.GetHighestSavedBlk()
+	for _, a := range s.Acks {
+		if s.Holding[a.GetHash().Fixed()] != nil {
+			a.FollowerExecute(s)
+		}
+	}
 
 	// Set this flag, so it acts as a constant.  We will set s.LeaderNewMin to false
 	// after processing the Holding Queue.  Ensures we only do this one per minute.
@@ -388,12 +384,6 @@ func (s *State) ReviewHolding() {
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
 	for k, v := range s.Holding {
-		ack := s.Acks[k]
-		if ack != nil {
-			s.LogMessage("executeMsg", "Found Ack for this thing in Holding", v)
-			v.FollowerExecute(s)
-			continue
-		}
 
 		if v.Expire(s) {
 			s.LogMessage("executeMsg", "expire from holding", v)
@@ -713,8 +703,8 @@ func rate() float64 {
 
 func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
-	add()
-	fmt.Printf("DBSTATE rate = %10.2f @ %d of ack(%d) (known(%d))\n", rate(), s.LLeaderHeight, s.GetHighestAck(), s.GetHighestKnownBlock())
+	//add()
+	//fmt.Printf("DBSTATE rate = %10.2f @ %d of ack(%d) (known(%d))\n", rate(), s.LLeaderHeight, s.GetHighestAck(), s.GetHighestKnownBlock())
 
 	dbstatemsg, _ := msg.(*messages.DBStateMsg)
 
@@ -865,10 +855,13 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	s.EOMDone = false
 	s.EOMSys = false
 	s.DBSig = false
-	s.DBSigDone = false
+	s.DBSigDone = false //p
+	//	s.LogPrintf("dbsig-eom", "DBSIGDone written %v @ %s", s.DBSigDone, atomic.WhereAmIString(0))
+
 	s.DBSigSys = false
 	s.Saving = true
 	s.Syncing = false
+	s.LogPrintf("dbsig-eom", "Reset Process State because we loaded a DBState")
 
 	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.
 	if s.DBStates.LastEnd < int(dbheight) {
@@ -946,13 +939,13 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	if okm {
 		s.LogMessage("executeMsg", "FollowerExecute3", msg)
 		msg.FollowerExecute(s)
+
+		s.LogMessage("executeMsg", "FollowerExecute4", ack)
+		ack.FollowerExecute(s)
+
+		s.MissingResponseAppliedCnt++
+
 	}
-
-	s.LogMessage("executeMsg", "FollowerExecute4", ack)
-	ack.FollowerExecute(s)
-
-	s.MissingResponseAppliedCnt++
-
 }
 
 func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
@@ -1205,6 +1198,8 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	TotalAcksInputs.Inc()
 	s.Acks[eom.GetMsgHash().Fixed()] = ack
 	m.SetLocal(false)
+	ack.SendOut(s, ack)
+	m.SendOut(s, m)
 	s.FollowerExecuteEOM(m)
 	s.UpdateState()
 	delete(s.Acks, ack.GetHash().Fixed())
@@ -1563,17 +1558,10 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// debug
 	if s.DebugExec() {
-		var ids string
 		if s.Syncing && s.EOM && !s.EOMDone && s.DBSigDone {
-			p := s.ProcessLists.Get(dbheight)
-			for i, l := range p.FedServers {
-				vm := p.VMs[i]
-				if !vm.Synced {
-					ids = ids + "," + l.GetChainID().String()[6:12]
-				}
-			}
+			ids := s.GetUnSyncedServers(dbheight)
 			if len(ids) > 0 {
-				s.LogPrintf("dbsig-eom", "Waiting for EOMs from %s", ids[1:])
+				s.LogPrintf("dbsig-eom", "Waiting for EOMs from %s", ids)
 			}
 		}
 	}
@@ -1828,6 +1816,23 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	return false
 }
 
+// Return a string with the short IDs for all unsynced VMs
+func (s *State) GetUnSyncedServers(dbheight uint32) string {
+	var ids string
+	p := s.ProcessLists.Get(dbheight)
+	for index, l := range s.GetFedServers(dbheight) {
+		vmIndex := p.ServerMap[s.CurrentMinute][index]
+		vm := p.VMs[vmIndex]
+		if !vm.Synced {
+			ids = ids + "," + l.GetChainID().String()[6:12]
+		}
+	}
+	if len(ids) > 0 {
+		ids = ids[1:] // drop the leading comma
+	}
+	return ids
+}
+
 func (s *State) CheckForIDChange() {
 	var reloadIdentity bool = false
 	if s.AckChange > 0 {
@@ -1879,18 +1884,34 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 	if s.Syncing && !s.DBSig {
 		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Will Not Process: dbht: %d return on s.Syncing(%v) && !s.DBSig(%v)", s.FactomNodeName,
 		//	dbs.DBHeight, s.Syncing, s.DBSig))
+		s.LogPrintf("dbsig-eom", "ProcessDBSig skip wait for EOMs to be done")
 		return false
 	}
 
 	pl := s.ProcessLists.Get(dbheight)
 	vm := s.ProcessLists.Get(dbheight).VMs[msg.GetVMIndex()]
 
+	// debug
+	s.LogPrintf("dbsig-eom", "ProcessDBSig@%d/%d/%d minute %d, Syncing %v , DBSID %v, DBSigDone %v, DBSigProcessed %v, DBSigLimit %v DBSigDone %v",
+		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
+
+	// debug
+	if s.DebugExec() {
+		if s.Syncing && s.DBSig && !s.DBSigDone {
+			ids := s.GetUnSyncedServers(dbheight)
+			if len(ids) > 0 {
+				s.LogPrintf("dbsig-eom", "Waiting for DBSigs from %s", ids)
+			}
+		}
+	}
 	if uint32(pl.System.Height) >= dbs.SysHeight {
 		s.DBSigSys = true
 	}
 
+	s.LogMessage("dbsig-eom", "ProcessDBSig ", msg)
 	// If we are done with DBSigs, and this message is processed, then we are done.  Let everything go!
 	if s.DBSigSys && s.DBSig && s.DBSigDone {
+		s.LogPrintf("dbsig-eom", "ProcessDBSig finalize DBSig processing")
 		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Finished with DBSig: s.DBSigSys(%v) && s.DBSig(%v) && s.DBSigDone(%v)", s.FactomNodeName, s.DBSigSys, s.DBSig, s.DBSigDone))
 		s.DBSigProcessed--
 		if s.DBSigProcessed <= 0 {
@@ -1899,6 +1920,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			s.EOM = false
 			s.DBSig = false
 			s.Syncing = false
+			s.LogPrintf("dbsig-eom", "ProcessDBSig complete for %d", dbs.Minute)
 		}
 		vm.Signed = true
 		//s.LeaderPL.AdminBlock
@@ -1907,13 +1929,16 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// Put the stuff that only executes once at the start of DBSignatures here
 	if !s.DBSig {
+		s.LogPrintf("dbsig-eom", "ProcessDBSig start DBSig processing for %d", dbs.Minute)
 
 		//fmt.Printf("ProcessDBSig(): %s Start DBSig %s\n", s.FactomNodeName, dbs.String())
 		s.DBSigLimit = len(pl.FedServers)
 		s.DBSigProcessed = 0
 		s.DBSig = true
 		s.Syncing = true
-		s.DBSigDone = false
+		s.DBSigDone = false // p
+		//		s.LogPrintf("dbsig-eom", "DBSIGDone written %v @ %s", s.DBSigDone, atomic.WhereAmIString(0))
+
 		for _, vm := range pl.VMs {
 			vm.Synced = false
 		}
@@ -1922,6 +1947,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// Put the stuff that executes per DBSignature here
 	if !vm.Synced {
+		s.LogPrintf("dbsig-eom", "ProcessDBSig Handle VM(%v) minute %d", msg.GetVMIndex(), dbs.Minute)
 
 		if s.LLeaderHeight > 0 && s.GetHighestCompletedBlk()+1 < s.LLeaderHeight {
 
@@ -1998,6 +2024,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// Put the stuff that executes once for set of DBSignatures (after I have them all) here
 	if allfaults && !s.DBSigDone && s.DBSigProcessed >= s.DBSigLimit {
+		s.LogPrintf("dbsig-eom", "ProcessDBSig stop DBSig processing minute %d", s.CurrentMinute)
 		//fmt.Println(fmt.Sprintf("All DBSigs are processed: allfaults(%v), && !s.DBSigDone(%v) && s.DBSigProcessed(%v)>= s.DBSigLimit(%v)",
 		//	allfaults, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit))
 		fails := 0
@@ -2025,7 +2052,9 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 		s.ReviewHolding()
 		s.Saving = false
-		s.DBSigDone = true
+		s.DBSigDone = true // p
+		//		s.LogPrintf("dbsig-eom", "DBSIGDone written %v @ %s", s.DBSigDone, atomic.WhereAmIString(0))
+
 	}
 	return false
 	/*
