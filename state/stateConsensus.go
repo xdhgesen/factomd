@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"hash"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -2473,10 +2474,12 @@ func (s *State) GetDirectoryBlock() interfaces.IDirectoryBlock {
 
 func (s *State) GetNewHash() (rval interfaces.IHash) {
 	defer func() {
-		if rval.IsHashNil() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
+			primitives.LogNilHashBug("State.GetNewHash() saw an interface that was nil")
 		}
 	}()
+
 	return new(primitives.Hash)
 }
 
