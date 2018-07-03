@@ -181,7 +181,7 @@ func (m *DBStateMsg) Validate(state interfaces.IState) int {
 	}
 
 	if diff > max {
-		fmt.Printf("DBState %v blocks ahead arrived in validate\n", diff)
+		//fmt.Printf("DBState %v blocks ahead arrived in validate\n", diff)
 		max = diff
 	}
 
