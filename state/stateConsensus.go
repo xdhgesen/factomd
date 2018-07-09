@@ -221,8 +221,9 @@ func (s *State) Process() (progress bool) {
 
 	/** Process all the DBStates  that might be pending **/
 
+	blk := s.GetHighestSavedBlk()
 	for {
-		ix := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase + 1
+		ix := int(blk) - s.DBStatesReceivedBase + 1
 		if ix < 0 || ix >= len(s.DBStatesReceived) {
 			break
 		}

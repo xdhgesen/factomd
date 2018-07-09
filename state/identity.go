@@ -7,6 +7,8 @@ package state
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"sort"
 
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/identity"
@@ -14,9 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 
-	"sort"
-
-	"fmt"
 
 	log "github.com/sirupsen/logrus"
 )
