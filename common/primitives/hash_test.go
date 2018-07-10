@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -16,6 +17,32 @@ import (
 	. "github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
 )
+
+func junk(x string) {
+	defer func() {
+		LogNilHashBug(x)
+	}()
+}
+
+func junk2(x string) {
+	defer func() {
+		LogNilHashBug(x)
+	}()
+}
+
+func Example_LogNilHashBugOnce() {
+	os.Stderr = os.Stdout
+	junk("GotA")
+	// Output: GotA. Called from goroutine 1 -/common/primitives/hash_test.go:25
+}
+
+func Example_LogNilHashBugMultiple() {
+	os.Stderr = os.Stdout
+	for i := 0; i < 5; i++ {
+		junk2(fmt.Sprintf("Got%d", i))
+	}
+	// Output: Got0. Called from goroutine 1 -/common/primitives/hash_test.go:31
+}
 
 func TestUnmarshalNilHash(t *testing.T) {
 	defer func() {
