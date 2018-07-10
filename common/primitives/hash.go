@@ -33,8 +33,6 @@ var ZeroHash interfaces.IHash = NewHash(constants.ZERO_HASH)
 
 var noRepeat map[string]int = make(map[string]int)
 
-
-
 func LogNilHashBug(msg string) {
 	whereAmI := atomic.WhereAmIString(2)
 	noRepeat[whereAmI]++
@@ -275,7 +273,13 @@ func (e *Hash) JSONString() (string, error) {
  **********************/
 
 // Create a Sha256 Hash from a byte array
-func Sha(p []byte) interfaces.IHash {
+func Sha(p []byte) (rval interfaces.IHash) {
+	defer func() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+			LogNilHashBug("primitives.Sha() saw an interface that was nil")
+		}
+	}()
 	h := new(Hash)
 	b := sha256.Sum256(p)
 	h.SetBytes(b[:])
@@ -283,7 +287,13 @@ func Sha(p []byte) interfaces.IHash {
 }
 
 // Shad Double Sha256 Hash; sha256(sha256(data))
-func Shad(data []byte) interfaces.IHash {
+func Shad(data []byte) (rval interfaces.IHash) {
+	defer func() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+			LogNilHashBug("primitives.Shad() saw an interface that was nil")
+		}
+	}()
 	h1 := sha256.Sum256(data)
 	h2 := sha256.Sum256(h1[:])
 	h := new(Hash)

@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	. "github.com/FactomProject/factomd/common/globals"
@@ -24,8 +25,6 @@ import (
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
-
-	"strings"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/messages"
@@ -310,10 +309,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
 	}
-	// Modify Identities of new nodes
-	if len(fnodes) > 1 && len(s.Prefix) == 0 {
-		modifyLoadIdentities() // We clone s to make all of our servers
-	}
+	//// Modify Identities of new nodes
+	//if len(fnodes) > 1 && len(s.Prefix) == 0 {
+	//	modifyLoadIdentities() // We clone s to make all of our servers
+	//}
 
 	// Setup the Skeleton Identity & Registration
 	for i := range fnodes {
@@ -347,6 +346,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		constants.COINBASE_DECLARATION = 10
 		constants.COINBASE_PAYOUT_FREQUENCY = 5
 		constants.COINBASE_ACTIVATION = 0
+
 	case "CUSTOM", "custom":
 		if bytes.Compare(p.CustomNet, []byte("\xe3\xb0\xc4\x42")) == 0 {
 			panic("Please specify a custom network with -customnet=<something unique here>")
@@ -513,9 +513,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	}
 
 	var colors []string = []string{"95cde5", "b01700", "db8e3c", "ffe35f"}
-
-	for i, s := range fnodes {
-		fmt.Printf("%d {color:#%v, shape:dot, label:%v}\n", i, colors[i%len(colors)], s.State.FactomNodeName)
+	if len(fnodes) > 2 {
+		for i, s := range fnodes {
+			fmt.Printf("%d {color:#%v, shape:dot, label:%v}\n", i, colors[i%len(colors)], s.State.FactomNodeName)
+		}
 	}
 	// Initate dbstate plugin if enabled. Only does so for first node,
 	// any more nodes on sim control will use default method
