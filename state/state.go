@@ -427,7 +427,6 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 
 	config := false
 	fi, err := os.Stat(configfile)
-	fmt.Printf("[%v] [%v]\n", fi, err)
 	if !os.IsNotExist(err) {
 		os.Stderr.WriteString(fmt.Sprintf("   Using the %s config file.\n", configfile))
 		newState.LoadConfig(configfile, s.GetNetworkName())
