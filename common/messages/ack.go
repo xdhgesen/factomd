@@ -113,6 +113,7 @@ func (m *Ack) Validate(s interfaces.IState) int {
 		return -1
 	}
 
+	_ = z
 	if s.GetHighestAck() < m.DBHeight {
 		s.SetHighestAck(m.DBHeight) // assume the ack isn't lying. this will make us start requesting DBState blocks...
 	}

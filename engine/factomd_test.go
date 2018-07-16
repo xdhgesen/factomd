@@ -121,7 +121,7 @@ func TestSetupANetwork(t *testing.T) {
 		"--controlpanelport=37002",
 		"--networkport=37003",
 		"--startdelay=1",
-		//"--debuglog=.*",
+		"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -147,9 +147,9 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("w")
 	WaitBlocks(state0, 1)
 	runCmd("g10")
-	WaitBlocks(state0, 1)
+	WaitBlocks(state0, 2)
 	// Allocate 4 leaders
-	WaitForMinute(state0, 3)
+	WaitForMinute(state0, 1)
 
 	runCmd("1")
 	runCmd("l")
@@ -364,7 +364,7 @@ func TestMakeALeader(t *testing.T) {
 		"--roundtimeout=2",
 		"--count=2",
 		"--startdelay=1",
-		//"--debuglog=F.*",
+		"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",

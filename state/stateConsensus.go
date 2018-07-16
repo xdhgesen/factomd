@@ -8,7 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"sync"
+	"os"
+	"reflect"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -410,7 +411,7 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-			v.SendOut(s, v)
+		v.SendOut(s, v)
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
@@ -637,7 +638,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 		// there is already a message in our slot?
 		if list[ack.Height].GetRepeatHash() != msg.GetRepeatHash() {
 			s.LogPrintf("executeMsg", "drop, processlist slot taken", len(list), int(ack.Height), list[ack.Height])
-		s.LogMessage("executeMsg", "found ", list[ack.Height])
+			s.LogMessage("executeMsg", "found ", list[ack.Height])
 		} else {
 			s.LogMessage("executeMsg", "executed twice", msg)
 		}
