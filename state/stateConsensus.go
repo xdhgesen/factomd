@@ -8,8 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"os"
-	"reflect"
+	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -38,6 +37,7 @@ var _ = (*hash.Hash32)(nil)
 //
 // Returns true if some message was processed.
 //***************************************************************
+
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
@@ -74,6 +74,7 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
+
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
 		return false
@@ -409,7 +410,7 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		v.SendOut(s, v)
+			v.SendOut(s, v)
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
@@ -540,13 +541,12 @@ func (s *State) AddDBState(isNew bool,
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
 			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			defer s.LeaderPL.FactoidBalancesTMutex.Unlock()
+			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesTMutex.Unlock()
 
 			s.LeaderPL.ECBalancesTMutex.Lock()
-			defer s.LeaderPL.ECBalancesTMutex.Unlock()
-
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.ECBalancesTMutex.Unlock()
 		}
 
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -637,7 +637,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 		// there is already a message in our slot?
 		if list[ack.Height].GetRepeatHash() != msg.GetRepeatHash() {
 			s.LogPrintf("executeMsg", "drop, processlist slot taken", len(list), int(ack.Height), list[ack.Height])
-			s.LogMessage("executeMsg", "found ", list[ack.Height])
+		s.LogMessage("executeMsg", "found ", list[ack.Height])
 		} else {
 			s.LogMessage("executeMsg", "executed twice", msg)
 		}
