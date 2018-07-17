@@ -73,9 +73,9 @@ func networkname() string {
 	if !once {
 		once = true
 		netName = globals.Params.NetworkName
-		if netName == "CUSTOM" {
+	if netName == "CUSTOM" {
 			netName = fmt.Sprintf("%s:%s", netName, globals.Params.CustomNetName)
-		}
+	}
 		fmt.Printf("Using NetworkName \"%s\"\n", netName)
 	}
 	return netName
