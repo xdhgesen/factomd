@@ -184,6 +184,7 @@ func (c *Connection) StatusString() string {
 func (c *Connection) IsPersistent() bool {
 	return c.isPersistent
 }
+
 func (c *Connection) Notes() string {
 	return c.notes
 }
@@ -214,6 +215,14 @@ func (c *Connection) commonInit(peer Peer) {
 func (c *Connection) Start() {
 	c.logger.Debug("Starting connection")
 	go c.runLoop()
+}
+
+// Copies metrics from another connection to this one.
+func (c *Connection) CopyMetricsFrom(another *Connection) {
+	// perform a shallow copy of the metrics, but update the state with the
+	// current value
+	c.metrics = another.metrics
+	c.metrics.ConnectionState = connectionStateStrings[c.state]
 }
 
 // runloop OWNs the connection.  It is the only goroutine that can change values in the connection struct
@@ -635,12 +644,6 @@ func (c *Connection) handleParcelTypes(parcel Parcel) {
 	case TypePeerResponse:
 		BlockFreeChannelSend(c.ReceiveChannel, ConnectionParcel{Parcel: parcel}) // Controller handles these.
 	case TypeMessage:
-		c.peer.QualityScore = c.peer.QualityScore + 1
-		// Store our connection ID so the controller can direct response to us.
-		parcel.Header.TargetPeer = c.peer.Hash
-		parcel.Header.NodeID = NodeID
-		BlockFreeChannelSend(c.ReceiveChannel, ConnectionParcel{Parcel: parcel}) // Controller handles these.
-	case TypeMessagePart:
 		c.peer.QualityScore = c.peer.QualityScore + 1
 		// Store our connection ID so the controller can direct response to us.
 		parcel.Header.TargetPeer = c.peer.Hash
