@@ -35,7 +35,7 @@ var controllerLogger = packageLogger.WithField("subpack", "controller")
 type Controller struct {
 	keepRunning bool // Indicates its time to shut down when false.
 
-	listenPort           string                 // port we listen on for new connections
+	listenPort  string             // port we listen on for new connections
 	connections *ConnectionManager // current connections
 
 	// After launching the network, the management is done via these channels.
@@ -51,12 +51,12 @@ type Controller struct {
 
 	discovery Discovery // Our discovery structure
 
-	lastPeerManagement        time.Time // Last time we ran peer management.
-	lastDiscoveryRequest      time.Time
-	NodeID                    uint64
-	lastStatusReport          time.Time
-	lastPeerRequest           time.Time        // Last time we asked peers about the peers they know about.
-	specialPeers              map[string]*Peer // special peers (from config file and from the command line params) by peer address
+	lastPeerManagement   time.Time // Last time we ran peer management.
+	lastDiscoveryRequest time.Time
+	NodeID               uint64
+	lastStatusReport     time.Time
+	lastPeerRequest      time.Time        // Last time we asked peers about the peers they know about.
+	specialPeers         map[string]*Peer // special peers (from config file and from the command line params) by peer address
 
 	// logging
 	logger *log.Entry
@@ -602,9 +602,9 @@ func (c *Controller) managePeers() {
 			parcel := *parcelp
 			parcel.Header.Type = TypePeerRequest
 			c.connections.SendToAll(ConnectionParcel{Parcel: parcel})
-			}
 		}
 	}
+}
 
 func (c *Controller) fillOutgoingSlots(openSlots int) {
 	peers := c.discovery.GetOutgoingPeers()
@@ -694,7 +694,7 @@ func (c *Controller) sendToRandomPeer(parcel Parcel) {
 	if randomConn == nil {
 		c.logger.Warn("Sending a parcel to a random peer failed: we don't have any peers to send to")
 		return
-}
+	}
 
 	parcel.Header.TargetPeer = randomConn.peer.Hash
 	c.doDirectedSend(parcel)
