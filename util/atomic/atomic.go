@@ -112,7 +112,7 @@ func Goid() string {
 
 func WhereAmIString(depth int) string {
 	_, fn, line, _ := runtime.Caller(depth + 1)
-    if prefix < len(fn) {
+	if prefix < len(fn) {
 		fn = fn[prefix:]
 	}
 	return fmt.Sprintf("%v-%s:%d", Goid(), fn, line)

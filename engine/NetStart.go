@@ -309,10 +309,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
 	}
-	//// Modify Identities of new nodes
-	//if len(fnodes) > 1 && len(s.Prefix) == 0 {
-	//	modifyLoadIdentities() // We clone s to make all of our servers
-	//}
+	// Modify Identities of new nodes
+	if len(fnodes) > 1 && len(s.Prefix) == 0 {
+		modifyLoadIdentities() // We clone s to make all of our servers
+	}
 
 	// Setup the Skeleton Identity & Registration
 	for i := range fnodes {

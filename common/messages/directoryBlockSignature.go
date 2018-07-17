@@ -170,16 +170,16 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 	if err != nil {
 		vlog("DirectoryBlockSignature  MarshalBinary fail %v", err)
 	}
+	// if this is a DBSig for a saved block it's invalid (old)
 	if m.DBHeight <= state.GetHighestSavedBlk() {
 		return -1 // past fail it
 	}
-	//block := state.GetHighestKnownBlock()
-	//if m.DBHeight > block+30 {
-	//	return -1 // Far future fail it
-	//}
-	//if m.DBHeight > block+3 {
-	//	return 0 // near future hold it
-	//}
+	// if this is a DBSig for a future block it's invalid (to far in the future)
+	if m.DBHeight > state.GetHighestKnownBlock() { // (this may need to be +1?)
+		//	vlog("[1] Validate Fail %s -- RAW: %x", m.String(), MarshalBinary())
+		//	// state.Logf("error", "DirectoryBlockSignature: Fail dbstate ht: %v < dbht: %v  %s\n  [%s] RAW: %x", m.DBHeight, state.GetHighestSavedBlk(), m.String(), m.GetMsgHash().String(), MarshalBinary())
+		return -1
+	}
 
 	found, _ := state.GetVirtualServers(m.DBHeight, 9, m.ServerIdentityChainID)
 
@@ -403,6 +403,7 @@ func (m *DirectoryBlockSignature) MarshalForSignature() (rval []byte, err error)
 
 func (m *DirectoryBlockSignature) MarshalBinary() (data []byte, err error) {
 
+	// do we have a saved binary version already?
 	if m.marshalCache != nil {
 		return m.marshalCache, nil
 	}
@@ -420,6 +421,8 @@ func (m *DirectoryBlockSignature) MarshalBinary() (data []byte, err error) {
 		}
 		return append(resp, sigBytes...), nil
 	}
+	// remember the binary version for next time
+	m.marshalCache = resp
 	return resp, nil
 }
 

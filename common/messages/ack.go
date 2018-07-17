@@ -113,12 +113,9 @@ func (m *Ack) Validate(s interfaces.IState) int {
 		return -1
 	}
 
-	_ = z
 	if s.GetHighestAck() < m.DBHeight {
 		s.SetHighestAck(m.DBHeight) // assume the ack isn't lying. this will make us start requesting DBState blocks...
 	}
-
-	//TODO: Check if ack is in the past? -- clay
 
 	delta := (int(m.DBHeight)-int(s.GetLeaderPL().GetDBHeight()))*10 + (int(m.Minute) - int(s.GetCurrentMinute()))
 
