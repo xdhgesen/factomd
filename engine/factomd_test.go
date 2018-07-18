@@ -26,20 +26,24 @@ var _ = Factomd
 func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, t *testing.T) *state.State {
 	l := len(GivenNodes)
 	DefaultOptions := map[string]string{
-		"--db":           "Map",
-		"--network":      fmt.Sprintf("%v", NetworkType),
-		"--net":          "alot+",
-		"--enablenet":    "false",
-		"--blktime":      "8",
-		"--faulttimeout": "2",
-		"--roundtimeout": "2",
-		"--count":        fmt.Sprintf("%v", l),
+		"--db":               "Map",
+		"--network":          fmt.Sprintf("%v", NetworkType),
+		"--net":              "alot+",
+		"--enablenet":        "false",
+		"--blktime":          "8",
+		"--faulttimeout":     "2",
+		"--roundtimeout":     "2",
+		"--count":            fmt.Sprintf("%v", l),
+		"--startdelay":       "1",
+		"--stdoutlog":        "out.txt",
+		"--stderrlog":        "err.txt",
+		"--checkheads":       "false",
+		"--logPort":          "37000",
+		"--port":             "37001",
+		"--controlpanelport": "37002",
+		"--networkport":      "37003",
+		"--debugconsole":     "remotehost:37093",
 		//"--debuglog=.*",
-		//"--debuglog=F.*",
-		"--startdelay": "1",
-		"--stdoutlog":  "out.txt",
-		"--stderrlog":  "err.txt",
-		"--checkheads": "false",
 	}
 
 	returningSlice := []string{}
@@ -199,7 +203,7 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{}, t)
 
 	runCmd("s")  // Show the process lists and directory block states as
 	runCmd("9")  // Puts the focus on node 9
@@ -338,7 +342,7 @@ func TestMakeALeader(t *testing.T) {
 	CheckAuthoritySet(2, 0, t)
 
 	PrintOneStatus(0, 0)
-	dblim := 3
+	dblim := 4
 	if state0.LLeaderHeight > uint32(dblim) {
 		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
 	}

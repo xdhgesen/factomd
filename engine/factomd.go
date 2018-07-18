@@ -5,23 +5,24 @@
 package engine
 
 import (
+	"bufio"
 	"fmt"
+	"io"
+	"net"
+	"os"
+	"os/exec"
+	"os/user"
 	"runtime"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-
-	"bufio"
-	"io"
-	"net"
-	"os"
-	"os/exec"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
+	"github.com/FactomProject/factomd/util"
 
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	log "github.com/sirupsen/logrus"
@@ -51,6 +52,21 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	fmt.Printf("Version: %s\n", FactomdVersion)
 	StartTime = time.Now()
 	fmt.Printf("Start time: %s\n", StartTime.String())
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Current directory: %s\n", cwd)
+
+	user, err := user.Current()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Current Id: " + user.Uid)
+	fmt.Println("Current Username: " + user.Username)
+	fmt.Println("Current Home Dir: " + user.HomeDir)
+	fmt.Println("Current Factom Home Dir: " + util.GetHomeDir())
 
 	state0 := new(state.State)
 	state0.IsRunning = true
