@@ -74,7 +74,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	if p.ConfigPath != "" {
 		FactomConfigFilename = p.ConfigPath
 	}
-	fmt.Println(fmt.Sprintf("factom config: %s", FactomConfigFilename))
+	fmt.Println(fmt.Sprintf("Factom config: %s", FactomConfigFilename))
 	s.LoadConfig(FactomConfigFilename, p.NetworkName)
 	s.OneLeader = p.Rotate
 	s.TimeOffset = primitives.NewTimestampFromMilliseconds(uint64(p.TimeOffset))
