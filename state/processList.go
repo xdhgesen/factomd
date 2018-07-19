@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"reflect"
 	"sync"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -781,6 +782,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				expectedSerialHash, err = primitives.CreateHash(last.MessageHash, thisAck.MessageHash)
 				if err != nil {
 					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
+					p.State.LogMessage("badMsgs", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
+
 					vm.List[j] = nil
 					if vm.HighestNil > j {
 						vm.HighestNil = j // Drag report limit back
@@ -834,6 +837,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 
 				if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					s.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
+					s.LogMessage("badMsgs", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
+
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					if vm.HighestNil > j {
 						vm.HighestNil = j // Drag report limit back
@@ -904,6 +909,15 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	}
 	if ack.GetMsgHash() == nil {
 		p.State.LogPrintf("processList", "Drop ack.GetMsgHash() == nil")
+		return
+	}
+
+	if m.GetHash() == nil || reflect.ValueOf(m.GetHash()).IsNil() {
+		p.State.LogMessage("badMsgs", "Nil hash in AddToProcessList", m)
+		return
+	}
+	if ack.GetHash() == nil || reflect.ValueOf(ack.GetHash()).IsNil() {
+		p.State.LogMessage("badMsgs", "Nil hash in AddToProcessList", ack)
 		return
 	}
 

@@ -117,7 +117,7 @@ func (m *Ack) Validate(s interfaces.IState) int {
 		s.SetHighestAck(m.DBHeight) // assume the ack isn't lying. this will make us start requesting DBState blocks...
 	}
 
-	delta := (int(m.DBHeight)-int(s.GetLeaderPL().GetDBHeight()))*10 + (int(m.Minute) - int(s.GetCurrentMinute()))
+	delta := (int(m.DBHeight)-int(s.GetLLeaderHeight()))*10 + (int(m.Minute) - int(s.GetCurrentMinute()))
 
 	if delta > 30 {
 		s.LogMessage("ackQueue", "Drop ack from future", m)
@@ -126,7 +126,7 @@ func (m *Ack) Validate(s interfaces.IState) int {
 		return -1
 	}
 
-	if delta > 15 {
+	if delta > 3 {
 		return 0 // put this in the holding and validate it later
 	}
 

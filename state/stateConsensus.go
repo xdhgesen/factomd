@@ -1816,7 +1816,7 @@ func (s *State) GetUnSyncedServers(dbheight uint32) string {
 		vmIndex := p.ServerMap[s.CurrentMinute][index]
 		vm := p.VMs[vmIndex]
 		if !vm.Synced {
-			ids = ids + "," + l.GetChainID().String()[6:12]
+			ids = ids + "," + fmt.Sprintf("%s:vm%d", l.GetChainID().String()[6:12], vmIndex)
 		}
 	}
 	if len(ids) > 0 {

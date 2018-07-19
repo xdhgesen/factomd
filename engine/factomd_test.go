@@ -84,9 +84,9 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 	time.Sleep(3 * time.Second)
 	creatingNodes(GivenNodes, state0)
 
-	t.Log("Allocated " + string(l) + " nodes")
+	t.Logf("Allocated %d nodes", l)
 	if len(GetFnodes()) != l {
-		t.Fatal("Should have allocated " + string(l) + " nodes")
+		t.Fatalf("Should have allocated %d nodes", l)
 		t.Fail()
 	}
 	return state0
@@ -211,6 +211,7 @@ func WaitMinutes(s *state.State, min int) {
 var ranSimTest = false
 
 func runCmd(cmd string) {
+	os.Stdout.WriteString("Executing: " + cmd + "\n")
 	os.Stderr.WriteString("Executing: " + cmd + "\n")
 	InputChan <- cmd
 	return

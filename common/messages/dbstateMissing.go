@@ -110,8 +110,8 @@ func (m *DBStateMissing) Validate(state interfaces.IState) int {
 	//	return -1
 	//}
 	//if the DBH start is in my future I can't help
-	block := state.GetHighestKnownBlock()
-	if m.DBHeightStart > block {
+	block := state.GetLLeaderHeight()
+	if m.DBHeightStart >= block {
 		return -1
 	}
 	return 1

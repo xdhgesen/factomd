@@ -305,7 +305,7 @@ func (e *Elections) LogMessage(logName string, comment string, msg interfaces.IM
 }
 
 func (e *Elections) LogPrintLeaders(log string) {
-	e.LogPrintf(log, "%20s | %20s", "Fed", "Aud")
+	e.LogPrintf(log, "AuthSet %15s | %15s", "Fed", "Aud")
 	limit := len(e.Federated)
 	if limit < len(e.Audit) {
 		limit = len(e.Audit)
@@ -314,12 +314,12 @@ func (e *Elections) LogPrintLeaders(log string) {
 		f := ""
 		a := ""
 		if i < len(e.Federated) {
-			f = fmt.Sprintf("%x", e.Federated[i].GetChainID().Bytes()[3:5])
+			f = fmt.Sprintf("%x", e.Federated[i].GetChainID().Bytes()[3:6])
 		}
 		if i < len(e.Audit) {
-			a = fmt.Sprintf("%x", e.Audit[i].GetChainID().Bytes()[3:5])
+			a = fmt.Sprintf("%x", e.Audit[i].GetChainID().Bytes()[3:6])
 		}
-		e.LogPrintf(log, "%x | %x", f, a)
+		e.LogPrintf(log, "AuthSet %15s | %215s", f, a)
 	}
 
 }
