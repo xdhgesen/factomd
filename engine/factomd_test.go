@@ -3,6 +3,7 @@ package engine_test
 import (
 	"fmt"
 	"os"
+	"reflect"
 	"runtime"
 	"sync"
 	"testing"
@@ -46,18 +47,38 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 		//"--debuglog=.*",
 	}
 
-	returningSlice := []string{}
-	for key, value := range DefaultOptions {
-		returningSlice = append(returningSlice, key+"="+value)
-	}
-
+	// loop thru the test specific options and overwrite the DefaultOptions
 	if Options != nil && len(Options) != 0 {
 		for key, value := range Options {
 			DefaultOptions[key] = value
 		}
 	}
 
+	// built the fake command line
+	returningSlice := []string{}
+	for key, value := range DefaultOptions {
+		returningSlice = append(returningSlice, key+"="+value)
+	}
+
+	fmt.Println("Command Line Arguments:")
+	for _, v := range returningSlice {
+		fmt.Printf("\t%s\n", v)
+	}
+
 	params := ParseCmdLine(returningSlice)
+	fmt.Println()
+
+	fmt.Println("Parameter:")
+	s := reflect.ValueOf(params).Elem()
+	typeOfT := s.Type()
+
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		fmt.Printf("%d: %25s %s = %v\n", i,
+			typeOfT.Field(i).Name, f.Type(), f.Interface())
+	}
+	fmt.Println()
+
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
@@ -93,14 +114,13 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 
 	runCmd("0")
 	for i, c := range []byte(creatingNodes) {
-		fmt.Println(i)
 		switch c {
 		case 'L', 'l':
-			fmt.Println("L")
 			runCmd("l")
 		case 'A', 'a':
 			runCmd("o")
 		case 'F', 'f':
+			runCmd(fmt.Sprintf("%d", i+1))
 			break
 		default:
 			panic("NOT L, A or F")
@@ -318,7 +338,7 @@ func TestLoad(t *testing.T) {
 	WaitBlocks(state0, 1)
 
 	PrintOneStatus(0, 0)
-	dblim := 32
+	dblim := 34
 	if state0.LLeaderHeight > uint32(dblim) {
 		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
 	}
@@ -500,7 +520,7 @@ func TestAnElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--debuglog": ".*"}, t)
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
