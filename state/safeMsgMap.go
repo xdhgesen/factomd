@@ -37,7 +37,9 @@ func (m *SafeMsgMap) Put(key [32]byte, msg interfaces.IMsg) {
 	m.Lock()
 	_, ok := m.msgmap[key]
 	if !ok {
-		defer m.s.LogMessage(m.name, "put", msg)
+		if m.s != nil {
+			defer m.s.LogMessage(m.name, "put", msg)
+		}
 	}
 	m.msgmap[key] = msg
 	m.Unlock()
@@ -47,7 +49,9 @@ func (m *SafeMsgMap) Delete(key [32]byte) (msg interfaces.IMsg, found bool) {
 	m.Lock()
 	msg, ok := m.msgmap[key] // return the message being deleted
 	if ok {
-		defer m.s.LogMessage(m.name, "delete", msg)
+		if m.s != nil {
+			defer m.s.LogMessage(m.name, "delete", msg)
+		}
 		delete(m.msgmap, key)
 	}
 	m.Unlock()
@@ -79,7 +83,9 @@ func (m *SafeMsgMap) Reset() {
 		m.msgmap = make(map[[32]byte]interfaces.IMsg)
 	}
 	m.Unlock()
-	m.s.LogPrintf(m.name, "reset")
+	if m.s != nil {
+		m.s.LogPrintf(m.name, "reset")
+	}
 }
 
 //

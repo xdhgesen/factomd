@@ -42,7 +42,6 @@ var _ = (*hash.Hash32)(nil)
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
-
 func (s *State) DebugExec() (ret bool) {
 	return globals.Params.DebugLogRegEx != ""
 }
@@ -50,31 +49,39 @@ func (s *State) DebugExec() (ret bool) {
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
 	if s.DebugExec() {
 		var dbh int
-		if s == nil {
-			fmt.Fprintf(os.Stderr, "No State %s:%s:%s\n", logName, comment, msg.String())
-			return
-		}
+		nodeName := "unknown"
+		minute := 0
+		if s != nil {
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, comment, msg)
+			nodeName = s.FactomNodeName
+			minute = int(s.CurrentMinute)
+		}
+		messages.StateLogMessage(nodeName, dbh, minute, logName, comment, msg)
 	}
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	if s.DebugExec() {
 		var dbh int
-		if s == nil {
-			fmt.Fprintf(os.Stderr, "No State %s:%s\n", logName, fmt.Sprintf(format, more))
-			return
-		}
+		nodeName := "unknown"
+		minute := 0
+		if s != nil {
 		if s.LeaderPL != nil {
 			dbh = int(s.LeaderPL.DBHeight)
 		}
-		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
+			nodeName = s.FactomNodeName
+			minute = int(s.CurrentMinute)
 	}
+		messages.StateLogPrintf(nodeName, dbh, minute, logName, format, more...)
+}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
+	if msg.GetHash() == nil {
+		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
+		return false
+	}
 
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
@@ -104,7 +111,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-		msg.SendOut(s, msg)
+			msg.SendOut(s, msg)
 
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
@@ -411,7 +418,7 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		v.SendOut(s, v)
+			v.SendOut(s, v)
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
@@ -638,7 +645,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 		// there is already a message in our slot?
 		if list[ack.Height].GetRepeatHash() != msg.GetRepeatHash() {
 			s.LogPrintf("executeMsg", "drop, processlist slot taken", len(list), int(ack.Height), list[ack.Height])
-			s.LogMessage("executeMsg", "found ", list[ack.Height])
+		s.LogMessage("executeMsg", "found ", list[ack.Height])
 		} else {
 			s.LogMessage("executeMsg", "executed twice", msg)
 		}
