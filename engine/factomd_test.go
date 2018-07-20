@@ -27,23 +27,24 @@ var _ = Factomd
 func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, t *testing.T) *state.State {
 	l := len(GivenNodes)
 	DefaultOptions := map[string]string{
-		"--db":               "Map",
-		"--network":          fmt.Sprintf("%v", NetworkType),
-		"--net":              "alot+",
-		"--enablenet":        "false",
-		"--blktime":          "8",
-		"--faulttimeout":     "2",
-		"--roundtimeout":     "2",
-		"--count":            fmt.Sprintf("%v", l),
-		"--startdelay":       "1",
-		"--stdoutlog":        "out.txt",
-		"--stderrlog":        "err.txt",
-		"--checkheads":       "false",
-		"--logPort":          "37000",
-		"--port":             "37001",
-		"--controlpanelport": "37002",
-		"--networkport":      "37003",
-		"--debugconsole":     "remotehost:37093",
+		"--db":                  "Map",
+		"--network":             fmt.Sprintf("%v", NetworkType),
+		"--net":                 "alot+",
+		"--enablenet":           "false",
+		"--blktime":             "8",
+		"--faulttimeout":        "2",
+		"--roundtimeout":        "2",
+		"--count":               fmt.Sprintf("%v", l),
+		"--startdelay":          "1",
+		"--stdoutlog":           "out.txt",
+		"--stderrlog":           "out.txt",
+		"--checkheads":          "false",
+		"--logPort":             "37000", // use different ports so I can run a test and a real node at the same time
+		"--port":                "37001",
+		"--controlpanelport":    "37002",
+		"--networkport":         "37003",
+		"--debugconsole":        "remotehost:37093", // turn on the debug console but don't open a window
+		"--controlpanelsetting": "readwrite",
 		//"--debuglog=.*",
 	}
 
@@ -645,7 +646,7 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{}, t)
 
 	state = GetFnodes()[2].State
 	state.MessageTally = true

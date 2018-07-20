@@ -2243,7 +2243,7 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
