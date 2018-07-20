@@ -19,6 +19,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
+
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
 
 	log "github.com/sirupsen/logrus"
@@ -28,6 +29,7 @@ var _ = fmt.Print
 var _ = log.Print
 
 var plLogger = packageLogger.WithFields(log.Fields{"subpack": "process-list"})
+
 
 type ProcessList struct {
 	DBHeight uint32 // The directory block height for these lists
@@ -98,21 +100,21 @@ type DBSig struct {
 }
 
 type VM struct {
-	List            []interfaces.IMsg    // Lists of acknowledged messages
-	ListAck         []*messages.Ack      // Acknowledgements
-	Height          int                  // Height of messages that have been processed
-	EomMinuteIssued int                  // Last Minute Issued on this VM (from the leader, when we are the leader)
-	LeaderMinute    int                  // Where the leader is in acknowledging messages
-	Synced          bool                 // Is this VM synced yet?
-	heartBeat       int64                // Just ping ever so often if we have heard nothing.
-	Signed          bool                 // We have signed the previous block.
-	WhenFaulted     int64                // WhenFaulted is a timestamp of when this VM was faulted
-	FaultFlag       int                  // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
-	ProcessTime     interfaces.Timestamp // Last time we made progress on this VM
-	VmIndex         int                  // the index of this MV
-	HighestAsk      int                  // highest ask sent to MMR for this VM
-	HighestNil      int                  // Debug highest nil reported
-	p               *ProcessList         // processList this VM part of
+	List            []interfaces.IMsg // Lists of acknowledged messages
+	ListAck         []*messages.Ack   // Acknowledgements
+	Height          int               // Height of messages that have been processed
+	EomMinuteIssued int               // Last Minute Issued on this VM (from the leader, when we are the leader)
+	LeaderMinute    int               // Where the leader is in acknowledging messages
+	Synced          bool              // Is this VM synced yet?
+	heartBeat   int64 // Just ping ever so often if we have heard nothing.
+	Signed      bool  // We have signed the previous block.
+	WhenFaulted int64 // WhenFaulted is a timestamp of when this VM was faulted
+	FaultFlag   int                  // FaultFlag tracks what the VM was faulted for (0 = EOM missing, 1 = negotiation issue)
+	ProcessTime interfaces.Timestamp // Last time we made progress on this VM
+	VmIndex     int                  // the index of this MV
+	HighestAsk  int                  // highest ask sent to MMR for this VM
+	HighestNil  int                  // Debug highest nil reported
+	p           *ProcessList         // processList this VM part of
 }
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
@@ -536,6 +538,7 @@ func (p *ProcessList) GetOldMsgs(key interfaces.IHash) interfaces.IMsg {
 	if p == nil {
 		return nil
 	}
+
 	p.oldmsgslock.Lock()
 	defer p.oldmsgslock.Unlock()
 	m, ok := p.OldMsgs[key.Fixed()]
@@ -618,6 +621,7 @@ func (p *ProcessList) CheckDiffSigTally() bool {
 	return true
 }
 
+
 func (p *ProcessList) TrimVMList(h uint32, vmIndex int) {
 	height := int(h)
 	if len(p.VMs[vmIndex].List) < height {
@@ -634,6 +638,7 @@ func (p *ProcessList) TrimVMList(h uint32, vmIndex int) {
 		}
 	} else {
 		p.State.LogPrintf("process", "Attempt to trim higher than list list=%d h=%d", len(p.VMs[vmIndex].List), height)
+
 	}
 }
 func (p *ProcessList) GetDBHeight() uint32 {
@@ -708,7 +713,6 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 }
 
 var extraDebug bool = false
-
 // Process messages and update our state.
 func (p *ProcessList) Process(s *State) (progress bool) {
 	dbht := s.GetHighestSavedBlk()
@@ -745,7 +749,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				s.LogPrintf("processStatus", x)
 				s.SyncingStateCurrent = (s.SyncingStateCurrent + 1) % len(s.SyncingState)
 				s.SyncingState[s.SyncingStateCurrent] = x
-			}
+				}
 			if extraDebug {
 				p.State.LogMessage("process", fmt.Sprintf("Consider %v/%v/%v", p.DBHeight, i, j), vm.List[j])
 			}
@@ -783,7 +787,6 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				if err != nil {
 					p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
 					p.State.LogMessage("badMsgs", fmt.Sprintf("nil out message %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), vm.List[j])
-
 					vm.List[j] = nil
 					if vm.HighestNil > j {
 						vm.HighestNil = j // Drag report limit back
@@ -838,7 +841,6 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
 					s.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
 					s.LogMessage("badMsgs", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
-
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					if vm.HighestNil > j {
 						vm.HighestNil = j // Drag report limit back
@@ -920,7 +922,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 		p.State.LogMessage("badMsgs", "Nil hash in AddToProcessList", ack)
 		return
 	}
-
 	TotalProcessListInputs.Inc()
 	messageHash := ack.GetHash() // This is the has of the message bring acknowledged not the hash of the ack message
 	msgHash := m.GetMsgHash()
@@ -1027,7 +1028,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	delete(p.State.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
-
 	p.AddOldMsgs(m)
 	p.OldAcks[msgHash.Fixed()] = ack
 
@@ -1204,6 +1204,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 	pl.PendingChainHeads = NewSafeMsgMap("PendingChainHeads", pl.State)
 	pl.OldMsgs = make(map[[32]byte]interfaces.IMsg)
 	pl.OldAcks = make(map[[32]byte]interfaces.IMsg)
+
 	pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
 	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 

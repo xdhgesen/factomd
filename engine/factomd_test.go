@@ -173,7 +173,6 @@ func WaitForMinute(s *state.State, min int) {
 	fmt.Printf("WaitForMinute(%d)\n", min)
 	TimeNow(s)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-
 	if s.CurrentMinute >= min {
 		for s.CurrentMinute > 0 {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
@@ -212,10 +211,10 @@ var ranSimTest = false
 
 func runCmd(cmd string) {
 	os.Stdout.WriteString("Executing: " + cmd + "\n")
-	os.Stderr.WriteString("Executing: " + cmd + "\n")
-	InputChan <- cmd
-	return
-}
+		os.Stderr.WriteString("Executing: " + cmd + "\n")
+		InputChan <- cmd
+		return
+	}
 
 func TestSetupANetwork(t *testing.T) {
 	if ranSimTest {
@@ -343,7 +342,6 @@ func TestLoad(t *testing.T) {
 	if state0.LLeaderHeight > uint32(dblim) {
 		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
 	}
-
 } // testLoad(){...}
 
 func TestMakeALeader(t *testing.T) {
@@ -597,6 +595,7 @@ func Test5up(t *testing.T) {
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
+
 	for {
 		pendingCommits := 0
 		for _, s := range fnodes {
@@ -637,6 +636,7 @@ func Test5up(t *testing.T) {
 	if state0.LLeaderHeight > 15 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
+
 }
 
 func TestDBsigEOMElection(t *testing.T) {
@@ -709,7 +709,6 @@ func TestDBsigEOMElection(t *testing.T) {
 	if state.LLeaderHeight > uint32(dblim) {
 		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state.LLeaderHeight)
 	}
-
 }
 func TestMultiple2Election(t *testing.T) {
 	if ranSimTest {
