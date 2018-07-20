@@ -32,7 +32,7 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 		"--net":              "alot+",
 		"--enablenet":        "false",
 		"--blktime":          "8",
-		"--faulttimeout":     "2",
+		"--faulttimeout":     "4",
 		"--roundtimeout":     "2",
 		"--count":            fmt.Sprintf("%v", l),
 		"--startdelay":       "1",
@@ -211,10 +211,10 @@ var ranSimTest = false
 
 func runCmd(cmd string) {
 	os.Stdout.WriteString("Executing: " + cmd + "\n")
-		os.Stderr.WriteString("Executing: " + cmd + "\n")
-		InputChan <- cmd
-		return
-	}
+	os.Stderr.WriteString("Executing: " + cmd + "\n")
+	InputChan <- cmd
+	return
+}
 
 func TestSetupANetwork(t *testing.T) {
 	if ranSimTest {
@@ -594,7 +594,6 @@ func Test5up(t *testing.T) {
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
-
 
 	for {
 		pendingCommits := 0
