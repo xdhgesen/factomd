@@ -219,14 +219,18 @@ func (f *P2PProxy) ManageOutChannel() {
 	for data := range f.BroadcastOut {
 		switch data.(type) {
 		case FactomMessage:
-			// Wrap it in a parcel and send it out channel ToNetwork.
 			fmessage := data.(FactomMessage)
-			parcel := p2p.NewParcel(p2p.CurrentNetwork, fmessage.Message)
-			parcel.Header.Type = p2p.TypeMessage
-			parcel.Header.TargetPeer = fmessage.PeerHash
-			parcel.Header.AppHash = fmessage.AppHash
-			parcel.Header.AppType = fmessage.AppType
-			p2p.BlockFreeChannelSend(f.ToNetwork, *parcel)
+			// Wrap it in a parcel and send it out channel ToNetwork.
+			parcels := p2p.ParcelsForPayload(p2p.CurrentNetwork, fmessage.Message)
+			for _, parcel := range parcels {
+				if parcel.Header.Type != p2p.TypeMessagePart {
+					parcel.Header.Type = p2p.TypeMessage
+				}
+				parcel.Header.TargetPeer = fmessage.PeerHash
+				parcel.Header.AppHash = fmessage.AppHash
+				parcel.Header.AppType = fmessage.AppType
+				p2p.BlockFreeChannelSend(f.ToNetwork, parcel)
+			}
 		default:
 			f.logger.Errorf("Garbage on f.BrodcastOut. %+v", data)
 		}

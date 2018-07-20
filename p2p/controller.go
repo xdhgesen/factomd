@@ -35,7 +35,7 @@ var controllerLogger = packageLogger.WithField("subpack", "controller")
 type Controller struct {
 	keepRunning bool // Indicates its time to shut down when false.
 
-	listenPort           string                 // port we listen on for new connections
+	listenPort  string             // port we listen on for new connections
 	connections *ConnectionManager // current connections
 
 	// After launching the network, the management is done via these channels.
@@ -51,12 +51,13 @@ type Controller struct {
 
 	discovery Discovery // Our discovery structure
 
-	lastPeerManagement        time.Time // Last time we ran peer management.
-	lastDiscoveryRequest      time.Time
-	NodeID                    uint64
-	lastStatusReport          time.Time
-	lastPeerRequest           time.Time        // Last time we asked peers about the peers they know about.
-	specialPeers              map[string]*Peer // special peers (from config file and from the command line params) by peer address
+	lastPeerManagement   time.Time // Last time we ran peer management.
+	lastDiscoveryRequest time.Time
+	NodeID               uint64
+	lastStatusReport     time.Time
+	lastPeerRequest      time.Time        // Last time we asked peers about the peers they know about.
+	specialPeers         map[string]*Peer // special peers (from config file and from the command line params) by peer address
+	partsAssembler       *PartsAssembler  // a data structure that assembles full messages from received message parts
 
 	// logging
 	logger *log.Entry
@@ -184,6 +185,7 @@ func (c *Controller) Init(ci ControllerInit) *Controller {
 	c.initSpecialPeers(ci)
 	c.lastDiscoveryRequest = time.Now() // Discovery does its own on startup.
 	c.lastConnectionMetricsUpdate = time.Now()
+	c.partsAssembler = new(PartsAssembler).Init()
 	discovery := new(Discovery).Init(ci.PeersFile, ci.SeedURL)
 	c.discovery = *discovery
 	return c
@@ -399,7 +401,6 @@ func (c *Controller) runloop() {
 	time.Sleep(time.Second * time.Duration(2)) // Wait a few seconds to let the system come up.
 
 	for c.keepRunning { // Run until we get the exit command
-
 		c.connections.UpdatePrometheusMetrics()
 		p2pControllerNumMetrics.Set(float64(len(c.connectionMetrics)))
 
@@ -450,10 +451,8 @@ func (c *Controller) route() {
 		switch parcel.Header.TargetPeer {
 		case FullBroadcastFlag: // Send to all peers
 			c.broadcast(parcel, true)
-
 		case BroadcastFlag: // Send to many peers
 			c.broadcast(parcel, false)
-
 		case RandomPeerFlag: // Find a random peer, send to that peer.
 			c.sendToRandomPeer(parcel)
 		default: // Check if we're connected to the peer, if not drop message.
@@ -480,6 +479,12 @@ func (c *Controller) handleParcelReceive(message interface{}, peerHash string, c
 	case TypeMessage: // Application message, send it on.
 		ApplicationMessagesReceived++
 		BlockFreeChannelSend(c.FromNetwork, parcel)
+	case TypeMessagePart: // A part of the application message, handle by assembler and if we have the full message, send it on.
+		assembled := c.partsAssembler.handlePart(parcel)
+		if assembled != nil {
+			ApplicationMessagesReceived++
+			BlockFreeChannelSend(c.FromNetwork, *assembled)
+		}
 	case TypePeerRequest: // send a response to the connection over its connection.SendChannel
 		// Get selection of peers from discovery
 		response := NewParcel(CurrentNetwork, c.discovery.SharePeers())
@@ -603,9 +608,9 @@ func (c *Controller) managePeers() {
 			parcel := *parcelp
 			parcel.Header.Type = TypePeerRequest
 			c.connections.SendToAll(ConnectionParcel{Parcel: parcel})
-			}
 		}
 	}
+}
 
 func (c *Controller) fillOutgoingSlots(openSlots int) {
 	peers := c.discovery.GetOutgoingPeers()
@@ -680,7 +685,7 @@ func (c *Controller) broadcast(parcel Parcel, full bool) {
 	if len(randomSelection) == 0 {
 		c.logger.Warn("Broadcast to random hosts failed: we don't have any peers to broadcast to")
 		return
-		}
+	}
 	for _, connection := range randomSelection {
 		BlockFreeChannelSend(connection.SendChannel, ConnectionParcel{Parcel: parcel})
 	}
@@ -695,7 +700,7 @@ func (c *Controller) sendToRandomPeer(parcel Parcel) {
 	if randomConn == nil {
 		c.logger.Warn("Sending a parcel to a random peer failed: we don't have any peers to send to")
 		return
-}
+	}
 
 	parcel.Header.TargetPeer = randomConn.peer.Hash
 	c.doDirectedSend(parcel)
