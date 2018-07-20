@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 	"time"
- 
+
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	. "github.com/FactomProject/factomd/engine"
