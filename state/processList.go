@@ -42,7 +42,6 @@ type askRef struct {
 	plRef
 	When int64
 }
-
 type ProcessList struct {
 	DBHeight uint32 // The directory block height for these lists
 
@@ -832,7 +831,6 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 
 	return
 }
-
 func (p *ProcessList) TrimVMList(h uint32, vmIndex int) {
 	height := int(h)
 	if len(p.VMs[vmIndex].List) < height {
@@ -1062,7 +1060,8 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 					//					p.State.LogMessage("processList", "done", msg)
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
-					p.State.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
+					state.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
+					//state.LogPrintf("process", "thisAck  %x", thisAck.SerialHash.Bytes())
 
 					progress = true
 
