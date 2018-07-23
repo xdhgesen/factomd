@@ -189,10 +189,18 @@ func HandleCurrentMinute(
 ) {
 	type ret struct {
 		Minute int
+		MinuteStartTime int64
+		BlockHeight uint32
 	}
 	r := new(ret)
 
 	r.Minute = state.GetCurrentMinute()
+	if r.Minute == 10 {
+		// TODO: investigate why a minute 10 is occasionally returned and if this behavior actually matters
+		r.Minute = 0
+	}
+	r.MinuteStartTime = state.GetCurrentMinuteStartTime()
+	r.BlockHeight = state.GetLLeaderHeight()
 	return r, nil
 }
 
