@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -38,7 +37,6 @@ var _ = (*hash.Hash32)(nil)
 // Returns true if some message was processed.
 //***************************************************************
 
-
 func (s *State) DebugExec() (ret bool) {
 	return globals.Params.DebugLogRegEx != ""
 }
@@ -49,9 +47,9 @@ func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) 
 		nodeName := "unknown"
 		minute := 0
 		if s != nil {
-		if s.LeaderPL != nil {
-			dbh = int(s.LeaderPL.DBHeight)
-		}
+			if s.LeaderPL != nil {
+				dbh = int(s.LeaderPL.DBHeight)
+			}
 			nodeName = s.FactomNodeName
 			minute = int(s.CurrentMinute)
 		}
@@ -65,14 +63,14 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 		nodeName := "unknown"
 		minute := 0
 		if s != nil {
-		if s.LeaderPL != nil {
-			dbh = int(s.LeaderPL.DBHeight)
-		}
+			if s.LeaderPL != nil {
+				dbh = int(s.LeaderPL.DBHeight)
+			}
 			nodeName = s.FactomNodeName
 			minute = int(s.CurrentMinute)
-	}
+		}
 		messages.StateLogPrintf(nodeName, dbh, minute, logName, format, more...)
-}
+	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	if msg.GetHash() == nil {
@@ -1406,15 +1404,15 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 
 	defer func() {
 		if worked {
-	TotalProcessListProcesses.Inc()
-	TotalCommitsOutputs.Inc()
-	s.Commits.Delete(msg.Entry.GetHash().Fixed()) // 	delete(s.Commits, msg.Entry.GetHash().Fixed())
+			TotalProcessListProcesses.Inc()
+			TotalCommitsOutputs.Inc()
+			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // 	delete(s.Commits, msg.Entry.GetHash().Fixed())
 
-	// This is so the api can determine if a chainhead is about to be updated. It fixes a race condition
-	// on the api. MUST BE BEFORE THE REPLAY FILTER ADD
-	pl.PendingChainHeads.Put(msg.Entry.GetChainID().Fixed(), msg)
-	// Okay the Reveal has been recorded.  Record this as an entry that cannot be duplicated.
-	s.Replay.IsTSValidAndUpdateState(constants.REVEAL_REPLAY, msg.Entry.GetHash().Fixed(), msg.Timestamp, s.GetTimestamp())
+			// This is so the api can determine if a chainhead is about to be updated. It fixes a race condition
+			// on the api. MUST BE BEFORE THE REPLAY FILTER ADD
+			pl.PendingChainHeads.Put(msg.Entry.GetChainID().Fixed(), msg)
+			// Okay the Reveal has been recorded.  Record this as an entry that cannot be duplicated.
+			s.Replay.IsTSValidAndUpdateState(constants.REVEAL_REPLAY, msg.Entry.GetHash().Fixed(), msg.Timestamp, s.GetTimestamp())
 			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // delete(s.Commits, msg.Entry.GetHash().Fixed())
 		}
 	}()
@@ -1675,7 +1673,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Process this SigType: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
 		return false
 	}
-
 
 	// After all EOM markers are processed, Claim we are done.  Now we can unwind
 
