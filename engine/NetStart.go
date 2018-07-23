@@ -512,7 +512,8 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	for i, s := range fnodes {
 		fmt.Printf("%d {color:#%v, shape:dot, label:%v}\n", i, colors[i%len(colors)], s.State.FactomNodeName)
 		}
-	// Initiate dbstate plugin if enabled. Only does so for first node,
+	}
+	// Initate dbstate plugin if enabled. Only does so for first node,
 	// any more nodes on sim control will use default method
 	fnodes[0].State.SetTorrentUploader(p.TorUpload)
 	if p.TorManage {

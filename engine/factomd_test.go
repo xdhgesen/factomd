@@ -157,31 +157,32 @@ func TimeNow(s *state.State) {
 }
 
 var statusState *state.State
+
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
 	if statusState == nil {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
-	go func() {
-		for {
+		go func() {
+			for {
 				s := statusState
-			newMinute := (s.CurrentMinute + 1) % 10
-			timeout := 8 // timeout if a minutes takes twice as long as expected
-			for s.CurrentMinute != newMinute && timeout > 0 {
-				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
-				timeout--
-			}
-			if timeout <= 0 {
-				fmt.Println("Stalled !!!")
-			}
+				newMinute := (s.CurrentMinute + 1) % 10
+				timeout := 8 // timeout if a minutes takes twice as long as expected
+				for s.CurrentMinute != newMinute && timeout > 0 {
+					sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+					time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+					timeout--
+				}
+				if timeout <= 0 {
+					fmt.Println("Stalled !!!")
+				}
 				// Make all the nodes update their status
-			for _, n := range GetFnodes() {
-				n.State.SetString()
+				for _, n := range GetFnodes() {
+					n.State.SetString()
+				}
+				PrintOneStatus(0, 0)
 			}
-			PrintOneStatus(0, 0)
-		}
-	}()
+		}()
 	} else {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
@@ -192,10 +193,12 @@ func StatusEveryMinute(s *state.State) {
 // Wait so many blocks
 func WaitBlocks(s *state.State, blks int) {
 	fmt.Printf("WaitBlocks(%d)\n", blks)
+	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+
 	TimeNow(s)
 	newBlock := int(s.LLeaderHeight) + blks
 	for int(s.LLeaderHeight) < newBlock {
-		time.Sleep(time.Second)
+		time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 	}
 	TimeNow(s)
 }
@@ -401,7 +404,6 @@ func TestLoad(t *testing.T) {
 	}
 } // testLoad(){...}
 
-
 // The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
 // the big happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
 // Using a message delay, drop and tree network makes this likely
@@ -409,7 +411,7 @@ func TestLoad(t *testing.T) {
 func TestLoadScrambled(t *testing.T) {
 	if ranSimTest {
 		return
-		}
+	}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("TestLoadScrambled:", r)
@@ -423,7 +425,7 @@ func TestLoadScrambled(t *testing.T) {
 
 	CheckAuthoritySet(2, 0, t)
 
-	runCmd("2")   // select 2
+	runCmd("2")     // select 2
 	runCmd("F1000") // set the message delay
 	runCmd("S10")   // delete 1% of the messages
 	runCmd("r")     // rotate the load around the network
@@ -687,7 +689,6 @@ func Test5up(t *testing.T) {
 
 	WaitMinutes(state0, 2)
 
-
 	for {
 		pendingCommits := 0
 		for _, s := range fnodes {
@@ -857,7 +858,6 @@ func TestMultiple3Election(t *testing.T) {
 
 	WaitForMinute(state0, 2)
 
-
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
@@ -904,7 +904,7 @@ func TestMultiple7Election(t *testing.T) {
 	for i := 1; i < 8; i++ {
 		runCmd(fmt.Sprintf("%d", i))
 		runCmd("x")
-		}
+	}
 	// force them all to be faulted
 	WaitMinutes(state0, 1)
 
