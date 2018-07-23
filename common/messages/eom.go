@@ -168,7 +168,7 @@ func (m *EOM) Validate(s interfaces.IState) int {
 		return -1
 	}
 
-	if delta > 3 {
+	if delta > 10 {
 		return 0 // put this in the holding and validate it later
 	}
 
