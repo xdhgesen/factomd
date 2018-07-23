@@ -157,39 +157,36 @@ func TimeNow(s *state.State) {
 }
 
 var statusState *state.State
-
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
-
 	if statusState == nil {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
-		go func() {
-			for {
+	go func() {
+		for {
 				s := statusState
-				newMinute := (s.CurrentMinute + 1) % 10
-				timeout := 8 // timeout if a minutes takes twice as long as expected
-				for s.CurrentMinute != newMinute && timeout > 0 {
-					sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-					time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
-					timeout--
-				}
-				if timeout <= 0 {
-					fmt.Println("Stalled !!!")
-				}
-				// Make all the nodes update their status
-				for _, n := range GetFnodes() {
-					n.State.SetString()
-				}
-				PrintOneStatus(0, 0)
+			newMinute := (s.CurrentMinute + 1) % 10
+			timeout := 8 // timeout if a minutes takes twice as long as expected
+			for s.CurrentMinute != newMinute && timeout > 0 {
+				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+				timeout--
 			}
-		}()
+			if timeout <= 0 {
+				fmt.Println("Stalled !!!")
+			}
+				// Make all the nodes update their status
+			for _, n := range GetFnodes() {
+				n.State.SetString()
+			}
+			PrintOneStatus(0, 0)
+		}
+	}()
 	} else {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
 
 	}
-
 }
 
 // Wait so many blocks
@@ -243,6 +240,7 @@ func WaitMinutes(s *state.State, min int) {
 }
 
 func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
+
 	leadercnt := 0
 	auditcnt := 0
 	for _, fn := range GetFnodes() {
@@ -258,6 +256,7 @@ func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
 	if leadercnt != leaders {
 		t.Fatalf("found %d leaders, expected %d", leadercnt, leaders)
 	}
+
 	if auditcnt != audits {
 		t.Fatalf("found %d audit servers, expected %d", auditcnt, audits)
 		t.Fail()
@@ -376,6 +375,7 @@ func TestSetupANetwork(t *testing.T) {
 	}
 
 }
+
 func TestLoad(t *testing.T) {
 	if ranSimTest {
 		return
@@ -409,7 +409,7 @@ func TestLoad(t *testing.T) {
 func TestLoadScrambled(t *testing.T) {
 	if ranSimTest {
 		return
-	}
+		}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("TestLoadScrambled:", r)
@@ -423,7 +423,7 @@ func TestLoadScrambled(t *testing.T) {
 
 	CheckAuthoritySet(2, 0, t)
 
-	runCmd("2")     // select 2
+	runCmd("2")   // select 2
 	runCmd("F1000") // set the message delay
 	runCmd("S10")   // delete 1% of the messages
 	runCmd("r")     // rotate the load around the network
@@ -687,6 +687,7 @@ func Test5up(t *testing.T) {
 
 	WaitMinutes(state0, 2)
 
+
 	for {
 		pendingCommits := 0
 		for _, s := range fnodes {
@@ -813,11 +814,13 @@ func TestMultiple2Election(t *testing.T) {
 	CheckAuthoritySet(5, 2, t)
 
 	WaitForMinute(state0, 2)
+
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
 	WaitForMinute(state0, 2)
+
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
@@ -853,6 +856,8 @@ func TestMultiple3Election(t *testing.T) {
 	CheckAuthoritySet(7, 4, t)
 
 	WaitForMinute(state0, 2)
+
+
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
@@ -887,7 +892,6 @@ func TestMultiple7Election(t *testing.T) {
 	}
 
 	//	return // this test inextricably needs boatload of time e.g. blktime=120 to pass so disable it from now.
-
 	ranSimTest = true
 
 	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", "LOCAL", map[string]string{"--debuglog": ".*", "--blktime": "60"}, t)
@@ -900,7 +904,7 @@ func TestMultiple7Election(t *testing.T) {
 	for i := 1; i < 8; i++ {
 		runCmd(fmt.Sprintf("%d", i))
 		runCmd("x")
-	}
+		}
 	// force them all to be faulted
 	WaitMinutes(state0, 1)
 
