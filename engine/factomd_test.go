@@ -376,7 +376,6 @@ func TestSetupANetwork(t *testing.T) {
 	}
 
 }
-
 func TestLoad(t *testing.T) {
 	if ranSimTest {
 		return
@@ -384,12 +383,51 @@ func TestLoad(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLFFFFFF", "LOCAL", map[string]string{}, t)
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLF", "LOCAL", map[string]string{}, t)
 
 	CheckAuthoritySet(2, 0, t)
 
 	runCmd("2")   // select 2
 	runCmd("R30") // Feed load
+	WaitBlocks(state0, 10)
+	runCmd("R0") // Stop load
+	WaitBlocks(state0, 1)
+
+	PrintOneStatus(0, 0)
+	dblim := 34
+	if state0.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
+	}
+} // testLoad(){...}
+
+
+// The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
+// the big happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
+// Using a message delay, drop and tree network makes this likely
+//
+func TestLoadScrambled(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("TestLoadScrambled:", r)
+		}
+	}()
+
+	ranSimTest = true
+
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLFFFFFF", "LOCAL", map[string]string{"--net": "tree"}, t)
+
+	CheckAuthoritySet(2, 0, t)
+
+	runCmd("2")     // select 2
+	runCmd("F1000") // set the message delay
+	runCmd("S10")   // delete 1% of the messages
+	runCmd("r")     // rotate the load around the network
+	runCmd("R3")    // Feed load
 	WaitBlocks(state0, 30)
 	runCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
