@@ -16,10 +16,10 @@ import (
 type StateSaverStruct struct {
 	FastBoot         bool
 	FastBootLocation string
-
-	TmpState []byte
-	Mutex    sync.Mutex
-	Stop     bool
+	TmpDBHt          uint32
+	TmpState         []byte
+	Mutex            sync.Mutex
+	Stop             bool
 }
 
 //To be increased whenever the data being saved changes from the last verion
@@ -39,13 +39,9 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	sss.Mutex.Lock()
 	defer sss.Mutex.Unlock()
 
-	//Don't save States after the server has booted - it might start it in a wrong state
-	if ss.State.DBFinished == true {
-		return nil
-	}
-
-	//Save only every 1000 states
-	if ss.GetHighestSavedBlk()%1000 != 0 || ss.GetHighestSavedBlk() < 1000 {
+	hsb := int(ss.GetHighestSavedBlk())
+	//Save only every 4 states
+	if hsb%ss.State.FastSaveRate != 0 || hsb < ss.State.FastSaveRate {
 		return nil
 	}
 
@@ -66,6 +62,7 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	h := primitives.Sha(b)
 	b = append(h.Bytes(), b...)
 	sss.TmpState = b
+	sss.TmpDBHt = ss.State.LLeaderHeight
 
 	return nil
 }
