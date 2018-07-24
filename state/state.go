@@ -377,6 +377,7 @@ type State struct {
 	HighestCompletedTorrent uint32
 	FastBoot                bool
 	FastBootLocation        string
+	FastSaveRate            int
 
 	// These stats are collected when we write the dbstate to the database.
 	NumNewChains   int // Number of new Chains in this block
@@ -391,8 +392,9 @@ type State struct {
 	SyncingStateCurrent int
 	processCnt          int64 // count of attempts to process .. so we can see if the thread is running
 
-	MMRInfo                                                         // fields for MMR processing
-	reportedActivations [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
+	MMRInfo                                                           // fields for MMR processing
+	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
+	validatorLoopThreadID string
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -516,6 +518,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.factomdTLSCertFile = s.factomdTLSCertFile
 	newState.FactomdLocations = s.FactomdLocations
 
+	newState.FastSaveRate = s.FastSaveRate
 	switch newState.DBType {
 	case "LDB":
 		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
@@ -830,7 +833,6 @@ func (s *State) Init() {
 	s.StartDelay = s.GetTimestamp().GetTimeMilli() // We can't start as a leader until we know we are upto date
 	s.RunLeader = false
 	s.IgnoreMissing = true
-	s.LogPrintf("executeMsg", "Set s.IgnoreMissing")
 	s.BootTime = s.GetTimestamp().GetTimeSeconds()
 
 	if s.LogPath == "stdout" {
@@ -1000,14 +1002,15 @@ func (s *State) Init() {
 			panic(err)
 		}
 
-		if d == nil || d.GetDatabaseHeight() < 2000 {
+		if d == nil || int(d.GetDatabaseHeight()) < s.FastSaveRate {
 			//If we have less than 2k blocks, we wipe SaveState
 			//This is to ensure we don't accidentally keep SaveState while deleting a database
 			s.StateSaverStruct.DeleteSaveState(s.Network)
 		} else {
 			err = s.StateSaverStruct.LoadDBStateList(s.DBStates, s.Network)
 			if err != nil {
-				panic(err)
+				os.Stderr.WriteString(err.Error())
+				s.StateSaverStruct.DeleteSaveState(s.Network)
 			}
 		}
 	}
@@ -1082,7 +1085,6 @@ func (s *State) GetEBlockKeyMRFromEntryHash(entryHash interfaces.IHash) (rval in
 			primitives.LogNilHashBug("State.GetEBlockKeyMRFromEntryHash() saw an interface that was nil")
 		}
 	}()
-
 	entry, err := s.DB.FetchEntry(entryHash)
 	if err != nil {
 		return nil
@@ -1940,7 +1942,6 @@ func (s *State) GetIdentityChainID() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("State.GetIdentityChainID() saw an interface that was nil")
 		}
 	}()
-
 	return s.IdentityChainID
 }
 
@@ -2203,7 +2204,6 @@ func (s *State) GetNetworkBootStrapKey() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("State.GetNetworkBootStrapKey() saw an interface that was nil")
 		}
 	}()
-
 	switch s.NetworkNumber {
 	case constants.NETWORK_MAIN:
 		key, _ := primitives.HexToHash("0426a802617848d4d16d87830fc521f4d136bb2d0c352850919c2679f189613a")
@@ -2232,7 +2232,6 @@ func (s *State) GetNetworkBootStrapIdentity() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("State.GetNetworkBootStrapIdentity() saw an interface that was nil")
 		}
 	}()
-
 	switch s.NetworkNumber {
 	case constants.NETWORK_MAIN:
 		return primitives.NewZeroHash()
@@ -2259,7 +2258,6 @@ func (s *State) GetNetworkSkeletonIdentity() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("State.GetNetworkSkeletonIdentity() saw an interface that was nil")
 		}
 	}()
-
 	switch s.NetworkNumber {
 	case constants.NETWORK_MAIN:
 		id, _ := primitives.HexToHash("8888882690706d0d45d49538e64e7c76571d9a9b331256b5b69d9fd2d7f1f14a")
@@ -2285,7 +2283,6 @@ func (s *State) GetNetworkIdentityRegistrationChain() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("State.GetNetworkIdentityRegistrationChain() saw an interface that was nil")
 		}
 	}()
-
 	id, _ := primitives.HexToHash("888888001750ede0eff4b05f0c3f557890b256450cabbb84cada937f9c258327")
 	return id
 }
