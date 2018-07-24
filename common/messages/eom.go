@@ -360,7 +360,8 @@ func (m *EOM) MarshalBinary() (data []byte, err error) {
 	} else {
 		buf.WriteByte(0)
 	}
-	return buf.DeepCopyBytes(), nil
+	m.marshalCache = buf.DeepCopyBytes()
+	return m.marshalCache, nil
 }
 
 func (m *EOM) String() string {

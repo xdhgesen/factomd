@@ -106,7 +106,7 @@ func (m *MissingEntryBlocks) Validate(state interfaces.IState) int {
 		return -1
 	}
 	// ignore it if it's from the future
-	if m.DBHeightStart > state.GetHighestKnownBlock() {
+	if m.DBHeightStart > state.GetLLeaderHeight() {
 		return -1
 	}
 	// if they are asking for too many DBStates in one request then toss the request
