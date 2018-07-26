@@ -262,6 +262,15 @@ func (m *Heartbeat) Validate(is interfaces.IState) int {
 		return -1
 	}
 
+	// Hold future heartbeats
+	if m.DBHeight > is.GetLLeaderHeight() {
+		if m.DBHeight-3 > is.GetLLeaderHeight() { // ignore heartbeats from the far future
+			return -1
+		}
+		return 0 // hold near future heartbeats
+	}
+
+
 	// Ignore old heartbeats
 	if m.DBHeight <= is.GetHighestSavedBlk() {
 		return -1

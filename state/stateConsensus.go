@@ -84,10 +84,6 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
-	if msg.GetHash() == nil {
-		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
-		return false
-	}
 
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
@@ -114,6 +110,11 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	}
 
 	valid := msg.Validate(s)
+	if valid == -1 {
+		s.LogMessage("invalidmsgs", "executeMgs()", msg)
+		msg.Validate(s) // call it again so I can walk down with the debugger
+	}
+
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as

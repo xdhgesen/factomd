@@ -1014,7 +1014,7 @@ func TestMultiple2Election(t *testing.T) {
 		"--count=10",
 		"--startdelay=1",
 		"--net=alot+",
-		//"--debuglog=F.*",
+		"--debuglog=F.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		//"--debugconsole=localhost:8093",

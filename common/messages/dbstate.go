@@ -156,11 +156,6 @@ func (m *DBStateMsg) Validate(state interfaces.IState) int {
 
 	dbheight := m.DirectoryBlock.GetHeader().GetDBHeight()
 
-	// Just accept the genesis block
-	if dbheight == 0 {
-		return 1
-	}
-
 	if state.GetNetworkID() != m.DirectoryBlock.GetHeader().GetNetworkID() {
 		state.AddStatus(fmt.Sprintf("DBStateMsg.Validate() Fail  ht: %d Expecting NetworkID %x and found %x",
 			dbheight, state.GetNetworkID(), m.DirectoryBlock.GetHeader().GetNetworkID()))
@@ -168,8 +163,18 @@ func (m *DBStateMsg) Validate(state interfaces.IState) int {
 		return -1
 	}
 
+	// Just accept the genesis block
+	if dbheight == 0 {
+		return 1
+	}
+
+	//if dbheight < state.GetLLeaderHeight() {
+	//	return -1
+	//}
+
 	// Difference of completed blocks, rather than just highest DBlock (might be missing entries)
-	diff := int(dbheight) - (int(state.GetEntryDBHeightComplete()))
+	i := int(state.GetEntryDBHeightComplete())
+	diff := int(dbheight) - i
 
 	// Look at saved heights if not too far from what we have saved.
 	if diff < -1 {
