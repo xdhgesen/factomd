@@ -526,6 +526,15 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath
 		break
 	}
+
+	height, err := s.DB.FetchDatabaseEntryHeight()
+	if err != nil {
+		os.Stderr.WriteString(fmt.Sprintf("%10s ERROR: %v\n", s.FactomNodeName, err))
+	} else {
+		os.Stderr.WriteString(fmt.Sprintf("%10s loaded to %8d\n", s.FactomNodeName, height))
+		s.EntryDBHeightComplete = height
+	}
+
 	return newState
 }
 
