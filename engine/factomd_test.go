@@ -6,18 +6,18 @@ import (
 	"testing"
 	"time"
 
-	"bytes"
-	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
-	"net/http"
-	"runtime"
-	"sync"
 	"strings"
+	"net/http"
+	"bytes"
 	"io/ioutil"
 	"github.com/FactomProject/factomd/common/primitives"
 	"strconv"
+	"github.com/FactomProject/factomd/activations"
+	"sync"
+	"runtime"
 )
 
 var _ = Factomd
@@ -29,7 +29,7 @@ var _ = Factomd
 // Pass in t for the testing as the 4th argument
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, t *testing.T) *state.State {
+func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, height int, elections int, elecrounds int, t *testing.T) *state.State {
 	l := len(GivenNodes)
 	DefaultOptions := map[string]string{
 		"--db":           "Map",
@@ -48,6 +48,7 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 		"--checkheads": "false",
 	}
 
+
 	returningSlice := []string{}
 	for key, value := range DefaultOptions {
 		returningSlice = append(returningSlice, key+"="+value)
@@ -61,6 +62,36 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 
 	params := ParseCmdLine(returningSlice)
 	state0 := Factomd(params, false).(*state.State)
+	blkt := globals.Params.BlkTime
+	roundt := globals.Params.RoundTimeout
+	et := globals.Params.FaultTimeout
+
+	Calctime := float64((height * blkt) + (elections * et) + (elecrounds * roundt)) * 1.1
+  	endtime := time.Now().Add(time.Second * time.Duration(Calctime))
+	fmt.Println("ENDTIME: ",endtime)
+
+  	quit := make(chan struct{})
+
+	go func() {
+		for {
+			select {
+			case <- quit:
+				return
+			default:
+				if int(state0.GetLLeaderHeight()) > height {
+					t.Fatalf("Height went higher than expected")
+					t.Fail()
+				}
+				if time.Now().After(endtime) {
+					t.Fatalf("Took too long")
+					t.Fail()
+				}
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}()
+
+
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
 	creatingNodes(GivenNodes, state0)
@@ -70,6 +101,7 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 		t.Fatal("Should have allocated " + string(l) + " nodes")
 		t.Fail()
 	}
+	close(quit)
 	return state0
 }
 
@@ -180,6 +212,13 @@ func runCmd(cmd string) {
 	return
 }
 
+func shutDownEverything(t *testing.T) {
+	t.Log("Shutting down the network")
+	for _, fn := range GetFnodes() {
+		fn.State.ShutdownChan <- 1
+	}
+}
+
 func TestMultipleFTAccountsAPI(t *testing.T) {
 	if ranSimTest {
 		return
@@ -187,7 +226,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0,0, t)
 	WaitForMinute(state0, 1)
 
 	url := "http://localhost:8088/v2"
@@ -232,11 +271,11 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 
 		// splits `num,num` up into `[num, num]` som BothNumbers[0] with give you the first value (the Temp value)
 		BothNumbers := strings.Split(individualArrays[i], `,`)
-		fmt.Println(BothNumbers[0])
 		if BothNumbers[0] !=  strconv.FormatInt(TempBalance, 10) || BothNumbers[1] != strconv.FormatInt(PermBalance, 10) {
 			t.Fatalf("Expected "+BothNumbers[0]+","+BothNumbers[1]+", but got %s"+ strconv.FormatInt(TempBalance, 10)+","+strconv.FormatInt(PermBalance, 10))
 		}
 	}
+	shutDownEverything(t)
 }
 
 func TestMultipleECAccountsAPI(t *testing.T) {
@@ -246,7 +285,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0,0,t)
 	WaitForMinute(state0, 1)
 
 	url := "http://localhost:8088/v2"
@@ -295,6 +334,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 			t.Fatalf("Expected "+BothNumbers[0]+","+BothNumbers[1]+", but got %s"+ strconv.FormatInt(TempBalance, 10)+","+strconv.FormatInt(PermBalance, 10))
 		}
 	}
+	shutDownEverything(t)
 }
 
 func TestSetupANetwork(t *testing.T) {
@@ -304,7 +344,7 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"},11, 0,0, t)
 
 	runCmd("s")  // Show the process lists and directory block states as
 	runCmd("9")  // Puts the focus on node 9
@@ -387,10 +427,7 @@ func TestSetupANetwork(t *testing.T) {
 	WaitForMinute(state0, 3) // Waits 3 "Minutes"
 	WaitBlocks(fn1.State, 3) // Waits for 3 blocks
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	time.Sleep(10 * time.Second)
 	PrintOneStatus(0, 0)
@@ -407,7 +444,7 @@ func TestLoad(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LL", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LL", "LOCAL", map[string]string{}, 35, 0, 0, t)
 
 	runCmd("1") // select node 1
 	runCmd("l") // make 1 a leader
@@ -422,6 +459,8 @@ func TestLoad(t *testing.T) {
 	runCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
 
+	fmt.Println("HEIGHT", state0.GetLLeaderHeight())
+	shutDownEverything(t)
 } // testLoad(){...}
 
 func TestMakeALeader(t *testing.T) {
@@ -431,7 +470,7 @@ func TestMakeALeader(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LL", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LL", "LOCAL", map[string]string{}, 5, 0,0,  t)
 
 	runCmd("1") // select node 1
 	runCmd("l") // make him a leader
@@ -466,7 +505,7 @@ func TestActivationHeightElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 14, 3, 2, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
@@ -549,10 +588,7 @@ func TestActivationHeightElection(t *testing.T) {
 
 	CheckAuthoritySet(leaders, audits, t)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	// Sleep one block
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
@@ -591,7 +627,7 @@ func TestAnElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, 9, 1, 2, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
@@ -640,10 +676,7 @@ func TestAnElection(t *testing.T) {
 
 	WaitBlocks(state0, 1)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	// Sleep one block
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
@@ -677,7 +710,7 @@ func Test5up(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--startdelay": "5"}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--startdelay": "5"}, 15, 0, 0, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
@@ -712,10 +745,7 @@ func Test5up(t *testing.T) {
 
 	WaitBlocks(state0, 1)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	// Sleep one block
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
@@ -737,7 +767,7 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 10, 1, 2, t)
 
 	state = GetFnodes()[2].State
 	state.MessageTally = true
@@ -800,10 +830,8 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	CheckAuthoritySet(5, 2, t)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	fmt.Println("HEIGHT", state.GetLLeaderHeight())
+	shutDownEverything(t)
 
 }
 
@@ -814,7 +842,7 @@ func TestMultiple2Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAF", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LLLLLLLAAF", "LOCAL", map[string]string{}, 6, 2, 2, t)
 
 	CheckAuthoritySet(7, 2, t)
 
@@ -830,10 +858,7 @@ func TestMultiple2Election(t *testing.T) {
 	runCmd("p")
 	WaitBlocks(state0, 3)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 }
 
 func TestMultiple3Election(t *testing.T) {
@@ -843,7 +868,7 @@ func TestMultiple3Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAAAF", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LLLLLLLAAAAF", "LOCAL", map[string]string{}, 6, 3, 2, t)
 
 	leadercnt := 0
 	auditcnt := 0
@@ -902,10 +927,7 @@ func TestMultiple3Election(t *testing.T) {
 		t.Fatalf("found %d audit, expected 4", auditcnt)
 	}
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 }
 
@@ -916,7 +938,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string{"--controlpanelsetting": "readwrite"}, t)
+	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string{"--controlpanelsetting": "readwrite"}, 6, 7, 5, t)
 
 	leadercnt := 0
 	auditcnt := 0
@@ -956,12 +978,9 @@ func TestMultiple7Election(t *testing.T) {
 	// Wait till the should have updated by DBSTATE
 	WaitBlocks(state0, 3)
 
-	CheckAuthoritySet(15, 10, t)
+	CheckAuthoritySet(16, 10, t)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 }
 
 func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
