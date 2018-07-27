@@ -2739,3 +2739,23 @@ func (s *State) IsActive(id activations.ActivationType) bool {
 
 	return rval
 }
+
+func (s *State) LogServers(logname string) {
+	p := s.LeaderPL
+	s.LogPrintf(logname, "%20s | %20s", "Fed", "Aud")
+	limit := len(p.FedServers)
+	if limit < len(p.AuditServers) {
+		limit = len(p.AuditServers)
+	}
+	for i := 0; i < limit; i++ {
+		f := ""
+		a := ""
+		if i < len(p.FedServers) {
+			f = fmt.Sprintf("%x", p.FedServers[i].GetChainID().Bytes()[3:6])
+		}
+		if i < len(p.AuditServers) {
+			a = fmt.Sprintf("%x", p.AuditServers[i].GetChainID().Bytes()[3:6])
+		}
+		s.LogPrintf(logname, "%s | %s", f, a)
+	}
+}

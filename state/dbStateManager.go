@@ -895,6 +895,9 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 }
 
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
+
+	list.State.LogPrintf("dbstate", "execute DBSTATE %s", d.String())
+
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
@@ -909,6 +912,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	if dbht > 0 && dbht <= list.ProcessHeight {
 		progress = true
 		d.Repeat = true
+		list.State.LogPrintf("dbstate", "ignore as repeat")
 		return
 	}
 
@@ -916,9 +920,12 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		pd := list.State.DBStates.Get(int(dbht - 1))
 		if pd != nil && !pd.Saved {
 			//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Previous dbstate (%d) not saved", dbht-1))
+			list.State.LogPrintf("dbstate", "ignore prev not yet saved")
 			return
 		}
 	}
+
+	list.State.LogPrintf("dbstate", "Applied")
 
 	// Bring the current federated servers and audit servers forward to the
 	// next block.
@@ -932,11 +939,13 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	pln := list.State.ProcessLists.Get(ht + 1)
 
 	if pl == nil {
+		list.State.LogPrintf("dbstate", "ignore no process list yet")
 		return
 	}
 
 	var out bytes.Buffer
 	out.WriteString("=== AdminBlock.UpdateState() Start ===\n")
+
 	prt := func(lable string, pl *ProcessList) {
 		if !list.State.DebugConsensus {
 			return
@@ -1097,7 +1106,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	d.TmpSaveStruct = SaveFactomdState(list.State, d)
 
 	list.State.Balancehash = fs.GetBalanceHash(false)
-	list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x")
+	//list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x", dbht, )
 	return
 }
 

@@ -63,7 +63,7 @@ func (m *FedVoteLevelMsg) String() string {
 		"Fed VoteLevelMsg",
 		m.DBHeight,
 		m.Minute,
-		m.Signer.Bytes()[3:5],
+		m.Signer.Bytes()[3:6],
 		m.Volunteer.ServerName,
 		m.Committed,
 		m.Level,
@@ -155,13 +155,16 @@ func (m *FedVoteLevelMsg) processIfCommitted(is interfaces.IState, elect interfa
 		// Send for the state to do the swap. It will only be sent with this
 		// flag ONCE
 		is.InMsgQueue().Enqueue(m)
+		e.LogMessage("election", "Send to state", m)
 		// End the election by setting this to '-1'
 		e.Electing = -1
 		e.LogPrintf("election", "**** Election is over. Elected %d[%x] ****", m.Volunteer.ServerIdx, m.Volunteer.ServerID.Bytes()[3:6])
+		e.LogPrintLeaders("election")
 
 		e.LogPrintf("faulting", "**** Election is over. Elected %d[%x] ****", m.Volunteer.ServerIdx, m.Volunteer.ServerID.Bytes()[3:6])
 		e.LogPrintf("faulting", e.Adapter.MessageLists())
 		e.LogPrintf("faulting", e.Adapter.Status())
+		//e.LogPrintLeaders("faulting")
 
 		// Add some string feedback for prints
 		t := "EOM"

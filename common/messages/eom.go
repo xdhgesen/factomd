@@ -129,13 +129,16 @@ func (m *EOM) Validate(state interfaces.IState) int {
 		return 1
 	}
 
-	// Ignore old EOM
-	if m.DBHeight <= state.GetHighestSavedBlk() {
+	// Ignore old EOM and far future EOMs
+	height := state.GetLLeaderHeight()
+	if m.DBHeight < height || m.DBHeight-3 > height {
 		return -1
 	}
 
 	found, _ := state.GetVirtualServers(m.DBHeight, int(m.Minute), m.ChainID)
 	if !found { // Only EOM from federated servers are valid.
+		state.LogPrintf("invalid", "could not find leader %x", m.ChainID.Bytes()[3:6])
+		state.LogServers("invalid")
 		return -1
 	}
 

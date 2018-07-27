@@ -293,7 +293,6 @@ func Peers(fnode *FactomNode) {
 					msg.SetNoResend(true)
 				}
 				if !crossBootIgnore(msg) {
-					fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
 					if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
 						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue2", msg)
 						fnode.State.LogMessage("InMsgQueue2", fromPeer+", enqueue", msg)

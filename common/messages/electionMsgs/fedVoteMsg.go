@@ -169,6 +169,8 @@ func (m *FedVoteMsg) ValidateVolunteer(v FedVoteVolunteerMsg, is interfaces.ISta
 	}
 
 	if v.VMIndex >= len(pl.VMs) || v.VMIndex < 0 {
+		is.LogMessage("executeMsg", "invalid VM", m)
+
 		return -1
 	}
 
@@ -178,6 +180,7 @@ func (m *FedVoteMsg) ValidateVolunteer(v FedVoteVolunteerMsg, is interfaces.ISta
 	if vm.Height < int(ack.Height) {
 		return 0
 	} else if vm.Height > int(ack.Height) {
+		is.LogMessage("executeMsg", "invalid height", m)
 		return -1
 	}
 
@@ -186,8 +189,13 @@ func (m *FedVoteMsg) ValidateVolunteer(v FedVoteVolunteerMsg, is interfaces.ISta
 
 func (m *FedVoteMsg) Validate(is interfaces.IState) int {
 	s := is.(*state.State)
-	if m.DBHeight < s.GetLeaderHeight() {
-		return -1
+
+	diff := m.DBHeight - s.GetLeaderHeight()
+	if diff < 0 || diff > 1 {
+		return -1 // it's in my past or distant future so ignore it
+	}
+	if diff > 0 {
+		return 0 // hold elections messages from the near future
 	}
 	sm := m.Super
 	vol := sm.GetVolunteerMessage().(*FedVoteVolunteerMsg)

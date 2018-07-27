@@ -190,7 +190,7 @@ var findHex *regexp.Regexp
 func LookupName(s string) string {
 	n, ok := globals.FnodeNames[s]
 	if ok {
-		return "<" + n + ">"
+		return fmt.Sprintf("%9s", "<"+n+">")
 	}
 	return ""
 }
@@ -229,6 +229,7 @@ func addNodeNames(s string) (rval string) {
 }
 
 func LogPrintf(name string, format string, more ...interface{}) {
+	sequence++
 	traceMutex.Lock()
 	defer traceMutex.Unlock()
 	myfile := getTraceFile(name)
