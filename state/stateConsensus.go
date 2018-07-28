@@ -374,7 +374,7 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 
 	preReviewHoldingTime := time.Now()
-	if len(s.XReview) > 0 || s.Syncing || s.Saving {
+	if len(s.XReview) > 0 {
 		return
 	}
 
@@ -2396,12 +2396,12 @@ func (s *State) NewAck(msg interfaces.IMsg, balanceHash interfaces.IHash) interf
 	ack.MessageHash = msg.GetMsgHash()
 	ack.LeaderChainID = s.IdentityChainID
 	ack.BalanceHash = balanceHash
-	listlen := len(s.LeaderPL.VMs[vmIndex].List)
-	if listlen == 0 {
+	position := s.LeaderPL.VMs[vmIndex].Height
+	if position == 0 {
 		ack.Height = 0
 		ack.SerialHash = ack.MessageHash
 	} else {
-		last := s.LeaderPL.GetAckAt(vmIndex, listlen-1)
+		last := s.LeaderPL.GetAckAt(vmIndex, position-1)
 		ack.Height = last.Height + 1
 		ack.SerialHash, _ = primitives.CreateHash(last.MessageHash, ack.MessageHash)
 	}
