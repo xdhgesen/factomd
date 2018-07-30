@@ -802,6 +802,9 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 	if vmIndex < 0 {
 		panic(errors.New("Old Faulting code"))
 	}
+	if p.State.IgnoreMissing || p.State.DBFinished == false {
+		return // Don't ask for missing message while in ignore
+	}
 
 	if delay < 50 {
 		delay = 50
