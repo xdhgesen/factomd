@@ -55,26 +55,15 @@ func main() {
 
 	testName := fmt.Sprintf("%s_%s", branchName, time.Now().Format("2006-01-02_15:04"))
 
-	// Create new chain for this test
-	chainEntry := factom.Entry{
-		ExtIDs: [][]byte{[]byte(testName)},
-	}
-	chain := factom.NewChain(&chainEntry)
-	_, err = factom.CommitChain(chain, ecAddress)
-	check(err, "Failed to commit chain")
-	_, err = factom.RevealChain(chain)
-	check(err, "Failed to reveal chain")
-
 	// Create output spreadsheet
 	file, err := os.Create(fmt.Sprintf("%s.csv", testName))
 	check(err, "Failed to create output file")
 	defer file.Close()
 	testContext := fmt.Sprintf(
-		"Branch:,%s\nBlockTime:,%d\nExpectedMinuteTime:,%f\nTest's ChainID:,%s\nNotes:\n\n",
+		"Branch:,%s\nBlockTime:,%d\nExpectedMinuteTime:,%f\nNotes:\n\n",
 		branchName,
 		blkTime,
 		idealMinuteTime.Seconds(),
-		chain.ChainID,
 	)
 	_, err = file.WriteString(testContext)
 	check(err, "Failed to write test context to file")
@@ -100,7 +89,7 @@ func main() {
 	minutesToNextThrottle := throttleInterval
 	var recentMinutes []time.Duration
 	throttle := make(chan int)
-	go generateLoad(tps, chain, ecAddress, throttle)
+	go generateLoad(tps, ecAddress, throttle)
 	ticker = time.NewTicker(100 * time.Millisecond)
 	for range ticker.C {
 		current, err = getCurrentMinute()
@@ -141,9 +130,9 @@ func main() {
 	}
 }
 
-// generateLoad starts sending a load of txs to a chain at the specified tps.
+// generateLoad starts sending a load of txs at the specified tps.
 // An integer sent through the throttle channel raises/lowers the load tps by that amount.
-func generateLoad(tps int, chain *factom.Chain, ecAddress *factom.ECAddress, throttle chan int) {
+func generateLoad(tps int, ecAddress *factom.ECAddress, throttle chan int) {
 	ticker := time.NewTicker(time.Second)
 	for ; true; <- ticker.C {
 		select {
@@ -152,12 +141,28 @@ func generateLoad(tps int, chain *factom.Chain, ecAddress *factom.ECAddress, thr
 		default:
 
 		}
-		go sendNTransactions(tps, chain, ecAddress)
+		go sendNTransactions(tps, ecAddress)
 	}
 }
 
-func sendNTransactions(n int, chain *factom.Chain, ecAddress *factom.ECAddress) {
+func sendNTransactions(n int, ecAddress *factom.ECAddress) {
+	var chain *factom.Chain = nil
 	for i := 0; i < n; i++ {
+		if chain == nil {
+			// New random chain for this set of txs
+			e := factom.Entry{
+				ExtIDs: make([][]byte, rand.Intn(4) + 1),
+			}
+			for i := range e.ExtIDs {
+				e.ExtIDs[i] = random.RandByteSliceOfLen(rand.Intn(300))
+			}
+			chain = factom.NewChain(&e)
+			_, err := factom.CommitChain(chain, ecAddress)
+			check(err, "Failed to commit chain")
+			_, err = factom.RevealChain(chain)
+			check(err, "Failed to reveal chain")
+			continue
+		}
 		// Entry with random ExtIDs and Content
 		e := factom.Entry{
 			ChainID: chain.ChainID,
