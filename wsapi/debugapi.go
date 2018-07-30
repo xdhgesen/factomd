@@ -195,12 +195,13 @@ func HandleCurrentMinute(
 	r := new(ret)
 
 	r.Minute = state.GetCurrentMinute()
+	r.BlockHeight = state.GetLLeaderHeight()
+	r.MinuteStartTime = state.GetCurrentMinuteStartTime()
 	if r.Minute == 10 {
 		// TODO: investigate why a minute 10 is occasionally returned and if this behavior actually matters
 		r.Minute = 0
+		r.BlockHeight = r.BlockHeight + 1
 	}
-	r.MinuteStartTime = state.GetCurrentMinuteStartTime()
-	r.BlockHeight = state.GetLLeaderHeight()
 	return r, nil
 }
 
