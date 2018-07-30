@@ -3,15 +3,17 @@ package engine_test
 import (
 	"fmt"
 	"os"
+	"reflect"
+	"runtime"
+	"strconv"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
-	"github.com/FactomProject/factomd/activations"
-	"sync"
-	"runtime"
 )
 
 var _ = Factomd
@@ -25,62 +27,119 @@ var _ = Factomd
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
 func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, t *testing.T) *state.State {
 	l := len(GivenNodes)
-	DefaultOptions:= map[string]string {
-		"--db" : "Map",
-		"--network" : fmt.Sprintf("%v", NetworkType),
-		"--net" : "alot+",
-		"--enablenet" : "false",
-		"--blktime" : "8",
-		"--faulttimeout" : "2",
-		"--roundtimeout" : "2",
-		"--count" : fmt.Sprintf("%v", l),
-		//"--debuglog=.*",
-		//"--debuglog=F.*",
-		"--startdelay" : "1",
-		"--stdoutlog" : "out.txt",
-		"--stderrlog" : "err.txt",
-		"--checkheads" : "false",
+	DefaultOptions := map[string]string{
+		"--db":               "Map",
+		"--network":          fmt.Sprintf("%v", NetworkType),
+		"--net":              "alot+",
+		"--enablenet":        "false",
+		"--blktime":          "10",
+		"--count":            fmt.Sprintf("%v", l),
+		"--startdelay":       "1",
+		"--stdoutlog":        "out.txt",
+		"--stderrlog":        "out.txt",
+		"--checkheads":       "false",
+		"--logPort":          "37000", // use different ports so I can run a test and a real node at the same time
+		"--port":             "37001",
+		"--controlpanelport": "37002",
+		"--networkport":      "37003",
+		"--debugconsole":     "remotehost:37093", // turn on the debug console but don't open a window
+		//		"--controlpanelsetting": "readwrite",
+		"--debuglog": "faulting|bad",
 	}
 
+	// loop thru the test specific options and overwrite or append to the DefaultOptions
+	if Options != nil && len(Options) != 0 {
+		for key, value := range Options {
+			if key != "--debuglog" {
+				DefaultOptions[key] = value
+			} else {
+				DefaultOptions[key] = DefaultOptions[key] + "|" + value // add debug log flags to the default
+			}
+			// remove options not supported by the current flags set so we can merge this update into older code bases
+			// TODO: use flag.VisitAll() to remove any options not supported by the current build
+		}
+	}
+
+	// default the fault time and round time based on the blk time out
+	blktime, err := strconv.Atoi(DefaultOptions["--blktime"])
+	if err != nil {
+		panic(err)
+	}
+
+	if DefaultOptions["--faulttimeout"] == "" {
+		DefaultOptions["--faulttimeout"] = fmt.Sprintf("%d", blktime/5) // use 2 minutes ...
+	}
+
+	if DefaultOptions["--roundtimeout"] == "" {
+		DefaultOptions["--roundtimeout"] = fmt.Sprintf("%d", blktime/5)
+	}
+
+	// built the fake command line
 	returningSlice := []string{}
 	for key, value := range DefaultOptions {
 		returningSlice = append(returningSlice, key+"="+value)
 	}
 
-	if Options != nil && len(Options) != 0 {
-		for key, value := range Options {
-			DefaultOptions[key] = value
-		}
+	fmt.Println("Command Line Arguments:")
+	for _, v := range returningSlice {
+		fmt.Printf("\t%s\n", v)
 	}
-
 	params := ParseCmdLine(returningSlice)
+	fmt.Println()
+
+	fmt.Println("Parameter:")
+	s := reflect.ValueOf(params).Elem()
+	typeOfT := s.Type()
+
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		fmt.Printf("%d: %25s %s = %v\n", i,
+			typeOfT.Field(i).Name, f.Type(), f.Interface())
+	}
+	fmt.Println()
+
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
+	StatusEveryMinute(state0)
 	creatingNodes(GivenNodes, state0)
 
-	t.Log("Allocated "+ string(l)+" nodes")
+	t.Logf("Allocated %d nodes", l)
 	if len(GetFnodes()) != l {
-		t.Fatal("Should have allocated "+ string(l)+" nodes")
+		t.Fatalf("Should have allocated %d nodes", l)
 		t.Fail()
 	}
 	return state0
 }
 
 func creatingNodes(creatingNodes string, state0 *state.State) {
-	runCmd(fmt.Sprintf("g%d", len(creatingNodes)))
+	nodes := len(creatingNodes)
+	runCmd(fmt.Sprintf("g%d", nodes))
+
+	// Wait till all the entries from the g command are processed
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		fmt.Printf("Waiting for g to complete\n")
+		WaitMinutes(state0, 1)
+
+	}
 	WaitBlocks(state0, 1) // Wait for 1 block
 	WaitForMinute(state0, 3)
 	runCmd("0")
-	for i,c := range []byte(creatingNodes) {
-		fmt.Println(i)
+	for i, c := range []byte(creatingNodes) {
 		switch c {
-		case 'L','l':
-			fmt.Println("L")
+		case 'L', 'l':
 			runCmd("l")
-		case 'A','a':
+		case 'A', 'a':
 			runCmd("o")
 		case 'F', 'f':
+			runCmd(fmt.Sprintf("%d", (i+1)%nodes))
 			break
 		default:
 			panic("NOT L, A or F")
@@ -90,32 +149,42 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 	WaitForMinute(state0, 1)
 }
 
-
 func TimeNow(s *state.State) {
 	fmt.Printf("%s:%d/%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
 }
 
+var statusState *state.State
+
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
-	go func() {
-		for {
-			newMinute := (s.CurrentMinute + 1) % 10
-			timeout := 8 // timeout if a minutes takes twice as long as expected
-			for s.CurrentMinute != newMinute && timeout > 0 {
-				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
-				timeout--
+	if statusState == nil {
+		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
+		statusState = s
+		go func() {
+			for {
+				s := statusState
+				newMinute := (s.CurrentMinute + 1) % 10
+				timeout := 8 // timeout if a minutes takes twice as long as expected
+				for s.CurrentMinute != newMinute && timeout > 0 {
+					sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+					time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+					timeout--
+				}
+				if timeout <= 0 {
+					fmt.Println("Stalled !!!")
+				}
+				// Make all the nodes update their status
+				for _, n := range GetFnodes() {
+					n.State.SetString()
+				}
+				PrintOneStatus(0, 0)
 			}
-			if timeout <= 0 {
-				fmt.Println("Stalled !!!")
-			}
-			// Make all the nodes update thier status
-			for _, n := range GetFnodes() {
-				n.State.SetString()
-			}
-			PrintOneStatus(0, 0)
-		}
-	}()
+		}()
+	} else {
+		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
+		statusState = s
+
+	}
 }
 
 // Wait so many blocks
@@ -134,14 +203,15 @@ func WaitBlocks(s *state.State, blks int) {
 func WaitForMinute(s *state.State, min int) {
 	fmt.Printf("WaitForMinute(%d)\n", min)
 	TimeNow(s)
+	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	if s.CurrentMinute >= min {
 		for s.CurrentMinute > 0 {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
 	}
 
 	for min > s.CurrentMinute {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 	}
 	TimeNow(s)
 }
@@ -166,10 +236,33 @@ func WaitMinutes(s *state.State, min int) {
 	TimeNow(s)
 }
 
+func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
+	leadercnt := 0
+	auditcnt := 0
+	for _, fn := range GetFnodes() {
+		s := fn.State
+		if s.Leader {
+			leadercnt++
+		}
+		list := s.ProcessLists.Get(s.LLeaderHeight)
+		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
+			auditcnt++
+		}
+	}
+	if leadercnt != leaders {
+		t.Fatalf("found %d leaders, expected %d", leadercnt, leaders)
+	}
+	if auditcnt != audits {
+		t.Fatalf("found %d audit servers, expected %d", auditcnt, audits)
+		t.Fail()
+	}
+}
+
 // We can only run 1 simtest!
 var ranSimTest = false
 
-func runCmd (cmd string) {
+func runCmd(cmd string) {
+	os.Stdout.WriteString("Executing: " + cmd + "\n")
 	os.Stderr.WriteString("Executing: " + cmd + "\n")
 	InputChan <- cmd
 	return
@@ -182,45 +275,44 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort" : "37000", "--port" : "37001", "--controlpanelport" : "37002", "--networkport" : "37003",}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{}, t)
 
-	runCmd("s") // Show the process lists and directory block states as
-	runCmd("9") // Puts the focus on node 9
-	runCmd("x") // Takes Node 9 Offline
-	runCmd("w") // Point the WSAPI to send API calls to the current node.
+	runCmd("9")  // Puts the focus on node 9
+	runCmd("x")  // Takes Node 9 Offline
+	runCmd("w")  // Point the WSAPI to send API calls to the current node.
 	runCmd("10") // Puts the focus on node 9
-	runCmd("8") // Puts the focus on node 8
-	runCmd("w") // Point the WSAPI to send API calls to the current node.
+	runCmd("8")  // Puts the focus on node 8
+	runCmd("w")  // Point the WSAPI to send API calls to the current node.
 	runCmd("7")
 	WaitBlocks(state0, 1) // Wait for 1 block
 
 	CheckAuthoritySet(4, 3, t)
-	
+
 	WaitForMinute(state0, 2) // Waits for 2 "Minutes"
-	runCmd("F100") //  Set the Delay on messages from all nodes to 100 milliseconds
-	runCmd("S10") // Set Drop Rate to 1.0 on everyone
-	runCmd("g10") // Adds 10 identities to your identity pool.
+	runCmd("F100")           //  Set the Delay on messages from all nodes to 100 milliseconds
+	runCmd("S10")            // Set Drop Rate to 1.0 on everyone
+	runCmd("g10")            // Adds 10 identities to your identity pool.
 
 	fn1 := GetFocus()
 	PrintOneStatus(0, 0)
 	if fn1.State.FactomNodeName != "FNode07" {
 		t.Fatalf("Expected FNode07, but got %s", fn1.State.FactomNodeName)
 	}
-	runCmd("g1") // Adds 1 identities to your identity pool.
+	runCmd("g1")             // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 3) // Waits for 3 "Minutes"
-	runCmd("g1") // // Adds 1 identities to your identity pool.
+	runCmd("g1")             // // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 4) // Waits for 4 "Minutes"
-	runCmd("g1") // Adds 1 identities to your identity pool.
+	runCmd("g1")             // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 5) // Waits for 5 "Minutes"
-	runCmd("g1") // Adds 1 identities to your identity pool.
+	runCmd("g1")             // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 6) // Waits for 6 "Minutes"
-	WaitBlocks(state0, 1) // Waits for 1 block
+	WaitBlocks(state0, 1)    // Waits for 1 block
 	WaitForMinute(state0, 1) // Waits for 1 "Minutes"
-	runCmd("g1") // Adds 1 identities to your identity pool.
+	runCmd("g1")             // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 2) // Waits for 2 "Minutes"
-	runCmd("g1") // Adds 1 identities to your identity pool.
+	runCmd("g1")             // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 3) // Waits for 3 "Minutes"
-	runCmd("g20") // Adds 20 identities to your identity pool.
+	runCmd("g20")            // Adds 20 identities to your identity pool.
 	WaitBlocks(state0, 1)
 	runCmd("9") // Focuses on Node 9
 	runCmd("x") // Brings Node 9 back Online
@@ -248,20 +340,20 @@ func TestSetupANetwork(t *testing.T) {
 
 	runCmd("/") // Sort Status by Node Name
 
-	runCmd("a1") // Shows Admin block for Node 1
-	runCmd("e1") // Shows Entry credit block for Node 1
-	runCmd("d1") // Shows Directory block
-	runCmd("f1") // Shows Factoid block for Node 1
-	runCmd("a100") // Shows Admin block for Node 100
-	runCmd("e100") // Shows Entry credit block for Node 100
-	runCmd("d100") // Shows Directory block
-	runCmd("f100") // Shows Factoid block for Node 1
-	runCmd("yh") // Nothing
-	runCmd("yc") // Nothing
-	runCmd("r") // Rotate the WSAPI around the nodes
+	runCmd("a1")             // Shows Admin block for Node 1
+	runCmd("e1")             // Shows Entry credit block for Node 1
+	runCmd("d1")             // Shows Directory block
+	runCmd("f1")             // Shows Factoid block for Node 1
+	runCmd("a100")           // Shows Admin block for Node 100
+	runCmd("e100")           // Shows Entry credit block for Node 100
+	runCmd("d100")           // Shows Directory block
+	runCmd("f100")           // Shows Factoid block for Node 1
+	runCmd("yh")             // Nothing
+	runCmd("yc")             // Nothing
+	runCmd("r")              // Rotate the WSAPI around the nodes
 	WaitForMinute(state0, 1) // Waits 1 "Minute"
 
-	runCmd("g1") // Adds 1 identities to your identity pool.
+	runCmd("g1")             // Adds 1 identities to your identity pool.
 	WaitForMinute(state0, 3) // Waits 3 "Minutes"
 	WaitBlocks(fn1.State, 3) // Waits for 3 blocks
 
@@ -285,21 +377,58 @@ func TestLoad(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LL", "LOCAL", map[string]string {}, t)
-
-	runCmd("1") // select node 1
-	runCmd("l") // make 1 a leader
-	WaitBlocks(state0, 1)
-	WaitForMinute(state0, 1)
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLF", "LOCAL", map[string]string{}, t)
 
 	CheckAuthoritySet(2, 0, t)
 
 	runCmd("2")   // select 2
 	runCmd("R30") // Feed load
+	WaitBlocks(state0, 10)
+	runCmd("R0") // Stop load
+	WaitBlocks(state0, 1)
+	PrintOneStatus(0, 0)
+	dblim := 34
+	if state0.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
+	}
+} // testLoad(){...}
+
+// The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
+// the big happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
+// Using a message delay, drop and tree network makes this likely
+//
+func TestLoadScrambled(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("TestLoadScrambled:", r)
+		}
+	}()
+
+	ranSimTest = true
+
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLFFFFFF", "LOCAL", map[string]string{"--net": "tree"}, t)
+
+	CheckAuthoritySet(2, 0, t)
+
+	runCmd("2")     // select 2
+	runCmd("F1000") // set the message delay
+	runCmd("S10")   // delete 1% of the messages
+	runCmd("r")     // rotate the load around the network
+	runCmd("R3")    // Feed load
 	WaitBlocks(state0, 30)
 	runCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
 
+	PrintOneStatus(0, 0)
+	dblim := 34
+	if state0.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
+	}
 } // testLoad(){...}
 
 func TestMakeALeader(t *testing.T) {
@@ -309,7 +438,7 @@ func TestMakeALeader(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LL", "LOCAL", map[string]string {}, t)
+	state0 := SetupSim("LF", "LOCAL", map[string]string{}, t)
 
 	runCmd("1") // select node 1
 	runCmd("l") // make him a leader
@@ -317,6 +446,12 @@ func TestMakeALeader(t *testing.T) {
 	WaitForMinute(state0, 1)
 
 	CheckAuthoritySet(2, 0, t)
+
+	PrintOneStatus(0, 0)
+	dblim := 5
+	if state0.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
+	}
 }
 
 func TestActivationHeightElection(t *testing.T) {
@@ -344,9 +479,8 @@ func TestActivationHeightElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string {"--logPort" : "37000",	"--port" : "37001", "--controlpanelport" : "37002", "--networkport" : "37003",},t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, t)
 
-	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
@@ -469,26 +603,11 @@ func TestAnElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string {}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
-	for {
-		pendingCommits := 0
-		for _, s := range fnodes {
-			pendingCommits += s.State.Commits.Len()
-		}
-		if pendingCommits == 0 {
-			break
-		}
-		fmt.Printf("Waiting for g6 to complete\n")
-		WaitMinutes(state0, 1)
-
-	}
-
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 2)
 	PrintOneStatus(0, 0)
 	runCmd("2")
 	runCmd("w") // point the control panel at 2
@@ -555,9 +674,8 @@ func Test5up(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string {"--startdelay" : "5",}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--startdelay": "5"}, t)
 
-	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
 	for {
@@ -600,11 +718,6 @@ func Test5up(t *testing.T) {
 	if state0.LLeaderHeight > 15 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
-	j := state0.SyncingStateCurrent
-	for range state0.SyncingState {
-		fmt.Println(state0.SyncingState[j])
-		j = (j - 1 + len(state0.SyncingState)) % len(state0.SyncingState)
-	}
 
 }
 
@@ -615,21 +728,11 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state := SetupSim("LLLLLAA", "LOCAL", map[string]string {"--logPort" : "37000", "--port" : "37001", "--controlpanelport" : "37002", "--networkport" : "37003",}, t)
+	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{}, t)
 
 	state = GetFnodes()[2].State
 	state.MessageTally = true
 	StatusEveryMinute(state)
-	t.Log("Allocated 7 nodes")
-	if len(GetFnodes()) != 7 {
-		t.Fatal("Should have allocated 7 nodes")
-		t.Fail()
-	}
-
-	WaitBlocks(state, 1)
-	WaitForMinute(state, 2)
-
-	CheckAuthoritySet(5, 2, t)
 
 	var wait sync.WaitGroup
 	wait.Add(2)
@@ -683,8 +786,13 @@ func TestDBsigEOMElection(t *testing.T) {
 		fn.State.ShutdownChan <- 1
 	}
 
-}
+	PrintOneStatus(0, 0)
+	dblim := 8
+	if state.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state.LLeaderHeight)
+	}
 
+}
 func TestMultiple2Election(t *testing.T) {
 	if ranSimTest {
 		return
@@ -692,21 +800,31 @@ func TestMultiple2Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAF", "LOCAL", map[string]string {}, t)
+	state0 := SetupSim("LLLLLAAF", "LOCAL", map[string]string{}, t)
 
-	CheckAuthoritySet(7, 2, t)
+	CheckAuthoritySet(5, 2, t)
 
+	WaitForMinute(state0, 2)
+	runCmd("1")
+	runCmd("x")
+	runCmd("2")
+	runCmd("x")
+	WaitForMinute(state0, 2)
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
 
-	runCmd("s")
-	runCmd("E")
-	runCmd("F")
-	runCmd("0")
-	runCmd("p")
+	runCmd("E") // Print Elections On--
+	runCmd("F") // Print SimElections On
+	runCmd("0") // Select node 0
+	runCmd("p") // Dump Process List
+
+	// Wait till they should have updated by DBSTATE
 	WaitBlocks(state0, 3)
+	WaitForMinute(state0, 1)
+
+	CheckAuthoritySet(5, 2, t)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
@@ -721,27 +839,11 @@ func TestMultiple3Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAAAF", "LOCAL", map[string]string {}, t)
+	state0 := SetupSim("LLLLLLLAAAAF", "LOCAL", map[string]string{}, t)
 
-	leadercnt := 0
-	auditcnt := 0
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
+	CheckAuthoritySet(7, 4, t)
 
-	if leadercnt != 7 {
-		t.Fatalf("found %d leaders, expected 7", leadercnt)
-	}
-	if auditcnt != 4 {
-		t.Fatalf("found %d audit, expected 4", auditcnt)
-	}
+	WaitForMinute(state0, 2)
 
 	runCmd("1")
 	runCmd("x")
@@ -757,28 +859,11 @@ func TestMultiple3Election(t *testing.T) {
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
+	// Wait till they should have updated by DBSTATE
 	WaitBlocks(state0, 3)
+	WaitForMinute(state0, 1)
 
-	leadercnt = 0
-	auditcnt = 0
-
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
-
-	if leadercnt != 7 {
-		t.Fatalf("found %d leaders, expected 7", leadercnt)
-	}
-	if auditcnt != 4 {
-		t.Fatalf("found %d audit, expected 4", auditcnt)
-	}
+	CheckAuthoritySet(7, 4, t)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
@@ -791,31 +876,15 @@ func TestMultiple7Election(t *testing.T) {
 	if ranSimTest {
 		return
 	}
+	//	return // this test inextricably needs boatload of time e.g. blktime=120 to pass so disable it from now.
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
+	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", "LOCAL", map[string]string{"--debuglog": ".*", "--blktime": "60"}, t)
 
-	leadercnt := 0
-	auditcnt := 0
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
+	CheckAuthoritySet(15, 10, t)
 
-	if leadercnt != 15 {
-		t.Fatalf("found %d leaders, expected 15", leadercnt)
-	}
-
-	if auditcnt != 10 {
-		t.Fatalf("found %d audits, expected 10", auditcnt)
-	}
+	WaitForMinute(state0, 2)
 
 	// Take 7 nodes off line
 	for i := 1; i < 8; i++ {
@@ -831,35 +900,14 @@ func TestMultiple7Election(t *testing.T) {
 		runCmd("x")
 	}
 
-	// Wait till the should have updated by DBSTATE
+	// Wait till they should have updated by DBSTATE
 	WaitBlocks(state0, 3)
+	WaitMinutes(state0, 1)
 
 	CheckAuthoritySet(15, 10, t)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
-	}
-}
-
-func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
-	leadercnt := 0
-	auditcnt := 0
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
-	if leadercnt != leaders {
-		t.Fatalf("found %d leaders, expected %d", leadercnt, leaders)
-	}
-	if auditcnt != audits {
-		t.Fatalf("found %d audit servers, expected %d", auditcnt, audits)
-		t.Fail()
 	}
 }
