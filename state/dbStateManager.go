@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -18,6 +20,7 @@ import (
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/factoid"
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -34,7 +37,8 @@ var _ = log.Print
 type DBState struct {
 	IsNew bool
 
-	SaveStruct *SaveState
+	TmpSaveStruct *SaveState
+	SaveStruct    *SaveState
 
 	DBHash interfaces.IHash
 	ABHash interfaces.IHash
@@ -202,11 +206,13 @@ func (a *DBState) IsSameAs(b *DBState) bool {
 }
 
 func (dbs *DBState) MarshalBinary() (rval []byte, err error) {
+
 	defer func(pe *error) {
 		if *pe != nil {
 			fmt.Fprintf(os.Stderr, "DBState.MarshalBinary err:%v", *pe)
 		}
 	}(&err)
+
 	dbs.Init()
 	b := primitives.NewBuffer(nil)
 
@@ -225,10 +231,10 @@ func (dbs *DBState) MarshalBinary() (rval []byte, err error) {
 		if err != nil {
 			return nil, err
 		}
-		err = b.PushBinaryMarshallable(dbs.SaveStruct)
-		if err != nil {
-			return nil, err
-		}
+        }
+	err = b.PushBinaryMarshallable(dbs.SaveStruct)
+	if err != nil {
+		return nil, err
 	}
 
 	err = b.PushBinaryMarshallable(dbs.DBHash)
@@ -342,11 +348,10 @@ func (dbs *DBState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	}
 
 	if ok == true {
-		dbs.SaveStruct = new(SaveState)
-		err = b.PopBinaryMarshallable(dbs.SaveStruct)
-		if err != nil {
-			return
-		}
+	dbs.SaveStruct = new(SaveState)
+	err = b.PopBinaryMarshallable(dbs.SaveStruct)
+	if err != nil {
+		return
 	}
 
 	err = b.PopBinaryMarshallable(dbs.DBHash)
@@ -450,7 +455,6 @@ func (dbs *DBState) UnmarshalBinary(p []byte) error {
 
 type DBStateList struct {
 	SrcNetwork bool // True if I got this block from the network.
-
 	LastEnd       int
 	LastBegin     int
 	TimeToAsk     interfaces.Timestamp
@@ -530,7 +534,6 @@ func (dbsl *DBStateList) MarshalBinary() (rval []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-
 	err = buf.PushUInt32(uint32(dbsl.LastEnd))
 	if err != nil {
 		return nil, err
@@ -539,6 +542,7 @@ func (dbsl *DBStateList) MarshalBinary() (rval []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	err = buf.PushBinaryMarshallable(dbsl.TimeToAsk)
 	if err != nil {
 		return nil, err
@@ -560,16 +564,18 @@ func (dbsl *DBStateList) MarshalBinary() (rval []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	l := len(dbsl.DBStates)
 	err = buf.PushVarInt(uint64(l))
 	if err != nil {
 		return nil, err
 	}
+
 	for _, v := range dbsl.DBStates {
-		err = buf.PushBinaryMarshallable(v)
-		if err != nil {
-			return nil, err
-		}
+			err = buf.PushBinaryMarshallable(v)
+			if err != nil {
+				return nil, err
+			}
 	}
 
 	return buf.DeepCopyBytes(), nil
@@ -586,12 +592,12 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 	if err != nil {
 		return
 	}
-
 	x, err := buf.PopUInt32()
 	if err != nil {
 		return
 	}
 	dbsl.LastEnd = int(x)
+
 	x, err = buf.PopUInt32()
 	if err != nil {
 		return
@@ -938,11 +944,13 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 			o := factoid.NewOutAddress(ia.CoinbaseAddress, amt)
 			outputs = append(outputs, o)
 		}
+
 		err = d.AdminBlock.AddCoinbaseDescriptor(outputs)
 		if err != nil {
 			panic(err)
 		}
 	}
+
 
 	err = d.AdminBlock.InsertIdentityABEntries()
 	if err != nil {
@@ -1045,7 +1053,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	// Saving our state so we can reset it if we need to.
 	d.SaveStruct = SaveFactomdState(list.State, d)
-
 	ht := d.DirectoryBlock.GetHeader().GetDBHeight()
 	pl := list.State.ProcessLists.Get(ht)
 	pln := list.State.ProcessLists.Get(ht + 1)
@@ -1071,6 +1078,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		}
 		out.WriteString("\n")
 	}
+
 
 	prt("pl 1st", pl)
 	prt("pln 1st", pln)
@@ -1132,7 +1140,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	if list.State.DBFinished {
 		list.State.Balancehash = fs.GetBalanceHash(false)
 	}
-
 	// Make the current exchange rate whatever we had in the previous block.
 	// UNLESS there was a FER entry processed during this block  changeheight will be left at 1 on a change block
 	if list.State.FERChangeHeight == 1 {
@@ -1259,6 +1266,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	dbheight := int(d.DirectoryBlock.GetHeader().GetDBHeight())
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.
+
 
 	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
 		return
@@ -1477,6 +1485,8 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	progress = true
 	d.ReadyToSave = false
 	d.Saved = true
+
+
 	return
 }
 
