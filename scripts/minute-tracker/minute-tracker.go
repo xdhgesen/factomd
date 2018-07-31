@@ -16,11 +16,8 @@ import (
 "log"
 )
 
-func init() {
-	factom.SetFactomdServer("localhost:8088")
-}
-
 func main() {
+	factomdLocationPtr := flag.String("factomdserver", "localhost:8088", "URL of the factomd instance to track")
 	tagPtr := flag.String("tag", "mainnet-follower", "Name to tag this test with")
 	blkTimePtr := flag.Int("blktime", 600, "Seconds per block of the running factomd instance")
 	flag.Usage = func() {
@@ -30,6 +27,7 @@ func main() {
 	flag.CommandLine.Parse(os.Args[1:])
 
 	// Process & check param values
+	factom.SetFactomdServer(*factomdLocationPtr)
 	tag := *tagPtr
 	blkTime := *blkTimePtr
 	if blkTime < 1 {
