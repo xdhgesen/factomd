@@ -62,14 +62,13 @@ func main() {
 		if previous.Minute != current.Minute {
 			// New minute started. Calculate summary of previous minute, then write it to the spreadsheet
 			previousMinuteTime := time.Duration(current.MinuteStartTime - previous.MinuteStartTime)
+			fmt.Printf("Completed minute %d \t block %d \t %f seconds\n", previous.Minute, previous.BlockHeight, previousMinuteTime.Seconds())
 			row := fmt.Sprintf("%d,%d,%f\n", previous.BlockHeight, previous.Minute, previousMinuteTime.Seconds())
 			go func() {
 				_, err = file.WriteString(row)
 				check(err, "Failed to write minute to file")
 			}()
 			previous = current
-
-			fmt.Printf("Started minute %d in block %d\n", current.Minute, current.BlockHeight)
 		}
 	}
 }
