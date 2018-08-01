@@ -19,11 +19,14 @@ import (
 	"sync"
 	"runtime"
 	"reflect"
+	"flag"
 )
 
 var _ = Factomd
+var par = globals.FactomParams{}
 
 var quit = make(chan struct{})
+
 
 // SetupSim takes care of your options, and setting up nodes
 // pass in a string for nodes: 4 Leaders, 3 Audit, 4 Followers: "LLLLAAAFFFF" as the first argument
@@ -32,9 +35,9 @@ var quit = make(chan struct{})
 // Pass in t for the testing as the 4th argument
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, height int, elections int, elecrounds int, t *testing.T) *state.State {
+func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, height int, elections int, elecrounds int, t *testing.T) *state.State {
 	l := len(GivenNodes)
-	DefaultOptions := map[string]string{
+	CmdLineOptions := map[string]string{
 		"--db":               "Map",
 		"--network":          fmt.Sprintf("%v", NetworkType),
 		"--net":              "alot+",
@@ -52,38 +55,54 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 		"--debugconsole":     "remotehost:37093", // turn on the debug console but don't open a window
 		//		"--controlpanelsetting": "readwrite",
 		"--debuglog": "faulting|bad",
+		"--Herro" : "globbly",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
-	if Options != nil && len(Options) != 0 {
-		for key, value := range Options {
+	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
+		for key, value := range UserAddedOptions {
 			if key != "--debuglog" {
-				DefaultOptions[key] = value
+				CmdLineOptions[key] = value
 			} else {
-				DefaultOptions[key] = DefaultOptions[key] + "|" + value // add debug log flags to the default
+				CmdLineOptions[key] = CmdLineOptions[key] + "|" + value // add debug log flags to the default
 			}
 			// remove options not supported by the current flags set so we can merge this update into older code bases
-			// TODO: use flag.VisitAll() to remove any options not supported by the current build
+		}
+	}
+
+	// TODO: use flag.VisitAll() to remove any options not supported by the current build
+
+	// Finds all of the valid commands and stores them
+	optionsArr := make([]string, 0)
+	flag.VisitAll(func(key *flag.Flag) {
+		optionsArr = append(optionsArr, "--"+key.Name)
+	})
+
+	// Loops through CmdLineOptions to removed commands that are not valid
+	for i, _ := range CmdLineOptions {
+		if !stringInSlice(i, optionsArr) {
+			fmt.Println("Not Included: "+i+", Removing from Options")
+			delete(CmdLineOptions, i)
 		}
 	}
 
 	// default the fault time and round time based on the blk time out
-	blktime, err := strconv.Atoi(DefaultOptions["--blktime"])
+	blktime, err := strconv.Atoi(CmdLineOptions["--blktime"])
 	if err != nil {
 		panic(err)
 	}
 
-	if DefaultOptions["--faulttimeout"] == "" {
-		DefaultOptions["--faulttimeout"] = fmt.Sprintf("%d", blktime/5) // use 2 minutes ...
+	if CmdLineOptions["--faulttimeout"] == "" {
+		CmdLineOptions["--faulttimeout"] = fmt.Sprintf("%d", blktime/5) // use 2 minutes ...
 	}
 
-	if DefaultOptions["--roundtimeout"] == "" {
-		DefaultOptions["--roundtimeout"] = fmt.Sprintf("%d", blktime/5)
+	if CmdLineOptions["--roundtimeout"] == "" {
+		CmdLineOptions["--roundtimeout"] = fmt.Sprintf("%d", blktime/5)
 	}
 
 	// built the fake command line
 	returningSlice := []string{}
-	for key, value := range DefaultOptions {
+	for key, value := range CmdLineOptions {
 		returningSlice = append(returningSlice, key+"="+value)
 	}
 
@@ -116,21 +135,16 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 	go func() {
 		for {
 			select {
-			case <- quit:
-				return
+			case  <- quit:
+			    return
 			default:
 				if int(state0.GetLLeaderHeight()) > height {
-					fmt.Println("HEIGHT HIGHER THAN EXPECTED")
-					t.Fatalf("Height went higher than expected")
-					t.Fail()
-					//panic("TOOK TOO LONG")
+					fmt.Println("Exceeded expected height")
+					panic("Exceeded expected height")
 				}
-				fmt.Println("CHECKING SOMETHING", time.Now().After(endtime))
 				if time.Now().After(endtime) {
-					fmt.Println("TIME OUT ERROR")
-					t.Fatalf("Took too long")
-					t.Fail()
-					//panic("TOOK TOO LONG")
+					fmt.Println("Took too long")
+					panic("TOOK TOO LONG")
 				}
 				time.Sleep(1 * time.Second)
 			}
@@ -149,6 +163,15 @@ func SetupSim(GivenNodes string, NetworkType string, Options map[string]string, 
 		t.Fail()
 	}
 	return state0
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
 
 func creatingNodes(creatingNodes string, state0 *state.State) {
@@ -308,7 +331,7 @@ func runCmd(cmd string) {
 }
 
 func shutDownEverything(t *testing.T) {
-	quit <- struct{}{}
+	close(quit)
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
@@ -574,7 +597,7 @@ func TestLoadScrambled(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLFFFFFF", "LOCAL", map[string]string{"--net": "tree"}, 5, 0, 0, t)
+	state0 := SetupSim("LLFFFFFF", "LOCAL", map[string]string{"--net": "tree"}, 40, 0, 0, t)
 
 	CheckAuthoritySet(2, 0, t)
 
