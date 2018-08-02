@@ -306,7 +306,7 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 
 	// Need to ensure the dbstate is at the same height as the state.
 	if ss.DBHeight != state.LLeaderHeight {
-		os.Stderr.WriteString(fmt.Sprintf("%10s dbht mismatch %d %d\n", state.GetFactomNodeName(), ss.DBHeight, state.LLeaderHeight))
+		//os.Stderr.WriteString(fmt.Sprintf("%10s dbht mismatch %d %d\n", state.GetFactomNodeName(), ss.DBHeight, state.LLeaderHeight))
 		return
 	}
 

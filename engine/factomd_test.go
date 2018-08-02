@@ -132,8 +132,8 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 
 	}
 
-	WaitBlocks(state0, 1) // Wait for 1 block
-	WaitForMinute(state0, 3)
+	WaitBlocks(state0, 1) // Wait for 2 block
+	WaitForMinute(state0, 1)
 
 	runCmd("0")
 	for i, c := range []byte(creatingNodes) {
@@ -149,9 +149,10 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 			panic("NOT L, A or F")
 		}
 	}
-	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitBlocks(state0, 2) // Wait for 1 block
 	WaitForMinute(state0, 1)
 }
+
 func TimeNow(s *state.State) {
 	fmt.Printf("%s:%d/%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
 }
@@ -894,11 +895,11 @@ func TestMultiple7Election(t *testing.T) {
 	//	return // this test inextricably needs boatload of time e.g. blktime=120 to pass so disable it from now.
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", "LOCAL", map[string]string{"--debuglog": ".*", "--blktime": "60"}, t)
+	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", "LOCAL", map[string]string{"--debuglog": ".*", "--blktime": "10"}, t)
+
+	WaitMinutes(state0, 5)
 
 	CheckAuthoritySet(15, 10, t)
-
-	WaitForMinute(state0, 2)
 
 	// Take 7 nodes off line
 	for i := 1; i < 8; i++ {
