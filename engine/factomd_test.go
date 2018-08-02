@@ -366,7 +366,7 @@ func TestMakeALeader(t *testing.T) {
 		"--roundtimeout=2",
 		"--count=2",
 		"--startdelay=1",
-		//"--debuglog=F.*",
+		"--debuglog=f.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
