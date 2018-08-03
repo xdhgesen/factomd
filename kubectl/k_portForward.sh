@@ -33,4 +33,4 @@ EOF
 ################################
 # End of AWK Scripts           #
 ################################
-kubectl get pods -l role=member | awk "$scriptVariable"
+(echo bootstrap-node-f5db45b97-6wqtn; kubectl get pods -l role=member) | awk "$scriptVariable"

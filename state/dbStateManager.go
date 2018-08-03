@@ -8,9 +8,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -20,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/factoid"
-	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -231,7 +228,7 @@ func (dbs *DBState) MarshalBinary() (rval []byte, err error) {
 		if err != nil {
 			return nil, err
 		}
-        }
+	}
 	err = b.PushBinaryMarshallable(dbs.SaveStruct)
 	if err != nil {
 		return nil, err
@@ -348,10 +345,11 @@ func (dbs *DBState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	}
 
 	if ok == true {
-	dbs.SaveStruct = new(SaveState)
-	err = b.PopBinaryMarshallable(dbs.SaveStruct)
-	if err != nil {
-		return
+		dbs.SaveStruct = new(SaveState)
+		err = b.PopBinaryMarshallable(dbs.SaveStruct)
+		if err != nil {
+			return
+		}
 	}
 
 	err = b.PopBinaryMarshallable(dbs.DBHash)
@@ -388,7 +386,8 @@ func (dbs *DBState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 		return
 	}
 
-	l, err := b.PopVarInt()
+	l, err2 := b.PopVarInt()
+	err = err2
 	if err != nil {
 		return
 	}
@@ -401,7 +400,8 @@ func (dbs *DBState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 		dbs.EntryBlocks = append(dbs.EntryBlocks, eb)
 	}
 
-	entries, rest, err := entryBlock.UnmarshalEntryList(b.DeepCopyBytes())
+	entries, rest, err2 := entryBlock.UnmarshalEntryList(b.DeepCopyBytes())
+	err = err2
 	if err != nil {
 		return
 	}
@@ -454,7 +454,7 @@ func (dbs *DBState) UnmarshalBinary(p []byte) error {
 }
 
 type DBStateList struct {
-	SrcNetwork bool // True if I got this block from the network.
+	SrcNetwork    bool // True if I got this block from the network.
 	LastEnd       int
 	LastBegin     int
 	TimeToAsk     interfaces.Timestamp
@@ -572,10 +572,10 @@ func (dbsl *DBStateList) MarshalBinary() (rval []byte, err error) {
 	}
 
 	for _, v := range dbsl.DBStates {
-			err = buf.PushBinaryMarshallable(v)
-			if err != nil {
-				return nil, err
-			}
+		err = buf.PushBinaryMarshallable(v)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return buf.DeepCopyBytes(), nil
@@ -951,7 +951,6 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 		}
 	}
 
-
 	err = d.AdminBlock.InsertIdentityABEntries()
 	if err != nil {
 		fmt.Println(err)
@@ -1078,7 +1077,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		}
 		out.WriteString("\n")
 	}
-
 
 	prt("pl 1st", pl)
 	prt("pln 1st", pln)
@@ -1266,7 +1264,6 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	dbheight := int(d.DirectoryBlock.GetHeader().GetDBHeight())
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.
-
 
 	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
 		return
@@ -1485,7 +1482,6 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	progress = true
 	d.ReadyToSave = false
 	d.Saved = true
-
 
 	return
 }
