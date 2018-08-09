@@ -345,10 +345,10 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0,0, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0,0, t)
 	WaitForMinute(state0, 1)
 
-	url := "http://localhost:8088/v2"
+	url := "http://localhost:"+fmt.Sprint(state0.GetPort())+"/v2"
 	arrayOfFactoidAccounts := []string{"FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC","FA3Y1tBWnFpyoZUPr9ZH51R1gSC8r5x5kqvkXL3wy4uRvzFnuWLB","FA3Fsy2WPkR5z7qjpL8H1G51RvZLCiLDWASS6mByeQmHSwAws8K7"}
 
 	var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-fct-balances", "params":{"addresses":["`+strings.Join(arrayOfFactoidAccounts, `", "`)+`"]}}  `)
@@ -407,7 +407,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0,0,t)
 	WaitForMinute(state0, 1)
 
-	url := "http://localhost:8088/v2"
+	url := "http://localhost:"+fmt.Sprint(state0.GetPort())+"/v2"
 	arrayOfECAccounts := []string{"EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab","EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
 
 	var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-ec-balances", "params":{"addresses":["`+strings.Join(arrayOfECAccounts, `", "`)+`"]}}  `)
