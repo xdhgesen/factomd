@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/globals"
-	."github.com/FactomProject/factomd/engine"
+	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
 	"strings"
 	"net/http"
@@ -216,32 +216,31 @@ func TimeNow(s *state.State) {
 }
 
 var statusState *state.State
-
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
 	if statusState == nil {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
-		go func() {
-			for {
+	go func() {
+		for {
 				s := statusState
-				newMinute := (s.CurrentMinute + 1) % 10
-				timeout := 8 // timeout if a minutes takes twice as long as expected
-				for s.CurrentMinute != newMinute && timeout > 0 {
-					sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-					time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
-					timeout--
-				}
-				if timeout <= 0 {
-					fmt.Println("Stalled !!!")
-				}
-				// Make all the nodes update their status
-				for _, n := range GetFnodes() {
-					n.State.SetString()
-				}
-				PrintOneStatus(0, 0)
+			newMinute := (s.CurrentMinute + 1) % 10
+			timeout := 8 // timeout if a minutes takes twice as long as expected
+			for s.CurrentMinute != newMinute && timeout > 0 {
+				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+				timeout--
 			}
-		}()
+			if timeout <= 0 {
+				fmt.Println("Stalled !!!")
+			}
+				// Make all the nodes update their status
+			for _, n := range GetFnodes() {
+				n.State.SetString()
+			}
+			PrintOneStatus(0, 0)
+		}
+	}()
 	} else {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
@@ -281,6 +280,7 @@ func WaitForMinute(s *state.State, min int) {
 // Wait some number of minutes
 func WaitMinutesQuite(s *state.State, min int) {
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+
 	newMinute := (s.CurrentMinute + min) % 10
 	newBlock := int(s.LLeaderHeight) + (s.CurrentMinute+min)/10
 	for int(s.LLeaderHeight) < newBlock {
@@ -319,7 +319,6 @@ func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
 		t.Fail()
 	}
 }
-
 // We can only run 1 simtest!
 var ranSimTest = false
 
@@ -375,7 +374,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		PermBalance, pok := state0.FactoidBalancesP[byteAcc]
 		if pok != true {
 			PermBalance = -1
-		}
+	}
 		pl := state0.ProcessLists.Get(state0.LLeaderHeight)
 		pl.FactoidBalancesTMutex.Lock()
 		// Gets the Temp Balance of the Factoid address
@@ -418,8 +417,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	resp, err := client.Do(req)
 	if err != nil {
 		panic(err)
-	}
-
+		}
 	defer resp.Body.Close()
 	body, _ := ioutil.ReadAll(resp.Body)
 
@@ -441,17 +439,17 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 		TempBalance, ok := pl.ECBalancesT[byteAcc]
 		if ok != true {
 			TempBalance = 0
-		}
+	}
 		if TempBalance == 0 {
 			TempBalance = PermBalance
-		}
+	}
 		pl.ECBalancesTMutex.Unlock()
 
 		// splits `num,num` up into `[num, num]` som BothNumbers[0] with give you the first value (the Temp value)
 		BothNumbers := strings.Split(individualArrays[i], `,`)
 		if BothNumbers[0] !=  strconv.FormatInt(TempBalance, 10) || BothNumbers[1] != strconv.FormatInt(PermBalance, 10) {
 			t.Fatalf("Expected "+BothNumbers[0]+","+BothNumbers[1]+", but got %s"+ strconv.FormatInt(TempBalance, 10)+","+strconv.FormatInt(PermBalance, 10))
-		}
+	}
 	}
 	shutDownEverything(t)
 }
@@ -553,6 +551,7 @@ func TestSetupANetwork(t *testing.T) {
 	if state0.LLeaderHeight > uint32(dblim) {
 		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
 	}
+
 }
 
 func TestLoad(t *testing.T) {
@@ -587,7 +586,7 @@ func TestLoad(t *testing.T) {
 func TestLoadScrambled(t *testing.T) {
 	if ranSimTest {
 		return
-	}
+		}
 	defer func() {
 		if r := recover(); r != nil {
 			t.Fatalf("TestLoadScrambled:", r)
@@ -601,7 +600,7 @@ func TestLoadScrambled(t *testing.T) {
 
 	CheckAuthoritySet(2, 0, t)
 
-	runCmd("2")     // select 2
+	runCmd("2")   // select 2
 	runCmd("F1000") // set the message delay
 	runCmd("S10")   // delete 1% of the messages
 	runCmd("r")     // rotate the load around the network
@@ -666,8 +665,10 @@ func TestActivationHeightElection(t *testing.T) {
 	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, 14, 3, 2, t)
 
 	WaitMinutes(state0, 2)
+
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
+
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 2)
 	PrintOneStatus(0, 0)
@@ -785,7 +786,6 @@ func TestAnElection(t *testing.T) {
 	}
 
 	state0 := SetupSim(nodeList, "LOCAL", map[string]string {}, 9, 1, 2, t)
-
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
@@ -802,6 +802,7 @@ func TestAnElection(t *testing.T) {
 	WaitMinutes(state0, 2)
 	//bring him back
 	runCmd("x")
+
 	// wait for him to update via dbstate and become an audit
 	WaitBlocks(state0, 4)
 	WaitMinutes(state0, 1)
@@ -855,6 +856,7 @@ func Test5up(t *testing.T) {
 	state0 := SetupSim(nodeList, "LOCAL", map[string]string {"--startdelay" : "5",}, 15, 0, 0, t)
 
 	WaitMinutes(state0, 2)
+
 
 	for {
 		pendingCommits := 0
@@ -958,8 +960,7 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	fmt.Println("HEIGHT", state.GetLLeaderHeight())
 	shutDownEverything(t)
-
-}
+	}
 
 func TestMultiple2Election(t *testing.T) {
 	if ranSimTest {
@@ -973,11 +974,13 @@ func TestMultiple2Election(t *testing.T) {
 	CheckAuthoritySet(5, 2, t)
 
 	WaitForMinute(state0, 2)
+
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
 	WaitForMinute(state0, 2)
+
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
@@ -994,6 +997,7 @@ func TestMultiple2Election(t *testing.T) {
 
 	CheckAuthoritySet(5, 2, t)
 	shutDownEverything(t)
+
 }
 
 func TestMultiple3Election(t *testing.T) {
@@ -1008,6 +1012,7 @@ func TestMultiple3Election(t *testing.T) {
 	CheckAuthoritySet(7, 4, t)
 
 	WaitForMinute(state0, 2)
+
 
 	runCmd("1")
 	runCmd("x")
@@ -1030,7 +1035,6 @@ func TestMultiple3Election(t *testing.T) {
 	CheckAuthoritySet(7, 4, t)
 
 	t.Log("Shutting down the network")
-
 	shutDownEverything(t)
 
 }
@@ -1053,7 +1057,7 @@ func TestMultiple7Election(t *testing.T) {
 	for i := 1; i < 8; i++ {
 		runCmd(fmt.Sprintf("%d", i))
 		runCmd("x")
-	}
+		}
 	// force them all to be faulted
 	WaitMinutes(state0, 1)
 
