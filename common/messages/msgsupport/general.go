@@ -14,6 +14,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
+	"github.com/FactomProject/factomd/common/messages/factored"
 )
 
 func UnmarshalMessage(data []byte) (interfaces.IMsg, error) {
@@ -62,9 +63,9 @@ func CreateMsg(messageType byte) interfaces.IMsg {
 	case constants.REMOVESERVER_MSG:
 		return new(messages.RemoveServerMsg)
 	case constants.BOUNCE_MSG:
-		return new(messages.Bounce)
+		return new(factored.Bounce)
 	case constants.BOUNCEREPLY_MSG:
-		return new(messages.BounceReply)
+		return new(factored.BounceReply)
 	case constants.SYNC_MSG:
 		return new(electionMsgs.SyncMsg)
 	case constants.VOLUNTEERAUDIT:
