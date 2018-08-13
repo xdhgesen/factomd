@@ -108,12 +108,6 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	runCmd := func(cmd string) {
-		os.Stderr.WriteString("Executing: " + cmd + "\n")
-		InputChan <- cmd
-		return
-	}
-
 	args := append([]string{},
 		"--db=Map",
 		"--network=LOCAL",
@@ -128,7 +122,7 @@ func TestSetupANetwork(t *testing.T) {
 		"--controlpanelport=37002",
 		"--networkport=37003",
 		"--startdelay=1",
-		//"--debuglog=.*",
+		"--debuglog=.*",
 		"--stdoutlog=out.txt",
 		"--stderrlog=err.txt",
 		"--checkheads=false",
@@ -138,6 +132,14 @@ func TestSetupANetwork(t *testing.T) {
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
+
+	runCmd := func(cmd string) {
+		TimeNow(state0)
+		os.Stderr.WriteString("Executing: " + cmd + "\n")
+		os.Stdout.WriteString("Executing: " + cmd + "\n")
+		InputChan <- cmd
+		return
+	}
 
 	t.Log("Allocated 10 nodes")
 	if len(GetFnodes()) != 10 {
@@ -154,7 +156,20 @@ func TestSetupANetwork(t *testing.T) {
 	runCmd("w")
 	WaitBlocks(state0, 1)
 	runCmd("g10")
-	WaitBlocks(state0, 1)
+
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		fmt.Printf("Waiting for G10 to complete\n")
+		WaitMinutes(state0, 1)
+
+	}
+	WaitBlocks(state0, 2)
 	// Allocate 4 leaders
 	WaitForMinute(state0, 3)
 
@@ -765,9 +780,6 @@ func Test5up(t *testing.T) {
 	WaitMinutes(state0, 2)
 
 	runCmd("g6")
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
-
 	for {
 		pendingCommits := 0
 		for _, s := range fnodes {
@@ -780,6 +792,9 @@ func Test5up(t *testing.T) {
 		WaitMinutes(state0, 1)
 
 	}
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 1)
+
 	// Allocate leaders
 	runCmd("1")
 	for i := 0; i < leaders-1; i++ {

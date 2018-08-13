@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
-	"sync"
+	"reflect"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -38,42 +38,51 @@ var _ = (*hash.Hash32)(nil)
 // Returns true if some message was processed.
 //***************************************************************
 
-var once sync.Once
-var debugExec_flag bool
+func (s *State) CheckFileName(name string) bool {
+	return messages.CheckFileName(name)
+}
 
 func (s *State) DebugExec() (ret bool) {
-	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
-
-	//return s.FactomNodeName == "FNode0"
-	return debugExec_flag
+	return globals.Params.DebugLogRegEx != ""
 }
 
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
 	if s.DebugExec() {
 		var dbh int
-		if s.LeaderPL != nil {
-			dbh = int(s.LeaderPL.DBHeight)
+		nodeName := "unknown"
+		minute := 0
+		if s != nil {
+			if s.LeaderPL != nil {
+				dbh = int(s.LeaderPL.DBHeight)
+			}
+			nodeName = s.FactomNodeName
+			minute = int(s.CurrentMinute)
 		}
-		messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, comment, msg)
+		messages.StateLogMessage(nodeName, dbh, minute, logName, comment, msg)
 	}
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	if s.DebugExec() {
 		var dbh int
-		if s.LeaderPL != nil {
-			dbh = int(s.LeaderPL.DBHeight)
+		nodeName := "unknown"
+		minute := 0
+		if s != nil {
+			if s.LeaderPL != nil {
+				dbh = int(s.LeaderPL.DBHeight)
+			}
+			nodeName = s.FactomNodeName
+			minute = int(s.CurrentMinute)
 		}
-		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
+		messages.StateLogPrintf(nodeName, dbh, minute, logName, format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
-	if msg.GetHash() == nil {
+	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
 		return false
 	}
-
 	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 	if !ok {
@@ -1295,6 +1304,8 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 func (s *State) ProcessAddServer(dbheight uint32, addServerMsg interfaces.IMsg) bool {
 	as, ok := addServerMsg.(*messages.AddServerMsg)
 	if ok && !ProcessIdentityToAdminBlock(s, as.ServerChainID, as.ServerType) {
+		s.LogMessage("executeMsg", "Failed to process", addServerMsg)
+
 		//s.AddStatus(fmt.Sprintf("Failed to add %x as server type %d", as.ServerChainID.Bytes()[2:5], as.ServerType))
 		return false
 	}
