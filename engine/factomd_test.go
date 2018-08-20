@@ -1,28 +1,32 @@
 package engine_test
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"bytes"
+	"flag"
 	"io/ioutil"
 	"net/http"
-	"os"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
-	"testing"
-	"time"
 
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
-	"github.com/FactomProject/factomd/wsapi"
 )
 
 var _ = Factomd
+var par = globals.FactomParams{}
+
+var quit = make(chan struct{})
 
 // SetupSim takes care of your options, and setting up nodes
 // pass in a string for nodes: 4 Leaders, 3 Audit, 4 Followers: "LLLLAAAFFFF" as the first argument
@@ -31,65 +35,170 @@ var _ = Factomd
 // Pass in t for the testing as the 4th argument
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, t *testing.T) *state.State {
+func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, height int, elections int, elecrounds int, t *testing.T) *state.State {
 	l := len(GivenNodes)
-	DefaultOptions := map[string]string{
-		"--db":           "Map",
-		"--network":      fmt.Sprintf("%v", NetworkType),
-		"--net":          "alot+",
-		"--enablenet":    "false",
-		"--blktime":      "8",
-		"--faulttimeout": "2",
-		"--roundtimeout": "2",
-		"--count":        fmt.Sprintf("%v", l),
-		//"--debuglog=.*",
-		//"--debuglog=F.*",
-		"--startdelay": "1",
-		"--stdoutlog":  "out.txt",
-		"--stderrlog":  "err.txt",
-		"--checkheads": "false",
+	CmdLineOptions := map[string]string{
+		"--db":                  "Map",
+		"--network":             fmt.Sprintf("%v", NetworkType),
+		"--net":                 "alot+",
+		"--enablenet":           "false",
+		"--blktime":             "10",
+		"--count":               fmt.Sprintf("%v", l),
+		"--startdelay":          "1",
+		"--stdoutlog":           "out.txt",
+		"--stderrlog":           "out.txt",
+		"--checkheads":          "false",
+		"--logPort":             "37000", // use different ports so I can run a test and a real node at the same time
+		"--port":                "37001",
+		"--controlpanelport":    "37002",
+		"--networkport":         "37003",
+		"--debugconsole":        "remotehost:37093", // turn on the debug console but don't open a window
+		"--controlpanelsetting": "readwrite",
+		"--debuglog":            "faulting|bad",
+		"--Herro":               "globbly",
 	}
 
+	// loop thru the test specific options and overwrite or append to the DefaultOptions
 	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
 		for key, value := range UserAddedOptions {
-			DefaultOptions[key] = value
+			if key != "--debuglog" {
+				CmdLineOptions[key] = value
+			} else {
+				CmdLineOptions[key] = CmdLineOptions[key] + "|" + value // add debug log flags to the default
+			}
 		}
 	}
 
+	// TODO: use flag.VisitAll() to remove any options not supported by the current build
+
+	// Finds all of the valid commands and stores them
+	optionsArr := make([]string, 0)
+	flag.VisitAll(func(key *flag.Flag) {
+		optionsArr = append(optionsArr, "--"+key.Name)
+	})
+
+	// Loops through CmdLineOptions to removed commands that are not valid
+	for i, _ := range CmdLineOptions {
+		if !stringInSlice(i, optionsArr) {
+			fmt.Println("Not Included: " + i + ", Removing from Options")
+			delete(CmdLineOptions, i)
+		}
+	}
+
+	// default the fault time and round time based on the blk time out
+	blktime, err := strconv.Atoi(CmdLineOptions["--blktime"])
+	if err != nil {
+		panic(err)
+	}
+
+	if CmdLineOptions["--faulttimeout"] == "" {
+		CmdLineOptions["--faulttimeout"] = fmt.Sprintf("%d", blktime/5) // use 2 minutes ...
+	}
+
+	if CmdLineOptions["--roundtimeout"] == "" {
+		CmdLineOptions["--roundtimeout"] = fmt.Sprintf("%d", blktime/5)
+	}
+
+	// built the fake command line
 	returningSlice := []string{}
-	for key, value := range DefaultOptions {
+	for key, value := range CmdLineOptions {
 		returningSlice = append(returningSlice, key+"="+value)
 	}
 
+	fmt.Println("Command Line Arguments:")
+	for _, v := range returningSlice {
+		fmt.Printf("\t%s\n", v)
+	}
 	params := ParseCmdLine(returningSlice)
+	fmt.Println()
+
+	fmt.Println("Parameter:")
+	s := reflect.ValueOf(params).Elem()
+	typeOfT := s.Type()
+
+	for i := 0; i < s.NumField(); i++ {
+		f := s.Field(i)
+		fmt.Printf("%d: %25s %s = %v\n", i,
+			typeOfT.Field(i).Name, f.Type(), f.Interface())
+	}
+	fmt.Println()
+
+	blkt := globals.Params.BlkTime
+	roundt := elections.RoundTimeout
+	et := elections.FaultTimeout
 	state0 := Factomd(params, false).(*state.State)
+	Calctime := float64((height*blkt)+(elections*et)+(elecrounds*roundt)) * 1.1
+	endtime := time.Now().Add(time.Second * time.Duration(Calctime))
+	fmt.Println("ENDTIME: ", endtime)
+
+	go func() {
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				if int(state0.GetLLeaderHeight()) > height {
+					fmt.Println("Exceeded expected height")
+					panic("Exceeded expected height")
+				}
+				if time.Now().After(endtime) {
+					fmt.Println("Took too long")
+					panic("TOOK TOO LONG")
+				}
+				time.Sleep(1 * time.Second)
+			}
+		}
+	}()
+
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
+	StatusEveryMinute(state0)
 	creatingNodes(GivenNodes, state0)
 
 	t.Logf("Allocated %d nodes", l)
-	lenFnodes := len(GetFnodes())
-	if lenFnodes != l {
+	if len(GetFnodes()) != l {
 		t.Fatalf("Should have allocated %d nodes", l)
 		t.Fail()
 	}
 	return state0
 }
 
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
 func creatingNodes(creatingNodes string, state0 *state.State) {
-	runCmd(fmt.Sprintf("g%d", len(creatingNodes)))
+	nodes := len(creatingNodes)
+	runCmd(fmt.Sprintf("g%d", nodes))
+
+	// Wait till all the entries from the g command are processed
+	for {
+		pendingCommits := 0
+		for _, s := range fnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if pendingCommits == 0 {
+			break
+		}
+		fmt.Printf("Waiting for g to complete\n")
+		WaitMinutes(state0, 1)
+	}
 	WaitBlocks(state0, 1) // Wait for 1 block
 	WaitForMinute(state0, 3)
 	runCmd("0")
 	for i, c := range []byte(creatingNodes) {
-		fmt.Println(i)
 		switch c {
 		case 'L', 'l':
-			fmt.Println("L")
 			runCmd("l")
 		case 'A', 'a':
 			runCmd("o")
 		case 'F', 'f':
+			runCmd(fmt.Sprintf("%d", (i+1)%nodes))
 			break
 		default:
 			panic("NOT L, A or F")
@@ -103,27 +212,38 @@ func TimeNow(s *state.State) {
 	fmt.Printf("%s:%d/%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
 }
 
+var statusState *state.State
+
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
-	go func() {
-		for {
-			newMinute := (s.CurrentMinute + 1) % 10
-			timeout := 8 // timeout if a minutes takes twice as long as expected
-			for s.CurrentMinute != newMinute && timeout > 0 {
-				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
-				timeout--
+	if statusState == nil {
+		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
+		statusState = s
+		go func() {
+			for {
+				s := statusState
+				newMinute := (s.CurrentMinute + 1) % 10
+				timeout := 8 // timeout if a minutes takes twice as long as expected
+				for s.CurrentMinute != newMinute && timeout > 0 {
+					sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+					time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+					timeout--
+				}
+				if timeout <= 0 {
+					fmt.Println("Stalled !!!")
+				}
+				// Make all the nodes update their status
+				for _, n := range GetFnodes() {
+					n.State.SetString()
+				}
+				PrintOneStatus(0, 0)
 			}
-			if timeout <= 0 {
-				fmt.Println("Stalled !!!")
-			}
-			// Make all the nodes update thier status
-			for _, n := range GetFnodes() {
-				n.State.SetString()
-			}
-			PrintOneStatus(0, 0)
-		}
-	}()
+		}()
+	} else {
+		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
+		statusState = s
+
+	}
 }
 
 // Wait so many blocks
@@ -142,14 +262,15 @@ func WaitBlocks(s *state.State, blks int) {
 func WaitForMinute(s *state.State, min int) {
 	fmt.Printf("WaitForMinute(%d)\n", min)
 	TimeNow(s)
+	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	if s.CurrentMinute >= min {
 		for s.CurrentMinute > 0 {
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
 	}
 
 	for min > s.CurrentMinute {
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 	}
 	TimeNow(s)
 }
@@ -157,7 +278,6 @@ func WaitForMinute(s *state.State, min int) {
 // Wait some number of minutes
 func WaitMinutesQuite(s *state.State, min int) {
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-
 	newMinute := (s.CurrentMinute + min) % 10
 	newBlock := int(s.LLeaderHeight) + (s.CurrentMinute+min)/10
 	for int(s.LLeaderHeight) < newBlock {
@@ -175,40 +295,162 @@ func WaitMinutes(s *state.State, min int) {
 	TimeNow(s)
 }
 
+func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
+	leadercnt := 0
+	auditcnt := 0
+	for _, fn := range GetFnodes() {
+		s := fn.State
+		if s.Leader {
+			leadercnt++
+		}
+		list := s.ProcessLists.Get(s.LLeaderHeight)
+		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
+			auditcnt++
+		}
+	}
+	if leadercnt != leaders {
+		t.Fatalf("found %d leaders, expected %d", leadercnt, leaders)
+	}
+	if auditcnt != audits {
+		t.Fatalf("found %d audit servers, expected %d", auditcnt, audits)
+		t.Fail()
+	}
+}
+
 // We can only run 1 simtest!
 var ranSimTest = false
 
 func runCmd(cmd string) {
+	os.Stdout.WriteString("Executing: " + cmd + "\n")
 	os.Stderr.WriteString("Executing: " + cmd + "\n")
 	InputChan <- cmd
 	return
 }
 
-func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
-	j, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
+func shutDownEverything(t *testing.T) {
+	close(quit)
+	t.Log("Shutting down the network")
+	for _, fn := range GetFnodes() {
+		fn.State.ShutdownChan <- 1
+	}
+}
+
+func TestMultipleFTAccountsAPI(t *testing.T) {
+	if ranSimTest {
+		return
 	}
 
-	portStr := fmt.Sprintf("%d", port)
-	resp, err := http.Post(
-		"http://localhost:"+portStr+"/v2",
-		"application/json",
-		bytes.NewBuffer(j))
+	ranSimTest = true
+
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0, 0, t)
+	WaitForMinute(state0, 1)
+
+	url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
+	arrayOfFactoidAccounts := []string{"FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "FA3Y1tBWnFpyoZUPr9ZH51R1gSC8r5x5kqvkXL3wy4uRvzFnuWLB", "FA3Fsy2WPkR5z7qjpL8H1G51RvZLCiLDWASS6mByeQmHSwAws8K7"}
+
+	var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-fct-balances", "params":{"addresses":["` + strings.Join(arrayOfFactoidAccounts, `", "`) + `"]}}  `)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("content-type", "text/plain;")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
+
 	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
 
-	body, err := ioutil.ReadAll(resp.Body)
+	temp := strings.Split(string(body), `balances":[[`)
+	justArray := strings.Split(temp[1], `]]}}`)
+	individualArrays := strings.Split(justArray[0], `],[`)
+
+	// To check if the balances returned from the API are right
+	for i, a := range arrayOfFactoidAccounts {
+		byteAcc := [32]byte{}
+		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
+		PermBalance, pok := state0.FactoidBalancesP[byteAcc]
+		if pok != true {
+			PermBalance = -1
+		}
+		pl := state0.ProcessLists.Get(state0.LLeaderHeight)
+		pl.FactoidBalancesTMutex.Lock()
+		// Gets the Temp Balance of the Factoid address
+		TempBalance, ok := pl.FactoidBalancesT[byteAcc]
+		if ok != true {
+			TempBalance = 0
+		}
+		if TempBalance == 0 {
+			TempBalance = PermBalance
+		}
+		pl.FactoidBalancesTMutex.Unlock()
+
+		// splits `num,num` up into `[num, num]` som BothNumbers[0] with give you the first value (the Temp value)
+		BothNumbers := strings.Split(individualArrays[i], `,`)
+		if BothNumbers[0] != strconv.FormatInt(TempBalance, 10) || BothNumbers[1] != strconv.FormatInt(PermBalance, 10) {
+			t.Fatalf("Expected " + BothNumbers[0] + "," + BothNumbers[1] + ", but got %s" + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
+		}
+	}
+	shutDownEverything(t)
+}
+
+func TestMultipleECAccountsAPI(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0, 0, t)
+	WaitForMinute(state0, 1)
+
+	url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
+	arrayOfECAccounts := []string{"EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab", "EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
+
+	var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-ec-balances", "params":{"addresses":["` + strings.Join(arrayOfECAccounts, `", "`) + `"]}}  `)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req.Header.Set("content-type", "text/plain;")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		panic(err)
 	}
-	r := primitives.NewJSON2Response()
-	if err := json.Unmarshal(body, r); err != nil {
-		return nil, err
+
+	defer resp.Body.Close()
+	body, _ := ioutil.ReadAll(resp.Body)
+
+	temp := strings.Split(string(body), `balances":[[`)
+	justArray := strings.Split(temp[1], `]]}}`)
+	individualArrays := strings.Split(justArray[0], `],[`)
+
+	// To check if the balances returned from the API are right
+	for i, a := range arrayOfECAccounts {
+		byteAcc := [32]byte{}
+		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
+		PermBalance, pok := state0.ECBalancesP[byteAcc]
+		if pok != true {
+			PermBalance = -1
+		}
+		pl := state0.ProcessLists.Get(state0.LLeaderHeight)
+		pl.ECBalancesTMutex.Lock()
+		// Gets the Temp Balance of the Factoid address
+		TempBalance, ok := pl.ECBalancesT[byteAcc]
+		if ok != true {
+			TempBalance = 0
+		}
+		if TempBalance == 0 {
+			TempBalance = PermBalance
+		}
+		pl.ECBalancesTMutex.Unlock()
+
+		// splits `num,num` up into `[num, num]` som BothNumbers[0] with give you the first value (the Temp value)
+		BothNumbers := strings.Split(individualArrays[i], `,`)
+		if BothNumbers[0] != strconv.FormatInt(TempBalance, 10) || BothNumbers[1] != strconv.FormatInt(PermBalance, 10) {
+			t.Fatalf("Expected " + BothNumbers[0] + "," + BothNumbers[1] + ", but got %s" + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
+		}
 	}
-	return nil, nil
+	shutDownEverything(t)
 }
 
 func TestSetupANetwork(t *testing.T) {
@@ -218,9 +460,8 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{}, 11, 0, 0, t)
 
-	runCmd("s")  // Show the process lists and directory block states as
 	runCmd("9")  // Puts the focus on node 9
 	runCmd("x")  // Takes Node 9 Offline
 	runCmd("w")  // Point the WSAPI to send API calls to the current node.
@@ -301,10 +542,7 @@ func TestSetupANetwork(t *testing.T) {
 	WaitForMinute(state0, 3) // Waits 3 "Minutes"
 	WaitBlocks(fn1.State, 3) // Waits for 3 blocks
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	time.Sleep(10 * time.Second)
 	PrintOneStatus(0, 0)
@@ -312,7 +550,6 @@ func TestSetupANetwork(t *testing.T) {
 	if state0.LLeaderHeight > uint32(dblim) {
 		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
 	}
-
 }
 
 func TestLoad(t *testing.T) {
@@ -322,21 +559,56 @@ func TestLoad(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LL", "LOCAL", map[string]string{}, t)
-
-	runCmd("1") // select node 1
-	runCmd("l") // make 1 a leader
-	WaitBlocks(state0, 1)
-	WaitForMinute(state0, 1)
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLF", "LOCAL", map[string]string{}, 35, 0, 0, t)
 
 	CheckAuthoritySet(2, 0, t)
 
 	runCmd("2")   // select 2
 	runCmd("R30") // Feed load
-	WaitBlocks(state0, 30)
+	WaitBlocks(state0, 10)
+	runCmd("R0") // Stop load
+	WaitBlocks(state0, 1)
+	PrintOneStatus(0, 0)
+	dblim := 34
+	if state0.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
+	}
+	shutDownEverything(t)
+} // testLoad(){...}
+
+// The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
+// the big happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
+// Using a message delay, drop and tree network makes this likely
+//
+func TestLoadScrambled(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("TestLoadScrambled:", r)
+		}
+	}()
+
+	ranSimTest = true
+
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLFFFFFF", "LOCAL", map[string]string{"--net": "tree"}, 40, 0, 0, t)
+
+	CheckAuthoritySet(2, 0, t)
+
+	runCmd("2")     // select 2
+	runCmd("F1000") // set the message delay
+	runCmd("S10")   // delete 1% of the messages
+	runCmd("r")     // rotate the load around the network
+	runCmd("R3")    // Feed load
+	WaitBlocks(state0, 10)
 	runCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
 
+	fmt.Println("HEIGHT", state0.GetLLeaderHeight())
+	shutDownEverything(t)
 } // testLoad(){...}
 
 func TestMakeALeader(t *testing.T) {
@@ -346,7 +618,7 @@ func TestMakeALeader(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LL", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LF", "LOCAL", map[string]string{}, 5, 0, 0, t)
 
 	runCmd("1") // select node 1
 	runCmd("l") // make him a leader
@@ -354,6 +626,13 @@ func TestMakeALeader(t *testing.T) {
 	WaitForMinute(state0, 1)
 
 	CheckAuthoritySet(2, 0, t)
+
+	PrintOneStatus(0, 0)
+	dblim := 5
+	if state0.LLeaderHeight > uint32(dblim) {
+		t.Fatalf("Failed to shut down factomd via ShutdownChan expected DBHeight %d got %d", dblim, state0.LLeaderHeight)
+	}
+	shutDownEverything(t)
 }
 
 func TestActivationHeightElection(t *testing.T) {
@@ -381,9 +660,8 @@ func TestActivationHeightElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, 14, 3, 2, t)
 
-	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
@@ -464,10 +742,7 @@ func TestActivationHeightElection(t *testing.T) {
 
 	CheckAuthoritySet(leaders, audits, t)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	// Sleep one block
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
@@ -506,26 +781,11 @@ func TestAnElection(t *testing.T) {
 		nodeList += "F"
 	}
 
-	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, t)
+	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, 9, 1, 2, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
-	for {
-		pendingCommits := 0
-		for _, s := range fnodes {
-			pendingCommits += s.State.Commits.Len()
-		}
-		if pendingCommits == 0 {
-			break
-		}
-		fmt.Printf("Waiting for g6 to complete\n")
-		WaitMinutes(state0, 1)
-
-	}
-
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 2)
 	PrintOneStatus(0, 0)
 	runCmd("2")
 	runCmd("w") // point the control panel at 2
@@ -555,10 +815,7 @@ func TestAnElection(t *testing.T) {
 
 	WaitBlocks(state0, 1)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 
 	// Sleep one block
 	time.Sleep(time.Duration(state0.DirectoryBlockInSeconds) * time.Second)
@@ -575,21 +832,11 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state := SetupSim("LLLLLAA", "LOCAL", map[string]string{}, 9, 9, 2, t)
 
 	state = GetFnodes()[2].State
 	state.MessageTally = true
 	StatusEveryMinute(state)
-	t.Log("Allocated 7 nodes")
-	if len(GetFnodes()) != 7 {
-		t.Fatal("Should have allocated 7 nodes")
-		t.Fail()
-	}
-
-	WaitBlocks(state, 1)
-	WaitForMinute(state, 2)
-
-	CheckAuthoritySet(5, 2, t)
 
 	var wait sync.WaitGroup
 	wait.Add(2)
@@ -638,10 +885,8 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	CheckAuthoritySet(5, 2, t)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	fmt.Println("HEIGHT", state.GetLLeaderHeight())
+	shutDownEverything(t)
 
 }
 
@@ -652,26 +897,32 @@ func TestMultiple2Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAF", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LLLLLAAF", "LOCAL", map[string]string{}, 7, 2, 2, t)
 
-	CheckAuthoritySet(7, 2, t)
+	CheckAuthoritySet(5, 2, t)
 
+	WaitForMinute(state0, 2)
+	runCmd("1")
+	runCmd("x")
+	runCmd("2")
+	runCmd("x")
+	WaitForMinute(state0, 2)
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
 
-	runCmd("s")
-	runCmd("E")
-	runCmd("F")
-	runCmd("0")
-	runCmd("p")
-	WaitBlocks(state0, 3)
+	runCmd("E") // Print Elections On--
+	runCmd("F") // Print SimElections On
+	runCmd("0") // Select node 0
+	runCmd("p") // Dump Process List
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	// Wait till they should have updated by DBSTATE
+	WaitBlocks(state0, 3)
+	WaitForMinute(state0, 1)
+
+	CheckAuthoritySet(5, 2, t)
+	shutDownEverything(t)
 }
 
 func TestMultiple3Election(t *testing.T) {
@@ -681,27 +932,11 @@ func TestMultiple3Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAAAF", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LLLLLLLAAAAF", "LOCAL", map[string]string{}, 6, 3, 2, t)
 
-	leadercnt := 0
-	auditcnt := 0
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
+	CheckAuthoritySet(7, 4, t)
 
-	if leadercnt != 7 {
-		t.Fatalf("found %d leaders, expected 7", leadercnt)
-	}
-	if auditcnt != 4 {
-		t.Fatalf("found %d audit, expected 4", auditcnt)
-	}
+	WaitForMinute(state0, 2)
 
 	runCmd("1")
 	runCmd("x")
@@ -717,33 +952,15 @@ func TestMultiple3Election(t *testing.T) {
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
+	// Wait till they should have updated by DBSTATE
 	WaitBlocks(state0, 3)
+	WaitForMinute(state0, 1)
 
-	leadercnt = 0
-	auditcnt = 0
-
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
-
-	if leadercnt != 7 {
-		t.Fatalf("found %d leaders, expected 7", leadercnt)
-	}
-	if auditcnt != 4 {
-		t.Fatalf("found %d audit, expected 4", auditcnt)
-	}
+	CheckAuthoritySet(7, 4, t)
 
 	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+
+	shutDownEverything(t)
 
 }
 
@@ -751,31 +968,15 @@ func TestMultiple7Election(t *testing.T) {
 	if ranSimTest {
 		return
 	}
+	//	return // this test inextricably needs boatload of time e.g. blktime=120 to pass so disable it from now.
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string{"--controlpanelsetting": "readwrite"}, t)
+	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", "LOCAL", map[string]string{"--debuglog": ".*", "--blktime": "60"}, 6, 7, 5, t)
 
-	leadercnt := 0
-	auditcnt := 0
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
+	CheckAuthoritySet(15, 10, t)
 
-	if leadercnt != 15 {
-		t.Fatalf("found %d leaders, expected 15", leadercnt)
-	}
-
-	if auditcnt != 10 {
-		t.Fatalf("found %d audits, expected 10", auditcnt)
-	}
+	WaitForMinute(state0, 2)
 
 	// Take 7 nodes off line
 	for i := 1; i < 8; i++ {
@@ -791,403 +992,14 @@ func TestMultiple7Election(t *testing.T) {
 		runCmd("x")
 	}
 
-	// Wait till the should have updated by DBSTATE
+	// Wait till they should have updated by DBSTATE
 	WaitBlocks(state0, 3)
+	WaitMinutes(state0, 1)
 
 	CheckAuthoritySet(15, 10, t)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
-	}
-}
-
-func TestMultipleFTAccountsAPI(t *testing.T) {
-	if ranSimTest {
-		return
-	}
-	ranSimTest = true
-
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
-	WaitForMinute(state0, 1)
-
-	type walletcallHelper struct {
-		CurrentHeight   uint32        `json:"currentheight"`
-		LastSavedHeight uint          `json:"lastsavedheight"`
-		Balances        []interface{} `json:"balances"`
-	}
-	type walletcall struct {
-		Jsonrpc string           `json:"jsonrps"`
-		Id      int              `json:"id"`
-		Result  walletcallHelper `json:"result"`
-	}
-
-	type ackHelp struct {
-		Jsonrpc string                       `json:"jsonrps"`
-		Id      int                          `json:"id"`
-		Result  wsapi.GeneralTransactionData `json:"result"`
-	}
-
-	apiCall := func(arrayOfFactoidAccounts []string) *walletcall {
-		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
-		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-fct-balances", "params":{"addresses":["` + strings.Join(arrayOfFactoidAccounts, `", "`) + `"]}}  `)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-		req.Header.Set("content-type", "text/plain;")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Error(err)
-		}
-
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-
-		resp2 := new(walletcall)
-		err1 := json.Unmarshal([]byte(body), &resp2)
-		if err1 != nil {
-			t.Error(err1)
-		}
-
-		return resp2
-	}
-
-	arrayOfFactoidAccounts := []string{"FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "FA3Y1tBWnFpyoZUPr9ZH51R1gSC8r5x5kqvkXL3wy4uRvzFnuWLB", "FA3Fsy2WPkR5z7qjpL8H1G51RvZLCiLDWASS6mByeQmHSwAws8K7"}
-	resp2 := apiCall(arrayOfFactoidAccounts)
-
-	// To check if the balances returned from the API are right
-	for i, a := range arrayOfFactoidAccounts {
-		fmt.Println("state0.LLeaderHeight ", state0.LLeaderHeight)
-		fmt.Println("state0.GetHighestSavedBlk() ", state0.GetHighestSavedBlk())
-		currentHeight := state0.LLeaderHeight
-		heighestSavedHeight := state0.GetHighestSavedBlk()
-		errNotAcc := ""
-
-		byteAcc := [32]byte{}
-		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
-
-		PermBalance, pok := state0.FactoidBalancesP[byteAcc] // Gets the Balance of the Factoid address
-
-		if state0.FactoidBalancesPapi != nil {
-			if savedBal, ok := state0.FactoidBalancesPapi[byteAcc]; ok {
-				PermBalance = savedBal
-			}
-		}
-
-		pl := state0.ProcessLists.Get(currentHeight)
-		pl.FactoidBalancesTMutex.Lock()
-		// Gets the Temp Balance of the Factoid address
-		TempBalance, tok := pl.FactoidBalancesT[byteAcc]
-		pl.FactoidBalancesTMutex.Unlock()
-
-		if tok != true && pok != true {
-			TempBalance = 0
-			PermBalance = 0
-			errNotAcc = "Address has not had a transaction"
-		} else if tok == true && pok == false {
-			PermBalance = 0
-			errNotAcc = ""
-		} else if tok == false && pok == true {
-			plLastHeight := state0.ProcessLists.Get(currentHeight - 1)
-			plLastHeight.FactoidBalancesTMutex.Lock()
-			TempBalanceLastHeight, tokLastHeight := plLastHeight.FactoidBalancesT[byteAcc] // Gets the Temp Balance of the Factoid address
-			plLastHeight.FactoidBalancesTMutex.Unlock()
-			if tokLastHeight == false {
-				TempBalance = PermBalance
-			} else {
-				TempBalance = TempBalanceLastHeight
-			}
-		}
-
-		x, ok := resp2.Result.Balances[i].(map[string]interface{})
-		if ok != true {
-			fmt.Println(x)
-		}
-		if resp2.Result.CurrentHeight != currentHeight || string(resp2.Result.LastSavedHeight) != string(heighestSavedHeight) {
-			t.Fatalf("Who wrote this trash code?... Expected a current height of " + fmt.Sprint(currentHeight) + " and a saved height of " + fmt.Sprint(heighestSavedHeight) + " but got " + fmt.Sprint(resp2.Result.CurrentHeight) + ", " + fmt.Sprint(resp2.Result.LastSavedHeight))
-		}
-
-		if x["ack"] != float64(TempBalance) || x["saved"] != float64(PermBalance) || x["err"] != errNotAcc {
-			t.Fatalf("Expected " + fmt.Sprint(strconv.FormatInt(x["ack"].(int64), 10)) + ", " + fmt.Sprint(strconv.FormatInt(x["saved"].(int64), 10)) + ", but got " + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
-		}
-	}
-	TimeNow(state0)
-	ToTestPermAndTempBetweenBlocks := []string{"FA3EPZYqodgyEGXNMbiZKE5TS2x2J9wF8J9MvPZb52iGR78xMgCb", "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"}
-	resp3 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok := resp3.Result.Balances[1].(map[string]interface{})
-	if ok != true {
-		fmt.Println(x)
-	}
-	if x["ack"] != x["saved"] {
-		t.Fatalf("Expected acknowledged and saved balances to be he same")
-	}
-
-	TimeNow(state0)
-
-	_, str := FundWallet(state0, uint64(200*5e7))
-
-	// a while loop to find when the transaction made FundWallet ^^Above^^ has been acknowledged
-	thisShouldNotBeUnknownAtSomePoint := "Unknown"
-	for thisShouldNotBeUnknownAtSomePoint != "TransactionACK" {
-		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
-		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method":"factoid-ack", "params":{"txid":"` + str + `"}}  `)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-		req.Header.Set("content-type", "text/plain;")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Error(err)
-		}
-
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-
-		resp2 := new(ackHelp)
-		err1 := json.Unmarshal([]byte(body), &resp2)
-		if err1 != nil {
-			t.Error(err1)
-		}
-
-		if resp2.Result.Status == "TransactionACK" {
-			thisShouldNotBeUnknownAtSomePoint = resp2.Result.Status
-		}
-	}
-
-	// This call should show a different acknowledged balance than the Saved Balance
-	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
-	if ok != true {
-		fmt.Println(x)
-	}
-
-	if x["ack"] == x["saved"] {
-		t.Fatalf("Expected acknowledged and saved balances to be different.")
-	}
-
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
-
-	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
-	if ok != true {
-		fmt.Println(x)
-	}
-	if x["ack"] != x["saved"] {
-		t.Fatalf("Expected acknowledged and saved balances to be he same")
-	}
-}
-
-func TestMultipleECAccountsAPI(t *testing.T) {
-	if ranSimTest {
-		return
-	}
-	ranSimTest = true
-
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "8088", "--controlpanelport": "37002", "--networkport": "37003"}, t)
-	WaitForMinute(state0, 1)
-
-	type walletcallHelper struct {
-		CurrentHeight   uint32        `json:"currentheight"`
-		LastSavedHeight uint          `json:"lastsavedheight"`
-		Balances        []interface{} `json:"balances"`
-	}
-	type walletcall struct {
-		Jsonrpc string           `json:"jsonrps"`
-		Id      int              `json:"id"`
-		Result  walletcallHelper `json:"result"`
-	}
-
-	type GeneralTransactionData struct {
-		Transid               string `json:"txis"`
-		TransactionDate       int64  `json:"transactiondate,omitempty"`       //Unix time
-		TransactionDateString string `json:"transactiondatestring,omitempty"` //ISO8601 time
-		BlockDate             int64  `json:"blockdate,omitempty"`             //Unix time
-		BlockDateString       string `json:"blockdatestring,omitempty"`       //ISO8601 time
-
-		//Malleated *Malleated `json:"malleated,omitempty"`
-		Status string `json:"status"`
-	}
-
-	type ackHelp struct {
-		Jsonrpc string                 `json:"jsonrps"`
-		Id      int                    `json:"id"`
-		Result  GeneralTransactionData `json:"result"`
-	}
-
-	type ackHelpEC struct {
-		Jsonrpc string            `json:"jsonrps"`
-		Id      int               `json:"id"`
-		Result  wsapi.EntryStatus `json:"result"`
-	}
-
-	apiCall := func(arrayOfECAccounts []string) *walletcall {
-		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
-		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-ec-balances", "params":{"addresses":["` + strings.Join(arrayOfECAccounts, `", "`) + `"]}}  `)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-		req.Header.Set("content-type", "text/plain;")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Error(err)
-		}
-
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-
-		resp2 := new(walletcall)
-		err1 := json.Unmarshal([]byte(body), &resp2)
-		if err1 != nil {
-			t.Error(err1)
-		}
-
-		return resp2
-	}
-
-	arrayOfECAccounts := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy"}
-	resp2 := apiCall(arrayOfECAccounts)
-
-	// To check if the balances returned from the API are right
-	for i, a := range arrayOfECAccounts {
-		currentHeight := state0.LLeaderHeight
-		heighestSavedHeight := state0.GetHighestSavedBlk()
-		errNotAcc := ""
-
-		byteAcc := [32]byte{}
-		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
-
-		PermBalance, pok := state0.ECBalancesP[byteAcc] // Gets the Balance of the EC address
-
-		if state0.ECBalancesPapi != nil {
-			if savedBal, ok := state0.ECBalancesPapi[byteAcc]; ok {
-				PermBalance = savedBal
-			}
-		}
-
-		pl := state0.ProcessLists.Get(currentHeight)
-		pl.ECBalancesTMutex.Lock()
-		// Gets the Temp Balance of the Entry Credit address
-		TempBalance, tok := pl.ECBalancesT[byteAcc]
-		pl.ECBalancesTMutex.Unlock()
-
-		if tok != true && pok != true {
-			TempBalance = 0
-			PermBalance = 0
-			errNotAcc = "Address has not had a transaction"
-		} else if tok == true && pok == false {
-			PermBalance = 0
-			errNotAcc = ""
-		} else if tok == false && pok == true {
-			plLastHeight := state0.ProcessLists.Get(currentHeight - 1)
-			plLastHeight.FactoidBalancesTMutex.Lock()
-			TempBalanceLastHeight, tokLastHeight := plLastHeight.FactoidBalancesT[byteAcc] // Gets the Temp Balance of the Factoid address
-			plLastHeight.FactoidBalancesTMutex.Unlock()
-			if tokLastHeight == false {
-				TempBalance = PermBalance
-			} else {
-				TempBalance = TempBalanceLastHeight
-			}
-		}
-
-		x, ok := resp2.Result.Balances[i].(map[string]interface{})
-		if ok != true {
-			fmt.Println(x)
-		}
-
-		if resp2.Result.CurrentHeight != currentHeight || string(resp2.Result.LastSavedHeight) != string(heighestSavedHeight) {
-			t.Fatalf("Who wrote this trash code?... Expected a current height of " + fmt.Sprint(currentHeight) + " and a saved height of " + fmt.Sprint(heighestSavedHeight) + " but got " + fmt.Sprint(resp2.Result.CurrentHeight) + ", " + fmt.Sprint(resp2.Result.LastSavedHeight))
-		}
-
-		if x["ack"] != float64(TempBalance) || x["saved"] != float64(PermBalance) || x["err"] != errNotAcc {
-			t.Fatalf("Expected " + fmt.Sprint(strconv.FormatInt(x["ack"].(int64), 10)) + ", " + fmt.Sprint(strconv.FormatInt(x["saved"].(int64), 10)) + ", but got " + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
-		}
-	}
-	TimeNow(state0)
-	ToTestPermAndTempBetweenBlocks := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
-	resp3 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok := resp3.Result.Balances[1].(map[string]interface{})
-	if ok != true {
-		fmt.Println(x)
-	}
-
-	if x["ack"] != x["saved"] {
-		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
-	}
-
-	TimeNow(state0)
-
-	_, str := FundWallet(state0, 20000000)
-
-	// a while loop to find when the transaction made FundWallet ^^Above^^ has been acknowledged
-	for {
-		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
-		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method":"factoid-ack", "params":{"txid":"` + str + `"}}  `)
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-		req.Header.Set("content-type", "text/plain;")
-
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			t.Error(err)
-		}
-
-		defer resp.Body.Close()
-		body, _ := ioutil.ReadAll(resp.Body)
-
-		resp2 := new(ackHelp)
-		err1 := json.Unmarshal([]byte(body), &resp2)
-		if err1 != nil {
-			t.Error(err1)
-		}
-
-		if resp2.Result.Status == "TransactionACK" {
-			break
-		}
-	}
-
-	// This call should show a different acknowledged balance than the Saved Balance
-	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
-	if ok != true {
-		fmt.Println(x)
-	}
-
-	if x["ack"] == x["saved"] {
-		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
-	}
-
-	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
-
-	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
-	if ok != true {
-		fmt.Println(x)
-	}
-	if x["ack"] != x["saved"] {
-		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
-	}
-}
-
-func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
-	leadercnt := 0
-	auditcnt := 0
-	for _, fn := range GetFnodes() {
-		s := fn.State
-		if s.Leader {
-			leadercnt++
-		}
-		list := s.ProcessLists.Get(s.LLeaderHeight)
-		if foundAudit, _ := list.GetAuditServerIndexHash(s.GetIdentityChainID()); foundAudit {
-			auditcnt++
-		}
-	}
-	if leadercnt != leaders {
-		t.Fatalf("found %d leaders, expected %d", leadercnt, leaders)
-	}
-	if auditcnt != audits {
-		t.Fatalf("found %d audit servers, expected %d", auditcnt, audits)
-		t.Fail()
 	}
 }
