@@ -30,24 +30,22 @@ var _ = Factomd
 // It has default but if you want just add it like "map[string]string{"--Other" : "Option"}" as the third argument
 // Pass in t for the testing as the 4th argument
 
-//EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, t *testing.T) *state.State {
+//EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",, map[string]string {"--controlpanelsetting" : "readwrite"}, t)
+func SetupSim(GivenNodes string, UserAddedOptions map[string]string, t *testing.T) *state.State {
 	l := len(GivenNodes)
 	DefaultOptions := map[string]string{
 		"--db":           "Map",
-		"--network":      fmt.Sprintf("%v", NetworkType),
+		"--network":      "LOCAL",
 		"--net":          "alot+",
 		"--enablenet":    "false",
 		"--blktime":      "8",
-		"--faulttimeout": "2",
+		"--faulttimeout": "8",
 		"--roundtimeout": "2",
 		"--count":        fmt.Sprintf("%v", l),
-		//"--debuglog=.*",
-		//"--debuglog=F.*",
-		"--startdelay": "1",
-		"--stdoutlog":  "out.txt",
-		"--stderrlog":  "err.txt",
-		"--checkheads": "false",
+		"--startdelay":   "1",
+		"--stdoutlog":    "out.txt",
+		"--stderrlog":    "out.txt",
+		"--checkheads":   "false",
 	}
 
 	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
