@@ -135,6 +135,15 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	roundt := globals.Params.RoundTimeout
 	et := globals.Params.FaultTimeout
 	state0 := Factomd(params, false).(*state.State)
+	state0.MessageTally = true
+
+	i := len(GetFnodes())
+	t.Logf("Allocated %d nodes", i)
+	if i != l {
+		t.Fatalf("Should have allocated %d nodes", l)
+		t.Fail()
+	}
+
 	Calctime := time.Duration(float64((height*blkt)+(elections*et)+(elecrounds*roundt))*10.1) * time.Second
 	endtime := time.Now().Add(Calctime)
 	fmt.Println("ENDTIME: ", endtime)
@@ -157,29 +166,14 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 			}
 		}
 	}()
-	state0.MessageTally = true
+
 	fmt.Printf("Starting timeout timer:  Expected test to take %s or %d blocks\n", Calctime, height)
-	StatusEveryMinute(state0)
+	//	StatusEveryMinute(state0)
 	creatingNodes(GivenNodes, state0)
-
-	t.Logf("Allocated %d nodes", l)
-	if len(GetFnodes()) != l {
-		t.Fatalf("Should have allocated %d nodes", l)
-		t.Fail()
-	}
+	PrintOneStatus(0, 0)
+	CheckAuthoritySet(t)
+	StatusEveryMinute(state0)
 	return state0
-}
-
-func stringInSlice(a string, list []string) bool {
-	if a[0:2] == "--" {
-		a = a[1:]
-	}
-	for _, b := range list {
-		if b == a[1:] {
-			return true
-		}
-	}
-	return false
 }
 
 var leaders, audits, followers int
@@ -210,8 +204,10 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 		WaitMinutes(state0, 1)
 
 	}
+
 	WaitBlocks(state0, 1) // Wait for 1 block
 	WaitForMinute(state0, 1)
+
 	runCmd("0")
 	for i, c := range []byte(creatingNodes) {
 		switch c {
@@ -231,6 +227,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 	}
 	WaitBlocks(state0, 1) // Wait for 1 block
 	WaitForMinute(state0, 1)
+
 }
 
 func TimeNow(s *state.State) {
