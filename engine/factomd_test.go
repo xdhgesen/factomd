@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"bytes"
-	"flag"
 	"io/ioutil"
 	"net/http"
 	"reflect"
@@ -19,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/elections"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
 )
@@ -35,27 +35,26 @@ var quit = make(chan struct{})
 // Pass in t for the testing as the 4th argument
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, height int, elections int, elecrounds int, t *testing.T) *state.State {
+func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, height int, electionCnt int, elecrounds int, t *testing.T) *state.State {
 	l := len(GivenNodes)
 	CmdLineOptions := map[string]string{
-		"--db":                  "Map",
-		"--network":             fmt.Sprintf("%v", NetworkType),
-		"--net":                 "alot+",
-		"--enablenet":           "false",
-		"--blktime":             "10",
-		"--count":               fmt.Sprintf("%v", l),
-		"--startdelay":          "1",
-		"--stdoutlog":           "out.txt",
-		"--stderrlog":           "out.txt",
-		"--checkheads":          "false",
-		"--logPort":             "37000", // use different ports so I can run a test and a real node at the same time
-		"--port":                "37001",
-		"--controlpanelport":    "37002",
-		"--networkport":         "37003",
-		"--debugconsole":        "remotehost:37093", // turn on the debug console but don't open a window
-		"--controlpanelsetting": "readwrite",
-		"--debuglog":            "faulting|bad",
-		"--Herro":               "globbly",
+		"--db":         "Map",
+		"--network":    fmt.Sprintf("%v", NetworkType),
+		"--net":        "alot+",
+		"--enablenet":  "false",
+		"--blktime":    "10",
+		"--count":      fmt.Sprintf("%v", l),
+		"--startdelay": "1",
+		"--stdoutlog":  "out.txt",
+		"--stderrlog":  "out.txt",
+		"--checkheads": "false",
+		//"--logPort":             "37000", // use different ports so I can run a test and a real node at the same time
+		//"--port":                "37001",
+		//"--controlpanelport":    "37002",
+		//"--networkport":         "37003",
+		//"--debugconsole":        "remotehost:37093", // turn on the debug console but don't open a window
+		//		"--controlpanelsetting": "readwrite",
+		"--debuglog": "faulting|bad",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
@@ -71,19 +70,19 @@ func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string
 
 	// TODO: use flag.VisitAll() to remove any options not supported by the current build
 
-	// Finds all of the valid commands and stores them
-	optionsArr := make([]string, 0)
-	flag.VisitAll(func(key *flag.Flag) {
-		optionsArr = append(optionsArr, "--"+key.Name)
-	})
-
-	// Loops through CmdLineOptions to removed commands that are not valid
-	for i, _ := range CmdLineOptions {
-		if !stringInSlice(i, optionsArr) {
-			fmt.Println("Not Included: " + i + ", Removing from Options")
-			delete(CmdLineOptions, i)
-		}
-	}
+	//// Finds all of the valid commands and stores them
+	//optionsArr := make(map[string]bool, 0)
+	//flag.VisitAll(func(key *flag.Flag) {
+	//	optionsArr["--"+key.Name] = true
+	//})
+	//
+	//// Loops through CmdLineOptions to removed commands that are not valid
+	//for i, _ := range CmdLineOptions {
+	//	if !optionsArr[i] {
+	//		fmt.Println("Not Included: " + i + ", Removing from Options")
+	//		delete(CmdLineOptions, i)
+	//	}
+	//}
 
 	// default the fault time and round time based on the blk time out
 	blktime, err := strconv.Atoi(CmdLineOptions["--blktime"])
@@ -127,7 +126,7 @@ func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string
 	roundt := elections.RoundTimeout
 	et := elections.FaultTimeout
 	state0 := Factomd(params, false).(*state.State)
-	Calctime := float64((height*blkt)+(elections*et)+(elecrounds*roundt)) * 1.1
+	Calctime := float64((height*blkt)+(electionCnt*et)+(elecrounds*roundt)) * 1.1
 	endtime := time.Now().Add(time.Second * time.Duration(Calctime))
 	fmt.Println("ENDTIME: ", endtime)
 
@@ -188,7 +187,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 		fmt.Printf("Waiting for g to complete\n")
 		WaitMinutes(state0, 1)
 	}
-	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitBlocks(state0, 2) // Wait for 1 block
 	WaitForMinute(state0, 3)
 	runCmd("0")
 	for i, c := range []byte(creatingNodes) {
@@ -204,7 +203,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 			panic("NOT L, A or F")
 		}
 	}
-	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitBlocks(state0, 2) // Wait for 1 block
 	WaitForMinute(state0, 1)
 }
 
@@ -217,7 +216,7 @@ var statusState *state.State
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
 	if statusState == nil {
-		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
+		fmt.Fprintf(os.Stdout, "Printing status from %s\n", s.FactomNodeName)
 		statusState = s
 		go func() {
 			for {
@@ -1002,4 +1001,57 @@ func TestMultiple7Election(t *testing.T) {
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
 	}
+}
+
+func TestDBsigElectionEvery2Block(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{}, 20, 10, 10, t)
+
+	state0 = GetFnodes()[0].State
+	state0.MessageTally = true
+	StatusEveryMinute(state0)
+
+	CheckAuthoritySet(6, 1, t)
+
+	var wait sync.WaitGroup
+	wait.Add(2)
+
+	// wait till after EOM 9 but before DBSIG
+	killAtMinute0BeforeDBSig := func(node int) {
+		s := GetFnodes()[node].State
+		if !s.IsLeader() {
+			panic("Can't kill a audit and cause an election")
+		}
+		WaitForMinute(s, 9) // wait till the victim is at minute 9
+		// wait till minute flips
+		for s.CurrentMinute != 0 {
+			runtime.Gosched()
+		}
+		s.SetNetStateOff(true) // kill the victim
+		wait.Done()            // signal the main thread that I killed him
+
+		fmt.Printf("Stopped %s\n", s.FactomNodeName)
+		WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
+		fmt.Printf("Started %s\n", s.FactomNodeName)
+		s.SetNetStateOff(false) // resurrect the victim
+
+	}
+
+	// for leader 2 thu 7 kill each in turn
+	for i := 2; i < 7; i++ {
+		go killAtMinute0BeforeDBSig(i)
+		wait.Wait() // wait till the election
+		fmt.Println("Caused Elections")
+
+		WaitBlocks(state0, 2) // wait till the victim is back as the audit server
+
+		CheckAuthoritySet(6, 1, t) // check the authority set is as expected
+	}
+
+	shutDownEverything(t)
 }
