@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/wsapi"
 )
 
 var _ = Factomd
@@ -40,21 +42,21 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	expectedHeight = height
 	l := len(GivenNodes)
 	CmdLineOptions := map[string]string{
-		"--db":                  "Map",
-		"--network":             "LOCAL",
-		"--net":                 "alot+",
-		"--enablenet":           "false",
-		"--blktime":             "10",
-		"--count":               fmt.Sprintf("%v", l),
-		"--startdelay":          "1",
-		"--stdoutlog":           "out.txt",
-		"--stderrlog":           "out.txt",
-		"--checkheads":          "false",
-		"--logPort":             "37000", // use different ports so I can run a test and a real node at the same time
-		"--port":                "37001",
-		"--controlpanelport":    "37002",
-		"--networkport":         "37003",
-		"--debugconsole":        "remotehost:37004", // turn on the debug console but don't open a window
+		"--db":         "Map",
+		"--network":    "LOCAL",
+		"--net":        "alot+",
+		"--enablenet":  "false",
+		"--blktime":    "20",
+		"--count":      fmt.Sprintf("%v", l),
+		"--startdelay": "1",
+		"--stdoutlog":  "out.txt",
+		"--stderrlog":  "out.txt",
+		"--checkheads": "false",
+		//"--logPort":             "37000", // use different ports so I can run a test and a real node at the same time
+		//"--port":                "37001",
+		//"--controlpanelport":    "37002",
+		//"--networkport":         "37003",
+		//"--debugconsole":        "remotehost:37004", // turn on the debug console but don't open a window
 		"--controlpanelsetting": "readwrite",
 		"--debuglog":            "faulting|bad",
 	}
@@ -136,7 +138,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	et := globals.Params.FaultTimeout
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
-
+	statusState = state0
 	i := len(GetFnodes())
 	t.Logf("Allocated %d nodes", i)
 	if i != l {
@@ -144,7 +146,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		t.Fail()
 	}
 
-	Calctime := time.Duration(float64((height*blkt)+(elections*et)+(elecrounds*roundt))*10.1) * time.Second
+	Calctime := time.Duration(float64((height*blkt)+(elections*et)+(elecrounds*roundt))*1.1) * time.Second
 	endtime := time.Now().Add(Calctime)
 	fmt.Println("ENDTIME: ", endtime)
 
@@ -154,8 +156,9 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 			case <-quit:
 				return
 			default:
-				if int(state0.GetLLeaderHeight()) > height {
-					fmt.Println("Test Timeout: Expected %d blocks\n", height)
+				currentHeight := int(statusState.GetLLeaderHeight())
+				if currentHeight > height {
+					fmt.Printf("Test Timeout: Expected %d blocks\n", height)
 					panic("Exceeded expected height")
 				}
 				if time.Now().After(endtime) {
@@ -167,12 +170,13 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		}
 	}()
 
+	WaitMinutes(state0, 5) // Let the system settle after creation.
+
 	fmt.Printf("Starting timeout timer:  Expected test to take %s or %d blocks\n", Calctime, height)
-	//	StatusEveryMinute(state0)
 	creatingNodes(GivenNodes, state0)
-	PrintOneStatus(0, 0)
 	CheckAuthoritySet(t)
-	StatusEveryMinute(state0)
+	//StatusEveryMinute(state0)
+
 	return state0
 }
 
@@ -205,7 +209,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 
 	}
 
-	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitBlocks(state0, 2) // Wait for 2 block
 	WaitForMinute(state0, 1)
 
 	runCmd("0")
@@ -322,6 +326,7 @@ func CheckAuthoritySet(t *testing.T) {
 	leadercnt := 0
 	auditcnt := 0
 	followercnt := 0
+	PrintOneStatus(0, 0)
 
 	for _, fn := range GetFnodes() {
 		s := fn.State
@@ -377,124 +382,6 @@ func shutDownEverything(t *testing.T) {
 	}
 }
 
-func TestMultipleFTAccountsAPI(t *testing.T) {
-	if ranSimTest {
-		return
-	}
-
-	ranSimTest = true
-
-	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--logPort": "37000", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0, 0, t)
-	WaitForMinute(state0, 1)
-
-	url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
-	arrayOfFactoidAccounts := []string{"FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "FA3Y1tBWnFpyoZUPr9ZH51R1gSC8r5x5kqvkXL3wy4uRvzFnuWLB", "FA3Fsy2WPkR5z7qjpL8H1G51RvZLCiLDWASS6mByeQmHSwAws8K7"}
-
-	var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-fct-balances", "params":{"addresses":["` + strings.Join(arrayOfFactoidAccounts, `", "`) + `"]}}  `)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-	req.Header.Set("content-type", "text/plain;")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-
-	temp := strings.Split(string(body), `balances":[[`)
-	justArray := strings.Split(temp[1], `]]}}`)
-	individualArrays := strings.Split(justArray[0], `],[`)
-
-	// To check if the balances returned from the API are right
-	for i, a := range arrayOfFactoidAccounts {
-		byteAcc := [32]byte{}
-		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
-		PermBalance, pok := state0.FactoidBalancesP[byteAcc]
-		if pok != true {
-			PermBalance = -1
-		}
-		pl := state0.ProcessLists.Get(state0.LLeaderHeight)
-		pl.FactoidBalancesTMutex.Lock()
-		// Gets the Temp Balance of the Factoid address
-		TempBalance, ok := pl.FactoidBalancesT[byteAcc]
-		if ok != true {
-			TempBalance = 0
-		}
-		if TempBalance == 0 {
-			TempBalance = PermBalance
-		}
-		pl.FactoidBalancesTMutex.Unlock()
-
-		// splits `num,num` up into `[num, num]` som BothNumbers[0] with give you the first value (the Temp value)
-		BothNumbers := strings.Split(individualArrays[i], `,`)
-		if BothNumbers[0] != strconv.FormatInt(TempBalance, 10) || BothNumbers[1] != strconv.FormatInt(PermBalance, 10) {
-			t.Fatalf("Expected " + BothNumbers[0] + "," + BothNumbers[1] + ", but got %s" + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
-		}
-	}
-	shutDownEverything(t)
-}
-
-func TestMultipleECAccountsAPI(t *testing.T) {
-	if ranSimTest {
-		return
-	}
-
-	ranSimTest = true
-
-	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 4, 0, 0, t)
-	WaitForMinute(state0, 1)
-
-	url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
-	arrayOfECAccounts := []string{"EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab", "EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
-
-	var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-ec-balances", "params":{"addresses":["` + strings.Join(arrayOfECAccounts, `", "`) + `"]}}  `)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
-	req.Header.Set("content-type", "text/plain;")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	defer resp.Body.Close()
-	body, _ := ioutil.ReadAll(resp.Body)
-
-	temp := strings.Split(string(body), `balances":[[`)
-	justArray := strings.Split(temp[1], `]]}}`)
-	individualArrays := strings.Split(justArray[0], `],[`)
-
-	// To check if the balances returned from the API are right
-	for i, a := range arrayOfECAccounts {
-		byteAcc := [32]byte{}
-		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
-		PermBalance, pok := state0.ECBalancesP[byteAcc]
-		if pok != true {
-			PermBalance = -1
-		}
-		pl := state0.ProcessLists.Get(state0.LLeaderHeight)
-		pl.ECBalancesTMutex.Lock()
-		// Gets the Temp Balance of the Factoid address
-		TempBalance, ok := pl.ECBalancesT[byteAcc]
-		if ok != true {
-			TempBalance = 0
-		}
-		if TempBalance == 0 {
-			TempBalance = PermBalance
-		}
-		pl.ECBalancesTMutex.Unlock()
-
-		// splits `num,num` up into `[num, num]` som BothNumbers[0] with give you the first value (the Temp value)
-		BothNumbers := strings.Split(individualArrays[i], `,`)
-		if BothNumbers[0] != strconv.FormatInt(TempBalance, 10) || BothNumbers[1] != strconv.FormatInt(PermBalance, 10) {
-			t.Fatalf("Expected " + BothNumbers[0] + "," + BothNumbers[1] + ", but got %s" + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
-		}
-	}
-	shutDownEverything(t)
-}
-
 func TestSetupANetwork(t *testing.T) {
 	if ranSimTest {
 		return
@@ -502,7 +389,7 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", map[string]string{}, 11, 0, 0, t)
+	state0 := SetupSim("LLLLAAAFFF", map[string]string{}, 13, 0, 0, t)
 
 	runCmd("9")  // Puts the focus on node 9
 	runCmd("x")  // Takes Node 9 Offline
@@ -595,7 +482,7 @@ func TestLoad(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLF", map[string]string{}, 15, 0, 0, t)
+	state0 := SetupSim("LLF", map[string]string{}, 17, 0, 0, t)
 
 	CheckAuthoritySet(t)
 
@@ -624,7 +511,7 @@ func TestLoadScrambled(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 14, 0, 0, t)
+	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 16, 0, 0, t)
 
 	CheckAuthoritySet(t)
 
@@ -647,7 +534,7 @@ func TestMakeALeader(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LF", map[string]string{}, 5, 0, 0, t)
+	state0 := SetupSim("LF", map[string]string{}, 7, 0, 0, t)
 
 	runCmd("1") // select node 1
 	runCmd("l") // make him a leader
@@ -668,7 +555,7 @@ func TestActivationHeightElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLAAF", map[string]string{}, 14, 2, 2, t)
+	state0 := SetupSim("LLLLLAAF", map[string]string{}, 16, 2, 2, t)
 
 	CheckAuthoritySet(t)
 
@@ -750,11 +637,10 @@ func TestAnElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLAAF", map[string]string{}, 9, 1, 1, t)
+	state0 := SetupSim("LLLAAF", map[string]string{}, 11, 1, 1, t)
 
 	WaitMinutes(state0, 2)
 
-	PrintOneStatus(0, 0)
 	runCmd("2")
 	runCmd("w") // point the control panel at 2
 
@@ -789,7 +675,7 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	ranSimTest = true
 
-	state := SetupSim("LLLLLAAF", map[string]string{}, 9, 4, 4, t)
+	state := SetupSim("LLLLLAAF", map[string]string{}, 11, 4, 4, t)
 
 	StatusEveryMinute(GetFnodes()[2].State)
 
@@ -851,7 +737,7 @@ func TestMultiple2Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLAAF", map[string]string{"--debuglog": ".*"}, 7, 2, 2, t)
+	state0 := SetupSim("LLLLLAAF", map[string]string{}, 9, 2, 2, t)
 
 	CheckAuthoritySet(t)
 
@@ -885,7 +771,7 @@ func TestMultiple3Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{"--debuglog": ".*"}, 6, 3, 3, t)
+	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{}, 10, 3, 3, t)
 
 	CheckAuthoritySet(t)
 
@@ -919,7 +805,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", map[string]string{}, 6, 7, 7, t)
+	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", map[string]string{}, 8, 7, 7, t)
 
 	CheckAuthoritySet(t)
 
@@ -943,5 +829,387 @@ func TestMultiple7Election(t *testing.T) {
 	WaitBlocks(state0, 3)
 	WaitMinutes(state0, 1)
 
+	shutDownEverything(t)
+}
+
+func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
+	j, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	portStr := fmt.Sprintf("%d", port)
+	resp, err := http.Post(
+		"http://localhost:"+portStr+"/v2",
+		"application/json",
+		bytes.NewBuffer(j))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	r := primitives.NewJSON2Response()
+	if err := json.Unmarshal(body, r); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
+func TestMultipleFTAccountsAPI(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 8, 0, 0, t)
+	WaitForMinute(state0, 1)
+	runCmd("0")
+	type walletcallHelper struct {
+		CurrentHeight   uint32        `json:"currentheight"`
+		LastSavedHeight uint          `json:"lastsavedheight"`
+		Balances        []interface{} `json:"balances"`
+	}
+	type walletcall struct {
+		Jsonrpc string           `json:"jsonrps"`
+		Id      int              `json:"id"`
+		Result  walletcallHelper `json:"result"`
+	}
+
+	type ackHelp struct {
+		Jsonrpc string                       `json:"jsonrps"`
+		Id      int                          `json:"id"`
+		Result  wsapi.GeneralTransactionData `json:"result"`
+	}
+
+	apiCall := func(arrayOfFactoidAccounts []string) *walletcall {
+		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
+		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-fct-balances", "params":{"addresses":["` + strings.Join(arrayOfFactoidAccounts, `", "`) + `"]}}  `)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+		req.Header.Set("content-type", "text/plain;")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		resp2 := new(walletcall)
+		err1 := json.Unmarshal([]byte(body), &resp2)
+		if err1 != nil {
+			t.Error(err1)
+		}
+
+		return resp2
+	}
+
+	arrayOfFactoidAccounts := []string{"FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "FA3Y1tBWnFpyoZUPr9ZH51R1gSC8r5x5kqvkXL3wy4uRvzFnuWLB", "FA3Fsy2WPkR5z7qjpL8H1G51RvZLCiLDWASS6mByeQmHSwAws8K7"}
+	resp2 := apiCall(arrayOfFactoidAccounts)
+
+	// To check if the balances returned from the API are right
+	for i, a := range arrayOfFactoidAccounts {
+		currentHeight := state0.LLeaderHeight
+		heighestSavedHeight := state0.GetHighestSavedBlk()
+		errNotAcc := ""
+
+		byteAcc := [32]byte{}
+		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
+
+		PermBalance, pok := state0.FactoidBalancesP[byteAcc] // Gets the Balance of the Factoid address
+
+		if state0.FactoidBalancesPapi != nil {
+			if savedBal, ok := state0.FactoidBalancesPapi[byteAcc]; ok {
+				PermBalance = savedBal
+			}
+		}
+
+		pl := state0.ProcessLists.Get(currentHeight)
+		pl.FactoidBalancesTMutex.Lock()
+		// Gets the Temp Balance of the Factoid address
+		TempBalance, tok := pl.FactoidBalancesT[byteAcc]
+		pl.FactoidBalancesTMutex.Unlock()
+
+		if tok != true && pok != true {
+			TempBalance = 0
+			PermBalance = 0
+			errNotAcc = "Address has not had a transaction"
+		} else if tok == true && pok == false {
+			PermBalance = 0
+			errNotAcc = ""
+		} else if tok == false && pok == true {
+			TempBalance = PermBalance
+		}
+
+		x, ok := resp2.Result.Balances[i].(map[string]interface{})
+		if ok != true {
+			fmt.Println(x)
+		}
+
+		if resp2.Result.CurrentHeight != currentHeight || string(resp2.Result.LastSavedHeight) != string(heighestSavedHeight) {
+			t.Fatalf("Expected a current height of %d and a saved height of %d but got %d, %d\n",
+				currentHeight, heighestSavedHeight, resp2.Result.CurrentHeight, resp2.Result.LastSavedHeight)
+		}
+
+		if x["ack"] != float64(TempBalance) || x["saved"] != float64(PermBalance) || x["err"] != errNotAcc {
+			t.Fatalf("Expected %v, %v, but got %v, %v", int64(x["ack"].(float64)), int64(x["saved"].(float64)), TempBalance, PermBalance)
+		}
+	}
+	TimeNow(state0)
+	ToTestPermAndTempBetweenBlocks := []string{"FA3EPZYqodgyEGXNMbiZKE5TS2x2J9wF8J9MvPZb52iGR78xMgCb", "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"}
+	resp3 := apiCall(ToTestPermAndTempBetweenBlocks)
+	x, ok := resp3.Result.Balances[1].(map[string]interface{})
+	if ok != true {
+		fmt.Println(x)
+	}
+	if x["ack"] != x["saved"] {
+		t.Fatalf("Expected acknowledged and saved balances to be he same")
+	}
+
+	TimeNow(state0)
+
+	_, str := FundWallet(state0, uint64(200*5e7))
+
+	// a while loop to find when the transaction made FundWallet ^^Above^^ has been acknowledged
+	thisShouldNotBeUnknownAtSomePoint := "Unknown"
+	for thisShouldNotBeUnknownAtSomePoint != "TransactionACK" {
+		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
+		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method":"factoid-ack", "params":{"txid":"` + str + `"}}  `)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+		req.Header.Set("content-type", "text/plain;")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		resp2 := new(ackHelp)
+		err1 := json.Unmarshal([]byte(body), &resp2)
+		if err1 != nil {
+			t.Error(err1)
+		}
+
+		if resp2.Result.Status == "TransactionACK" {
+			thisShouldNotBeUnknownAtSomePoint = resp2.Result.Status
+		}
+	}
+
+	// This call should show a different acknowledged balance than the Saved Balance
+	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
+	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
+	if ok != true {
+		fmt.Println(x)
+	}
+
+	if x["ack"] == x["saved"] {
+		t.Fatalf("Expected acknowledged and saved balances to be different.")
+	}
+
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 1)
+
+	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
+	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
+	if ok != true {
+		fmt.Println(x)
+	}
+	if x["ack"] != x["saved"] {
+		t.Fatalf("Expected acknowledged and saved balances to be he same")
+	}
+	shutDownEverything(t)
+}
+
+func TestMultipleECAccountsAPI(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+
+	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, 8, 0, 0, t)
+	WaitForMinute(state0, 1)
+
+	type walletcallHelper struct {
+		CurrentHeight   uint32        `json:"currentheight"`
+		LastSavedHeight uint          `json:"lastsavedheight"`
+		Balances        []interface{} `json:"balances"`
+	}
+	type walletcall struct {
+		Jsonrpc string           `json:"jsonrps"`
+		Id      int              `json:"id"`
+		Result  walletcallHelper `json:"result"`
+	}
+
+	type GeneralTransactionData struct {
+		Transid               string `json:"txis"`
+		TransactionDate       int64  `json:"transactiondate,omitempty"`       //Unix time
+		TransactionDateString string `json:"transactiondatestring,omitempty"` //ISO8601 time
+		BlockDate             int64  `json:"blockdate,omitempty"`             //Unix time
+		BlockDateString       string `json:"blockdatestring,omitempty"`       //ISO8601 time
+
+		//Malleated *Malleated `json:"malleated,omitempty"`
+		Status string `json:"status"`
+	}
+
+	type ackHelp struct {
+		Jsonrpc string                 `json:"jsonrps"`
+		Id      int                    `json:"id"`
+		Result  GeneralTransactionData `json:"result"`
+	}
+
+	type ackHelpEC struct {
+		Jsonrpc string            `json:"jsonrps"`
+		Id      int               `json:"id"`
+		Result  wsapi.EntryStatus `json:"result"`
+	}
+
+	apiCall := func(arrayOfECAccounts []string) *walletcall {
+		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
+		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-ec-balances", "params":{"addresses":["` + strings.Join(arrayOfECAccounts, `", "`) + `"]}}  `)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+		req.Header.Set("content-type", "text/plain;")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		resp2 := new(walletcall)
+		err1 := json.Unmarshal([]byte(body), &resp2)
+		if err1 != nil {
+			t.Error(err1)
+		}
+
+		return resp2
+	}
+
+	arrayOfECAccounts := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy"}
+	resp2 := apiCall(arrayOfECAccounts)
+
+	// To check if the balances returned from the API are right
+	for i, a := range arrayOfECAccounts {
+		currentHeight := state0.LLeaderHeight
+		heighestSavedHeight := state0.GetHighestSavedBlk()
+		errNotAcc := ""
+
+		byteAcc := [32]byte{}
+		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
+
+		PermBalance, pok := state0.ECBalancesP[byteAcc] // Gets the Balance of the EC address
+
+		if state0.ECBalancesPapi != nil {
+			if savedBal, ok := state0.ECBalancesPapi[byteAcc]; ok {
+				PermBalance = savedBal
+			}
+		}
+
+		pl := state0.ProcessLists.Get(currentHeight)
+		pl.ECBalancesTMutex.Lock()
+		// Gets the Temp Balance of the Entry Credit address
+		TempBalance, tok := pl.ECBalancesT[byteAcc]
+		pl.ECBalancesTMutex.Unlock()
+
+		if tok != true && pok != true {
+			TempBalance = 0
+			PermBalance = 0
+			errNotAcc = "Address has not had a transaction"
+		} else if tok == true && pok == false {
+			PermBalance = 0
+			errNotAcc = ""
+		} else if tok == false && pok == true {
+			TempBalance = PermBalance
+		}
+
+		x, ok := resp2.Result.Balances[i].(map[string]interface{})
+		if ok != true {
+			fmt.Println(x)
+		}
+
+		if resp2.Result.CurrentHeight != currentHeight || string(resp2.Result.LastSavedHeight) != string(heighestSavedHeight) {
+			t.Fatalf("Who wrote this trash code?... Expected a current height of " + fmt.Sprint(currentHeight) + " and a saved height of " + fmt.Sprint(heighestSavedHeight) + " but got " + fmt.Sprint(resp2.Result.CurrentHeight) + ", " + fmt.Sprint(resp2.Result.LastSavedHeight))
+		}
+
+		if x["ack"] != float64(TempBalance) || x["saved"] != float64(PermBalance) || x["err"] != errNotAcc {
+			t.Fatalf("Expected " + fmt.Sprint(strconv.FormatInt(x["ack"].(int64), 10)) + ", " + fmt.Sprint(strconv.FormatInt(x["saved"].(int64), 10)) + ", but got " + strconv.FormatInt(TempBalance, 10) + "," + strconv.FormatInt(PermBalance, 10))
+		}
+	}
+	TimeNow(state0)
+	ToTestPermAndTempBetweenBlocks := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
+	resp3 := apiCall(ToTestPermAndTempBetweenBlocks)
+	x, ok := resp3.Result.Balances[1].(map[string]interface{})
+	if ok != true {
+		fmt.Println(x)
+	}
+
+	if x["ack"] != x["saved"] {
+		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
+	}
+
+	TimeNow(state0)
+
+	_, str := FundWallet(state0, 20000000)
+
+	// a while loop to find when the transaction made FundWallet ^^Above^^ has been acknowledged
+	for {
+		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
+		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method":"factoid-ack", "params":{"txid":"` + str + `"}}  `)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+		req.Header.Set("content-type", "text/plain;")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		resp2 := new(ackHelp)
+		err1 := json.Unmarshal([]byte(body), &resp2)
+		if err1 != nil {
+			t.Error(err1)
+		}
+
+		if resp2.Result.Status == "TransactionACK" {
+			break
+		}
+	}
+
+	// This call should show a different acknowledged balance than the Saved Balance
+	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
+	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
+	if ok != true {
+		fmt.Println(x)
+	}
+
+	if x["ack"] == x["saved"] {
+		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
+	}
+
+	WaitBlocks(state0, 1)
+	WaitMinutes(state0, 1)
+
+	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
+	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
+	if ok != true {
+		fmt.Println(x)
+	}
+	if x["ack"] != x["saved"] {
+		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
+	}
 	shutDownEverything(t)
 }

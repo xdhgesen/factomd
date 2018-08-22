@@ -2356,7 +2356,7 @@ func (s *State) SummaryHeader() string {
 			s.NumFCTTrans)
 	}
 
-	str := fmt.Sprintf(" %s\n %10s %6s %12s %5s %4s %6s %10s %8s %5s %4s %20s %14s %10s %-8s %-9s %16s %9s %9s %s\n",
+	str := fmt.Sprintf(" %s\n %10s %6s %12s %5s %4s %6s %10s %8s %5s %4s %20s %14s %10s %-8s %-9s %16s %9s %10s - %s\n",
 		sum,
 		"Node",
 		"ID   ",

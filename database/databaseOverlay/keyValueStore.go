@@ -49,8 +49,11 @@ func (db *Overlay) FetchDatabaseEntryHeight() (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	buf := primitives.NewBuffer(bs.Bytes)
-	height, err := buf.PopUInt32()
+	height := uint32(0)
+	if len(bs.Bytes) != 0 {
+		buf := primitives.NewBuffer(bs.Bytes)
+		height, err = buf.PopUInt32()
+	}
 	if err != nil {
 		return 0, err
 	}
