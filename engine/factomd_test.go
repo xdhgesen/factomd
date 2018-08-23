@@ -1009,7 +1009,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "network|process|dbsig"}, 14, 10, 10, t)
+	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig"}, 26, 6, 6, t)
 
 	StatusEveryMinute(state0)
 
@@ -1034,7 +1034,8 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 		fmt.Println("Caused Elections")
 
-		WaitBlocks(state0, 2) // wait till the victim is back as the audit server
+		WaitBlocks(state0, 2)    // wait till the victim is back as the audit server
+		WaitForMinute(state0, 1) // Wait till ablock is loaded
 
 		CheckAuthoritySet(6, 1, t) // check the authority set is as expected
 	}
