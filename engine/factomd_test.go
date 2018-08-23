@@ -1027,9 +1027,9 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 			runtime.Gosched()
 		}
 		s.SetNetStateOff(true) // kill the victim
-		fmt.Printf("Stopped %s\n", s.FactomNodeName)
+		s.LogPrintf("faulting", "Stopped %s\n", s.FactomNodeName)
 		WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
-		fmt.Printf("Started %s\n", s.FactomNodeName)
+		s.LogPrintf("faulting", "Start %s\n", s.FactomNodeName)
 		s.SetNetStateOff(false) // resurrect the victim
 
 		fmt.Println("Caused Elections")
