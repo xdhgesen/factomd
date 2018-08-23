@@ -1,19 +1,18 @@
 package engine_test
 
 import (
-	"fmt"
-	"os"
-	"testing"
-	"time"
-
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"testing"
+	"time"
 
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
@@ -1016,12 +1015,9 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	CheckAuthoritySet(6, 1, t)
 
-	var wait sync.WaitGroup
-	wait.Add(1)
-
-	// wait till after EOM 9 but before DBSIG
-	killAtMinute0BeforeDBSig := func(node int) {
-		s := GetFnodes()[node].State
+	// for leader 1 thu 7 kill each in turn
+	for i := 1; i < 7; i++ {
+		s := GetFnodes()[i].State
 		if !s.IsLeader() {
 			panic("Can't kill a audit and cause an election")
 		}
@@ -1031,19 +1027,11 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 			runtime.Gosched()
 		}
 		s.SetNetStateOff(true) // kill the victim
-		wait.Done()            // signal the main thread that I killed him
-
 		fmt.Printf("Stopped %s\n", s.FactomNodeName)
 		WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
 		fmt.Printf("Started %s\n", s.FactomNodeName)
 		s.SetNetStateOff(false) // resurrect the victim
 
-	}
-
-	// for leader 2 thu 7 kill each in turn
-	for i := 2; i < 7; i++ {
-		go killAtMinute0BeforeDBSig(i)
-		wait.Wait() // wait till the election
 		fmt.Println("Caused Elections")
 
 		WaitBlocks(state0, 2) // wait till the victim is back as the audit server
