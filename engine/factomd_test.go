@@ -1010,16 +1010,14 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "network|process"}, 14, 10, 10, t)
+	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "network|process|dbsig"}, 14, 10, 10, t)
 
-	state0 = GetFnodes()[0].State
-	state0.MessageTally = true
 	StatusEveryMinute(state0)
 
 	CheckAuthoritySet(6, 1, t)
 
 	var wait sync.WaitGroup
-	wait.Add(2)
+	wait.Add(1)
 
 	// wait till after EOM 9 but before DBSIG
 	killAtMinute0BeforeDBSig := func(node int) {
