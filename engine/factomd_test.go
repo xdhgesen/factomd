@@ -1010,7 +1010,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{}, 14, 10, 10, t)
+	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "network|process"}, 14, 10, 10, t)
 
 	state0 = GetFnodes()[0].State
 	state0.MessageTally = true
