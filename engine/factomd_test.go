@@ -586,7 +586,7 @@ func TestLoadScrambled(t *testing.T) {
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			t.Fatalf("TestLoadScrambled:", r)
+			t.Fatalf("TestLoadScrambled: %v", r)
 		}
 	}()
 
@@ -1010,7 +1010,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{}, 20, 10, 10, t)
+	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{}, 14, 10, 10, t)
 
 	state0 = GetFnodes()[0].State
 	state0.MessageTally = true
