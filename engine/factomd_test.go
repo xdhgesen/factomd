@@ -1045,7 +1045,42 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 	shutDownEverything(t)
 }
 
-// Cheap tets for developing binary search commits algorithm
+func TestDBSigElection(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+
+	state0 := SetupSim("LLLAF", "LOCAL", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 8, 1, 1, t)
+	StatusEveryMinute(state0)
+
+	CheckAuthoritySet(3, 1, t)
+
+	s := GetFnodes()[2].State
+	if !s.IsLeader() {
+		panic("Can't kill a audit and cause an election")
+	}
+	WaitForMinute(s, 9) // wait till the victim is at minute 9
+	// wait till minute flips
+	for s.CurrentMinute != 0 {
+		runtime.Gosched()
+	}
+	s.SetNetStateOff(true) // kill the victim
+	s.LogPrintf("faulting", "Stopped %s\n", s.FactomNodeName)
+	WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
+	s.LogPrintf("faulting", "Start %s\n", s.FactomNodeName)
+	s.SetNetStateOff(false) // resurrect the victim
+
+	WaitBlocks(state0, 2)    // wait till the victim is back as the audit server
+	WaitForMinute(state0, 1) // Wait till ablock is loaded
+	WaitForMinute(state0, 2) // Wait another couple minute in case any nodes are behind
+
+	CheckAuthoritySet(6, 1, t) // check the authority set is as expected
+
+	shutDownEverything(t)
+}
+
+// Cheap tests for developing binary search commits algorithm
 
 func TestPass(t *testing.T) {
 	if ranSimTest {
