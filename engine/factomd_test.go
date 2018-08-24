@@ -17,6 +17,7 @@ import (
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/common/primitives/random"
 	"github.com/FactomProject/factomd/elections"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
@@ -885,7 +886,6 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	CheckAuthoritySet(5, 2, t)
 
-	fmt.Println("HEIGHT", state.GetLLeaderHeight())
 	shutDownEverything(t)
 
 }
@@ -998,10 +998,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	CheckAuthoritySet(15, 10, t)
 
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
+	shutDownEverything(t)
 }
 
 func TestDBsigElectionEvery2Block(t *testing.T) {
@@ -1011,7 +1008,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	ranSimTest = true
 
-	iterations := 100
+	iterations := 1
 	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 26*iterations, 6*iterations, 6*iterations, t)
 
 	StatusEveryMinute(state0)
@@ -1046,4 +1043,38 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 		}
 	}
 	shutDownEverything(t)
+}
+
+// Cheap tets for developing binary search commits algorithm
+
+func TestPass(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+}
+
+func TestFail(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+	t.Fatal("Failed")
+
+}
+
+func TestRandom(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	if random.RandUInt8() > 200 {
+		t.Fatal("Failed")
+	}
+
 }
