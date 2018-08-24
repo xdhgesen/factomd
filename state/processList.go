@@ -724,14 +724,10 @@ func (p *ProcessList) makeMMRs(s interfaces.IState, asks <-chan askRef, adds <-c
 		// You have to compute this at every cycle as you can change the block time
 		// in sim control.
 		// blocktime in milliseconds
-		askDelay := int64(s.(*State).DirectoryBlockInSeconds * 1000)
+		askDelay := int64(s.(*State).DirectoryBlockInSeconds*1000) / 50
 		// Take 1/10 of 1 minute boundary (DBlock is 10*min)
 		//		This means on 10min block, 6 second delay
 		//					  1min block, .6 second delay
-		askDelay = askDelay / 50
-		if askDelay < 500 { // Don't go below half a second. That is just too much
-			askDelay = 500
-		}
 
 		if askDelay != lastAskDelay {
 			s.LogPrintf(logname, "AskDelay %d BlockTime %d", askDelay, s.(*State).DirectoryBlockInSeconds)

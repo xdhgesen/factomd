@@ -33,6 +33,8 @@ var quit = make(chan struct{})
 // It has default but if you want just add it like "map[string]string{"--Other" : "Option"}" as the third argument
 // Pass in t for the testing as the 4th argument
 
+var endtime time.Time
+
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
 func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string]string, height int, electionCnt int, elecrounds int, t *testing.T) *state.State {
 	l := len(GivenNodes)
@@ -126,7 +128,7 @@ func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string
 	et := elections.FaultTimeout
 	state0 := Factomd(params, false).(*state.State)
 	Calctime := float64((height*blkt)+(electionCnt*et)+(elecrounds*roundt)) * 1.1
-	endtime := time.Now().Add(time.Second * time.Duration(Calctime))
+	endtime = time.Now().Add(time.Second * time.Duration(Calctime))
 	fmt.Println("ENDTIME: ", endtime)
 
 	go func() {
@@ -1009,36 +1011,39 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig"}, 26, 6, 6, t)
+	iterations := 100
+	state0 := SetupSim("LLLLLLAF", "LOCAL", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 26*iterations, 6*iterations, 6*iterations, t)
 
 	StatusEveryMinute(state0)
+	runCmd("S10") // Set Drop Rate to 1.0 on everyone
 
 	CheckAuthoritySet(6, 1, t)
 
-	// for leader 1 thu 7 kill each in turn
-	for i := 1; i < 7; i++ {
-		s := GetFnodes()[i].State
-		if !s.IsLeader() {
-			panic("Can't kill a audit and cause an election")
+	for j := 0; j <= iterations; j++ {
+		// for leader 1 thu 7 kill each in turn
+		for i := 1; i < 7; i++ {
+			s := GetFnodes()[i].State
+			if !s.IsLeader() {
+				panic("Can't kill a audit and cause an election")
+			}
+			WaitForMinute(s, 9) // wait till the victim is at minute 9
+			// wait till minute flips
+			for s.CurrentMinute != 0 {
+				runtime.Gosched()
+			}
+			s.SetNetStateOff(true) // kill the victim
+			s.LogPrintf("faulting", "Stopped %s\n", s.FactomNodeName)
+			WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
+			s.LogPrintf("faulting", "Start %s\n", s.FactomNodeName)
+			s.SetNetStateOff(false) // resurrect the victim
+
+			fmt.Printf("Time remaining %s\n", endtime.Sub(time.Now()).String())
+
+			WaitBlocks(state0, 2)    // wait till the victim is back as the audit server
+			WaitForMinute(state0, 8) // Wait till ablock is loaded
+
+			CheckAuthoritySet(6, 1, t) // check the authority set is as expected
 		}
-		WaitForMinute(s, 9) // wait till the victim is at minute 9
-		// wait till minute flips
-		for s.CurrentMinute != 0 {
-			runtime.Gosched()
-		}
-		s.SetNetStateOff(true) // kill the victim
-		s.LogPrintf("faulting", "Stopped %s\n", s.FactomNodeName)
-		WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
-		s.LogPrintf("faulting", "Start %s\n", s.FactomNodeName)
-		s.SetNetStateOff(false) // resurrect the victim
-
-		fmt.Println("Caused Elections")
-
-		WaitBlocks(state0, 2)    // wait till the victim is back as the audit server
-		WaitForMinute(state0, 1) // Wait till ablock is loaded
-
-		CheckAuthoritySet(6, 1, t) // check the authority set is as expected
 	}
-
 	shutDownEverything(t)
 }
