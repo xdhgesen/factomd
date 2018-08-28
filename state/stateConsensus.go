@@ -111,6 +111,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	}
 
 	valid := msg.Validate(s)
+	valid = msg.Validate(s)
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
@@ -121,8 +122,10 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			if !s.NoEntryYet(msg.GetHash(), nil) {
 				delete(s.Holding, msg.GetHash().Fixed())
 				s.Commits.Delete(msg.GetHash().Fixed())
+				s.LogMessage("executeMsg", "Drop Duplicate", msg)
 				return true
 			}
+			s.LogMessage("executeMsg", "Valid Hold", msg)
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		}
 
@@ -147,6 +150,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex)
 				TotalXReviewQueueInputs.Inc()
 				s.XReview = append(s.XReview, msg)
+				s.LogMessage("executeMsg", "XReview", msg)
 			} else {
 				s.LogMessage("executeMsg", "LeaderExecute", msg)
 				msg.LeaderExecute(s)
@@ -165,6 +169,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			TotalHoldingQueueInputs.Inc()
 			TotalHoldingQueueRecycles.Inc()
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
+			s.LogMessage("executeMsg", "Hold", msg)
 		} else {
 			s.LogMessage("executeMsg", "drop, IReplay", msg)
 		}
