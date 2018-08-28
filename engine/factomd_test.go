@@ -99,7 +99,6 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 	WaitBlocks(state0, 1) // Wait for 1 block
 	WaitForMinute(state0, 1)
 }
-
 func TimeNow(s *state.State) {
 	fmt.Printf("%s:%d/%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
 }
@@ -158,7 +157,6 @@ func WaitForMinute(s *state.State, min int) {
 // Wait some number of minutes
 func WaitMinutesQuite(s *state.State, min int) {
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-
 	newMinute := (s.CurrentMinute + min) % 10
 	newBlock := int(s.LLeaderHeight) + (s.CurrentMinute+min)/10
 	for int(s.LLeaderHeight) < newBlock {
@@ -476,7 +474,6 @@ func TestActivationHeightElection(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 }
-
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
 		return
@@ -508,7 +505,6 @@ func TestAnElection(t *testing.T) {
 	}
 
 	state0 := SetupSim(nodeList, "LOCAL", map[string]string{}, t)
-
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
@@ -534,12 +530,14 @@ func TestAnElection(t *testing.T) {
 	CheckAuthoritySet(leaders, audits, t)
 
 	// remove the last leader
+
 	runCmd(fmt.Sprintf("%d", leaders-1))
 	runCmd("x")
 	// wait for the election
 	WaitMinutes(state0, 2)
 	//bring him back
 	runCmd("x")
+
 	// wait for him to update via dbstate and become an audit
 	WaitBlocks(state0, 4)
 	WaitMinutes(state0, 1)
@@ -643,7 +641,6 @@ func TestDBsigEOMElection(t *testing.T) {
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
 	}
-
 }
 
 func TestMultiple2Election(t *testing.T) {
@@ -656,7 +653,6 @@ func TestMultiple2Election(t *testing.T) {
 	state0 := SetupSim("LLLLLLLAAF", "LOCAL", map[string]string{}, t)
 
 	CheckAuthoritySet(7, 2, t)
-
 	runCmd("1")
 	runCmd("x")
 	runCmd("2")
@@ -673,6 +669,7 @@ func TestMultiple2Election(t *testing.T) {
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
 	}
+
 }
 
 func TestMultiple3Election(t *testing.T) {
@@ -700,6 +697,7 @@ func TestMultiple3Election(t *testing.T) {
 	if leadercnt != 7 {
 		t.Fatalf("found %d leaders, expected 7", leadercnt)
 	}
+
 	if auditcnt != 4 {
 		t.Fatalf("found %d audit, expected 4", auditcnt)
 	}
@@ -740,7 +738,6 @@ func TestMultiple3Election(t *testing.T) {
 	if auditcnt != 4 {
 		t.Fatalf("found %d audit, expected 4", auditcnt)
 	}
-
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
@@ -796,7 +793,6 @@ func TestMultiple7Election(t *testing.T) {
 	WaitBlocks(state0, 3)
 
 	CheckAuthoritySet(15, 10, t)
-
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
@@ -1170,7 +1166,6 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
 	}
 }
-
 func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
 	leadercnt := 0
 	auditcnt := 0
@@ -1309,5 +1304,4 @@ func TestRandom(t *testing.T) {
 	if random.RandUInt8() > 200 {
 		t.Fatal("Failed")
 	}
-
 }

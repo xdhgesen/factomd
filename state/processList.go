@@ -675,25 +675,25 @@ var extraDebug bool = false
 func (p *ProcessList) Process(s *State) (progress bool) {
 	dbht := s.GetHighestSavedBlk()
 	if dbht >= p.DBHeight {
-		//s.AddStatus(fmt.Sprintf("ProcessList.Process: VM Height is %d and Saved height is %d", dbht, s.GetHighestSavedBlk()))
+		//p.State.AddStatus(fmt.Sprintf("ProcessList.Process: VM Height is %d and Saved height is %d", dbht, s.GetHighestSavedBlk()))
 		return false
 	}
 
 	s.PLProcessHeight = p.DBHeight
 
-	now := s.GetTimestamp()
+	now := p.State.GetTimestamp()
 
 	for i := 0; i < len(p.FedServers); i++ {
 		vm := p.VMs[i]
 
-		if vm.Height == len(vm.List) && s.Syncing && !vm.Synced {
+		if vm.Height == len(vm.List) && p.State.Syncing && !vm.Synced {
 			// means that we are missing an EOM
-			vm.ReportMissing(vm.Height, 0)
+			p.Ask(i, uint32(vm.Height), 10) // Ask 10ms out, unless we already asked
 		}
 
 		// If we haven't heard anything from a VM in 2 seconds, ask for a message at the last-known height
 		if vm.Height == len(vm.List) && now.GetTimeMilli()-vm.ProcessTime.GetTimeMilli() > 2000 {
-			vm.ReportMissing(vm.Height, 2000) // Ask for one past the end of the list
+			p.Ask(i, uint32(vm.Height), 2000) // 2 second delay
 		}
 
 	VMListLoop:
@@ -719,7 +719,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				for k := j; k < len(vm.List); k++ {
 					if vm.List[k] == nil {
 						cnt++
-						vm.ReportMissing(k, 0)
+						p.Ask(i, uint32(k), 10) // Ask 10ms
 					}
 				}
 				if s.DebugExec() {
@@ -778,8 +778,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 			// Keep in mind, the process list is processing at a height one greater than the database. 1 is caught up.  2 is one behind.
 			// Until the first couple signatures are processed, we will be 2 behind.
 			//TODO: Why is this in the execution per message per VM when it's global to the processlist -- clay
-			if s.WaitForEntries {
-				s.LogPrintf("processList", "s.WaitForEntries")
+			if p.State.WaitForEntries {
+				p.State.LogPrintf("processList", "p.State.WaitForEntries")
 				break VMListLoop // Don't process further in this list, go to the next.
 			}
 
@@ -791,14 +791,15 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 			if (vm.LeaderMinute < 2 && diff <= 3) || diff <= 2 {
 				// If we can't process this entry (i.e. returns false) then we can't process any more.
 				p.NextHeightToProcess[i] = j + 1 // unused...
+				msg := thisMsg
 
 				now := p.State.GetTimestamp()
 
 				msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
 				msgHashFixed := msg.GetMsgHash().Fixed()
 
-				if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
-					s.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
+				if _, valid := p.State.Replay.Valid(constants.INTERNAL_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now); !valid {
+					p.State.LogMessage("process", fmt.Sprintf("drop %v/%v/%v, hash INTERNAL_REPLAY", p.DBHeight, i, j), thisMsg)
 					vm.List[j] = nil // If we have seen this message, we don't process it again.  Ever.
 					if vm.HighestNil > j {
 						vm.HighestNil = j // Drag report limit back
@@ -815,36 +816,35 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 				if msg.Process(p.DBHeight, s) { // Try and Process this entry
 
 					if msg.Type() == constants.REVEAL_ENTRY_MSG {
-						delete(s.Holding, msg.GetMsgHash().Fixed()) // We successfully executed the message, so take it out of holding if it is there.
-						s.Commits.Delete(msg.GetMsgHash().Fixed())
+						delete(p.State.Holding, msg.GetMsgHash().Fixed()) // We successfully executed the message, so take it out of holding if it is there.
+						p.State.Commits.Delete(msg.GetMsgHash().Fixed())
 					}
 
-					//					s.LogMessage("processList", "done", msg)
+					//					p.State.LogMessage("processList", "done", msg)
 					vm.heartBeat = 0
 					vm.Height = j + 1 // Don't process it again if the process worked.
-					s.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
-					s.LogPrintf("process", "thisAck  %x", thisAck.SerialHash.Bytes())
+					p.State.LogMessage("process", fmt.Sprintf("done %v/%v/%v", p.DBHeight, i, j), msg)
 
 					progress = true
 
 					// We have already tested and found m to be a new message.  We now record its hashes so later, we
 					// can detect that it has been recorded.  We don't care about the results of IsTSValidAndUpdateState at this point.
 					// block network replay too since we have already seen this message there is not need to see it again
-					s.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
-					s.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY|constants.NETWORK_REPLAY, msgRepeatHashFixed, msg.GetTimestamp(), now)
+					p.State.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
-					delete(s.Acks, msgHashFixed)
-					delete(s.Holding, msgHashFixed)
+					delete(p.State.Acks, msgHashFixed)
+					delete(p.State.Holding, msgHashFixed)
 
 				} else {
-					s.LogMessage("process", fmt.Sprintf("retry %v/%v/%v", p.DBHeight, i, j), msg)
-					//s.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
+					p.State.LogMessage("process", fmt.Sprintf("retry %v/%v/%v", p.DBHeight, i, j), msg)
+					//p.State.AddStatus(fmt.Sprintf("processList.Process(): Could not process entry dbht: %d VM: %d  msg: [[%s]]", p.DBHeight, i, msg.String()))
 					break VMListLoop // Don't process further in this list, go to the next.
 				}
 			} else {
 				s.LogMessage("process", "Waiting on saving", msg)
 				// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
-				// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, state.EntryDBHeightComplete))
+				// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, s.EntryDBHeightComplete))
 				if extraDebug {
 					p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", s.EntryDBHeightComplete, p.DBHeight, vm.LeaderMinute)
 				}
@@ -856,6 +856,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 }
 
 func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
+
 	p.State.LogMessage("processList", "Message:", m)
 	p.State.LogMessage("processList", "Ack:", ack)
 	if p == nil {

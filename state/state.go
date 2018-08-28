@@ -528,10 +528,12 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath
 		break
 	}
+
 	if globals.Params.WriteProcessedDBStates {
 		path := filepath.Join(newState.LdbPath, newState.Network, "dbstates")
 		os.MkdirAll(path, 0777)
 	}
+
 	return newState
 }
 
@@ -1011,8 +1013,12 @@ func (s *State) Init() {
 			s.StateSaverStruct.DeleteSaveState(s.Network)
 		} else {
 			err = s.StateSaverStruct.LoadDBStateList(s.DBStates, s.Network)
-			if err != nil {
-				panic(err)
+			if err == nil {
+				for _, dbstate := range s.DBStates.DBStates {
+					if dbstate != nil {
+						dbstate.SaveStruct.Commits.s = s
+					}
+				}
 			}
 		}
 	}
@@ -1032,6 +1038,7 @@ func (s *State) Init() {
 		path := filepath.Join(s.LdbPath, s.Network, "dbstates")
 		os.MkdirAll(path, 0777)
 	}
+
 }
 
 func (s *State) HookLogstash() error {
