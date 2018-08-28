@@ -209,7 +209,7 @@ func (m *MessageBase) SentInvalid() bool {
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
 func (m *MessageBase) Resend(s interfaces.IState) (rtn bool) {
-		return true
+	return true
 }
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
