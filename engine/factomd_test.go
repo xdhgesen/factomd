@@ -833,6 +833,7 @@ func TestMultiple3Election(t *testing.T) {
 	// Wait till they should have updated by DBSTATE
 	WaitBlocks(state0, 3)
 	WaitForMinute(state0, 1)
+	WaitForAllNodes(state0)
 	CheckAuthoritySet(t)
 	shutDownEverything(t)
 
@@ -845,7 +846,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", map[string]string{}, 6, 7, 7, t)
+	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAAF", map[string]string{}, 7, 7, 7, t)
 
 	CheckAuthoritySet(t)
 
@@ -866,9 +867,10 @@ func TestMultiple7Election(t *testing.T) {
 	}
 
 	// Wait till they should have updated by DBSTATE
-	WaitBlocks(state0, 3)
+	WaitBlocks(state0, 2)
 	WaitMinutes(state0, 1)
-
+	WaitForAllNodes(state0)
+	CheckAuthoritySet(t)
 	shutDownEverything(t)
 }
 
@@ -1249,7 +1251,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 	ranSimTest = true
 
 	iterations := 1
-	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 26, 6, 6, t)
+	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 28, 6, 6, t)
 
 	runCmd("S10") // Set Drop Rate to 1.0 on everyone
 
