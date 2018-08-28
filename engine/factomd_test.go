@@ -382,6 +382,9 @@ func shutDownEverything(t *testing.T) {
 	if currentHeight < statusState.LLeaderHeight {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
+
+	fmt.Printf("Test took %d blocks and %s time\n", GetFnodes()[0].State.LLeaderHeight, time.Now().Sub(GetFnodes()[0].State.Starttime))
+
 }
 
 func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
@@ -540,8 +543,8 @@ func TestLoadScrambled(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 14, 0, 0, t)
-
+	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 32, 0, 0, t)
+	//TODO: Why does this run longer than expected?
 	CheckAuthoritySet(t)
 
 	runCmd("2")     // select 2
@@ -714,7 +717,8 @@ func TestDBsigEOMElection(t *testing.T) {
 	state0 := SetupSim("LLLLLAAF", map[string]string{}, 9, 4, 4, t)
 
 	// get status from FNode02 because he is not involved in the elections
-	StatusEveryMinute(GetFnodes()[2].State)
+	state2 := GetFnodes()[2].State
+	StatusEveryMinute(state2)
 
 	var wait sync.WaitGroup
 	wait.Add(2)
@@ -752,7 +756,7 @@ func TestDBsigEOMElection(t *testing.T) {
 	wait.Wait()
 	fmt.Println("Caused Elections")
 
-	WaitMinutes(state0, 1)
+	WaitMinutes(state2, 1)
 	// bring them back
 	runCmd("0")
 	runCmd("x")
@@ -764,7 +768,6 @@ func TestDBsigEOMElection(t *testing.T) {
 	WaitForAllNodes(state0)
 	CheckAuthoritySet(t)
 	shutDownEverything(t)
-
 }
 
 func TestMultiple2Election(t *testing.T) {
@@ -809,7 +812,7 @@ func TestMultiple3Election(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{"--debuglog": ".*"}, 6, 3, 3, t)
+	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{"--debuglog": ".*"}, 9, 3, 3, t)
 
 	CheckAuthoritySet(t)
 
@@ -1307,7 +1310,7 @@ func TestDBSigElection(t *testing.T) {
 	}
 	s.SetNetStateOff(true) // kill the victim
 	s.LogPrintf("faulting", "Stopped %s\n", s.FactomNodeName)
-	WaitForMinute(state0, 1) // Wait till FNode0 move ahead a minute (the election is over)
+	WaitForMinute(state0, 2) // Wait till FNode0 move ahead a minute (the election is over)
 	s.LogPrintf("faulting", "Start %s\n", s.FactomNodeName)
 	s.SetNetStateOff(false) // resurrect the victim
 
