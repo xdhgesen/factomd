@@ -57,7 +57,7 @@ func TestBalanceHash(t *testing.T) {
 	fs := new(FactoidState)
 	s.FactoidState = fs
 	fs.State = s
-	s.validatorLoopThreadID = atomic.Goid()
+	s.ValidatorLoopThreadID = atomic.Goid()
 
 	s.FactoidBalancesP = map[[32]byte]int64{}
 	s.ECBalancesP = map[[32]byte]int64{}
