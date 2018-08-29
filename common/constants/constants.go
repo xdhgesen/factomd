@@ -385,3 +385,5 @@ const (
 	// Time window for identity to require registration: 24hours = 144 blocks
 	IDENTITY_REGISTRATION_BLOCK_WINDOW uint32 = 144
 )
+
+const MAX_DB_STATES_PER_REQUEST = 5
