@@ -18,6 +18,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives/random"
 	. "github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/testHelper"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var fs interfaces.IFactoidState
@@ -56,6 +57,8 @@ func TestBalanceHash(t *testing.T) {
 	fs := new(FactoidState)
 	s.FactoidState = fs
 	fs.State = s
+	s.validatorLoopThreadID = atomic.Goid()
+
 	s.FactoidBalancesP = map[[32]byte]int64{}
 	s.ECBalancesP = map[[32]byte]int64{}
 
