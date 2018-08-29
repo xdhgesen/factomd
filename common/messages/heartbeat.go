@@ -219,6 +219,7 @@ func (m *Heartbeat) MarshalBinary() (data []byte, err error) {
 		}
 		return append(resp, sigBytes...), nil
 	}
+	m.marshalCache = resp
 	return resp, nil
 }
 
