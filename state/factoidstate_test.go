@@ -206,6 +206,8 @@ func TestUpdateECTransactionWithNegativeBalance(t *testing.T) {
 		return
 	}
 
+	s.ValidatorLoopThreadID = atomic.Goid() // lie about the owning thread since this code doesn't send transactions as messages
+
 	s.PutE(true, add1.Fixed(), 10)
 
 	add1bs := primitives.StringToByteSlice32("0000000000000000000000000000000000000000000000000000000000000001")
@@ -234,6 +236,8 @@ func TestUpdateECTransactionWithNegativeBalance(t *testing.T) {
 	}
 
 	s = testHelper.CreateAndPopulateTestState()
+	s.ValidatorLoopThreadID = atomic.Goid() // lie about the owning thread since this code doesn't send transactions as messages
+
 	fs = s.FactoidState
 	s.PutE(true, add1.Fixed(), 10)
 
