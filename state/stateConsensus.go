@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -39,18 +38,12 @@ var _ = (*hash.Hash32)(nil)
 // Returns true if some message was processed.
 //***************************************************************
 
-var once sync.Once
-var debugExec_flag bool
-
 func (s *State) CheckFileName(name string) bool {
 	return messages.CheckFileName(name)
 }
 
 func (s *State) DebugExec() (ret bool) {
-	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
-
-	//return s.FactomNodeName == "FNode0"
-	return debugExec_flag
+	return globals.Params.DebugLogRegEx != ""
 }
 
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
@@ -658,8 +651,12 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	list := pl.VMs[ack.VMIndex].List
 	if len(list) > int(ack.Height) && list[ack.Height] != nil {
 		// there is already a message in our slot?
-		s.LogPrintf("executeMsg", "drop, len(list)(%d) > int(ack.Height)(%d) && list[ack.Height](%p) != nil", len(list), int(ack.Height), list[ack.Height])
-		s.LogMessage("executeMsg", "found ", list[ack.Height])
+		if list[ack.Height].GetRepeatHash() != msg.GetRepeatHash() {
+			s.LogPrintf("executeMsg", "drop, processlist slot taken", len(list), int(ack.Height), list[ack.Height])
+			s.LogMessage("executeMsg", "found ", list[ack.Height])
+		} else {
+			s.LogMessage("executeMsg", "executed twice", msg)
+		}
 		return
 	}
 
@@ -1586,7 +1583,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	vm := pl.VMs[vmIndex]
 
 	s.LogPrintf("dbsig-eom", "ProcessEOM@%d/%d/%d minute %d, Syncing %v , EOM %v, EOMDone %v, EOMProcessed %v, EOMLimit %v DBSigDone %v",
-		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.EOM, s.EOMDone, s.EOMProcessed, s.EOMLimit, s.DBSigDone)
+		dbheight, msg.GetVMIndex(), vm.Height, s.CurrentMinute, s.Syncing, s.EOM, s.EOMDone, s.EOMProcessed, s.EOMLimit, s.DBSigDone)
 
 	// debug
 	if s.DebugExec() {
@@ -1709,11 +1706,9 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		return false
 	}
 
-	allfaults := s.LeaderPL.System.Height >= s.LeaderPL.SysHighest
-
 	// After all EOM markers are processed, Claim we are done.  Now we can unwind
 
-	if allfaults && s.EOMProcessed == s.EOMLimit && !s.EOMDone {
+	if s.EOMProcessed == s.EOMLimit && !s.EOMDone {
 		s.LogPrintf("dbsig-eom", "ProcessEOM stop EOM processing minute %d", s.CurrentMinute)
 
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: SigType Complete: %10s vm %2d allfaults(%v) && s.EOMProcessed(%v) == s.EOMLimit(%v) && !s.EOMDone(%v)",
@@ -1863,7 +1858,7 @@ func (s *State) GetUnSyncedServers(dbheight uint32) string {
 		vmIndex := p.ServerMap[s.CurrentMinute][index]
 		vm := p.VMs[vmIndex]
 		if !vm.Synced {
-			ids = ids + "," + l.GetChainID().String()[6:12]
+			ids = ids + "," + fmt.Sprintf("%s:vm%d", l.GetChainID().String()[6:12], vmIndex)
 		}
 	}
 	if len(ids) > 0 {
@@ -1932,7 +1927,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// debug
 	s.LogPrintf("dbsig-eom", "ProcessDBSig@%d/%d/%d minute %d, Syncing %v , DBSID %v, DBSigDone %v, DBSigProcessed %v, DBSigLimit %v DBSigDone %v",
-		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
+		dbheight, msg.GetVMIndex(), vm.Height, s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
 
 	// debug
 	if s.DebugExec() {
@@ -2024,6 +2019,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 			// If the Directory block hash doesn't work for me, then the dbsig doesn't work for me, so
 			// toss it and ask our neighbors for another one.
+			s.LogMessage("badMsgs", "Invalid bad body MR", dbs)
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
 			return false
@@ -2036,6 +2032,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		}
 		if !dbs.DBSignature.Verify(data) {
 			// If the signature fails, then ask for another one.
+			s.LogMessage("badMsgs", "Invalid DBSignature", dbs)
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
 			return false
@@ -2046,6 +2043,9 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LogPrintf("executeMsg", "Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
 
 			// If the authority is bad, toss this signature and ask for another.
+			s.LogMessage("badMsgs", "Invalid Signature", dbs)
+			s.LogPrintf("badMsgs", "Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
+
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
 			return false
@@ -2282,8 +2282,8 @@ func (s *State) GetHighestKnownBlock() uint32 {
 }
 
 // GetF()
-// If rt (return temp) is true, return the temp balance.  If false, return the perm balance (balance as of
-// the last completed block.
+// If rt == true, read the Temp balances.  Otherwise read the Permenent balances.
+// concurrency safe to call
 func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 	ok := false
 	if rt {
@@ -2292,31 +2292,45 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 			pl.FactoidBalancesTMutex.Lock()
 			v, ok = pl.FactoidBalancesT[adr]
 			pl.FactoidBalancesTMutex.Unlock()
+		} else {
+			s.LogPrintf("factoids", "GetF(%v,%x) = %d -- no pl", rt, adr[:4], v)
 		}
 	}
 	if !ok {
 		s.FactoidBalancesPMutex.Lock()
 		v = s.FactoidBalancesP[adr]
 		s.FactoidBalancesPMutex.Unlock()
+		s.LogPrintf("factoids", "GetF(%v,%x) = %d using permanent balance", rt, adr[:4], v)
+	} else {
+		s.LogPrintf("factoids", "GetF(%v,%x) = %d using temporary balance", rt, adr[:4], v)
 	}
 
 	return v
 
 }
 
+// PutF()
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// concurrency safe to call
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	if s.validatorLoopThreadID != atomic.Goid() {
+		panic("Second thread writing the factoids")
+	}
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
 			pl.FactoidBalancesT[adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
+			s.LogPrintf("factoids", "PutF(%v,%x, %d) using temporary balance", rt, adr[:4], v)
+		} else {
+			s.LogPrintf("factoids", "PutF(%v,%x, %d) using temporary balance -- no pl", rt, adr[:4], v)
 		}
 	} else {
 		s.FactoidBalancesPMutex.Lock()
 		s.FactoidBalancesP[adr] = v
 		s.FactoidBalancesPMutex.Unlock()
+		s.LogPrintf("factoids", "PutF(%v,%x, %d) using permanent balance", rt, adr[:4], v)
 	}
 }
 
@@ -2328,30 +2342,44 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 			pl.ECBalancesTMutex.Lock()
 			v, ok = pl.ECBalancesT[adr]
 			pl.ECBalancesTMutex.Unlock()
+		} else {
+			s.LogPrintf("entrycredits", "GetE(%v,%x) = %d -- no pl", rt, adr[:4], v)
 		}
 	}
 	if !ok {
 		s.ECBalancesPMutex.Lock()
 		v = s.ECBalancesP[adr]
 		s.ECBalancesPMutex.Unlock()
+		s.LogPrintf("entrycredits", "GetE(%v,%x) = %d using permanent balance", rt, adr[:4], v)
+	} else {
+		s.LogPrintf("entrycredits", "GetE(%v,%x) = %d using temporary balance", rt, adr[:4], v)
 	}
 	return v
 
 }
 
+// PutE()
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// concurrency safe to call
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	if s.validatorLoopThreadID != atomic.Goid() {
+		panic("Second thread writing the entrycredits")
+	}
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.ECBalancesTMutex.Lock()
 			pl.ECBalancesT[adr] = v
 			pl.ECBalancesTMutex.Unlock()
+			s.LogPrintf("entrycredits", "PutE(%v,%x, %d) using temporary balance", rt, adr[:4], v)
+		} else {
+			s.LogPrintf("entrycredits", "PutE(%v,%x, %d) using temporary balance -- no pl", rt, adr[:4], v)
 		}
 	} else {
 		s.ECBalancesPMutex.Lock()
 		s.ECBalancesP[adr] = v
 		s.ECBalancesPMutex.Unlock()
+		s.LogPrintf("entrycredits", "PutE(%v,%x, %d) using permanent balance", rt, adr[:4], v)
 	}
 }
 

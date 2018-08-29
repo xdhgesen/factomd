@@ -111,8 +111,11 @@ func (m *Ack) Validate(s interfaces.IState) int {
 	// Only new acks are valid. Of course, the VMIndex has to be valid too.
 	msg, _ := s.GetMsg(m.VMIndex, int(m.DBHeight), int(m.Height))
 	if msg != nil {
-		s.LogMessage("executeMsg", "Ack slot taken", m)
-		s.LogMessage("executeMsg", "found:", msg)
+		if msg.GetHash() == m.GetHash() {
+			s.LogMessage("executeMsg", "duplicate Ack for", msg)
+		} else {
+			s.LogMessage("executeMsg", "Ack slot taken", m)
+		}
 		return -1
 	}
 

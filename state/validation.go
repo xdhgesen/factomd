@@ -11,6 +11,7 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
+	"github.com/FactomProject/factomd/util/atomic"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,6 +19,7 @@ func (state *State) ValidatorLoop() {
 	CheckGrants()
 	timeStruct := new(Timer)
 	var prev time.Time
+	state.validatorLoopThreadID = atomic.Goid()
 	for {
 		if state.DebugExec() {
 			status := ""
@@ -38,7 +40,8 @@ func (state *State) ValidatorLoop() {
 				status += fmt.Sprintf("Pending Entries %d ", pendingEntries) // cope with nil
 				status += fmt.Sprintf("Acks %d ", len(state.AcksMap))
 				status += fmt.Sprintf("MsgQueue %d ", len(state.msgQueue))
-				status += fmt.Sprintf("InMsgQueue %d ", state.inMsgQueue.Length())
+				status += fmt.Sprintf("InMsgQueue  %d ", state.inMsgQueue.Length())
+				status += fmt.Sprintf("InMsgQueue2 %d ", state.inMsgQueue2.Length())
 				status += fmt.Sprintf("APIQueue   %d ", state.apiQueue.Length())
 				status += fmt.Sprintf("AckQueue %d ", len(state.ackQueue))
 				status += fmt.Sprintf("TimerMsgQueue %d ", len(state.timerMsgQueue))
