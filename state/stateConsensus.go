@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -39,45 +38,39 @@ var _ = (*hash.Hash32)(nil)
 // Returns true if some message was processed.
 //***************************************************************
 
-var once sync.Once
-var debugExec_flag bool
+func (s *State) CheckFileName(name string) bool {
+	return messages.CheckFileName(name)
+}
 
 func (s *State) DebugExec() (ret bool) {
-	once.Do(func() { debugExec_flag = globals.Params.DebugLogRegEx != "" })
-
-	//return s.FactomNodeName == "FNode0"
-	return debugExec_flag
+	return globals.Params.DebugLogRegEx != ""
 }
 
 func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
 	if s.DebugExec() {
 		var dbh int
-		nodeName := "unknown"
-		minute := 0
-		if s != nil {
+		if s == nil {
+			messages.StateLogMessage("unknown", 0, 0, logName, comment, msg)
+		} else {
 			if s.LeaderPL != nil {
 				dbh = int(s.LeaderPL.DBHeight)
 			}
-			nodeName = s.FactomNodeName
-			minute = int(s.CurrentMinute)
+			messages.StateLogMessage(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, comment, msg)
 		}
-		messages.StateLogMessage(nodeName, dbh, minute, logName, comment, msg)
 	}
 }
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	if s.DebugExec() {
-		var dbh int
-		nodeName := "unknown"
-		minute := 0
-		if s != nil {
+		if s == nil {
+			messages.StateLogPrintf("unknown", 0, 0, logName, format, more...)
+		} else {
+			var dbh int
 			if s.LeaderPL != nil {
 				dbh = int(s.LeaderPL.DBHeight)
 			}
-			nodeName = s.FactomNodeName
-			minute = int(s.CurrentMinute)
+			messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
 		}
-		messages.StateLogPrintf(nodeName, dbh, minute, logName, format, more...)
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
@@ -109,10 +102,8 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-		if msg.GetResendCnt() == 0 {
-			msg.SendOut(s, msg)
-		} else if msg.Resend(s) {
-			msg.SendOut(s, msg)
+		if !msg.IsLocal() && !msg.IsPeer2Peer() {
+			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
 		}
 
 		switch msg.Type() {
@@ -558,13 +549,12 @@ func (s *State) AddDBState(isNew bool,
 		{
 			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
 			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			defer s.LeaderPL.FactoidBalancesTMutex.Unlock()
+			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesTMutex.Unlock()
 
 			s.LeaderPL.ECBalancesTMutex.Lock()
-			defer s.LeaderPL.ECBalancesTMutex.Unlock()
-
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.ECBalancesTMutex.Unlock()
 		}
 
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -1023,7 +1013,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 		msgResponse := messages.NewMissingMsgResponse(s, pl.System.List[m.SystemHeight], nil)
 		msgResponse.SetOrigin(m.GetOrigin())
 		msgResponse.SetNetworkOrigin(m.GetNetworkOrigin())
-		s.NetworkOutMsgQueue().Enqueue(msgResponse)
+		msgResponse.SendOut(s, msgResponse)
 		s.MissingRequestReplyCnt++
 		sent = true
 	}
@@ -1036,7 +1026,7 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 			msgResponse := messages.NewMissingMsgResponse(s, missingmsg, ackMsg)
 			msgResponse.SetOrigin(m.GetOrigin())
 			msgResponse.SetNetworkOrigin(m.GetNetworkOrigin())
-			s.NetworkOutMsgQueue().Enqueue(msgResponse)
+			msgResponse.SendOut(s, msgResponse)
 			s.MissingRequestReplyCnt++
 			sent = true
 		}
