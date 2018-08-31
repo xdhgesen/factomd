@@ -336,7 +336,6 @@ func TestLoad(t *testing.T) {
 	WaitBlocks(state0, 1)
 
 } // testLoad(){...}
-
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
 		return
@@ -739,7 +738,6 @@ func TestMultiple3Election(t *testing.T) {
 	if auditcnt != 4 {
 		t.Fatalf("found %d audit, expected 4", auditcnt)
 	}
-
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
@@ -794,7 +792,6 @@ func TestMultiple7Election(t *testing.T) {
 	// Wait till the should have updated by DBSTATE
 	WaitBlocks(state0, 3)
 	CheckAuthoritySet(15, 10, t)
-
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
@@ -1168,7 +1165,6 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 		t.Fatalf("Expected " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]) + " but got " + fmt.Sprint(x["ack"]) + ", " + fmt.Sprint(x["saved"]))
 	}
 }
-
 func CheckAuthoritySet(leaders int, audits int, t *testing.T) {
 	leadercnt := 0
 	auditcnt := 0
