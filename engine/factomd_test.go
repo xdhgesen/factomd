@@ -136,7 +136,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 				return
 			default:
 				if int(state0.GetLLeaderHeight()) > height {
-					fmt.Println("Test Timeout: Expected %d blocks\n", height)
+					fmt.Printf("Test Timeout: Expected %d blocks\n", height)
 					panic("Exceeded expected height")
 				}
 				if time.Now().After(endtime) {
@@ -536,7 +536,7 @@ func TestLoadScrambled(t *testing.T) {
 	}
 	defer func() {
 		if r := recover(); r != nil {
-			t.Fatalf("TestLoadScrambled:", r)
+			t.Fatalf("TestLoadScrambled: %v", r)
 		}
 	}()
 
