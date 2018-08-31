@@ -507,6 +507,7 @@ func TestAnElection(t *testing.T) {
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
+
 	for {
 		pendingCommits := 0
 		for _, s := range fnodes {
@@ -563,6 +564,7 @@ func TestAnElection(t *testing.T) {
 	if state0.LLeaderHeight > 9 {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
+
 
 }
 

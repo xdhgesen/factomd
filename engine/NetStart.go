@@ -178,7 +178,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	s.CheckChainHeads.CheckChainHeads = p.CheckChainHeads
 	s.CheckChainHeads.Fix = p.FixChainHeads
-
 	fmt.Println(">>>>>>>>>>>>>>>>")
 	fmt.Println(">>>>>>>>>>>>>>>> Net Sim Start!")
 	fmt.Println(">>>>>>>>>>>>>>>>")
@@ -567,7 +566,6 @@ func printGraphData(filename string, period int) {
 		time.Sleep(time.Duration(period) * time.Second)
 	} // for ever ...
 }
-
 //**********************************************************************
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
@@ -606,7 +604,6 @@ func startServers(load bool) {
 		go Timer(fnode.State)
 		go fnode.State.ValidatorLoop()
 		go elections.Run(fnode.State)
-
 	}
 }
 

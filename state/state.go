@@ -2140,7 +2140,6 @@ func (s *State) GetAuthorityInterface(chainid interfaces.IHash) interfaces.IAuth
 	}
 	return rval
 }
-
 // GetLeaderPL returns the leader process list from the state. this method is
 // for debugging and should not be called in normal production code.
 func (s *State) GetLeaderPL() interfaces.IProcessList {
