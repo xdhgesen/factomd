@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -744,11 +743,9 @@ func (p *ProcessList) Ask(vmIndex int, height uint32, delay int64) {
 	if p.asks == nil { // If it is nil, there is no makemmrs
 		return
 	}
-
 	if p.State.IgnoreMissing || p.State.DBFinished == false {
 		return // Don't ask for missing message while we are in ignore.
 	}
-
 	if vmIndex < 0 {
 		panic(errors.New("Old Faulting code"))
 	}
@@ -833,7 +830,6 @@ var decodeMap map[foo]string = map[foo]string{
 	foo{false, false, false, false, false, false, true, false, true}: "Normal (Begining of time)", //0x140
 	foo{false, false, false, true, false, false, true, false, true}:  "Normal",                    //0x148
 	foo{true, false, true, true, false, false, true, false, true}:    "Syncing EOM Start",         //0x14d
-
 	foo{false, false, false, false, false, true, false, false, true}: " Unexpected", // 0x120
 
 	//foo{true, false, false, false, false, false, false, false, false}: "Sync Only??",                     //0x100 ***
@@ -903,16 +899,14 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
 			state.ProcessListProcessCnt++
-			if state.DebugExec() {
-				x := p.decodeState(state.Syncing, state.DBSig, state.EOM, state.DBSigDone, state.EOMDone,
-					len(state.LeaderPL.FedServers), state.EOMProcessed, state.DBSigProcessed)
+			x := p.decodeState(state.Syncing, state.DBSig, state.EOM, state.DBSigDone, state.EOMDone,
+				len(state.LeaderPL.FedServers), state.EOMProcessed, state.DBSigProcessed)
 
-				// Compute a syncing state string and report if it has changed
-				if state.SyncingState[state.SyncingStateCurrent] != x {
-					state.LogPrintf("processStatus", x)
-					state.SyncingStateCurrent = (state.SyncingStateCurrent + 1) % len(state.SyncingState)
-					state.SyncingState[state.SyncingStateCurrent] = x
-				}
+			// Compute a syncing state string and report if it has changed
+			if state.SyncingState[state.SyncingStateCurrent] != x {
+				state.LogPrintf("processStatus", x)
+				state.SyncingStateCurrent = (state.SyncingStateCurrent + 1) % len(state.SyncingState)
+				state.SyncingState[state.SyncingStateCurrent] = x
 			}
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
@@ -1048,7 +1042,6 @@ func (p *ProcessList) AddToProcessList(ack *messages.Ack, m interfaces.IMsg) {
 	if p == nil { // Just do nothing if we don't have a process list here.
 		return
 	}
-
 	p.State.LogMessage("processList", "Message:", m)
 	p.State.LogMessage("processList", "Ack:", ack)
 	if p == nil {
