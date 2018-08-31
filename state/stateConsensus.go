@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash"
 	"reflect"
-	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
