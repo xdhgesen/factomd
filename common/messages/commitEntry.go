@@ -224,13 +224,29 @@ func (m *CommitEntryMsg) LogFields() log.Fields {
 //  0   -- Cannot tell if message is Valid
 //  1   -- Message is valid
 func (m *CommitEntryMsg) Validate(state interfaces.IState) int {
-	if !m.validsig && !m.CommitEntry.IsValid() {
-		return -1
+	if !m.validsig {
+
+		//double check the version commit
+		if m.CommitEntry.Version != 0 {
+			state.LogMessage("executeMsg", "invalid version", m)
+			return -1
+		}
+		//double check the credits in the commit
+		if m.CommitEntry.Credits < 1 || m.CommitEntry.Credits > 10 {
+			state.LogMessage("executeMsg", "invalid fee", m)
+			return -1
+		}
+		//if there were no errors in processing the signature, formatting or if didn't validate
+		if nil != m.CommitEntry.ValidateSignatures() {
+			state.LogMessage("executeMsg", "invalid signature", m)
+			return -1
+		}
 	}
-	m.validsig = true
+	m.validsig = true // don't recheck the basics
 
 	ebal := state.GetFactoidState().GetECBalance(*m.CommitEntry.ECPubKey)
 	if int(m.CommitEntry.Credits) > int(ebal) {
+		state.LogMessage("executeMsg", "insufficient funds", m)
 		return 0
 	}
 	return 1

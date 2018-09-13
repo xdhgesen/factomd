@@ -167,6 +167,7 @@ func (c *CommitEntry) IsValid() bool {
 
 	//if there were no errors in processing the signature, formatting or if didn't validate
 	if nil == c.ValidateSignatures() {
+
 		return true
 	} else {
 		return false

@@ -2672,6 +2672,7 @@ func (s *State) ProcessInvalidMsgQueue() {
 		}
 		select {
 		case msg := <-s.networkInvalidMsgQueue:
+			s.LogMessage("invalid", "invalid", msg)
 			s.InvalidMessages[msg.GetHash().Fixed()] = msg
 		}
 	}
