@@ -180,6 +180,16 @@ func WaitBlocks(s *state.State, blks int) {
 	TimeNow(s)
 }
 
+// Wait for a  blocks
+func WaitForBlock(s *state.State, newBlock int) {
+	fmt.Printf("WaitForBlock(%d)\n", newBlock)
+	TimeNow(s)
+	for int(s.LLeaderHeight) < newBlock {
+		time.Sleep(time.Second)
+	}
+	TimeNow(s)
+}
+
 // Wait to a given minute.  If we are == to the minute or greater, then
 // we first wait to the start of the next block.
 func WaitForMinute(s *state.State, min int) {
@@ -1272,6 +1282,30 @@ func TestDBSigElection(t *testing.T) {
 	WaitForAllNodes(state0)
 
 	CheckAuthoritySet(3, 1, t) // check the authority set is as expected
+
+	t.Log("Shutting down the network")
+	for _, fn := range GetFnodes() {
+		fn.State.ShutdownChan <- 1
+	}
+
+}
+
+func TestDBStateCatchup(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+
+	state0 := SetupSim("LF", "LOCAL", map[string]string{"--debuglog": "."}, t)
+	StatusEveryMinute(state0)
+	state1 := GetFnodes()[1].State
+
+	runCmd("1")
+	runCmd("x")
+	WaitBlocks(state0, 4) // wait till the victim is back as the audit server
+	runCmd("x")
+
+	WaitForBlock(state1, 9) // wait till the victim is back as the audit server
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {

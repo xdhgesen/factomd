@@ -191,17 +191,18 @@ func (list *DBStateList) NewCatchup2() {
 	// Get information about the known block height
 	hs := list.State.GetHighestSavedBlk()
 	hk := list.State.GetHighestAck()
-	if k := list.State.GetHighestKnownBlock(); k > hk+2 {
+	k := list.State.GetHighestKnownBlock()
+	if k > hk+2 {
 		hk = k
 	}
 
 	fmt.Println("DEBUG: highest saved: ", hs)
 	fmt.Println("DEBUG: highest known: ", hk)
 
-	// add all states that are missing before the latest known hight
+	// add all states that are missing before the latest known height
 	for h := hs; h < hk; h++ {
-		if !l.Exists(h) {
-			l.Add(h)
+		if !l.Exists(h) { // how do you know these ar not in DBStatesReceived? --clay
+			l.Add(h) // add these to the list of missing ...
 		}
 	}
 
@@ -212,11 +213,11 @@ func (list *DBStateList) NewCatchup2() {
 	fmt.Println("DEBUG: total states recieved: ", l.DEBUGStatesDeleted)
 	fmt.Println()
 
-	// TODO: add locking arround the goroutine generation
+	// TODO: add locking around the goroutine generation
 	// send requests for the missing states from the list with a maximum of 20
 	// requests
 	for _, state := range l.States {
-		if state.Status() == stateMissing && len(l.requestSem) < l.requestLimit {
+		if state.Status() == stateMissing && len(l.requestSem) < l.requestLimit { // if the state is missing and I have room
 			l.requestSem <- state.Height()
 			go func(s *MissingState) {
 				for {
@@ -251,7 +252,7 @@ const (
 	stateMissing MissingStateStatus = iota
 	// stateWaiting - the state has been requested from the network
 	stateWaiting
-	// stateComplete - the state has been recieved from the network
+	// stateComplete - the state has been received from the network
 	stateComplete
 )
 
@@ -331,9 +332,9 @@ func (s *MissingState) SetStatus(status MissingStateStatus) {
 // from the network.
 type MissingStateList struct {
 	States         map[uint32]*MissingState
-	requestTimeout time.Duration
-	requestLimit   int
-	requestSem     chan uint32
+	requestTimeout time.Duration // move to globals.params and add flag to set
+	requestLimit   int           // move to globals.params and add flag to set
+	requestSem     chan uint32   // please use atomic.AtomicInt instead of a chan for this
 	lock           sync.RWMutex
 
 	// TODO: get rid of this
