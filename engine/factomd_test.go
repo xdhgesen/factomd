@@ -1011,7 +1011,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		fmt.Println(x)
 	}
 	if x["ack"] != x["saved"] {
-		t.Fatalf("Expected acknowledged and saved balances to be he same")
+		t.Fatalf("Expected acknowledged and saved balances to be the same")
 	}
 
 	TimeNow(state0)
@@ -1048,23 +1048,27 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 
 	// This call should show a different acknowledged balance than the Saved Balance
 	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
+	y, ok := resp_5.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
 	}
+	fmt.Println("before")
+	TimeNow(state0)
 
-	if x["ack"] == x["saved"] {
+	if y["ack"] == y["saved"] {
 		t.Fatalf("Expected acknowledged and saved balances to be different.")
 	}
 
 	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
+	WaitMinutes(state0, 3)
 
 	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
 	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
 	}
+	fmt.Println("after")
+	TimeNow(state0)
 	if x["ack"] != x["saved"] {
 		t.Fatalf("Expected acknowledged and saved balances to be he same")
 	}
