@@ -216,6 +216,8 @@ func (list *DBStateList) NewCatchup2() {
 	// TODO: add locking around the goroutine generation
 	// send requests for the missing states from the list with a maximum of 20
 	// requests
+	l.Lock()
+	defer l.Unlock()
 	for _, state := range l.States {
 		if state.Status() == stateMissing && len(l.requestSem) < l.requestLimit { // if the state is missing and I have room
 			l.requestSem <- state.Height()
