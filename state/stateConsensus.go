@@ -868,7 +868,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.
 	if s.DBStates.LastEnd < int(dbheight) {
-		s.DBStates.Catchup(true)
+		s.DBStates.NewCatchup2()
 	}
 	if s.DBStates.LastBegin < int(dbheight)+1 {
 		s.DBStates.LastBegin = int(dbheight)

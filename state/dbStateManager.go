@@ -1589,7 +1589,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 }
 
 func (list *DBStateList) UpdateState() (progress bool) {
-	list.Catchup(false)
+	list.NewCatchup2()
 
 	saved := 0
 	for i, d := range list.DBStates {

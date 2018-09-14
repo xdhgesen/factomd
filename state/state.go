@@ -285,7 +285,8 @@ type State struct {
 	Anchor interfaces.IAnchor
 
 	// Directory Block State
-	DBStates *DBStateList // Holds all DBStates not yet processed.
+	DBStates        *DBStateList // Holds all DBStates not yet processed.
+	MissingDBStates *MissingStateList
 
 	// Having all the state for a particular directory block stored in one structure
 	// makes creating the next state, updating the various states, and setting up the next
@@ -908,6 +909,8 @@ func (s *State) Init() {
 	s.DBStates = new(DBStateList)
 	s.DBStates.State = s
 	s.DBStates.DBStates = make([]*DBState, 0)
+
+	s.MissingDBStates = NewMissingStateList()
 
 	switch s.NodeMode {
 	case "FULL":
