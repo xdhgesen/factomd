@@ -184,6 +184,8 @@ func (s *State) Process() (progress bool) {
 		return false
 	}
 
+	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
+	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 	// If we are not running the leader, then look to see if we have waited long enough to
 	// start running the leader.  If we are, start the clock on Ignoring Missing Messages.  This
 	// is so we don't conflict with past version of the network if we have to reboot the network.
@@ -194,7 +196,6 @@ func (s *State) Process() (progress bool) {
 	}
 
 	if !s.RunLeader {
-		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			if s.DBFinished == true {
 				s.RunLeader = true
@@ -204,11 +205,8 @@ func (s *State) Process() (progress bool) {
 				}
 			}
 		}
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 
 	} else if s.IgnoreMissing {
-		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
-		now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 		if now-s.StartDelay > s.StartDelayLimit {
 			s.IgnoreMissing = false
 		}
@@ -258,7 +256,6 @@ ackLoop:
 			}
 
 			if s.IgnoreMissing {
-				now := s.GetTimestamp().GetTimeSeconds() //todo: Do we really need to do this every loop?
 				if now-ack.GetTimestamp().GetTimeSeconds() < 60*15 {
 					s.LogMessage("ackQueue", "Execute", ack)
 					s.executeMsg(vm, ack)
@@ -414,13 +411,7 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		if v.GetResendCnt() == 0 {
-			v.SendOut(s, v)
-		} else {
-			if v.Resend(s) {
-				v.SendOut(s, v)
-			}
-		}
+		v.SendOut(s, v)
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
@@ -587,7 +578,7 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 		m.SetMinute(ack.Minute)
 
 		pl := s.ProcessLists.Get(ack.DBHeight)
-		pl.AddToProcessList(ack, m)
+		pl.AddToProcessList(s, ack, m)
 
 		// Cross Boot Replay
 		s.CrossReplayAddSalt(ack.DBHeight, ack.Salt)
@@ -621,7 +612,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
 		pl := s.ProcessLists.Get(ack.DBHeight)
-		pl.AddToProcessList(ack, m)
+		pl.AddToProcessList(s, ack, m)
 	}
 }
 
@@ -1090,7 +1081,7 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	}
 
 	// Add the message and ack to the process list.
-	pl.AddToProcessList(ack, m)
+	pl.AddToProcessList(s, ack, m)
 
 	// Check to make sure AddToProcessList removed it from holding (added it to the list)
 	if s.Holding[m.GetMsgHash().Fixed()] != nil {
@@ -1124,7 +1115,7 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 	m.SetLeaderChainID(ack.GetLeaderChainID())
 	m.SetMinute(ack.Minute)
 
-	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(ack, m)
+	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(s, ack, m)
 }
 
 func (s *State) setCurrentMinute(m int) {
@@ -1248,7 +1239,7 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	m.SetLeaderChainID(ack.GetLeaderChainID())
 	m.SetMinute(ack.Minute)
 
-	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(ack, m)
+	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(s, ack, m)
 }
 
 func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
@@ -1296,7 +1287,7 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 	// Put the acknowledgement in the Acks so we can tell if AddToProcessList() adds it.
 	s.Acks[m.GetMsgHash().Fixed()] = ack
 	TotalAcksInputs.Inc()
-	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(ack, m)
+	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(s, ack, m)
 
 	// If it was not added, then handle as a follower, and leave.
 	if s.Acks[m.GetMsgHash().Fixed()] != nil {
