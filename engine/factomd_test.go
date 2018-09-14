@@ -285,7 +285,7 @@ func WaitBlocks(s *state.State, blks int) {
 	TimeNow(s)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	newBlock := int(s.LLeaderHeight) + blks
-	for i := int(s.LLeaderHeight); i < newBlock; i++ {
+	for i := int(s.LLeaderHeight) + 1; i <= newBlock; i++ {
 		for int(s.LLeaderHeight) < i {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
@@ -295,7 +295,7 @@ func WaitBlocks(s *state.State, blks int) {
 
 // Wait for a specific blocks
 func WaitForBlock(s *state.State, newBlock int) {
-	fmt.Printf("WaitForBlocks(%d)\n", newBlock)
+	fmt.Printf("WaitForBlock(%d)\n", newBlock)
 	TimeNow(s)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	for i := int(s.LLeaderHeight); i < newBlock; i++ {
@@ -562,7 +562,7 @@ func TestLoadScrambled(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 32, 0, 0, t)
+	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree", "--faulttimeout": "10"}, 32, 0, 0, t)
 	//TODO: Why does this run longer than expected?
 	CheckAuthoritySet(t)
 
@@ -1275,7 +1275,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 	ranSimTest = true
 
 	iterations := 1
-	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 28, 6, 6, t)
+	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 46, 7, 7, t)
 
 	runCmd("S10") // Set Drop Rate to 1.0 on everyone
 
@@ -1503,7 +1503,7 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 		t.Fatalf("constants.COINBASE_DECLARATION = %d expect 140\n", constants.COINBASE_DECLARATION)
 	}
 
-	nextBlock += oldCBDelay + 1
+	nextBlock += oldCBDelay
 	fmt.Println("Wait till second grant should payout if the activation fails")
 	WaitForBlock(state0, int(nextBlock+1)) // next old payout passed activation (should not be paid)
 	CBT = factoidState0.GetCoinbaseTransaction(nextBlock, state0.GetLeaderTimestamp())
@@ -1511,7 +1511,11 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 		t.Fatalf("because the payout delay changed there is no payout at block %d\n", nextBlock)
 	}
 
-	nextBlock += constants.COINBASE_DECLARATION - oldCBDelay + 1
+	// don't want to wait 140 blocks so:
+	fmt.Println("Change COINBASE_DECLARATION to 20 so we don't have to wait so long")
+	constants.COINBASE_DECLARATION = 20
+
+	nextBlock += constants.COINBASE_DECLARATION - oldCBDelay
 	fmt.Println("Wait till second grant should payout with the new activation height")
 	WaitForBlock(state0, int(nextBlock+1)) // next payout passed new activation (should be paid)
 	CBT = factoidState0.GetCoinbaseTransaction(nextBlock, state0.GetLeaderTimestamp())
