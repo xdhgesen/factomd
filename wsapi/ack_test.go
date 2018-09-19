@@ -12,6 +12,7 @@ import (
 
 func TestDecodeTransactionToHashes(t *testing.T) {
 	//blocks := testHelper.CreateFullTestBlockSet()
+	initfortest()
 
 	for _, block := range blocks {
 		for _, tx := range block.Entries {
@@ -78,6 +79,7 @@ func TestDecodeTransactionToHashes(t *testing.T) {
 func TestHandleV2FactoidACK(t *testing.T) {
 	//s := testHelper.CreateAndPopulateTestState()
 	//blocks := testHelper.CreateFullTestBlockSet()
+	initfortest()
 
 	for _, block := range blocks {
 		for _, tx := range block.FBlock.GetTransactions() {
@@ -176,6 +178,7 @@ func TestHandleV2FactoidACK(t *testing.T) {
 func TestHandleV2EntryACK(t *testing.T) {
 	//s := testHelper.CreateAndPopulateTestState()
 	//blocks := testHelper.CreateFullTestBlockSet()
+	initfortest()
 
 	for _, block := range blocks {
 		for _, tx := range block.Entries {
