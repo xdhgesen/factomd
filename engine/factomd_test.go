@@ -61,6 +61,10 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		"--checkheads":          "false",
 		"--controlpanelsetting": "readwrite",
 		"--debuglog":            "faulting|bad",
+		"--logPort":          "37000",
+		"--port":             "37001",
+		"--controlpanelport": "37002",
+		"--networkport":      "37003",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
@@ -574,9 +578,8 @@ func TestLoadScrambled(t *testing.T) {
 	WaitBlocks(state0, 10)
 	runCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
-
 	shutDownEverything(t)
-} // testLoad(){...}
+} // TestLoadScrambled(){...}
 
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
@@ -1479,7 +1482,7 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 	// reach into the activation an hack the TESTNET_COINBASE_PERIOD to be early so I can check it worked.
 	activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"] = 22
 
-	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 160, 0, 0, t)
+	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "2"}, 180, 0, 0, t)
 	CheckAuthoritySet(t)
 	fmt.Println("Simulation configured")
 	nextBlock := uint32(11 + constants.COINBASE_DECLARATION) // first grant is at 11 so it pays at 21
@@ -1510,10 +1513,6 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 	if len(CBT.GetOutputs()) != 0 {
 		t.Fatalf("because the payout delay changed there is no payout at block %d\n", nextBlock)
 	}
-
-	// don't want to wait 140 blocks so:
-	fmt.Println("Change COINBASE_DECLARATION to 20 so we don't have to wait so long")
-	constants.COINBASE_DECLARATION = 20
 
 	nextBlock += constants.COINBASE_DECLARATION - oldCBDelay
 	fmt.Println("Wait till second grant should payout with the new activation height")

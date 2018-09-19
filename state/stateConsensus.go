@@ -74,7 +74,6 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
-
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
 		return false
@@ -103,9 +102,13 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
+<<<<<<<<< Temporary merge branch 1
 		if !msg.IsLocal() && !msg.IsPeer2Peer() {
 			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
 		}
+=========
+		msg.SendOut(s, msg)
+>>>>>>>>> Temporary merge branch 2
 
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
@@ -177,7 +180,6 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 func (s *State) Process() (progress bool) {
 
-	s.StateProcessCnt++
 	if s.ResetRequest {
 		s.ResetRequest = false
 		s.DoReset()
@@ -186,6 +188,7 @@ func (s *State) Process() (progress bool) {
 
 	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
 	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
+
 	// If we are not running the leader, then look to see if we have waited long enough to
 	// start running the leader.  If we are, start the clock on Ignoring Missing Messages.  This
 	// is so we don't conflict with past version of the network if we have to reboot the network.
@@ -205,7 +208,6 @@ func (s *State) Process() (progress bool) {
 				}
 			}
 		}
-
 	} else if s.IgnoreMissing {
 		if now-s.StartDelay > s.StartDelayLimit {
 			s.IgnoreMissing = false
@@ -1204,7 +1206,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 		m.FollowerExecute(s)
 		return
 	}
-
 	if pl.VMs[dbs.VMIndex].Height > 0 {
 		s.LogPrintf("executeMsg", "DBSig issue height = %d, length = %d", pl.VMs[dbs.VMIndex].Height, len(pl.VMs[dbs.VMIndex].List))
 		s.LogMessage("executeMsg", "drop, already processed ", pl.VMs[dbs.VMIndex].List[0])
@@ -1218,7 +1219,6 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 		} else {
 			s.LogMessage("executeMsg", "duplicate execute", pl.VMs[dbs.VMIndex].List[0])
 		}
-
 		return
 	}
 
@@ -1359,7 +1359,6 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 	c, _ := commitChain.(*messages.CommitChainMsg)
 
 	pl := s.ProcessLists.Get(dbheight)
-
 	if e := s.GetFactoidState().UpdateECTransaction(true, c.CommitChain); e == nil {
 		// save the Commit to match against the Reveal later
 		h := c.GetHash()
@@ -1372,10 +1371,10 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 			s.XReview = append(s.XReview, entry)
 			TotalHoldingQueueOutputs.Inc()
 		}
+
 		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 		return true
 	}
-
 	//s.AddStatus("Cannot process Commit Chain")
 
 	return false
@@ -1425,7 +1424,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // delete(s.Commits, msg.Entry.GetHash().Fixed())
 		}
 	}()
-
 	myhash := msg.Entry.GetHash()
 
 	chainID := msg.Entry.GetChainID()
@@ -1506,10 +1504,8 @@ func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, inte
 		panic(err)
 	}
 	ack := s.NewAck(dbs, s.Balancehash).(*messages.Ack)
-
 	s.LogMessage("dbstate", "CreateDBSig", dbs)
 	s.LogPrintf("dbstate", dbstate.String())
-
 	return dbs, ack
 }
 
@@ -1564,7 +1560,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	vm := pl.VMs[vmIndex]
 
 	s.LogPrintf("dbsig-eom", "ProcessEOM@%d/%d/%d minute %d, Syncing %v , EOM %v, EOMDone %v, EOMProcessed %v, EOMLimit %v DBSigDone %v",
-		dbheight, msg.GetVMIndex(), vm.Height, s.CurrentMinute, s.Syncing, s.EOM, s.EOMDone, s.EOMProcessed, s.EOMLimit, s.DBSigDone)
+		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.EOM, s.EOMDone, s.EOMProcessed, s.EOMLimit, s.DBSigDone)
 
 	// debug
 	if s.DebugExec() {
@@ -1910,7 +1906,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// debug
 	s.LogPrintf("dbsig-eom", "ProcessDBSig@%d/%d/%d minute %d, Syncing %v , DBSID %v, DBSigDone %v, DBSigProcessed %v, DBSigLimit %v DBSigDone %v",
-		dbheight, msg.GetVMIndex(), vm.Height, s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
+		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
 
 	// debug
 	if s.DebugExec() {
@@ -1999,7 +1995,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
 			plog("Failed. DBlocks do not match Expected-Body-Mr: %x, Got: %x",
 				dblk.GetHeader().GetBodyMR().Fixed(), dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
-
 			// If the Directory block hash doesn't work for me, then the dbsig doesn't work for me, so
 			// toss it and ask our neighbors for another one.
 			vm.ListAck[0] = nil
@@ -2022,7 +2017,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		valid, err := s.FastVerifyAuthoritySignature(data, dbs.DBSignature, dbs.DBHeight)
 		if err != nil || valid != 1 {
 			s.LogPrintf("executeMsg", "Failed. Invalid Auth Sig: Pubkey: %x", dbs.Signature.GetKey())
-
 			// If the authority is bad, toss this signature and ask for another.
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
@@ -2288,6 +2282,7 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
+
 			pl.FactoidBalancesT[adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
 		}
@@ -2354,13 +2349,7 @@ func (s *State) GetDirectoryBlock() interfaces.IDirectoryBlock {
 	return s.DBStates.Last().DirectoryBlock
 }
 
-func (s *State) GetNewHash() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetNewHash() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetNewHash() interfaces.IHash {
 	return new(primitives.Hash)
 }
 

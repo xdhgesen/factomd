@@ -11,7 +11,8 @@ import (
 )
 
 func TestDecodeTransactionToHashes(t *testing.T) {
-	blocks := testHelper.CreateFullTestBlockSet()
+	//blocks := testHelper.CreateFullTestBlockSet()
+	initfortest()
 
 	for _, block := range blocks {
 		for _, tx := range block.Entries {
@@ -76,8 +77,9 @@ func TestDecodeTransactionToHashes(t *testing.T) {
 }
 
 func TestHandleV2FactoidACK(t *testing.T) {
-	state := testHelper.CreateAndPopulateTestState()
-	blocks := testHelper.CreateFullTestBlockSet()
+	//s := testHelper.CreateAndPopulateTestState()
+	//blocks := testHelper.CreateFullTestBlockSet()
+	initfortest()
 
 	for _, block := range blocks {
 		for _, tx := range block.FBlock.GetTransactions() {
@@ -85,7 +87,7 @@ func TestHandleV2FactoidACK(t *testing.T) {
 			txID := tx.GetSigHash().String()
 			req.TxID = txID
 
-			r, jError := HandleV2FactoidACK(state, req)
+			r, jError := HandleV2FactoidACK(s, req)
 
 			if jError != nil {
 				t.Errorf("%v", jError)
@@ -113,7 +115,7 @@ func TestHandleV2FactoidACK(t *testing.T) {
 			}
 			req.FullTransaction = hex.EncodeToString(h)
 
-			r, jError = HandleV2FactoidACK(state, req)
+			r, jError = HandleV2FactoidACK(s, req)
 
 			if jError != nil {
 				t.Errorf("%v", jError)
@@ -141,7 +143,7 @@ func TestHandleV2FactoidACK(t *testing.T) {
 		req := AckRequest{}
 		req.TxID = h.String()
 
-		r, jError := HandleV2FactoidACK(state, req)
+		r, jError := HandleV2FactoidACK(s, req)
 
 		if jError != nil {
 			t.Errorf("%v", jError)
@@ -164,7 +166,7 @@ func TestHandleV2FactoidACK(t *testing.T) {
 		req = AckRequest{}
 		req.FullTransaction = h.String()
 
-		_, jError = HandleV2FactoidACK(state, req)
+		_, jError = HandleV2FactoidACK(s, req)
 
 		if jError == nil {
 			t.Error("Invalid transactions not caught")
@@ -174,8 +176,9 @@ func TestHandleV2FactoidACK(t *testing.T) {
 }
 
 func TestHandleV2EntryACK(t *testing.T) {
-	state := testHelper.CreateAndPopulateTestState()
-	blocks := testHelper.CreateFullTestBlockSet()
+	//s := testHelper.CreateAndPopulateTestState()
+	//blocks := testHelper.CreateFullTestBlockSet()
+	initfortest()
 
 	for _, block := range blocks {
 		for _, tx := range block.Entries {
@@ -183,7 +186,7 @@ func TestHandleV2EntryACK(t *testing.T) {
 			txID := tx.GetHash().String()
 			req.TxID = txID
 
-			r, jError := HandleV2EntryACK(state, req)
+			r, jError := HandleV2EntryACK(s, req)
 
 			if jError != nil {
 				t.Errorf("%v", jError)
@@ -217,7 +220,7 @@ func TestHandleV2EntryACK(t *testing.T) {
 			}
 			req.FullTransaction = hex.EncodeToString(h)
 
-			r, jError = HandleV2EntryACK(state, req)
+			r, jError = HandleV2EntryACK(s, req)
 
 			if jError != nil {
 				t.Errorf("%v", jError)
@@ -254,7 +257,7 @@ func TestHandleV2EntryACK(t *testing.T) {
 			entryHash := tx.GetEntryHash().String()
 			req.TxID = txID
 
-			r, jError := HandleV2EntryACK(state, req)
+			r, jError := HandleV2EntryACK(s, req)
 
 			if jError != nil {
 				t.Errorf("%v", jError)
@@ -289,7 +292,7 @@ func TestHandleV2EntryACK(t *testing.T) {
 			}
 			req.FullTransaction = hex.EncodeToString(h)
 
-			r, jError = HandleV2EntryACK(state, req)
+			r, jError = HandleV2EntryACK(s, req)
 
 			if jError != nil {
 				t.Errorf("%v", jError)
@@ -324,7 +327,7 @@ func TestHandleV2EntryACK(t *testing.T) {
 		req := AckRequest{}
 		req.TxID = h.String()
 
-		r, jError := HandleV2EntryACK(state, req)
+		r, jError := HandleV2EntryACK(s, req)
 
 		if jError != nil {
 			t.Errorf("%v", jError)
@@ -353,7 +356,7 @@ func TestHandleV2EntryACK(t *testing.T) {
 		req = AckRequest{}
 		req.FullTransaction = h.String()
 
-		_, jError = HandleV2EntryACK(state, req)
+		_, jError = HandleV2EntryACK(s, req)
 
 		if jError == nil {
 			t.Error("Invalid transactions not caught")
