@@ -293,7 +293,7 @@ func WaitBlocks(s *state.State, blks int) {
 	}
 }
 
-// Wait for a specific blocks
+// Wait for a specific block
 func WaitForBlock(s *state.State, newBlock int) {
 	fmt.Printf("WaitForBlocks(%d)\n", newBlock)
 	TimeNow(s)
@@ -304,16 +304,6 @@ func WaitForBlock(s *state.State, newBlock int) {
 		}
 		TimeNow(s)
 	}
-}
-
-// Wait for a  blocks
-func WaitForBlock(s *state.State, newBlock int) {
-	fmt.Printf("WaitForBlock(%d)\n", newBlock)
-	TimeNow(s)
-	for int(s.LLeaderHeight) < newBlock {
-		time.Sleep(time.Second)
-	}
-	TimeNow(s)
 }
 
 // Wait to a given minute.  If we are == to the minute or greater, then
@@ -1536,7 +1526,7 @@ func TestDBStateCatchup(t *testing.T) {
 	}
 	ranSimTest = true
 
-	state0 := SetupSim("LF", "LOCAL", map[string]string{"--debuglog": "."}, t)
+	state0 := SetupSim("LF", map[string]string{"--debuglog": "."}, 20, 0, 0, t)
 	StatusEveryMinute(state0)
 	state1 := GetFnodes()[1].State
 

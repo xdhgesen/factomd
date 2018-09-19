@@ -245,6 +245,7 @@ func (s *State) Process() (progress bool) {
 		}
 
 		process = append(process, recieved.Message())
+		s.StatesWaiting.Del(recieved.Height())
 		s.StatesReceived.Del(recieved.Height())
 	}
 
