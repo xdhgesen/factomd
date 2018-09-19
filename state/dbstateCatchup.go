@@ -1,283 +1,332 @@
 package state
 
 import (
-	"fmt"
-	"sync"
+	"container/list"
 	"time"
 
-	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 )
 
 // Once a second at most, we check to see if we need to pull down some blocks to catch up.
-func (list *DBStateList) Catchup(justDoIt bool) {
-	// We only check if we need updates once every so often.
+// func (list *DBStateList) Catchup(justDoIt bool) {
+// 	// We only check if we need updates once every so often.
+//
+// 	now := list.State.GetTimestamp()
+//
+// 	hs := int(list.State.GetHighestSavedBlk())
+// 	hk := int(list.State.GetHighestAck())
+// 	if list.State.GetHighestKnownBlock() > uint32(hk+2) {
+// 		hk = int(list.State.GetHighestKnownBlock())
+// 	}
+//
+// 	begin := hs + 1
+// 	end := hk
+//
+// 	ask := func() {
+//
+// 		tolerance := 1
+// 		if list.State.Leader {
+// 			tolerance = 2
+// 		}
+//
+// 		if list.TimeToAsk != nil && hk-hs > tolerance && now.GetTime().After(list.TimeToAsk.GetTime()) {
+//
+// 			// Find the first dbstate we don't have.
+// 			for i, v := range list.State.DBStatesReceived {
+// 				ix := i + list.State.DBStatesReceivedBase
+// 				if ix <= hs {
+// 					continue
+// 				}
+// 				if ix >= hk {
+// 					return
+// 				}
+// 				if v == nil {
+// 					begin = ix
+// 					break
+// 				}
+// 			}
+//
+// 			for len(list.State.DBStatesReceived)+list.State.DBStatesReceivedBase <= hk {
+// 				list.State.DBStatesReceived = append(list.State.DBStatesReceived, nil)
+// 			}
+//
+// 			//  Find the end of the dbstates that we don't have.
+// 			for i, v := range list.State.DBStatesReceived {
+// 				ix := i + list.State.DBStatesReceivedBase
+//
+// 				if ix <= begin {
+// 					continue
+// 				}
+// 				if ix >= end {
+// 					break
+// 				}
+// 				if v != nil {
+// 					end = ix - 1
+// 					break
+// 				}
+// 			}
+//
+// 			if list.State.RunLeader && !list.State.IgnoreMissing {
+// 				msg := messages.NewDBStateMissing(list.State, uint32(begin), uint32(end+5))
+//
+// 				if msg != nil {
+// 					//		list.State.RunLeader = false
+// 					//		list.State.StartDelay = list.State.GetTimestamp().GetTimeMilli()
+// 					msg.SendOut(list.State, msg)
+// 					list.State.DBStateAskCnt++
+// 					list.TimeToAsk.SetTimeSeconds(now.GetTimeSeconds() + 6)
+// 					list.LastBegin = begin
+// 					list.LastEnd = end
+// 				}
+// 			}
+// 		}
+// 	}
+//
+// 	if end-begin > 200 {
+// 		end = begin + 200
+// 	}
+//
+// 	if end+3 > begin && justDoIt {
+// 		ask()
+// 		return
+// 	}
+//
+// 	// return if we are caught up, and clear our timer
+// 	if end-begin < 1 {
+// 		list.TimeToAsk = nil
+// 		return
+// 	}
+//
+// 	// First Ask.  Because the timer is nil!
+// 	if list.TimeToAsk == nil {
+// 		// Okay, have nothing in play, so wait a bit just in case.
+// 		list.TimeToAsk = list.State.GetTimestamp()
+// 		list.TimeToAsk.SetTimeSeconds(now.GetTimeSeconds() + 6)
+// 		list.LastBegin = begin
+// 		list.LastEnd = end
+// 		return
+// 	}
+//
+// 	if list.TimeToAsk.GetTime().Before(now.GetTime()) {
+// 		ask()
+// 		return
+// 	}
+//
+// }
+//
+// func (list *DBStateList) NewCatchup() {
+// 	// make a list of missing states
+// 	missingStates := make([]uint32, 0)
+// 	// hs := list.State.GetHighestSavedBlk()
+// 	hk := list.State.GetHighestAck()
+// 	if k := list.State.GetHighestKnownBlock(); k > hk+2 {
+// 		hk = k
+// 	}
+//
+// 	for i, v := range list.State.DBStatesReceived[list.State.DBStatesReceivedBase:] {
+// 		if v == nil {
+// 			missingStates = append(missingStates, uint32(i))
+// 		}
+// 	}
+// 	for n := missingStates[len(missingStates)-1]; n < hk; n++ {
+// 		missingStates = append(missingStates, n)
+// 	}
+//
+// 	// split the list of missing states into messages requesting up to 5
+// 	// consecutive missing states at a time. No more than 20 such message
+// 	// requests should be outstanding.
+// 	msgSem := make(chan int, 20)
+// 	max := len(missingStates) - 1
+//
+// 	for i := 0; i <= max; {
+// 		start := missingStates[i]
+// 		end := start
+//
+// 		for count := 0; count < 5; count++ {
+// 			if i+1 > max {
+// 				break
+// 			}
+// 			if end+1 != missingStates[i+1] {
+// 				i++
+// 				break
+// 			}
+// 			end++
+// 			i++
+// 		}
+//
+// 		go func(msg interfaces.IMsg) {
+// 			if msg == nil {
+// 				return
+// 			}
+// 			msgSem <- 1
+//
+// 			msg.SendOut(list.State, msg)
+// 			list.State.DBStateAskCnt++
+//
+// 			<-msgSem
+// 		}(messages.NewDBStateMissing(list.State, start, end))
+// 	}
+// }
+//
+// func (list *DBStateList) NewCatchup2() {
+// 	l := list.State.MissingDBStates
+//
+// 	// add missing states to the list if they are not there already
+// 	fmt.Println("DEBUG: checking DBStatesReceived ", len(list.State.DBStatesReceived))
+// 	// for i, v := range list.State.DBStatesReceived {
+// 	for i, v := range list.State.DBStatesReceived[list.State.DBStatesReceivedBase:] {
+// 		h := uint32(i)
+// 		if v == nil {
+// 			if !l.Exists(h) {
+// 				l.Add(h)
+// 			}
+// 		} else if l.Exists(h) {
+// 			// l.Del(h)
+// 			l.Get(h).SetStatus(stateComplete)
+// 		}
+// 	}
+//
+// 	// Get information about the known block height
+// 	hs := list.State.GetHighestSavedBlk()
+// 	hk := list.State.GetHighestAck()
+// 	k := list.State.GetHighestKnownBlock()
+// 	if k > hk+2 {
+// 		hk = k
+// 	}
+//
+// 	fmt.Println("DEBUG: highest saved: ", hs)
+// 	fmt.Println("DEBUG: highest known: ", hk)
+//
+// 	// add all states that are missing before the latest known height
+// 	for h := hs; h < hk; h++ {
+// 		if !l.Exists(h) { // how do you know these ar not in DBStatesReceived? --clay
+// 			l.Add(h) // add these to the list of missing ...
+// 		}
+// 	}
+//
+// 	fmt.Println("DEBUG: missing states: ", len(l.States))
+// 	fmt.Println("DEBUG: used requestCount: ", l.requestCount)
+// 	fmt.Println("DEBUG: DBStateAskCnt: ", list.State.DBStateAskCnt)
+// 	fmt.Println("DEBUG: total states requested: ", l.DEBUGStatesRequested)
+// 	fmt.Println("DEBUG: total states recieved: ", l.DEBUGStatesDeleted)
+// 	fmt.Println()
+//
+// 	// TODO: add locking around the goroutine generation
+// 	// send requests for the missing states from the list with a maximum of 20
+// 	// requests
+// 	l.Lock()
+// 	defer l.Unlock()
+// 	for _, state := range l.States {
+// 		if state.Status() == stateMissing && l.requestCount <= l.requestLimit { // if the state is missing and I have room
+// 			l.requestCount++
+// 			go func(s *MissingState) {
+// 				for {
+// 					switch s.Status() {
+// 					case stateMissing:
+// 						s.Request(list)
+// 						l.DEBUGStatesRequested++
+// 					case stateWaiting:
+// 						// check if the message has been waiting too long.
+// 						if s.RequestAge() > l.requestTimeout {
+// 							s.SetStatus(stateMissing)
+// 							break
+// 						}
+// 						time.Sleep(2 * time.Second)
+// 					case stateComplete:
+// 						l.Del(s.Height())
+// 						l.DEBUGStatesDeleted++
+// 						break
+// 					}
+// 				}
+// 				l.requestCount--
+// 			}(state)
+// 		}
+// 	}
+// }
 
-	now := list.State.GetTimestamp()
+func (list *DBStateList) NewCatchup3() {
+	missing := list.State.StatesMissing
+	waiting := list.State.StatesWaiting
+	recieved := list.State.StatesReceived
 
-	hs := int(list.State.GetHighestSavedBlk())
-	hk := int(list.State.GetHighestAck())
-	if list.State.GetHighestKnownBlock() > uint32(hk+2) {
-		hk = int(list.State.GetHighestKnownBlock())
-	}
-
-	begin := hs + 1
-	end := hk
-
-	ask := func() {
-
-		tolerance := 1
-		if list.State.Leader {
-			tolerance = 2
-		}
-
-		if list.TimeToAsk != nil && hk-hs > tolerance && now.GetTime().After(list.TimeToAsk.GetTime()) {
-
-			// Find the first dbstate we don't have.
-			for i, v := range list.State.DBStatesReceived {
-				ix := i + list.State.DBStatesReceivedBase
-				if ix <= hs {
-					continue
-				}
-				if ix >= hk {
-					return
-				}
-				if v == nil {
-					begin = ix
-					break
-				}
-			}
-
-			for len(list.State.DBStatesReceived)+list.State.DBStatesReceivedBase <= hk {
-				list.State.DBStatesReceived = append(list.State.DBStatesReceived, nil)
-			}
-
-			//  Find the end of the dbstates that we don't have.
-			for i, v := range list.State.DBStatesReceived {
-				ix := i + list.State.DBStatesReceivedBase
-
-				if ix <= begin {
-					continue
-				}
-				if ix >= end {
-					break
-				}
-				if v != nil {
-					end = ix - 1
-					break
-				}
-			}
-
-			if list.State.RunLeader && !list.State.IgnoreMissing {
-				msg := messages.NewDBStateMissing(list.State, uint32(begin), uint32(end+5))
-
-				if msg != nil {
-					//		list.State.RunLeader = false
-					//		list.State.StartDelay = list.State.GetTimestamp().GetTimeMilli()
-					msg.SendOut(list.State, msg)
-					list.State.DBStateAskCnt++
-					list.TimeToAsk.SetTimeSeconds(now.GetTimeSeconds() + 6)
-					list.LastBegin = begin
-					list.LastEnd = end
-				}
-			}
-		}
-	}
-
-	if end-begin > 200 {
-		end = begin + 200
-	}
-
-	if end+3 > begin && justDoIt {
-		ask()
-		return
-	}
-
-	// return if we are caught up, and clear our timer
-	if end-begin < 1 {
-		list.TimeToAsk = nil
-		return
-	}
-
-	// First Ask.  Because the timer is nil!
-	if list.TimeToAsk == nil {
-		// Okay, have nothing in play, so wait a bit just in case.
-		list.TimeToAsk = list.State.GetTimestamp()
-		list.TimeToAsk.SetTimeSeconds(now.GetTimeSeconds() + 6)
-		list.LastBegin = begin
-		list.LastEnd = end
-		return
-	}
-
-	if list.TimeToAsk.GetTime().Before(now.GetTime()) {
-		ask()
-		return
-	}
-
-}
-
-func (list *DBStateList) NewCatchup() {
-	// make a list of missing states
-	missingStates := make([]uint32, 0)
-	// hs := list.State.GetHighestSavedBlk()
-	hk := list.State.GetHighestAck()
-	if k := list.State.GetHighestKnownBlock(); k > hk+2 {
-		hk = k
-	}
-
-	for i, v := range list.State.DBStatesReceived[list.State.DBStatesReceivedBase:] {
-		if v == nil {
-			missingStates = append(missingStates, uint32(i))
-		}
-	}
-	for n := missingStates[len(missingStates)-1]; n < hk; n++ {
-		missingStates = append(missingStates, n)
-	}
-
-	// split the list of missing states into messages requesting up to 5
-	// consecutive missing states at a time. No more than 20 such message
-	// requests should be outstanding.
-	msgSem := make(chan int, 20)
-	max := len(missingStates) - 1
-
-	for i := 0; i <= max; {
-		start := missingStates[i]
-		end := start
-
-		for count := 0; count < 5; count++ {
-			if i+1 > max {
-				break
-			}
-			if end+1 != missingStates[i+1] {
-				i++
-				break
-			}
-			end++
-			i++
-		}
-
-		go func(msg interfaces.IMsg) {
-			if msg == nil {
-				return
-			}
-			msgSem <- 1
-
-			msg.SendOut(list.State, msg)
-			list.State.DBStateAskCnt++
-
-			<-msgSem
-		}(messages.NewDBStateMissing(list.State, start, end))
-	}
-}
-
-func (list *DBStateList) NewCatchup2() {
-	l := list.State.MissingDBStates
-
-	// add missing states to the list if they are not there already
-	fmt.Println("DEBUG: checking DBStatesReceived ", len(list.State.DBStatesReceived))
-	// for i, v := range list.State.DBStatesReceived {
-	for i, v := range list.State.DBStatesReceived[list.State.DBStatesReceivedBase:] {
-		h := uint32(i)
-		if v == nil {
-			if !l.Exists(h) {
-				l.Add(h)
-			}
-		} else if l.Exists(h) {
-			// l.Del(h)
-			l.Get(h).SetStatus(stateComplete)
-		}
-	}
+	// Update the list
 
 	// Get information about the known block height
 	hs := list.State.GetHighestSavedBlk()
 	hk := list.State.GetHighestAck()
-	k := list.State.GetHighestKnownBlock()
-	if k > hk+2 {
-		hk = k
+	if list.State.GetHighestKnownBlock() > hk+2 {
+		hk = list.State.GetHighestKnownBlock()
 	}
 
-	fmt.Println("DEBUG: highest saved: ", hs)
-	fmt.Println("DEBUG: highest known: ", hk)
+	if recieved.Base() < hs {
+		recieved.SetBase(hs)
+	}
 
-	// add all states that are missing before the latest known height
-	for h := hs; h < hk; h++ {
-		if !l.Exists(h) { // how do you know these ar not in DBStatesReceived? --clay
-			l.Add(h) // add these to the list of missing ...
+	// find gaps in the recieved list
+	for e := recieved.List.Front(); e != nil; e = e.Next() {
+		i := e.Value.(*ReceivedState).Height() + 1
+		if e.Next() != nil {
+			for i < e.Next().Value.(*ReceivedState).Height() {
+				missing.Add(i)
+			}
 		}
 	}
 
-	fmt.Println("DEBUG: missing states: ", len(l.States))
-	fmt.Println("DEBUG: used requestSems: ", len(l.requestSem))
-	fmt.Println("DEBUG: DBStateAskCnt: ", list.State.DBStateAskCnt)
-	fmt.Println("DEBUG: total states requested: ", l.DEBUGStatesRequested)
-	fmt.Println("DEBUG: total states recieved: ", l.DEBUGStatesDeleted)
-	fmt.Println()
+	// add all known states after the last recieved to the missing list
 
-	// TODO: add locking around the goroutine generation
-	// send requests for the missing states from the list with a maximum of 20
-	// requests
-	l.Lock()
-	defer l.Unlock()
-	for _, state := range l.States {
-		if state.Status() == stateMissing && len(l.requestSem) < l.requestLimit { // if the state is missing and I have room
-			l.requestSem <- state.Height()
-			go func(s *MissingState) {
-				for {
-					switch s.Status() {
-					case stateMissing:
-						s.Request(list)
-						l.DEBUGStatesRequested++
-					case stateWaiting:
-						// check if the message has been waiting too long.
-						if s.RequestAge() > l.requestTimeout {
-							s.SetStatus(stateMissing)
-							break
-						}
-						time.Sleep(2 * time.Second)
-					case stateComplete:
-						l.Del(s.Height())
-						l.DEBUGStatesDeleted++
-						break
-					}
-				}
-				<-l.requestSem
-			}(state)
+	for i := recieved.Last(); i < hk; i++ {
+		missing.Add(i)
+	}
+
+	// TODO: requestTimeout should be a global config variable
+	requestTimeout := 1 * time.Minute
+
+	// check the waiting list and move any requests that have timed out back
+	// into the missing list.
+	for e := waiting.List.Front(); e != nil; e = e.Next() {
+		s := e.Value.(*WaitingState)
+		if s.RequestAge() > requestTimeout {
+			waiting.Del(s.Height())
+			missing.Add(s.Height())
 		}
 	}
-}
 
-// MissingStateStatus indicates what step in the process the MissingState is in.
-type MissingStateStatus byte
+	// request missing states
+	// TODO: requestLimit should be a global config variable
+	requestLimit := 20
 
-const (
-	// stateMissing - the state needs to be requested from the network
-	stateMissing MissingStateStatus = iota
-	// stateWaiting - the state has been requested from the network
-	stateWaiting
-	// stateComplete - the state has been received from the network
-	stateComplete
-)
+	for e := missing.List.Front(); e != nil; e = e.Next() {
+		if waiting.Len() >= requestLimit {
+			break
+		}
+		s := e.Value.(*MissingState)
+		missing.Del(s.Height())
+		waiting.Add(s.Height())
 
-// String returns a string for printing MissingStateStatus
-func (s MissingStateStatus) String() string {
-	switch s {
-	case stateMissing:
-		return fmt.Sprint("Missing")
-	case stateWaiting:
-		return fmt.Sprint("Waiting")
-	case stateComplete:
-		return fmt.Sprint("Complete")
-	default:
-		return fmt.Sprint("Unknown")
+		msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
+		if msg != nil {
+			msg.SendOut(list.State, msg)
+		}
 	}
+	// Request sends a Missing State Message to the network.
+	// func (s *MissingState) Request(list *DBStateList) {
+	// 	s.ResetRequestAge()
+	// 	s.SetStatus(stateWaiting)
+	//
+	// 	msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
+	// 	if msg == nil {
+	// 		return
+	// 	}
+	// 	msg.SendOut(list.State, msg)
+	// 	list.State.DBStateAskCnt++
+	// }
+
 }
 
 // MissingState is information about a DBState that is known to exist but is not
 // available on the current node.
 type MissingState struct {
-	height      uint32
-	status      MissingStateStatus
-	requestTime time.Time
+	height uint32
 }
 
 // NewMissingState creates a new MissingState for the DBState at a specific
@@ -285,121 +334,207 @@ type MissingState struct {
 func NewMissingState(height uint32) *MissingState {
 	s := new(MissingState)
 	s.height = height
-	s.SetStatus(stateMissing)
 	return s
 }
 
-// Height returns the height of the MissingState
 func (s *MissingState) Height() uint32 {
 	return s.height
 }
 
-// TODO: maybe the request should be executed in the main loop instead of in its
-// own method
+// TODO: if StatesMissing takes a long time to seek through the list we should
+// replace the iteration with binary search
 
-// Request sends a Missing State Message to the network.
-func (s *MissingState) Request(list *DBStateList) {
-	s.ResetRequestAge()
-	s.SetStatus(stateWaiting)
-
-	msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
-	if msg == nil {
-		return
-	}
-	msg.SendOut(list.State, msg)
-	list.State.DBStateAskCnt++
+type StatesMissing struct {
+	List *list.List
 }
 
-// RequestAge returns the time since a request for the missing state was made.
-func (s *MissingState) RequestAge() time.Duration {
-	return time.Since(s.requestTime)
-}
-
-// ResetRequestAge sets the age to 0
-func (s *MissingState) ResetRequestAge() {
-	s.requestTime = time.Now()
-}
-
-// Status returns the status of the MissingState
-func (s *MissingState) Status() MissingStateStatus {
-	return s.status
-}
-
-// SetStatus sets the status of the MissingState
-func (s *MissingState) SetStatus(status MissingStateStatus) {
-	s.status = status
-}
-
-// MissingStateList is a list of the known missing DBStates that we need to get
-// from the network.
-type MissingStateList struct {
-	States         map[uint32]*MissingState
-	requestTimeout time.Duration // move to globals.params and add flag to set
-	requestLimit   int           // move to globals.params and add flag to set
-	requestSem     chan uint32   // please use atomic.AtomicInt instead of a chan for this
-	lock           sync.RWMutex
-
-	// TODO: get rid of this
-	DEBUGStatesDeleted   int
-	DEBUGStatesRequested int
-}
-
-// NewMissingStateList creates a new list of missing DBStates.
-func NewMissingStateList() *MissingStateList {
-	fmt.Println("DEBUG: NewMissingStateList")
-	l := new(MissingStateList)
-	l.States = make(map[uint32]*MissingState)
-	l.requestTimeout = 30 * time.Second
-	l.requestLimit = 100
-	l.requestSem = make(chan uint32, l.requestLimit)
+// NewStatesMissing creates a new list of missing DBStates.
+func NewStatesMissing() *StatesMissing {
+	l := new(StatesMissing)
+	l.List = list.New()
 	return l
 }
 
 // Add adds a new MissingState to the list.
-func (l *MissingStateList) Add(height uint32) {
-	l.Lock()
-	defer l.Unlock()
-	l.States[height] = NewMissingState(height)
+func (l *StatesMissing) Add(height uint32) {
+	for e := l.List.Back(); e != nil; e = e.Prev() {
+		s := e.Value.(*MissingState)
+		if height > s.Height() {
+			l.List.InsertAfter(NewMissingState(height), e)
+			return
+		} else if height == s.Height() {
+			return
+		}
+	}
+	l.List.PushFront(height)
 }
 
 // Del removes a MissingState from the list.
-func (l *MissingStateList) Del(height uint32) {
-	l.Lock()
-	defer l.Unlock()
-	delete(l.States, height)
+func (l *StatesMissing) Del(height uint32) {
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		if e.Value.(*MissingState).Height() == height {
+			l.List.Remove(e)
+			break
+		}
+	}
 }
 
-// Exists checks to see if a MissingState is already in the list.
-func (l *MissingStateList) Exists(height uint32) bool {
-	l.RLock()
-	defer l.RUnlock()
-	_, ok := l.States[height]
-	return ok
+func (l *StatesMissing) Get(height uint32) *MissingState {
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		s := e.Value.(*MissingState)
+		if s.Height() == height {
+			return s
+		}
+	}
+	return nil
 }
 
-// Get returns a MissingState from the list.
-func (l *MissingStateList) Get(height uint32) *MissingState {
-	l.RLock()
-	defer l.RUnlock()
-	return l.States[height]
+// GetNext returns a the next MissingState from the list.
+func (l *StatesMissing) GetNext() *MissingState {
+	return l.List.Front().Value.(*MissingState)
 }
 
-// Lock closes the write lock for the list.
-func (l *MissingStateList) Lock() {
-	l.lock.Lock()
+type WaitingState struct {
+	height        uint32
+	requestedTime time.Time
 }
 
-// Unlock opens the write lock for the list.
-func (l *MissingStateList) Unlock() {
-	l.lock.Unlock()
+func NewWaitingState(height uint32) *WaitingState {
+	s := new(WaitingState)
+	s.height = height
+	s.requestedTime = time.Now()
+	return s
 }
 
-// RLock closes the read lock for the list.
-func (l *MissingStateList) RLock() {
-	l.lock.RLock()
+func (s *WaitingState) Height() uint32 {
+	return s.height
 }
 
-// RUnlock opens the read lock for the list.
-func (l *MissingStateList) RUnlock() {
-	l.lock.RUnlock()
+func (s *WaitingState) RequestAge() time.Duration {
+	return time.Since(s.requestedTime)
+}
+
+func (s *WaitingState) ResetRequestAge() {
+	s.requestedTime = time.Now()
+}
+
+type StatesWaiting struct {
+	List *list.List
+}
+
+func NewStatesWaiting() *StatesWaiting {
+	l := new(StatesWaiting)
+	l.List = list.New()
+	return l
+}
+
+func (l *StatesWaiting) Add(height uint32) {
+	l.List.PushBack(NewWaitingState(height))
+}
+
+func (l *StatesWaiting) Del(height uint32) {
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		if e.Value.(*WaitingState).Height() == height {
+			l.List.Remove(e)
+			break
+		}
+	}
+}
+
+func (l *StatesWaiting) Get(height uint32) *WaitingState {
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		if e.Value.(*WaitingState).Height() == height {
+			return e.Value.(*WaitingState)
+		}
+	}
+	return nil
+}
+
+func (l *StatesWaiting) Len() int {
+	return l.List.Len()
+}
+
+type ReceivedState struct {
+	height uint32
+}
+
+func NewReceivedState(height uint32) *ReceivedState {
+	return new(ReceivedState)
+}
+
+func (s *ReceivedState) Height() uint32 {
+	return s.height
+}
+
+type StatesReceived struct {
+	List *list.List
+	base uint32
+}
+
+func NewStatesReceived() *StatesReceived {
+	l := new(StatesReceived)
+	l.List = list.New()
+	return l
+}
+
+func (l *StatesReceived) Base() uint32 {
+	return l.base
+}
+
+func (l *StatesReceived) SetBase(height uint32) {
+	l.base = height
+
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		switch v := e.Value.(*ReceivedState).Height(); {
+		case v < height:
+			l.List.Remove(e)
+		case v == height:
+			break
+		case v > height:
+			l.List.PushFront(height)
+			break
+		}
+	}
+}
+
+func (l *StatesReceived) Last() uint32 {
+	s := l.List.Back()
+	if s == nil {
+		return 0
+	}
+	return s.Value.(*ReceivedState).Height()
+}
+
+// Add adds a new recieved state to the list.
+func (l *StatesReceived) Add(height uint32) {
+	for e := l.List.Back(); e != nil; e = e.Prev() {
+		s := e.Value.(*ReceivedState)
+		if height > s.Height() {
+			l.List.InsertAfter(NewReceivedState(height), e)
+			return
+		} else if height == s.Height() {
+			return
+		}
+	}
+	l.List.PushFront(NewReceivedState(height))
+}
+
+// TODO: We probably don't need Del or Get for StatesReceived
+
+func (l *StatesReceived) Del(height uint32) {
+	for e := l.List.Back(); e != nil; e = e.Prev() {
+		if e.Value.(*ReceivedState).Height() == height {
+			l.List.Remove(e)
+			break
+		}
+	}
+}
+
+func (l *StatesReceived) Get(height uint32) *ReceivedState {
+	for e := l.List.Back(); e != nil; e = e.Prev() {
+		if e.Value.(*ReceivedState).Height() == height {
+			return e.Value.(*ReceivedState)
+		}
+	}
+	return nil
 }
