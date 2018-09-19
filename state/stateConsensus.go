@@ -102,13 +102,9 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	switch valid {
 	case 1:
 		// The highest block for which we have received a message.  Sometimes the same as
-<<<<<<<<< Temporary merge branch 1
-		if !msg.IsLocal() && !msg.IsPeer2Peer() {
-			msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
-		}
-=========
-		msg.SendOut(s, msg)
->>>>>>>>> Temporary merge branch 2
+		
+		msg.SendOut(s, msg) // send out messages that are valid and not local or peer to  peer
+		
 
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
