@@ -456,14 +456,22 @@ func (l *StatesWaiting) Len() int {
 
 type ReceivedState struct {
 	height uint32
+	msg    *messages.DBStateMsg
 }
 
-func NewReceivedState(height uint32) *ReceivedState {
-	return new(ReceivedState)
+func NewReceivedState(height uint32, msg *messages.DBStateMsg) *ReceivedState {
+	s := new(ReceivedState)
+	s.height = height
+	s.msg = msg
+	return s
 }
 
 func (s *ReceivedState) Height() uint32 {
 	return s.height
+}
+
+func (s *ReceivedState) Message() *messages.DBStateMsg {
+	return s.msg
 }
 
 type StatesReceived struct {
@@ -506,17 +514,17 @@ func (l *StatesReceived) Last() uint32 {
 }
 
 // Add adds a new recieved state to the list.
-func (l *StatesReceived) Add(height uint32) {
+func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		s := e.Value.(*ReceivedState)
 		if height > s.Height() {
-			l.List.InsertAfter(NewReceivedState(height), e)
+			l.List.InsertAfter(NewReceivedState(height, msg), e)
 			return
 		} else if height == s.Height() {
 			return
 		}
 	}
-	l.List.PushFront(NewReceivedState(height))
+	l.List.PushFront(NewReceivedState(height, msg))
 }
 
 // TODO: We probably don't need Del or Get for StatesReceived

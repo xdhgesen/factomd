@@ -233,16 +233,19 @@ func (s *State) Process() (progress bool) {
 	/** Process all the DBStates  that might be pending **/
 
 	for {
-		ix := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase + 1
-		if ix < 0 || ix >= len(s.DBStatesReceived) {
+		recieved := func() *ReceivedState {
+			r := s.StatesReceived.List.Front()
+			if r == nil {
+				return nil
+			}
+			return r.Value.(*ReceivedState)
+		}()
+		if recieved == nil {
 			break
 		}
-		msg := s.DBStatesReceived[ix]
-		if msg == nil {
-			break
-		}
-		process = append(process, msg)
-		s.DBStatesReceived[ix] = nil
+
+		process = append(process, recieved.Message())
+		s.StatesReceived.Del(recieved.Height())
 	}
 
 	preAckLoopTime := time.Now()
@@ -722,26 +725,12 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	switch pdbstate.ValidNext(s, dbstatemsg) {
 	case 0:
-		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
-
-		// Don't add duplicate dbstate messages.
-		if s.DBStatesReceivedBase < int(s.GetHighestSavedBlk()) {
-			cut := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase
-			if len(s.DBStatesReceived) > cut {
-				s.DBStatesReceived = append(make([]*messages.DBStateMsg, 0), s.DBStatesReceived[cut:]...)
-			}
-			s.DBStatesReceivedBase += cut
-		}
-		ix := int(dbheight) - s.DBStatesReceivedBase
-		if ix < 0 {
+		if dbheight < s.StatesReceived.Base() {
 			// If we are missing entries at this DBState, we can apply the entries only
 			s.ExecuteEntriesInDBState(dbstatemsg)
 			return
 		}
-		for len(s.DBStatesReceived) <= ix {
-			s.DBStatesReceived = append(s.DBStatesReceived, nil)
-		}
-		s.DBStatesReceived[ix] = dbstatemsg
+		s.StatesReceived.Add(dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight(), dbstatemsg)
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))

@@ -76,8 +76,6 @@ type State struct {
 	LogBits int64 // Bit zero is for logging the Directory Block on DBSig [5]
 
 	DBStatesSent            []*interfaces.DBStateSent
-	DBStatesReceivedBase    int
-	DBStatesReceived        []*messages.DBStateMsg
 	LocalServerPrivKey      string
 	DirectoryBlockInSeconds int
 	PortNumber              int
