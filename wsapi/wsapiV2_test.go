@@ -25,16 +25,20 @@ func TestRegisterPrometheus(t *testing.T) {
 
 var s *state.State
 var blocks []*testHelper.BlockSet
+var done bool
 
-func init() {
-	s = testHelper.CreateAndPopulateTestState()
-	blocks = testHelper.CreateFullTestBlockSet()
-	Start(s)
+func initfortest() {
+	if !done {
+		s = testHelper.CreateAndPopulateTestState()
+		blocks = testHelper.CreateFullTestBlockSet()
+		Start(s)
+		done = true
+	}
 }
 
 // Test disabled because of circleCI issues with it.
 func TestHandleV2GetRaw(t *testing.T) {
-
+	initfortest()
 	type RawData struct {
 		Hash1 string
 		Hash2 string
@@ -163,6 +167,7 @@ func v2Request(req *primitives.JSON2Request) (*primitives.JSON2Response, error) 
 }
 
 func TestHandleV2CommitEntry(t *testing.T) {
+	initfortest()
 	msg := new(MessageRequest)
 	// Can replace with any Entry message
 	msg.Message = "00015507C1024BF5C956749FC3EBA4ACC60FD485FB100E601070A44FCCE54FF358D60669854734013B6A27BCCEB6A42D62A3A8D02A6F0D73653215771DE243A63AC048A18B59DA29F4CBD953E6EBE684D693FDCA270CE231783E8ECC62D630F983CD59E559C6253F84D1F54C8E8D8665D493F7B4A4C1864751E3CDEC885A64C2144E0938BF648A00"
@@ -184,6 +189,7 @@ func TestHandleV2CommitEntry(t *testing.T) {
 }
 
 func TestV2HandleEntryCreditBalance(t *testing.T) {
+	initfortest()
 	eckey := testHelper.NewECAddressPublicKeyString(0)
 	req := new(AddressRequest)
 	req.Address = eckey
@@ -214,6 +220,7 @@ func TestV2HandleEntryCreditBalance(t *testing.T) {
 }
 
 func TestV2HandleFactoidBalance(t *testing.T) {
+	initfortest()
 	//state := testHelper.CreateAndPopulateTestState()
 	eckey := testHelper.NewFactoidRCDAddressString(0)
 	req := new(AddressRequest)
@@ -232,6 +239,7 @@ func TestV2HandleFactoidBalance(t *testing.T) {
 }
 
 func TestHandleV2CommitChain(t *testing.T) {
+	initfortest()
 	msg := new(MessageRequest)
 	// Can replace with any Chain message
 	msg.Message = "00015507b2f70bd0165d9fa19a28cfaafb6bc82f538955a98c7b7e60d79fbf92655c1bff1c76466cb3bc3f3cc68d8b2c111f4f24c88d9c031b4124395c940e5e2c5ea496e8aaa2f5c956749fc3eba4acc60fd485fb100e601070a44fcce54ff358d606698547340b3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da2946c901273e616bdbb166c535b26d0d446bc69b22c887c534297c7d01b2ac120237086112b5ef34fc6474e5e941d60aa054b465d4d770d7f850169170ef39150b"
@@ -253,6 +261,7 @@ func TestHandleV2CommitChain(t *testing.T) {
 }
 
 func TestHandleV2GetReceipt(t *testing.T) {
+	initfortest()
 	state := testHelper.CreateAndPopulateTestState()
 	//Start(state)
 
@@ -281,6 +290,7 @@ func TestHandleV2GetReceipt(t *testing.T) {
 }
 
 func TestHandleV2GetTranasction(t *testing.T) {
+	initfortest()
 	state := testHelper.CreateAndPopulateTestState()
 	blocks := testHelper.CreateFullTestBlockSet()
 
