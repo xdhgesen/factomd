@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -35,6 +36,15 @@ var Servers map[int]*web.Server
 var ServersMutex sync.Mutex
 
 func Start(state interfaces.IState) {
+	fmt.Println("Check for port conflict")
+	out, err := exec.Command("bash", "-c", fmt.Sprintf("lsof -i :%d", state.GetPort())).Output()
+	if err != nil {
+		fmt.Println("error occured")
+		fmt.Printf("%s\n", err.Error())
+	}
+	fmt.Printf("%s", string(out))
+	fmt.Println("done checking for port conflict")
+
 	RegisterPrometheus()
 	var server *web.Server
 
@@ -113,6 +123,7 @@ func Start(state interfaces.IState) {
 
 		} else {
 			log.Print("Starting API server")
+
 			go server.Run(fmt.Sprintf(":%d", state.GetPort()))
 		}
 	}
