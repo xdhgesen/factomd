@@ -244,7 +244,7 @@ import (
 // 	}
 // }
 
-func (list *DBStateList) NewCatchup3() {
+func (list *DBStateList) Catchup() {
 	missing := list.State.StatesMissing
 	waiting := list.State.StatesWaiting
 	recieved := list.State.StatesReceived
