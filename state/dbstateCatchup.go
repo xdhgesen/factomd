@@ -285,7 +285,7 @@ func (list *DBStateList) Catchup() {
 	}
 
 	// add all known states after the last recieved to the missing list
-	for i := recieved.Last(); i < hk; i++ {
+	for i := recieved.LastHeight(); i < hk; i++ {
 		if waiting.Get(i) == nil {
 			missing.Add(i)
 		}
@@ -458,11 +458,13 @@ func (l *StatesWaiting) Len() int {
 	return l.List.Len()
 }
 
+// ReceivedState represents a DBStateMsg received from the network
 type ReceivedState struct {
 	height uint32
 	msg    *messages.DBStateMsg
 }
 
+// NewReceivedState creates a new member for the StatesReceived list
 func NewReceivedState(height uint32, msg *messages.DBStateMsg) *ReceivedState {
 	s := new(ReceivedState)
 	s.height = height
@@ -470,14 +472,18 @@ func NewReceivedState(height uint32, msg *messages.DBStateMsg) *ReceivedState {
 	return s
 }
 
+// Height returns the block height of the received state
 func (s *ReceivedState) Height() uint32 {
 	return s.height
 }
 
+// Message returns the DBStateMsg received from the network.
 func (s *ReceivedState) Message() *messages.DBStateMsg {
 	return s.msg
 }
 
+// StatesReceived is the list of DBStates recieved from the network. "base"
+// represents the height of known saved states.
 type StatesReceived struct {
 	List *list.List
 	base uint32
@@ -489,6 +495,7 @@ func NewStatesReceived() *StatesReceived {
 	return l
 }
 
+// Base returns the base height of the StatesReceived list
 func (l *StatesReceived) Base() uint32 {
 	return l.base
 }
@@ -509,7 +516,8 @@ func (l *StatesReceived) SetBase(height uint32) {
 	}
 }
 
-func (l *StatesReceived) Last() uint32 {
+// LastHeight returns the height of the last member in StatesReceived
+func (l *StatesReceived) LastHeight() uint32 {
 	s := l.List.Back()
 	if s == nil {
 		return 0
@@ -531,6 +539,7 @@ func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
 	l.List.PushFront(NewReceivedState(height, msg))
 }
 
+// Del removes a state from the StatesReceived list
 func (l *StatesReceived) Del(height uint32) {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		if e.Value.(*ReceivedState).Height() == height {
@@ -540,6 +549,7 @@ func (l *StatesReceived) Del(height uint32) {
 	}
 }
 
+// Get returns a member from the StatesReceived list
 func (l *StatesReceived) Get(height uint32) *ReceivedState {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		if e.Value.(*ReceivedState).Height() == height {
