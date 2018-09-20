@@ -232,15 +232,11 @@ func (s *State) Process() (progress bool) {
 
 	/** Process all the DBStates  that might be pending **/
 
-	for {
-		r := s.StatesReceived.List.Front()
-		if r == nil {
-			break
-		}
+	for r := s.StatesReceived.List.Front(); r != nil; r = r.Next() {
 		recieved := r.Value.(*ReceivedState)
 
 		process = append(process, recieved.Message())
-		s.StatesReceived.Del(recieved.Height())
+		// s.StatesReceived.Del(recieved.Height())
 	}
 
 	preAckLoopTime := time.Now()
@@ -726,6 +722,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			return
 		}
 		height := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
+		s.StatesMissing.Del(height)
 		s.StatesWaiting.Del(height)
 		s.StatesReceived.Add(height, dbstatemsg)
 		return

@@ -2,7 +2,6 @@ package state
 
 import (
 	"container/list"
-	"fmt"
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages"
@@ -264,11 +263,12 @@ func (list *DBStateList) Catchup() {
 	}
 
 	// remove any states from the missing list that we know have been saved
-	for e := missing.List.Front(); e != nil; e = e.Next() {
-		s := e.Value.(*MissingState)
-		if s.Height() < recieved.Base() {
+	for s := missing.GetNext(); s != nil; s = missing.GetNext() {
+		if s.Height() <= recieved.Base() {
 			missing.Del(s.Height())
 			waiting.Del(s.Height())
+		} else {
+			break
 		}
 	}
 
@@ -277,14 +277,18 @@ func (list *DBStateList) Catchup() {
 		i := e.Value.(*ReceivedState).Height() + 1
 		if e.Next() != nil {
 			for i < e.Next().Value.(*ReceivedState).Height() {
-				missing.Add(i)
+				if waiting.Get(i) == nil {
+					missing.Add(i)
+				}
 			}
 		}
 	}
 
 	// add all known states after the last recieved to the missing list
 	for i := recieved.Last(); i < hk; i++ {
-		missing.Add(i)
+		if waiting.Get(i) == nil {
+			missing.Add(i)
+		}
 	}
 
 	// TODO: requestTimeout and requestLimit should be a global config variables
@@ -308,14 +312,14 @@ func (list *DBStateList) Catchup() {
 		if waiting.Len() >= requestLimit {
 			break
 		}
-		missing.Del(s.Height())
-		waiting.Add(s.Height())
 
-		fmt.Println("DEBUG: requesting state ", s.Height())
 		msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
 		if msg != nil {
 			msg.SendOut(list.State, msg)
 		}
+
+		missing.Del(s.Height())
+		waiting.Add(s.Height())
 	}
 }
 
@@ -442,8 +446,9 @@ func (l *StatesWaiting) Del(height uint32) {
 
 func (l *StatesWaiting) Get(height uint32) *WaitingState {
 	for e := l.List.Front(); e != nil; e = e.Next() {
-		if e.Value.(*WaitingState).Height() == height {
-			return e.Value.(*WaitingState)
+		s := e.Value.(*WaitingState)
+		if s.Height() == height {
+			return s
 		}
 	}
 	return nil
@@ -514,7 +519,6 @@ func (l *StatesReceived) Last() uint32 {
 
 // Add adds a new recieved state to the list.
 func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
-	fmt.Println("DEBUG: received state ", height)
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		s := e.Value.(*ReceivedState)
 		if height > s.Height() {
@@ -526,8 +530,6 @@ func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
 	}
 	l.List.PushFront(NewReceivedState(height, msg))
 }
-
-// TODO: We probably don't need Del or Get for StatesReceived
 
 func (l *StatesReceived) Del(height uint32) {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
