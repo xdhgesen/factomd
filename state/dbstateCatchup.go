@@ -268,6 +268,7 @@ func (list *DBStateList) Catchup() {
 		s := e.Value.(*MissingState)
 		if s.Height() < recieved.Base() {
 			missing.Del(s.Height())
+			waiting.Del(s.Height())
 		}
 	}
 
@@ -286,8 +287,9 @@ func (list *DBStateList) Catchup() {
 		missing.Add(i)
 	}
 
-	// TODO: requestTimeout should be a global config variable
+	// TODO: requestTimeout and requestLimit should be a global config variables
 	requestTimeout := 1 * time.Minute
+	requestLimit := 20
 
 	// check the waiting list and move any requests that have timed out back
 	// into the missing list.
@@ -300,9 +302,8 @@ func (list *DBStateList) Catchup() {
 	}
 
 	// request missing states
-	// TODO: requestLimit should be a global config variable
-	requestLimit := 20
-
+	// TODO: parallelize by blocking until the number of waiting states goes
+	// down then continue
 	for s := missing.GetNext(); s != nil; s = missing.GetNext() {
 		if waiting.Len() >= requestLimit {
 			break
@@ -316,19 +317,6 @@ func (list *DBStateList) Catchup() {
 			msg.SendOut(list.State, msg)
 		}
 	}
-	// Request sends a Missing State Message to the network.
-	// func (s *MissingState) Request(list *DBStateList) {
-	// 	s.ResetRequestAge()
-	// 	s.SetStatus(stateWaiting)
-	//
-	// 	msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
-	// 	if msg == nil {
-	// 		return
-	// 	}
-	// 	msg.SendOut(list.State, msg)
-	// 	list.State.DBStateAskCnt++
-	// }
-
 }
 
 // MissingState is information about a DBState that is known to exist but is not

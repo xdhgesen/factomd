@@ -233,19 +233,13 @@ func (s *State) Process() (progress bool) {
 	/** Process all the DBStates  that might be pending **/
 
 	for {
-		recieved := func() *ReceivedState {
-			r := s.StatesReceived.List.Front()
-			if r == nil {
-				return nil
-			}
-			return r.Value.(*ReceivedState)
-		}()
-		if recieved == nil {
+		r := s.StatesReceived.List.Front()
+		if r == nil {
 			break
 		}
+		recieved := r.Value.(*ReceivedState)
 
 		process = append(process, recieved.Message())
-		s.StatesWaiting.Del(recieved.Height())
 		s.StatesReceived.Del(recieved.Height())
 	}
 
@@ -731,7 +725,9 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			s.ExecuteEntriesInDBState(dbstatemsg)
 			return
 		}
-		s.StatesReceived.Add(dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight(), dbstatemsg)
+		height := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
+		s.StatesWaiting.Del(height)
+		s.StatesReceived.Add(height, dbstatemsg)
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
