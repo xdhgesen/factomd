@@ -1530,12 +1530,14 @@ func TestDBStateCatchup(t *testing.T) {
 	StatusEveryMinute(state0)
 	state1 := GetFnodes()[1].State
 
+	// disconnect follower
 	runCmd("1")
 	runCmd("x")
-	WaitBlocks(state0, 4) // wait till the victim is back as the audit server
+	// wait for 4 blocks then re-connect follower
+	WaitBlocks(state0, 4)
 	runCmd("x")
 
-	WaitForBlock(state1, 9) // wait till the victim is back as the audit server
+	WaitForBlock(state1, 9)
 
 	t.Log("Shutting down the network")
 	for _, fn := range GetFnodes() {
