@@ -2,6 +2,7 @@ package state
 
 import (
 	"container/list"
+	"fmt"
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages"
@@ -298,30 +299,57 @@ func (list *DBStateList) Catchup() {
 
 	// check the waiting list and move any requests that have timed out back
 	// into the missing list.
-	for e := waiting.List.Front(); e != nil; e = e.Next() {
-		s := e.Value.(*WaitingState)
-		if s.RequestAge() > requestTimeout {
-			waiting.Del(s.Height())
-			missing.Add(s.Height())
+	go func() {
+		for e := waiting.List.Front(); e != nil; e = e.Next() {
+			s := e.Value.(*WaitingState)
+			if s.RequestAge() > requestTimeout {
+				waiting.Del(s.Height())
+				missing.Notify <- NewMissingState(s.Height())
+			}
 		}
-	}
+	}()
 
-	// request missing states
-	// TODO: parallelize by blocking until the number of waiting states goes
-	// down then continue
-	for s := missing.GetNext(); s != nil; s = missing.GetNext() {
-		if waiting.Len() >= requestLimit {
-			break
+	// manage the state lists
+	go func() {
+		select {
+		case s := <-missing.Notify:
+			if waiting.Get(s.Height()) == nil {
+				missing.Add(s.Height())
+			}
+			if recieved.Get(s.Height()) != nil {
+				fmt.Println("DEBUG: error the \"missing\" state is already in the recieved list ", s.Height())
+			}
+		case s := <-waiting.Notify:
+			if waiting.Get(s.Height()) == nil {
+				waiting.Add(s.Height())
+			}
+			missing.Del(s.Height())
+		case s := <-recieved.Notify:
+			if waiting.Get(s.Height()) == nil {
+				waiting.Del(s.Height())
+				recieved.Add(s.Height(), s.Message())
+			} else {
+				fmt.Println("DEBUG: error a state was recieved that was not in the waiting list: ", s.Height())
+			}
 		}
+	}()
 
-		msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
-		if msg != nil {
-			msg.SendOut(list.State, msg)
+	// request missing states from the network
+	go func() {
+		for waiting.Len() < requestLimit {
+			s := missing.GetNext()
+			if s != nil {
+				msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
+				if msg != nil {
+					msg.SendOut(list.State, msg)
+				}
+
+				waiting.Notify <- NewWaitingState(s.Height())
+			} else {
+				time.Sleep(10 * time.Second)
+			}
 		}
-
-		missing.Del(s.Height())
-		waiting.Add(s.Height())
-	}
+	}()
 }
 
 // MissingState is information about a DBState that is known to exist but is not
@@ -442,9 +470,9 @@ func (l *StatesWaiting) Add(height uint32) {
 
 func (l *StatesWaiting) Del(height uint32) {
 	for e := l.List.Front(); e != nil; e = e.Next() {
-		if e.Value.(*WaitingState).Height() == height {
+		s := e.Value.(*WaitingState)
+		if s.Height() == height {
 			l.List.Remove(e)
-			break
 		}
 	}
 }

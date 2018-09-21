@@ -722,9 +722,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			return
 		}
 		height := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
-		s.StatesMissing.Del(height)
-		s.StatesWaiting.Del(height)
-		s.StatesReceived.Add(height, dbstatemsg)
+		s.StatesReceived.Notify <- NewReceivedState(height, dbstatemsg)
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
