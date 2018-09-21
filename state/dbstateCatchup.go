@@ -254,6 +254,7 @@ func (list *DBStateList) Catchup() {
 	// Get information about the known block height
 	hs := list.State.GetHighestSavedBlk()
 	hk := list.State.GetHighestAck()
+	// TODO: find out the significance of highest ack + 2
 	if list.State.GetHighestKnownBlock() > hk+2 {
 		hk = list.State.GetHighestKnownBlock()
 	}
@@ -285,7 +286,7 @@ func (list *DBStateList) Catchup() {
 	}
 
 	// add all known states after the last recieved to the missing list
-	for i := recieved.LastHeight(); i < hk; i++ {
+	for i := recieved.HeighestRecieved(); i < hk; i++ {
 		if waiting.Get(i) == nil {
 			missing.Add(i)
 		}
@@ -345,13 +346,15 @@ func (s *MissingState) Height() uint32 {
 // replace the iteration with binary search
 
 type StatesMissing struct {
-	List *list.List
+	List   *list.List
+	Notify chan *MissingState
 }
 
 // NewStatesMissing creates a new list of missing DBStates.
 func NewStatesMissing() *StatesMissing {
 	l := new(StatesMissing)
 	l.List = list.New()
+	l.Notify = make(chan *MissingState)
 	return l
 }
 
@@ -422,12 +425,14 @@ func (s *WaitingState) ResetRequestAge() {
 }
 
 type StatesWaiting struct {
-	List *list.List
+	List   *list.List
+	Notify chan *WaitingState
 }
 
 func NewStatesWaiting() *StatesWaiting {
 	l := new(StatesWaiting)
 	l.List = list.New()
+	l.Notify = make(chan *WaitingState)
 	return l
 }
 
@@ -485,13 +490,15 @@ func (s *ReceivedState) Message() *messages.DBStateMsg {
 // StatesReceived is the list of DBStates recieved from the network. "base"
 // represents the height of known saved states.
 type StatesReceived struct {
-	List *list.List
-	base uint32
+	List   *list.List
+	Notify chan *ReceivedState
+	base   uint32
 }
 
 func NewStatesReceived() *StatesReceived {
 	l := new(StatesReceived)
 	l.List = list.New()
+	l.Notify = make(chan *ReceivedState)
 	return l
 }
 
@@ -505,24 +512,28 @@ func (l *StatesReceived) SetBase(height uint32) {
 
 	for e := l.List.Front(); e != nil; e = e.Next() {
 		switch v := e.Value.(*ReceivedState).Height(); {
-		case v < height:
+		case v < l.base:
 			l.List.Remove(e)
-		case v == height:
+		case v == l.base:
+			l.List.Remove(e)
 			break
-		case v > height:
-			l.List.PushFront(height)
+		case v > l.base:
 			break
 		}
 	}
 }
 
-// LastHeight returns the height of the last member in StatesReceived
-func (l *StatesReceived) LastHeight() uint32 {
+// HeighestRecieved returns the height of the last member in StatesReceived
+func (l *StatesReceived) HeighestRecieved() uint32 {
+	height := uint32(0)
 	s := l.List.Back()
-	if s == nil {
-		return 0
+	if s != nil {
+		height = s.Value.(*ReceivedState).Height()
 	}
-	return s.Value.(*ReceivedState).Height()
+	if l.Base() > height {
+		return l.Base()
+	}
+	return height
 }
 
 // Add adds a new recieved state to the list.

@@ -136,7 +136,6 @@ func (state *State) ValidatorLoop() {
 
 			}
 		}
-
 	}
 }
 
