@@ -244,7 +244,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	go StartProfiler(p.MemProfileRate, p.ExposeProfiling)
 
 	s.AddPrefix(p.Prefix)
-	s.SetOut(false)
+	s.SetOut(true)
 	s.Init()
 	s.SetDropRate(p.DropRate)
 

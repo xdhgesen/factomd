@@ -2257,7 +2257,7 @@ func (s *State) GetHighestKnownBlock() uint32 {
 }
 
 // GetF()
-// If rt == true, read the Temp balances.  Otherwise read the Permenent balances.
+// If rt == true, read the Temp balances.  Otherwise read the Permanent balances.
 // concurrency safe to call
 func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 	ok := false

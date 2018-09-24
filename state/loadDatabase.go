@@ -32,8 +32,8 @@ func LoadDatabase(s *State) {
 	// prevent MMR processing from happening for blocks being loaded from the database
 	s.DBHeightAtBoot = blkCnt
 
-	last := time.Now()
-
+	first := time.Now()
+	last := first
 	//msg, err := s.LoadDBState(blkCnt)
 	start := s.GetDBHeightComplete()
 	if start > 10 {
@@ -43,7 +43,7 @@ func LoadDatabase(s *State) {
 	for i := int(start); i <= int(blkCnt); i++ {
 		if i > 0 && i%1000 == 0 {
 			bps := float64(1000) / time.Since(last).Seconds()
-			os.Stderr.WriteString(fmt.Sprintf("%20s Loading Block %7d / %v. Blocks per second %8.2f\n", s.FactomNodeName, i, blkCnt, bps))
+			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f %v remaining %v\n", s.FactomNodeName, i, blkCnt, bps, last.Sub(first), last.Add(time.Duration((float64(blkCnt)-float64(i))*bps)*time.Second))
 			last = time.Now()
 		}
 

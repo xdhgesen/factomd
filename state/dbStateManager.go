@@ -8,15 +8,17 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
-	// "github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/factoid"
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -1097,8 +1099,15 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	// Saving our state so we can reset it if we need to.
 	d.TmpSaveStruct = SaveFactomdState(list.State, d)
-	list.State.Balancehash = fs.GetBalanceHash(false)
 
+	// Writing the DBState to a debug file allows for later analyzing the last block not saved to the database.
+	// Do not do this while loading from disk, as those blocks are already saved
+	if list.State.DBFinished && globals.Params.WriteProcessedDBStates {
+		list.WriteDBStateToDebugFile(d)
+	}
+
+	list.State.Balancehash = fs.GetBalanceHash(false)
+	list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x")
 	return
 }
 
@@ -1139,6 +1148,55 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 }
 
 var nowish int64 = time.Now().Unix()
+
+// WriteDBStateToDebugFile will write the marshaled dbstate to a file alongside the database.
+// This can be written on the processblocks, so in the event the block does not get written to disk
+// in the event of a stall, the dbstate can be analyzed. The written dbstate does NOT include entries.
+func (list *DBStateList) WriteDBStateToDebugFile(d *DBState) {
+	// Because DBStates include the Savestate, we cannot marshal it, as the savestate is not set
+	// So change it to a full block
+
+	f := NewWholeBlock()
+	f.DBlock = d.DirectoryBlock
+	f.ABlock = d.AdminBlock
+	f.FBlock = d.FactoidBlock
+	f.ECBlock = d.EntryCreditBlock
+	f.EBlocks = d.EntryBlocks
+
+	data, err := f.MarshalBinary()
+	if err != nil {
+		fmt.Printf("An error has occurred while writing the DBState to disk: %s\n", err.Error())
+		return
+	}
+
+	filename := fmt.Sprintf("processed_dbstate_%d.block", d.DirectoryBlock.GetDatabaseHeight()%10)
+	path := filepath.Join(list.State.LdbPath, list.State.Network, "dbstates", filename)
+
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+	if err != nil {
+		fmt.Printf("An error has occurred while writing the DBState to disk: %s\n", err.Error())
+		return
+	}
+
+	file.Write(data)
+	file.Close()
+}
+
+func ReadDBStateFromDebugFile(filename string) (*WholeBlock, error) {
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0777)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
+	wb := NewWholeBlock()
+	err = wb.UnmarshalBinary(data)
+	return wb, err
+}
 
 func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	dbheight := int(d.DirectoryBlock.GetHeader().GetDBHeight())
@@ -1240,7 +1298,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				allowedEntries[e.Fixed()] = struct{}{}
 			}
 		} else {
-			list.State.Logf("error", "Error putting entries in allowedmap, as Eblock is not in Dblock")
+			list.State.LogPrintf("dbstateprocess", "Error putting entries in allowedmap, as Eblock is not in Dblock")
 		}
 	}
 
@@ -1256,7 +1314,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				panic(err.Error())
 			}
 		} else {
-			list.State.Logf("error", "Error saving eblock from dbstate, eblock not allowed")
+			list.State.LogPrintf("dbstateprocess", "Error saving eblock from dbstate, eblock not allowed")
 		}
 	}
 	for _, e := range d.Entries {
@@ -1266,7 +1324,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				panic(err.Error())
 			}
 		} else {
-			list.State.Logf("error", "Error saving entry from dbstate, entry not allowed")
+			list.State.LogPrintf("dbstateprocess", "Error saving entry from dbstate, entry not allowed")
 		}
 	}
 	list.State.NumEntries += len(d.Entries)
@@ -1290,11 +1348,11 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 							panic(err.Error())
 						}
 					} else {
-						list.State.Logf("error", "Error saving entry from process list, entry not allowed")
+						list.State.LogPrintf("dbstateprocess", "Error saving entry from process list, entry not allowed")
 					}
 				}
 			} else {
-				list.State.Logf("error", "Error saving eblock from process list, eblock not allowed")
+				list.State.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
 			}
 		}
 		pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
@@ -1317,12 +1375,12 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		good := true
 		mr, err := list.State.DB.FetchDBKeyMRByHeight(uint32(dbheight))
 		if err != nil {
-			os.Stderr.WriteString(err.Error() + "\n")
+			list.State.LogPrintf("dbstateprocess", err.Error())
 			return
 			panic(fmt.Sprintf("%20s At Directory Block Height %d", list.State.FactomNodeName, dbheight))
 		}
 		if mr == nil {
-			os.Stderr.WriteString(fmt.Sprintf("There is no mr returned by list.State.DB.FetchDBKeyMRByHeight() at %d\n", dbheight))
+			list.State.LogPrintf("dbstateprocess", "There is no mr returned by list.State.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
 			mr = d.DirectoryBlock.GetKeyMR()
 			good = false
 		}
@@ -1330,15 +1388,15 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		td, err := list.State.DB.FetchDBlock(mr)
 		if err != nil || td == nil {
 			if err != nil {
-				os.Stderr.WriteString(err.Error() + "\n")
+				list.State.LogPrintf("dbstateprocess", err.Error())
 			} else {
-				os.Stderr.WriteString(fmt.Sprintf("Could not get directory block by primary key at Block Height %d\n", dbheight))
+				list.State.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
 			}
 			return
 			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", list.State.FactomNodeName, dbheight))
 		}
 		if td.GetKeyMR().Fixed() != mr.Fixed() {
-			os.Stderr.WriteString(fmt.Sprintf("Key MR is wrong at Directory Block Height %d\n", dbheight))
+			list.State.LogPrintf("dbsatesprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
 			return
 			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", list.State.FactomNodeName, dbheight))
 		}
