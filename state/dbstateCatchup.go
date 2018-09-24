@@ -339,7 +339,11 @@ func (list *DBStateList) Catchup() {
 
 	// request missing states from the network
 	go func() {
-		for waiting.Len() < requestLimit {
+		for {
+			for waiting.Len() >= requestLimit {
+				time.Sleep(5 * time.Second)
+			}
+
 			s := missing.GetNext()
 			if s != nil && waiting.Get(s.Height()) == nil {
 				fmt.Println("DEBUG: requesting state ", s.Height())
@@ -349,12 +353,27 @@ func (list *DBStateList) Catchup() {
 				}
 
 				waiting.Notify <- NewWaitingState(s.Height())
-			} else {
-				// TODO: do something more smart like waiting on the list to change.
-				time.Sleep(10 * time.Second)
 			}
 		}
 	}()
+
+	// go func() {
+	// 	for waiting.Len() < requestLimit {
+	// 		s := missing.GetNext()
+	// 		if s != nil && waiting.Get(s.Height()) == nil {
+	// 			fmt.Println("DEBUG: requesting state ", s.Height())
+	// 			msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
+	// 			if msg != nil {
+	// 				msg.SendOut(list.State, msg)
+	// 			}
+	//
+	// 			waiting.Notify <- NewWaitingState(s.Height())
+	// 		} else {
+	// 			// TODO: do something more smart like waiting on the list to change.
+	// 			time.Sleep(10 * time.Second)
+	// 		}
+	// 	}
+	// }()
 }
 
 // MissingState is information about a DBState that is known to exist but is not
