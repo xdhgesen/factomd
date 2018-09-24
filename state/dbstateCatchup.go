@@ -313,15 +313,18 @@ func (list *DBStateList) Catchup() {
 	go func() {
 		select {
 		case s := <-missing.Notify:
-			if waiting.Get(s.Height()) == nil {
-				missing.Add(s.Height())
-			}
 			if recieved.Get(s.Height()) != nil {
 				fmt.Println("DEBUG: error the \"missing\" state is already in the recieved list ", s.Height())
+				break
+			}
+			if waiting.Get(s.Height()) == nil {
+				missing.Add(s.Height())
 			}
 		case s := <-waiting.Notify:
 			if waiting.Get(s.Height()) == nil {
 				waiting.Add(s.Height())
+			} else {
+				fmt.Println("DEBUG: recieved waiting state already in list ", s.Height())
 			}
 			missing.Del(s.Height())
 		case s := <-recieved.Notify:
@@ -338,7 +341,8 @@ func (list *DBStateList) Catchup() {
 	go func() {
 		for waiting.Len() < requestLimit {
 			s := missing.GetNext()
-			if s != nil {
+			if s != nil && waiting.Get(s.Height()) == nil {
+				fmt.Println("DEBUG: requesting state ", s.Height())
 				msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
 				if msg != nil {
 					msg.SendOut(list.State, msg)
@@ -346,6 +350,7 @@ func (list *DBStateList) Catchup() {
 
 				waiting.Notify <- NewWaitingState(s.Height())
 			} else {
+				// TODO: do something more smart like waiting on the list to change.
 				time.Sleep(10 * time.Second)
 			}
 		}
