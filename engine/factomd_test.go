@@ -298,7 +298,7 @@ func WaitForBlock(s *state.State, newBlock int) {
 	fmt.Printf("WaitForBlocks(%d)\n", newBlock)
 	TimeNow(s)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-	for i := int(s.LLeaderHeight); i < newBlock; i++ {
+	for i := int(s.LLeaderHeight) + 1; i <= newBlock; i++ {
 		for int(s.LLeaderHeight) < i {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
@@ -1563,17 +1563,17 @@ func TestFactoidDBState(t *testing.T) {
 	activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"] = 22
 
 	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 20, 0, 0, t)
-	state3 := GetFnodes()[2].State
-	WaitBlocks(state3, 1)
+	//	state3 := GetFnodes()[2].State
 
+	WaitForBlock(state0, 5)
 	WaitForMinute(state0, 0)
 	go func() {
-		for i := 0; i <= 12; i++ {
+		for i := 0; i <= 32; i++ {
 			FundWallet(state0, 10000)
+			WaitMinutes(state0, 1)
 		}
 	}()
 
-	WaitMinutes(state0, 1)
 	runCmd("2")
 	runCmd("x")
 	WaitBlocks(state0, 1)

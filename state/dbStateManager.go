@@ -1428,7 +1428,9 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if list.State.StateSaverStruct.FastBoot {
 		d.SaveStruct = d.TmpSaveStruct
 		err := list.State.StateSaverStruct.SaveDBStateList(list.State.DBStates, list.State.Network)
-		list.State.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
+		if err != nil {
+			list.State.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
+		}
 	}
 
 	return
