@@ -1539,7 +1539,7 @@ func TestFail(t *testing.T) {
 	ranSimTest = true
 	t.Fatal("Failed")
 
-}
+} // test
 
 func TestRandom(t *testing.T) {
 	if ranSimTest {
