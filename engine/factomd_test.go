@@ -132,7 +132,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	et := elections.FaultTimeout
 	startTime = time.Now()
 	state0 := Factomd(params, false).(*state.State)
-	statusState = state0
+	StatusEveryMinute(state0)
 	Calctime := time.Duration(float64((height*blkt)+(electionsCnt*et)+(RoundsCnt*roundt))*1.1) * time.Second
 	endtime := time.Now().Add(Calctime)
 	fmt.Println("ENDTIME: ", endtime)
@@ -281,11 +281,11 @@ func StatusEveryMinute(s *state.State) {
 
 // Wait so many blocks
 func WaitBlocks(s *state.State, blks int) {
-	fmt.Printf("WaitBlocks(%d)\n", blks)
-	TimeNow(s)
+	fmt.Printf("WaitBlocks(%d) ", blks)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	newBlock := int(s.LLeaderHeight) + blks
-	for i := int(s.LLeaderHeight); i < newBlock; i++ {
+	for i := int(s.LLeaderHeight + 1); i <= newBlock; i++ {
+		fmt.Printf("%s:%d-:-%d wait for %d-:-0\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute, newBlock)
 		for int(s.LLeaderHeight) < i {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
@@ -1551,4 +1551,35 @@ func TestRandom(t *testing.T) {
 	if random.RandUInt8() > 200 {
 		t.Fatal("Failed")
 	}
+}
+
+func TestFactoidDBState(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+
+	// reach into the activation an hack the TESTNET_COINBASE_PERIOD to be early so I can check it worked.
+	activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"] = 22
+
+	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 20, 0, 0, t)
+	state3 := GetFnodes()[2].State
+	WaitBlocks(state3, 1)
+
+	WaitForMinute(state0, 0)
+	go func() {
+		for i := 0; i <= 12; i++ {
+			FundWallet(state0, 10000)
+		}
+	}()
+
+	WaitMinutes(state0, 1)
+	runCmd("2")
+	runCmd("x")
+	WaitBlocks(state0, 1)
+	runCmd("x")
+	WaitBlocks(state0, 2)
+	WaitForAllNodes(state0)
+	shutDownEverything(t)
+
 }

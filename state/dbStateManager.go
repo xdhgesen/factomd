@@ -1172,7 +1172,9 @@ func (list *DBStateList) WriteDBStateToDebugFile(d *DBState) {
 	filename := fmt.Sprintf("processed_dbstate_%d.block", d.DirectoryBlock.GetDatabaseHeight()%10)
 	path := filepath.Join(list.State.LdbPath, list.State.Network, "dbstates", filename)
 
-	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0777)
+	fmt.Printf("Saving DBH %d to %s\n", list.State.LLeaderHeight, path)
+
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0775)
 	if err != nil {
 		fmt.Printf("An error has occurred while writing the DBState to disk: %s\n", err.Error())
 		return
@@ -1396,7 +1398,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", list.State.FactomNodeName, dbheight))
 		}
 		if td.GetKeyMR().Fixed() != mr.Fixed() {
-			list.State.LogPrintf("dbsatesprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
+			list.State.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
 			return
 			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", list.State.FactomNodeName, dbheight))
 		}
@@ -1426,7 +1428,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if list.State.StateSaverStruct.FastBoot {
 		d.SaveStruct = d.TmpSaveStruct
 		err := list.State.StateSaverStruct.SaveDBStateList(list.State.DBStates, list.State.Network)
-		list.State.LogPrintf("dbsatesprocess", "Error while saving Fastboot %v", err)
+		list.State.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
 	}
 
 	return
