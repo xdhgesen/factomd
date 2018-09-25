@@ -43,8 +43,8 @@ func LoadDatabase(s *State) {
 	for i := int(start); i <= int(blkCnt); i++ {
 		if i > 0 && i%1000 == 0 {
 			bps := float64(1000) / time.Since(last).Seconds()
-			abps := float64(i) / first.Sub(last).Seconds()
-			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f Progress %v remaining %v\n", s.FactomNodeName, i, blkCnt, bps,
+			abps := float64(i) / last.Sub(first).Seconds()
+			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f/%8.2f Progress %v remaining %v\n", s.FactomNodeName, i, blkCnt, bps, abps,
 				last.Sub(first), time.Duration((float64(blkCnt)-float64(i))/abps)*time.Second)
 			last = time.Now()
 		}
