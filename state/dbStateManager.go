@@ -903,16 +903,21 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
 
+	s := list.State
+	s.LogPrintf("dbstateprocess", "ProcessBlock %d", d.DirectoryBlock.GetHeader().GetDBHeight())
+
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
+		s.LogPrintf("dbstateprocess", "Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v)", d.Locked, d.IsNew, d.Repeat)
 		return
 	}
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
 	// go forward.
 	if dbht > 0 && dbht <= list.ProcessHeight {
+		s.LogPrintf("dbstateprocess", "Skipping old ProcessHeight = %d", list.ProcessHeight)
 		progress = true
 		d.Repeat = true
 		return
@@ -920,6 +925,11 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	if dbht > 1 {
 		pd := list.State.DBStates.Get(int(dbht - 1))
+		if pd != nil {
+			s.LogPrintf("dbstateprocess", "Skipping Prev Block Missing")
+		} else if !pd.Saved {
+			s.LogPrintf("dbstateprocess", "Skipping Prev Block not saved")
+		}
 		if pd != nil && !pd.Saved {
 			//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Previous dbstate (%d) not saved", dbht-1))
 			return
@@ -938,6 +948,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	pln := list.State.ProcessLists.Get(ht + 1)
 
 	if pl == nil {
+		s.LogPrintf("dbstateprocess", "Skipping No ProcessList")
 		return
 	}
 
@@ -1106,8 +1117,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		list.WriteDBStateToDebugFile(d)
 	}
 
+	tbh := list.State.FactoidState.GetBalanceHash(true) // recompute temp balance hash here
 	list.State.Balancehash = fs.GetBalanceHash(false)
-	list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x")
+	list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x", dbht, list.State.Balancehash.Bytes()[0:4], tbh.Bytes()[0:4])
 	return
 }
 

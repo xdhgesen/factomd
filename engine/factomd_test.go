@@ -61,6 +61,10 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		"--checkheads":          "false",
 		"--controlpanelsetting": "readwrite",
 		"--debuglog":            ".|faulting|bad",
+		"--logPort":             "37000",
+		"--port":                "37001",
+		"--controlpanelport":    "37002",
+		"--networkport":         "37003",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
@@ -1559,26 +1563,24 @@ func TestFactoidDBState(t *testing.T) {
 	}
 	ranSimTest = true
 
-	// reach into the activation an hack the TESTNET_COINBASE_PERIOD to be early so I can check it worked.
-	activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"] = 22
-
-	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 20, 0, 0, t)
-	//	state3 := GetFnodes()[2].State
-
+	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 120, 0, 0, t)
 	WaitForBlock(state0, 5)
-	WaitForMinute(state0, 0)
+
 	go func() {
-		for i := 0; i <= 32; i++ {
+		for i := 0; i <= 1000; i++ {
 			FundWallet(state0, 10000)
-			WaitMinutes(state0, 1)
+			time.Sleep(time.Duration(random.RandIntBetween(250, 1250)) * time.Millisecond)
 		}
 	}()
 
 	runCmd("2")
-	runCmd("x")
-	WaitBlocks(state0, 1)
-	runCmd("x")
-	WaitBlocks(state0, 2)
+	for i := 0; i < 20; i++ {
+		WaitMinutes(state0, i)
+		runCmd("x")
+		WaitMinutes(state0, 1+i)
+		runCmd("x")
+		WaitBlocks(state0, 2)
+	}
 	WaitForAllNodes(state0)
 	shutDownEverything(t)
 

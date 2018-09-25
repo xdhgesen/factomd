@@ -111,8 +111,12 @@ func (m *Ack) Validate(s interfaces.IState) int {
 	// Only new acks are valid. Of course, the VMIndex has to be valid too.
 	msg, _ := s.GetMsg(m.VMIndex, int(m.DBHeight), int(m.Height))
 	if msg != nil {
-		s.LogMessage("executeMsg", "Ack slot taken", m)
-		s.LogMessage("executeMsg", "found:", msg)
+		if msg == m {
+			s.LogMessage("executeMsg", "Ack slot taken", m)
+			s.LogMessage("executeMsg", "found:", msg)
+		} else {
+			s.LogPrintf("executeMsg", "duplicate at %d/%d/%d", int(m.DBHeight), m.VMIndex, int(m.Height))
+		}
 		return -1
 	}
 
@@ -120,6 +124,7 @@ func (m *Ack) Validate(s interfaces.IState) int {
 		// Check signature
 		bytes, err := m.MarshalForSignature()
 		if err != nil {
+			s.LogPrintf("executeMsg", "Validate Marshal Failed %v", err)
 			//fmt.Println("Err is not nil on Ack sig check: ", err)
 			return -1
 		}
@@ -128,10 +133,12 @@ func (m *Ack) Validate(s interfaces.IState) int {
 
 		//ackSigned, err := m.VerifySignature()
 		if err != nil {
+			s.LogPrintf("executeMsg", "VerifyAuthoritySignature Failed %v", err)
 			//fmt.Println("Err is not nil on Ack sig check: ", err)
 			return -1
 		}
 		if ackSigned <= 0 {
+			s.LogPrintf("executeMsg", "Not signed by a leader %v", err)
 			return -1
 		}
 	}
