@@ -721,8 +721,8 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			s.ExecuteEntriesInDBState(dbstatemsg)
 			return
 		}
-		height := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
-		s.StatesReceived.Notify <- NewReceivedState(height, dbstatemsg)
+		// TODO: move recieved notification to NetworkProcessorNet
+		s.StatesReceived.Notify <- NewReceivedState(dbheight, dbstatemsg)
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
@@ -841,10 +841,6 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	s.Saving = true
 	s.Syncing = false
 
-	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.
-	if s.DBStates.LastEnd < int(dbheight) {
-		s.DBStates.Catchup()
-	}
 	if s.DBStates.LastBegin < int(dbheight)+1 {
 		s.DBStates.LastBegin = int(dbheight)
 	}

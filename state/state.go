@@ -915,6 +915,8 @@ func (s *State) Init() {
 	s.StatesWaiting = NewStatesWaiting()
 	s.StatesReceived = NewStatesReceived()
 
+	go s.DBStates.Catchup()
+
 	switch s.NodeMode {
 	case "FULL":
 		s.Leader = false

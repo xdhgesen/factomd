@@ -250,52 +250,64 @@ func (list *DBStateList) Catchup() {
 	waiting := list.State.StatesWaiting
 	recieved := list.State.StatesReceived
 
-	// Update the list
-
-	// Get information about the known block height
-	hs := list.State.GetHighestSavedBlk()
-	hk := list.State.GetHighestAck()
-	// TODO: find out the significance of highest ack + 2
-	if list.State.GetHighestKnownBlock() > hk+2 {
-		hk = list.State.GetHighestKnownBlock()
-	}
-
-	if recieved.Base() < hs {
-		recieved.SetBase(hs)
-	}
-
-	// remove any states from the missing list that we know have been saved
-	for s := missing.GetNext(); s != nil; s = missing.GetNext() {
-		if s.Height() <= recieved.Base() {
-			missing.Del(s.Height())
-			waiting.Del(s.Height())
-		} else {
-			break
-		}
-	}
-
-	// find gaps in the recieved list
-	for e := recieved.List.Front(); e != nil; e = e.Next() {
-		i := e.Value.(*ReceivedState).Height() + 1
-		if e.Next() != nil {
-			for i < e.Next().Value.(*ReceivedState).Height() {
-				if waiting.Get(i) == nil {
-					missing.Add(i)
-				}
-			}
-		}
-	}
-
-	// add all known states after the last recieved to the missing list
-	for i := recieved.HeighestRecieved(); i < hk; i++ {
-		if waiting.Get(i) == nil {
-			missing.Add(i)
-		}
-	}
-
 	// TODO: requestTimeout and requestLimit should be a global config variables
 	requestTimeout := 1 * time.Minute
 	requestLimit := 20
+
+	// keep the lists up to date with the saved states.
+	go func() {
+		heartbeat := time.Tick(5 * time.Second)
+		for {
+			<-heartbeat
+
+			// Get information about the known block height
+			hs := list.State.GetHighestSavedBlk()
+			hk := list.State.GetHighestAck()
+			// TODO: find out the significance of highest ack + 2
+			if list.State.GetHighestKnownBlock() > hk+2 {
+				hk = list.State.GetHighestKnownBlock()
+			}
+
+			if recieved.Base() < hs {
+				recieved.SetBase(hs)
+			}
+
+			// TODO: removing missing and waiting states could be done in parallel.
+			// remove any states from the missing list that have been saved.
+			for e := missing.List.Front(); e != nil; e = e.Next() {
+				s := e.Value.(*MissingState)
+				if s.Height() <= recieved.Base() {
+					missing.Del(s.Height())
+				}
+			}
+
+			// remove any states from the waiting list that have been saved.
+			for e := waiting.List.Front(); e != nil; e = e.Next() {
+				s := e.Value.(*WaitingState)
+				if s.Height() <= recieved.Base() {
+					waiting.Del(s.Height())
+				}
+			}
+
+			// find gaps in the recieved list
+			for e := recieved.List.Front(); e != nil; e = e.Next() {
+				// if the height of the next recieved state is not equal to the
+				// height of the current recieved state plus one then there is a
+				// gap in the recieved state list.
+				n := e.Value.(*ReceivedState).Height()
+				if e.Next() != nil {
+					for n+1 < e.Next().Value.(*ReceivedState).Height() {
+						missing.Notify <- NewMissingState(n + 1)
+					}
+				}
+			}
+
+			// add all known states after the last recieved to the missing list
+			for n := recieved.HeighestRecieved() + 1; n < hk; n++ {
+				missing.Notify <- NewMissingState(n)
+			}
+		}
+	}()
 
 	// check the waiting list and move any requests that have timed out back
 	// into the missing list.
@@ -356,24 +368,6 @@ func (list *DBStateList) Catchup() {
 			}
 		}
 	}()
-
-	// go func() {
-	// 	for waiting.Len() < requestLimit {
-	// 		s := missing.GetNext()
-	// 		if s != nil && waiting.Get(s.Height()) == nil {
-	// 			fmt.Println("DEBUG: requesting state ", s.Height())
-	// 			msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
-	// 			if msg != nil {
-	// 				msg.SendOut(list.State, msg)
-	// 			}
-	//
-	// 			waiting.Notify <- NewWaitingState(s.Height())
-	// 		} else {
-	// 			// TODO: do something more smart like waiting on the list to change.
-	// 			time.Sleep(10 * time.Second)
-	// 		}
-	// 	}
-	// }()
 }
 
 // MissingState is information about a DBState that is known to exist but is not

@@ -453,6 +453,7 @@ func (dbs *DBState) UnmarshalBinary(p []byte) error {
 type DBStateList struct {
 	SrcNetwork bool // True if I got this block from the network.
 
+	// TODO: maybe get rid of LastBegin LastEnd and TimeToAsk
 	LastEnd       int
 	LastBegin     int
 	TimeToAsk     interfaces.Timestamp
@@ -1589,8 +1590,6 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 }
 
 func (list *DBStateList) UpdateState() (progress bool) {
-	list.Catchup()
-
 	saved := 0
 	for i, d := range list.DBStates {
 		//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v \n", "DBStateList Update", list.State.FactomNodeName, "Looking at", i, "DBHeight", list.Base+uint32(i))
