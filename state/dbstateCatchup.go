@@ -323,28 +323,30 @@ func (list *DBStateList) Catchup() {
 
 	// manage the state lists
 	go func() {
-		select {
-		case s := <-missing.Notify:
-			if recieved.Get(s.Height()) != nil {
-				fmt.Println("DEBUG: error the \"missing\" state is already in the recieved list ", s.Height())
-				break
-			}
-			if waiting.Get(s.Height()) == nil {
-				missing.Add(s.Height())
-			}
-		case s := <-waiting.Notify:
-			if waiting.Get(s.Height()) == nil {
-				waiting.Add(s.Height())
-			} else {
-				fmt.Println("DEBUG: recieved waiting state already in list ", s.Height())
-			}
-			missing.Del(s.Height())
-		case s := <-recieved.Notify:
-			if waiting.Get(s.Height()) == nil {
-				waiting.Del(s.Height())
-				recieved.Add(s.Height(), s.Message())
-			} else {
-				fmt.Println("DEBUG: error a state was recieved that was not in the waiting list: ", s.Height())
+		for {
+			select {
+			case s := <-missing.Notify:
+				if recieved.Get(s.Height()) != nil {
+					fmt.Println("DEBUG: error the \"missing\" state is already in the recieved list ", s.Height())
+					continue
+				}
+				if waiting.Get(s.Height()) == nil {
+					missing.Add(s.Height())
+				}
+			case s := <-waiting.Notify:
+				if waiting.Get(s.Height()) == nil {
+					waiting.Add(s.Height())
+				} else {
+					fmt.Println("DEBUG: recieved waiting state already in list ", s.Height())
+				}
+				missing.Del(s.Height())
+			case s := <-recieved.Notify:
+				if waiting.Get(s.Height()) == nil {
+					waiting.Del(s.Height())
+					recieved.Add(s.Height(), s.Message())
+				} else {
+					fmt.Println("DEBUG: error a state was recieved that was not in the waiting list: ", s.Height())
+				}
 			}
 		}
 	}()
