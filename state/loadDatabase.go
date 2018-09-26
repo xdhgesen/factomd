@@ -6,9 +6,9 @@ package state
 
 import (
 	"fmt"
-	"time"
-
+	"math"
 	"os"
+	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -22,6 +22,17 @@ import (
 
 var _ = fmt.Print
 
+func humanizeDuration(duration time.Duration) string {
+	hours := int64(duration.Hours())
+	minutes := int64(math.Mod(duration.Minutes(), 60))
+	seconds := int64(math.Mod(duration.Seconds(), 60))
+
+	if hours > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", hours, minutes, seconds)
+	}
+	return fmt.Sprintf("%d:%02d", minutes, seconds)
+}
+
 func LoadDatabase(s *State) {
 	var blkCnt uint32
 
@@ -32,8 +43,9 @@ func LoadDatabase(s *State) {
 	// prevent MMR processing from happening for blocks being loaded from the database
 	s.DBHeightAtBoot = blkCnt
 
-	last := time.Now()
-
+	first := time.Now()
+	last := first
+	time.Sleep(time.Second)
 	//msg, err := s.LoadDBState(blkCnt)
 	start := s.GetDBHeightComplete()
 	if start > 10 {
@@ -41,10 +53,23 @@ func LoadDatabase(s *State) {
 	}
 
 	for i := int(start); i <= int(blkCnt); i++ {
-		if i > 0 && i%1000 == 0 {
-			bps := float64(1000) / time.Since(last).Seconds()
-			os.Stderr.WriteString(fmt.Sprintf("%20s Loading Block %7d / %v. Blocks per second %8.2f\n", s.FactomNodeName, i, blkCnt, bps))
+		if i > int(start)+500 && i%1000 == 0 {
+			seconds := time.Since(last).Seconds()
+			bps := float64(1000) / seconds
+			f := time.Since(first).Seconds()
+			abps := float64(i-int(start)) / f
+			timeUsed := time.Since(first)
+
+			blocksRemaining := float64(blkCnt) - float64(i)
+			timeRemaining := time.Duration(blocksRemaining/abps) * time.Second
+
+			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f average bps %8.2f Progress %v remaining %v\n", s.FactomNodeName, i, blkCnt, bps, abps,
+				humanizeDuration(timeUsed), humanizeDuration(timeRemaining))
 			last = time.Now()
+
+			height := s.GetLLeaderHeight()
+			fmt.Fprintf(os.Stderr, "%20s Federated: DBH: %8d, Feds %d, audits: %d \n", s.FactomNodeName, height, len(s.GetFedServers(height)), len(s.GetAuditServers(height)))
+
 		}
 
 		msg, err := s.LoadDBState(uint32(i))
