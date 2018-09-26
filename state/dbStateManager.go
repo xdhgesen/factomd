@@ -634,8 +634,7 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 			return
 		}
 		dbsl.DBStates = append(dbsl.DBStates, dbs)
-		fmt.Println(dbsl.State.FactomNodeName, "Loading DBH ", dbs.DirectoryBlock.GetHeader().GetDBHeight())
-
+		//		fmt.Println(dbsl.State.FactomNodeName, "Loading DBH ", dbs.DirectoryBlock.GetHeader().GetDBHeight())
 	}
 
 	newData = buf.DeepCopyBytes()
@@ -647,22 +646,6 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 			s := dbsl.State
 			ss := dbsl.DBStates[i].SaveStruct
 			ss.RestoreFactomdState(s)
-
-			//s.LogPrintf("fct_transactions", "Loading %d FTC balances from DBH %d", len(ss.FactoidBalancesP), dbh)
-			//s.FactoidBalancesPMutex.Lock()
-			//s.FactoidBalancesP = make(map[[32]byte]int64, len(ss.FactoidBalancesP))
-			//for k := range ss.FactoidBalancesP {
-			//	s.FactoidBalancesP[k] = ss.FactoidBalancesP[k]
-			//}
-			//s.FactoidBalancesPMutex.Unlock()
-			//
-			//s.LogPrintf("ec_transactions", "Loading %d EC balances from DBH %d", len(ss.ECBalancesP), dbh)
-			//s.ECBalancesPMutex.Lock()
-			//s.ECBalancesP = make(map[[32]byte]int64, len(ss.ECBalancesP))
-			//for k := range ss.ECBalancesP {
-			//	s.ECBalancesP[k] = ss.ECBalancesP[k]
-			//}
-			//s.ECBalancesPMutex.Unlock()
 			break
 		}
 	}
@@ -1699,6 +1682,7 @@ searchLoop:
 	keep := uint32(3) // How many states to keep around; debugging helps with more.
 	if uint32(cnt) > keep && int(list.Complete)-cnt+int(keep) > 0 {
 		var dbstates []*DBState
+		list.State.LogPrintf("dbstatesProcess", "remove %d states", cnt-int(keep))
 		dbstates = append(dbstates, list.DBStates[cnt-int(keep):]...)
 		list.DBStates = dbstates
 		list.Base = list.Base + uint32(cnt) - keep
@@ -1713,11 +1697,19 @@ searchLoop:
 	}
 
 	// make room for this entry.
+	x := index + 1 - len(list.DBStates)
+	if x > 1 {
+		list.State.LogPrintf("dbstatesProcess", "Add %d states", x)
+	}
 	for len(list.DBStates) <= index {
 		list.DBStates = append(list.DBStates, nil)
 	}
 	if list.DBStates[index] == nil {
 		list.DBStates[index] = dbState
+		list.State.LogPrintf("dbstatesProcess", "Add DBH %d ", dbState.DirectoryBlock.GetHeader().GetDBHeight())
+	} else {
+		list.State.LogPrintf("dbstatesProcess", "Drop %v", dbState)
+
 	}
 
 	return true

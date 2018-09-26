@@ -579,7 +579,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	// s.AddStatus(fmt.Sprintln("Index: ", index, "dbht:", ss.DBHeight, "lleaderheight", s.LLeaderHeight))
 
 	dindex := ss.DBHeight - s.DBStates.Base
-	s.DBStates.DBStates = s.DBStates.DBStates[:dindex+1] // Keep up to the state we are restoring too.
+	s.DBStates.DBStates = s.DBStates.DBStates[:dindex] // Keep up to the state we are restoring too.
 	//s.AddStatus(fmt.Sprintf("SAVESTATE Restoring the State to dbht: %d", ss.DBHeight))
 	s.LogPrintf("dbstatesProcess", "restoring to DBH %d", ss.DBHeight)
 	s.Replay = ss.Replay.Save()
@@ -608,21 +608,6 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 		s.ECBalancesP[k] = ss.ECBalancesP[k]
 	}
 	s.ECBalancesPMutex.Unlock()
-
-	//
-	//s.FactoidBalancesPMutex.Lock()
-	//s.FactoidBalancesP = make(map[[32]byte]int64, 0)
-	//for k := range ss.FactoidBalancesP {
-	//	s.FactoidBalancesP[k] = ss.FactoidBalancesP[k]
-	//}
-	//s.FactoidBalancesPMutex.Unlock()
-	//
-	//s.ECBalancesPMutex.Lock()
-	//s.ECBalancesP = make(map[[32]byte]int64, 0)
-	//for k := range ss.ECBalancesP {
-	//	s.ECBalancesP[k] = ss.ECBalancesP[k]
-	//}
-	//s.ECBalancesPMutex.Unlock()
 
 	// Restore IDControl
 	s.IdentityControl = ss.IdentityControl
@@ -944,7 +929,6 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println("Loading", l, "Feds")
 	for i := 0; i < int(l); i++ {
 		s := new(Server)
 		err = buf.PopBinaryMarshallable(s)
@@ -958,7 +942,6 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	if err != nil {
 		return
 	}
-	fmt.Println("Loading", l, "Auds")
 	for i := 0; i < int(l); i++ {
 		s := new(Server)
 		err = buf.PopBinaryMarshallable(s)

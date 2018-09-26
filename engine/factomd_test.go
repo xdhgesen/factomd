@@ -61,6 +61,11 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		"--checkheads":          "false",
 		"--controlpanelsetting": "readwrite",
 		"--debuglog":            "faulting|bad",
+
+		"--logPort":          "37000",
+		"--port":             "37001",
+		"--controlpanelport": "37002",
+		"--networkport":      "37003",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
@@ -157,7 +162,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	}()
 	state0.MessageTally = true
 	fmt.Printf("Starting timeout timer:  Expected test to take %s or %d blocks\n", Calctime.String(), height)
-	//	StatusEveryMinute(state0)
+	StatusEveryMinute(state0)
 	WaitMinutes(state0, 1) // wait till initial DBState message for the genesis block is processed
 	creatingNodes(GivenNodes, state0)
 
@@ -197,7 +202,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 		if iq == 0 && iq2 == 0 && pendingCommits == 0 && holding == 0 {
 			break
 		}
-		fmt.Printf("Waiting for g to complete\n")
+		fmt.Printf("Waiting for g to complete %d %d %d %d\n", iq, iq2, pendingCommits, holding)
 		WaitMinutes(state0, 1)
 
 	}
@@ -285,7 +290,7 @@ func WaitBlocks(s *state.State, blks int) {
 	TimeNow(s)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	newBlock := int(s.LLeaderHeight) + blks
-	for i := int(s.LLeaderHeight); i < newBlock; i++ {
+	for i := int(s.LLeaderHeight) + 1; i <= newBlock; i++ {
 		for int(s.LLeaderHeight) < i {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
@@ -295,7 +300,7 @@ func WaitBlocks(s *state.State, blks int) {
 
 // Wait for a specific blocks
 func WaitForBlock(s *state.State, newBlock int) {
-	fmt.Printf("WaitForBlocks(%d)\n", newBlock)
+	fmt.Printf("WaitForBlock(%d)\n", newBlock)
 	TimeNow(s)
 	sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
 	for i := int(s.LLeaderHeight); i < newBlock; i++ {
@@ -522,7 +527,6 @@ func TestSetupANetwork(t *testing.T) {
 	WaitBlocks(fn1.State, 3) // Waits for 3 blocks
 
 	shutDownEverything(t)
-
 }
 
 func TestLoad(t *testing.T) {
@@ -562,7 +566,7 @@ func TestLoadScrambled(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 32, 0, 0, t)
+	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree", "--faulttimeout": "10"}, 32, 0, 0, t)
 	//TODO: Why does this run longer than expected?
 	CheckAuthoritySet(t)
 
@@ -574,9 +578,8 @@ func TestLoadScrambled(t *testing.T) {
 	WaitBlocks(state0, 10)
 	runCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
-
 	shutDownEverything(t)
-} // testLoad(){...}
+} // TestLoadScrambled(){...}
 
 func TestMakeALeader(t *testing.T) {
 	if ranSimTest {
@@ -1011,7 +1014,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		fmt.Println(x)
 	}
 	if x["ack"] != x["saved"] {
-		t.Fatalf("Expected acknowledged and saved balances to be he same")
+		t.Fatalf("Expected acknowledged and saved balances to be the same")
 	}
 
 	TimeNow(state0)
@@ -1048,23 +1051,27 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 
 	// This call should show a different acknowledged balance than the Saved Balance
 	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
-	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
+	y, ok := resp_5.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
 	}
+	fmt.Println("before")
+	TimeNow(state0)
 
-	if x["ack"] == x["saved"] {
+	if y["ack"] == y["saved"] {
 		t.Fatalf("Expected acknowledged and saved balances to be different.")
 	}
 
 	WaitBlocks(state0, 1)
-	WaitMinutes(state0, 1)
+	WaitMinutes(state0, 3)
 
 	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
 	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
 	}
+	fmt.Println("after")
+	TimeNow(state0)
 	if x["ack"] != x["saved"] {
 		t.Fatalf("Expected acknowledged and saved balances to be he same")
 	}
@@ -1271,7 +1278,7 @@ func TestDBsigElectionEvery2Block(t *testing.T) {
 	ranSimTest = true
 
 	iterations := 1
-	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 28, 6, 6, t)
+	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 46, 7, 7, t)
 
 	runCmd("S10") // Set Drop Rate to 1.0 on everyone
 
@@ -1401,7 +1408,6 @@ func TestGrants(t *testing.T) {
 			t.Errorf("FinalBalanceMismatch for %s. Got %d expected %d", addr, balance, factoidBalance)
 		}
 	}
-
 	// loop thru the dbheights  to get the admin block and check them and make sure the payouts get returned
 	for dbheight := uint32(min - constants.COINBASE_PAYOUT_FREQUENCY*2); dbheight <= uint32(max+constants.COINBASE_PAYOUT_FREQUENCY*2); dbheight++ {
 		expected := makeExpected(heights[dbheight])
@@ -1453,9 +1459,7 @@ func TestGrants(t *testing.T) {
 			}
 		}
 	} // for all dbheights {...}
-
 	WaitForAllNodes(state0)
-
 	CheckAuthoritySet(t) // check the authority set is as expected
 	shutDownEverything(t)
 }
@@ -1465,7 +1469,6 @@ func printList(title string, list map[string]uint64) {
 		fmt.Printf("%v - %v:%v\n", title, addr, amt)
 	}
 }
-
 func TestTestNetCoinBaseActivation(t *testing.T) {
 	if ranSimTest {
 		return
@@ -1475,7 +1478,7 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 	// reach into the activation an hack the TESTNET_COINBASE_PERIOD to be early so I can check it worked.
 	activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"] = 22
 
-	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 160, 0, 0, t)
+	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "2"}, 180, 0, 0, t)
 	CheckAuthoritySet(t)
 	fmt.Println("Simulation configured")
 	nextBlock := uint32(11 + constants.COINBASE_DECLARATION) // first grant is at 11 so it pays at 21
@@ -1499,7 +1502,7 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 		t.Fatalf("constants.COINBASE_DECLARATION = %d expect 140\n", constants.COINBASE_DECLARATION)
 	}
 
-	nextBlock += oldCBDelay + 1
+	nextBlock += oldCBDelay
 	fmt.Println("Wait till second grant should payout if the activation fails")
 	WaitForBlock(state0, int(nextBlock+1)) // next old payout passed activation (should not be paid)
 	CBT = factoidState0.GetCoinbaseTransaction(nextBlock, state0.GetLeaderTimestamp())
@@ -1507,7 +1510,7 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 		t.Fatalf("because the payout delay changed there is no payout at block %d\n", nextBlock)
 	}
 
-	nextBlock += constants.COINBASE_DECLARATION - oldCBDelay + 1
+	nextBlock += constants.COINBASE_DECLARATION - oldCBDelay
 	fmt.Println("Wait till second grant should payout with the new activation height")
 	WaitForBlock(state0, int(nextBlock+1)) // next payout passed new activation (should be paid)
 	CBT = factoidState0.GetCoinbaseTransaction(nextBlock, state0.GetLeaderTimestamp())
