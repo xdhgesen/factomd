@@ -250,7 +250,6 @@ func TestSignedDBStateValidate(t *testing.T) {
 	if genDBState.Validate(state) != 1 {
 		t.Error("Genesis should always be valid")
 	}
-
 	state.FollowerExecuteDBState(genDBState)
 	// Ok Geneis set
 

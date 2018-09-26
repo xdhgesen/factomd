@@ -2288,7 +2288,7 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
 // concurrency safe to call
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
-	if s.validatorLoopThreadID != atomic.Goid() {
+	if s.ValidatorLoopThreadID != atomic.Goid() {
 		panic("Second thread writing the factoids")
 	}
 	if rt {
@@ -2339,7 +2339,7 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
 // concurrency safe to call
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
-	if s.validatorLoopThreadID != atomic.Goid() {
+	if s.ValidatorLoopThreadID != atomic.Goid() {
 		panic("Second thread writing the entrycredits")
 	}
 	if rt {

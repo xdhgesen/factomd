@@ -12,6 +12,8 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
+	"github.com/FactomProject/factomd/util/atomic"
+
 	//"github.com/FactomProject/factomd/engine"
 	//"github.com/FactomProject/factomd/log"
 	"time"
@@ -34,6 +36,7 @@ func CreateEmptyTestState() *state.State {
 	s.Network = "LOCAL"
 	s.LogPath = "stdout"
 	s.Init()
+	s.ValidatorLoopThreadID = atomic.Goid()
 	s.Network = "LOCAL"
 	s.CheckChainHeads.CheckChainHeads = false
 	state.LoadDatabase(s)

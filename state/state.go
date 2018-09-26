@@ -398,7 +398,7 @@ type State struct {
 	MMRInfo          // fields for MMR processing
 
 	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
-	validatorLoopThreadID string
+	ValidatorLoopThreadID string
 }
 
 var _ interfaces.IState = (*State)(nil)

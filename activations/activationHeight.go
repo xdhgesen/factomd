@@ -48,8 +48,10 @@ func init() {
 			"Change testnet coin base payout delay to 140 blocks",
 			math.MaxInt32, // inactive unless overridden below
 			map[string]int{
-				"LOCAL":                     math.MaxInt32,
-				"CUSTOM:fct_community_test": 45335, //  Monday morning September 17
+				"":                          math.MaxInt32, // testing
+				"MAIN":                      math.MaxInt32, // mainnet
+				"LOCAL":                     math.MaxInt32, // development
+				"CUSTOM:fct_community_test": 45335,         // Monday morning September 17
 			},
 		},
 	}
