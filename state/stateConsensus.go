@@ -230,13 +230,11 @@ func (s *State) Process() (progress bool) {
 		}
 	}
 
-	/** Process all the DBStates  that might be pending **/
-
-	for r := s.StatesReceived.List.Front(); r != nil; r = r.Next() {
-		recieved := r.Value.(*ReceivedState)
-
-		process = append(process, recieved.Message())
-		// s.StatesReceived.Del(recieved.Height())
+	// Add the next recieved states to process.
+	// GetNext returns nil if the next member of StatesReceived is not the next
+	// height that needs to be processed.
+	for r := s.StatesReceived.GetNext(); r != nil; r = s.StatesReceived.GetNext() {
+		process = append(process, r.Message())
 	}
 
 	preAckLoopTime := time.Now()
