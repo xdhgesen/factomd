@@ -109,7 +109,8 @@ func (list *DBStateList) Catchup() {
 					fmt.Println("DEBUG: recieved waiting state already in list ", s.Height())
 				}
 				// missing.Del(s.Height())
-			case s := <-recieved.Notify:
+			case m := <-recieved.Notify:
+				s := NewReceivedState(m)
 				fmt.Println("DEBUG: recieved state ", s.Height())
 				if waiting.Has(s.Height()) {
 					waiting.Del(s.Height())
@@ -305,9 +306,9 @@ type ReceivedState struct {
 }
 
 // NewReceivedState creates a new member for the StatesReceived list
-func NewReceivedState(height uint32, msg *messages.DBStateMsg) *ReceivedState {
+func NewReceivedState(msg *messages.DBStateMsg) *ReceivedState {
 	s := new(ReceivedState)
-	s.height = height
+	s.height = msg.DirectoryBlock.GetHeader().GetDBHeight()
 	s.msg = msg
 	return s
 }
@@ -326,14 +327,14 @@ func (s *ReceivedState) Message() *messages.DBStateMsg {
 // represents the height of known saved states.
 type StatesReceived struct {
 	List   *list.List
-	Notify chan *ReceivedState
+	Notify chan *messages.DBStateMsg
 	base   uint32
 }
 
 func NewStatesReceived() *StatesReceived {
 	l := new(StatesReceived)
 	l.List = list.New()
-	l.Notify = make(chan *ReceivedState)
+	l.Notify = make(chan *messages.DBStateMsg)
 	return l
 }
 
@@ -376,13 +377,13 @@ func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		s := e.Value.(*ReceivedState)
 		if height > s.Height() {
-			l.List.InsertAfter(NewReceivedState(height, msg), e)
+			l.List.InsertAfter(NewReceivedState(msg), e)
 			return
 		} else if height == s.Height() {
 			return
 		}
 	}
-	l.List.PushFront(NewReceivedState(height, msg))
+	l.List.PushFront(NewReceivedState(msg))
 }
 
 // Del removes a state from the StatesReceived list

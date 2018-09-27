@@ -719,8 +719,6 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			s.ExecuteEntriesInDBState(dbstatemsg)
 			return
 		}
-		// TODO: move recieved notification to NetworkProcessorNet
-		s.StatesReceived.Notify <- NewReceivedState(dbheight, dbstatemsg)
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
