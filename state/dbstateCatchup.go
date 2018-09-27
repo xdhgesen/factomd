@@ -13,9 +13,8 @@ func (list *DBStateList) Catchup() {
 	waiting := list.State.StatesWaiting
 	recieved := list.State.StatesReceived
 
-	// TODO: requestTimeout and requestLimit should be a global config variables
-	requestTimeout := 1 * time.Minute
-	requestLimit := 20
+	requestTimeout := time.Duration(list.State.RequestTimeout) * time.Second
+	requestLimit := list.State.RequestLimit
 
 	// keep the lists up to date with the saved states.
 	go func() {
