@@ -2,7 +2,6 @@ package state
 
 import (
 	"container/list"
-	"fmt"
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages"
@@ -19,10 +18,6 @@ func (list *DBStateList) Catchup() {
 	// keep the lists up to date with the saved states.
 	go func() {
 		for {
-			fmt.Println("DEBUG: missing ", missing.List.Len())
-			fmt.Println("DEBUG: waiting ", waiting.Len())
-			fmt.Println("DEBUG: recieved ", recieved.Base()+uint32(recieved.List.Len()))
-
 			// Get information about the known block height
 			hs := list.State.GetHighestSavedBlk()
 			hk := list.State.GetHighestAck()
@@ -95,28 +90,21 @@ func (list *DBStateList) Catchup() {
 		for {
 			select {
 			case s := <-missing.Notify:
-				if recieved.Get(s.Height()) != nil {
-					fmt.Println("DEBUG: error the \"missing\" state is already in the recieved list ", s.Height())
-					continue
-				}
-				if !waiting.Has(s.Height()) {
-					missing.Add(s.Height())
+				if recieved.Get(s.Height()) == nil {
+					if !waiting.Has(s.Height()) {
+						missing.Add(s.Height())
+					}
 				}
 			case s := <-waiting.Notify:
 				if !waiting.Has(s.Height()) {
 					waiting.Add(s.Height())
-				} else {
-					fmt.Println("DEBUG: recieved waiting state already in list ", s.Height())
 				}
-				// missing.Del(s.Height())
 			case m := <-recieved.Notify:
 				s := NewReceivedState(m)
-				fmt.Println("DEBUG: recieved state ", s.Height())
 				if waiting.Has(s.Height()) {
 					waiting.Del(s.Height())
 					recieved.Add(s.Height(), s.Message())
 				} else {
-					fmt.Println("DEBUG: error a state was recieved that was not in the waiting list: ", s.Height())
 					recieved.Add(s.Height(), s.Message())
 				}
 			default:
@@ -131,13 +119,10 @@ func (list *DBStateList) Catchup() {
 			if waiting.Len() < requestLimit {
 				s := missing.GetNext()
 				if s != nil && !waiting.Has(s.Height()) {
-					fmt.Println("DEBUG: requesting state ", s.Height())
 					msg := messages.NewDBStateMissing(list.State, s.Height(), s.Height())
 					if msg != nil {
 						msg.SendOut(list.State, msg)
 						waiting.Notify <- NewWaitingState(s.Height())
-					} else {
-						fmt.Println("DEBUG: error missing state msg was nil")
 					}
 				}
 			} else {
