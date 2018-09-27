@@ -101,14 +101,10 @@ func (list *DBStateList) Catchup() {
 				}
 			case m := <-recieved.Notify:
 				s := NewReceivedState(m)
-				if waiting.Has(s.Height()) {
-					waiting.Del(s.Height())
-					recieved.Add(s.Height(), s.Message())
-				} else {
-					recieved.Add(s.Height(), s.Message())
-				}
-			default:
-				time.Sleep(20 * time.Millisecond)
+				waiting.Del(s.Height())
+				recieved.Add(s.Height(), s.Message())
+				// default:
+				// 	time.Sleep(20 * time.Millisecond)
 			}
 		}
 	}()
