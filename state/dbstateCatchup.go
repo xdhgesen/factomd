@@ -103,8 +103,6 @@ func (list *DBStateList) Catchup() {
 				s := NewReceivedState(m)
 				waiting.Del(s.Height())
 				recieved.Add(s.Height(), s.Message())
-				// default:
-				// 	time.Sleep(20 * time.Millisecond)
 			}
 		}
 	}()
