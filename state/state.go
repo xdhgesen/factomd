@@ -174,8 +174,6 @@ type State struct {
 	apiQueue               APIMSGQueue
 	ackQueue               chan interfaces.IMsg
 	msgQueue               chan interfaces.IMsg
-	RequestTimeout         int
-	RequestLimit           int
 
 	ShutdownChan chan int // For gracefully halting Factom
 	JournalFile  string
@@ -207,6 +205,10 @@ type State struct {
 	// own messages from the previously executing network can confuse you.
 	IgnoreDone    bool
 	IgnoreMissing bool
+
+	// Timout and Limit for outstanding missing DBState requests
+	RequestTimeout int
+	RequestLimit   int
 
 	LLeaderHeight   uint32
 	Leader          bool
