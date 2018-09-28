@@ -207,7 +207,7 @@ type State struct {
 	IgnoreMissing bool
 
 	// Timout and Limit for outstanding missing DBState requests
-	RequestTimeout int
+	RequestTimeout time.Duration
 	RequestLimit   int
 
 	LLeaderHeight   uint32
@@ -735,7 +735,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.ControlPanelPort = cfg.App.ControlPanelPort
 		s.RpcUser = cfg.App.FactomdRpcUser
 		s.RpcPass = cfg.App.FactomdRpcPass
-		s.RequestTimeout = cfg.App.RequestTimeout
+		s.RequestTimeout = time.Duration(cfg.App.RequestTimeout) * time.Second
 		s.RequestLimit = cfg.App.RequestLimit
 		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
 		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
