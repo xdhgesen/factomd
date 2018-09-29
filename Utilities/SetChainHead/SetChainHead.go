@@ -86,10 +86,10 @@ func SetDirectoryBlockHead(dbo *databaseOverlay.Overlay, newHeight int) error {
 		panic("DBlock head not found")
 	}
 
-	if dBlock.GetHeader().GetDBHeight() < uint32(newHeight) {
-		fmt.Printf("highest DB is %v but specified %v\n", dBlock.GetHeader().GetDBHeight(), newHeight)
-		panic("not enough DBlocks to reset")
-	}
+	//if dBlock.GetHeader().GetDBHeight() < uint32(newHeight) {
+	//	fmt.Printf("highest DB is %v but specified %v\n", dBlock.GetHeader().GetDBHeight(), newHeight)
+	//	panic("not enough DBlocks to reset")
+	//}
 	newHeadBlock, err := dbo.FetchDBlockByHeight(uint32(newHeight))
 	if err != nil {
 		panic(err)
