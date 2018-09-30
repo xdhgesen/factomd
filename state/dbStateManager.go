@@ -1396,6 +1396,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 
 	// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
 	// have marked them all as saved to disk!  So we gotta save them to disk.  Or panic trying.
+	fmt.Printf("SaveDBStateToDB(%d)\n", dbheight)
 
 	// Only trim when we are really saving.
 	v := dbheight + int(list.State.IdentityChainID.Bytes()[4])

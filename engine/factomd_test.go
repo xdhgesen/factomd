@@ -66,7 +66,7 @@ func SetupSim(GivenNodes string, NetworkType string, UserAddedOptions map[string
 	state0 := Factomd(params, false).(*state.State)
 	state0.MessageTally = true
 	time.Sleep(3 * time.Second)
-	StatusEveryMinute(state0)
+	//StatusEveryMinute(state0)
 	creatingNodes(GivenNodes, state0)
 
 	t.Logf("Allocated %d nodes", l)
@@ -261,7 +261,7 @@ func TestSetupANetwork(t *testing.T) {
 
 	ranSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
+	state0 := SetupSim("LLLLAAAFFF", "LOCAL", map[string]string{}, t)
 
 	runCmd("s")  // Show the process lists and directory block states as
 	runCmd("9")  // Puts the focus on node 9
@@ -426,7 +426,7 @@ func TestActivationHeightElection(t *testing.T) {
 
 	state0 := SetupSim(nodeList, "LOCAL", map[string]string{"--logPort": "37000", "--port": "37001", "--controlpanelport": "37002", "--networkport": "37003"}, t)
 
-	StatusEveryMinute(state0)
+	//StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
@@ -1311,5 +1311,17 @@ func TestRandom(t *testing.T) {
 	if random.RandUInt8() > 200 {
 		t.Fatal("Failed")
 	}
+
+}
+
+func TestSaveState(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+	state0 := SetupSim("LF", "LOCAL", map[string]string{"--debuglog": ".", "--db": "LDB"}, t)
+	WaitBlocks(state0, 2
+
+	)
 
 }
