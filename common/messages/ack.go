@@ -88,6 +88,7 @@ func (m *Ack) Validate(s interfaces.IState) int {
 	//	atomic.WhereAmI2("Ack.Validate()", 1)
 	// If too old, it isn't valid.
 	if m.DBHeight <= s.GetHighestSavedBlk() {
+		s.LogMessage("ackQueue", "Drop, from past", m)
 		return -1
 	}
 
@@ -123,15 +124,18 @@ func (m *Ack) Validate(s interfaces.IState) int {
 			//fmt.Println("Err is not nil on Ack sig check: ", err)
 			return -1
 		}
-		s.LogMessage("executeMsg", "Validate", m)
+		//		s.LogMessage("executeMsg", "Validate", m)
 		ackSigned, err := s.FastVerifyAuthoritySignature(bytes, m.Signature, m.DBHeight)
 
 		//ackSigned, err := m.VerifySignature()
 		if err != nil {
+			s.LogMessage("ackQueue", fmt.Sprintf("ValidateSig error %v", err), m)
 			//fmt.Println("Err is not nil on Ack sig check: ", err)
 			return -1
 		}
 		if ackSigned <= 0 {
+			s.LogMessage("ackQueue", "InvalidSig", m)
+
 			return -1
 		}
 	}

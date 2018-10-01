@@ -1275,6 +1275,7 @@ func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 			for _, dbsig := range pl.DBSignatures {
 				allSigs = append(allSigs, dbsig.Signature)
 			}
+
 		}
 	} else {
 		abEntries := nextABlock.GetABEntries()

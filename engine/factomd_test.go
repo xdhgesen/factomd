@@ -1319,9 +1319,7 @@ func TestSaveState(t *testing.T) {
 		return
 	}
 	ranSimTest = true
-	state0 := SetupSim("LF", "LOCAL", map[string]string{"--debuglog": ".", "--db": "LDB"}, t)
-	WaitBlocks(state0, 2
-
-	)
+	state0 := SetupSim("LF", "LOCAL", map[string]string{"--debuglog": ".", "--db": "LDB", "--stdoutlog": "pdout.txt"}, t)
+	WaitBlocks(state0, 8)
 
 }
