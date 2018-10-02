@@ -2,7 +2,6 @@ package adminBlock
 
 import (
 	"fmt"
-	"log"
 	"reflect"
 
 	"github.com/FactomProject/factomd/common/constants"
