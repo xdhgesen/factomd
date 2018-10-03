@@ -16,7 +16,7 @@ import (
 type StateSaverStruct struct {
 	FastBoot         bool
 	FastBootLocation string
-
+	TmpDBHt          uint32
 	TmpState []byte
 	Mutex    sync.Mutex
 	Stop     bool
@@ -39,33 +39,30 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	sss.Mutex.Lock()
 	defer sss.Mutex.Unlock()
 
-	//Don't save States after the server has booted - it might start it in a wrong state
-	if ss.State.DBFinished == true {
-		return nil
+	hsb := int(ss.GetHighestSavedBlk())
+	//Save only every FastSaveRate states
+
+	if (hsb+1)%ss.State.FastSaveRate == 0 {
+		//Marshal state for future saving
+		b, err := ss.MarshalBinary()
+		if err != nil {
+			return err
+		}
+		//adding an integrity check
+		h := primitives.Sha(b)
+		b = append(h.Bytes(), b...)
+		sss.TmpState = b
+		sss.TmpDBHt = ss.State.LLeaderHeight
 	}
 
-	//Save only every 1000 states
-	if ss.GetHighestSavedBlk()%1000 != 0 || ss.GetHighestSavedBlk() < 1000 {
-		return nil
-	}
-
-	//Actually save data from previous cached state to prevent dealing with rollbacks
-	if len(sss.TmpState) > 0 {
+	if hsb%ss.State.FastSaveRate == 0  &&  len(sss.TmpState) > 0 {
+		//Actually save data from previous cached state to prevent dealing with rollbacks
 		err := SaveToFile(sss.TmpState, NetworkIDToFilename(networkName, sss.FastBootLocation))
 		if err != nil {
 			return err
 		}
+		sss.TmpState = nil
 	}
-
-	//Marshal state for future saving
-	b, err := ss.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	//adding an integrity check
-	h := primitives.Sha(b)
-	b = append(h.Bytes(), b...)
-	sss.TmpState = b
 
 	return nil
 }
