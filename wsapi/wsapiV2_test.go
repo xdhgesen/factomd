@@ -104,10 +104,10 @@ func TestHandleV2GetRaw(t *testing.T) {
 	}
 	raw.Raw = primitives.EncodeBinary(hex)
 	toTest = append(toTest, raw) //5
-//	//initializing server
-//	state := testHelper.CreateAndPopulateTestState()
-//	Start(state)
-//
+	//	//initializing server
+	//	state := testHelper.CreateAndPopulateTestState()
+	//	Start(state)
+	//
 	for i, v := range toTest {
 		data := new(HashRequest)
 		data.Hash = v.Hash1
