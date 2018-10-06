@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -125,7 +124,7 @@ type State struct {
 	serverPrt   string
 	StatusMutex sync.Mutex
 	StatusStrs  []string
-	Starttime   time.Time
+	starttime   time.Time
 	transCnt    int
 	lasttime    time.Time
 	tps         float64
@@ -398,9 +397,7 @@ type State struct {
 	StateUpdateState      int64
 	ValidatorLoopSleepCnt int64
 	processCnt            int64 // count of attempts to process .. so we can see if the thread is running
-	MMRInfo                     // fields for MMR processing
-
-	reportedActivations [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
+	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -533,12 +530,10 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath
 		break
 	}
-
 	if globals.Params.WriteProcessedDBStates {
 		path := filepath.Join(newState.LdbPath, newState.Network, "dbstates")
 		os.MkdirAll(path, 0777)
 	}
-
 	return newState
 }
 
@@ -953,7 +948,6 @@ func (s *State) Init() {
 			Fix:       s.CheckChainHeads.Fix,
 		})
 	}
-
 	if s.ExportData {
 		s.DB.SetExportData(s.ExportDataSubpath)
 	}
@@ -1004,7 +998,7 @@ func (s *State) Init() {
 		s.ExchangeRateAuthorityPublicKey = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
 	}
 	// end of FER removal
-	s.Starttime = time.Now()
+	s.starttime = time.Now()
 
 	if s.StateSaverStruct.FastBoot {
 		d, err := s.DB.FetchDBlockHead()
@@ -1041,12 +1035,10 @@ func (s *State) Init() {
 		}
 	}
 
-	s.startMMR()
 	if globals.Params.WriteProcessedDBStates {
 		path := filepath.Join(s.LdbPath, s.Network, "dbstates")
 		os.MkdirAll(path, 0777)
 	}
-
 }
 
 func (s *State) HookLogstash() error {
@@ -1099,13 +1091,7 @@ func (s *State) GetMissingEntryCount() uint32 {
 	return uint32(len(s.MissingEntries))
 }
 
-func (s *State) GetEBlockKeyMRFromEntryHash(entryHash interfaces.IHash) (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetEBlockKeyMRFromEntryHash() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetEBlockKeyMRFromEntryHash(entryHash interfaces.IHash) interfaces.IHash {
 	entry, err := s.DB.FetchEntry(entryHash)
 	if err != nil {
 		return nil
@@ -1956,13 +1942,7 @@ func (s *State) SetFactoshisPerEC(factoshisPerEC uint64) {
 	s.FactoshisPerEC = factoshisPerEC
 }
 
-func (s *State) GetIdentityChainID() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetIdentityChainID() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetIdentityChainID() interfaces.IHash {
 	return s.IdentityChainID
 }
 
@@ -2218,13 +2198,7 @@ func (s *State) GetNetworkID() uint32 {
 }
 
 // The initial public key that can sign the first block
-func (s *State) GetNetworkBootStrapKey() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetNetworkBootStrapKey() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetNetworkBootStrapKey() interfaces.IHash {
 	switch s.NetworkNumber {
 	case constants.NETWORK_MAIN:
 		key, _ := primitives.HexToHash("0426a802617848d4d16d87830fc521f4d136bb2d0c352850919c2679f189613a")
@@ -2246,13 +2220,7 @@ func (s *State) GetNetworkBootStrapKey() (rval interfaces.IHash) {
 }
 
 // The initial identity that can sign the first block
-func (s *State) GetNetworkBootStrapIdentity() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetNetworkBootStrapIdentity() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetNetworkBootStrapIdentity() interfaces.IHash {
 	switch s.NetworkNumber {
 	case constants.NETWORK_MAIN:
 		return primitives.NewZeroHash()
@@ -2272,13 +2240,7 @@ func (s *State) GetNetworkBootStrapIdentity() (rval interfaces.IHash) {
 }
 
 // The identity for validating messages
-func (s *State) GetNetworkSkeletonIdentity() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetNetworkSkeletonIdentity() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetNetworkSkeletonIdentity() interfaces.IHash {
 	switch s.NetworkNumber {
 	case constants.NETWORK_MAIN:
 		id, _ := primitives.HexToHash("8888882690706d0d45d49538e64e7c76571d9a9b331256b5b69d9fd2d7f1f14a")
@@ -2297,24 +2259,12 @@ func (s *State) GetNetworkSkeletonIdentity() (rval interfaces.IHash) {
 	return id
 }
 
-func (s *State) GetNetworkIdentityRegistrationChain() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetNetworkIdentityRegistrationChain() saw an interface that was nil")
-		}
-	}()
+func (s *State) GetNetworkIdentityRegistrationChain() interfaces.IHash {
 	id, _ := primitives.HexToHash("888888001750ede0eff4b05f0c3f557890b256450cabbb84cada937f9c258327")
 	return id
 }
 
-func (s *State) GetMatryoshka(dbheight uint32) (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("State.GetMatryoshka saw an interface thatwas nil")
-		}
-	}()
+func (s *State) GetMatryoshka(dbheight uint32) interfaces.IHash {
 	return nil
 }
 
@@ -2443,7 +2393,7 @@ func (s *State) SetStringConsensus() {
 //		totalTPS	: Transaction rate over life of node (totaltime / totaltrans)
 //		instantTPS	: Transaction rate weighted over last 3 seconds
 func (s *State) CalculateTransactionRate() (totalTPS float64, instantTPS float64) {
-	runtime := time.Since(s.Starttime)
+	runtime := time.Since(s.starttime)
 	shorttime := time.Since(s.lasttime)
 	total := s.FactoidTrans + s.NewEntryChains + s.NewEntries
 	tps := float64(total) / float64(runtime.Seconds())
@@ -2791,11 +2741,6 @@ func (s *State) updateNetworkControllerConfig() {
 	}
 
 	s.NetworkController.ReloadSpecialPeers(newPeersConfig)
-}
-
-// Check and Add a hash to the network replay filter
-func (s *State) AddToReplayFilter(mask int, hash [32]byte, timestamp interfaces.Timestamp, systemtime interfaces.Timestamp) (rval bool) {
-	return s.Replay.IsTSValidAndUpdateState(constants.NETWORK_REPLAY, hash, timestamp, systemtime)
 }
 
 // Return if a feature is active for the current height
