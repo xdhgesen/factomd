@@ -49,16 +49,16 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	expectedHeight = height
 	l := len(GivenNodes)
 	CmdLineOptions := map[string]string{
-		"--db":           "Map",
+		"--db":                  "Map",
 		"--network":             "LOCAL",
-		"--net":          "alot+",
-		"--enablenet":    "false",
+		"--net":                 "alot+",
+		"--enablenet":           "false",
 		"--blktime":             "10",
-		"--count":        fmt.Sprintf("%v", l),
-		"--startdelay": "1",
-		"--stdoutlog":  "out.txt",
+		"--count":               fmt.Sprintf("%v", l),
+		"--startdelay":          "1",
+		"--stdoutlog":           "out.txt",
 		"--stderrlog":           "out.txt",
-		"--checkheads": "false",
+		"--checkheads":          "false",
 		"--controlpanelsetting": "readwrite",
 		"--debuglog":            "faulting|bad",
 		"--logPort":             "37000",
@@ -74,9 +74,9 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 				CmdLineOptions[key] = value
 			} else {
 				CmdLineOptions[key] = CmdLineOptions[key] + "|" + value // add debug log flags to the default
-		}
+			}
 			// remove options not supported by the current flags set so we can merge this update into older code bases
-	}
+		}
 	}
 	// Finds all of the valid commands and stores them
 	optionsArr := make(map[string]bool, 0)
@@ -248,31 +248,32 @@ func TimeNow(s *state.State) {
 }
 
 var statusState *state.State
+
 // print the status for every minute for a state
 func StatusEveryMinute(s *state.State) {
 	if statusState == nil {
 		fmt.Fprintf(os.Stdout, "Printing status from %s\n", s.FactomNodeName)
 		statusState = s
-	go func() {
-		for {
+		go func() {
+			for {
 				s := statusState
-			newMinute := (s.CurrentMinute + 1) % 10
-			timeout := 8 // timeout if a minutes takes twice as long as expected
-			for s.CurrentMinute != newMinute && timeout > 0 {
-				sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
-				time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
-				timeout--
-			}
-			if timeout <= 0 {
-				fmt.Println("Stalled !!!")
-			}
+				newMinute := (s.CurrentMinute + 1) % 10
+				timeout := 8 // timeout if a minutes takes twice as long as expected
+				for s.CurrentMinute != newMinute && timeout > 0 {
+					sleepTime := time.Duration(globals.Params.BlkTime) * 1000 / 40 // Figure out how long to sleep in milliseconds
+					time.Sleep(sleepTime * time.Millisecond)                       // wake up and about 4 times per minute
+					timeout--
+				}
+				if timeout <= 0 {
+					fmt.Println("Stalled !!!")
+				}
 				// Make all the nodes update their status
-			for _, n := range GetFnodes() {
-				n.State.SetString()
+				for _, n := range GetFnodes() {
+					n.State.SetString()
+				}
+				PrintOneStatus(0, 0)
 			}
-			PrintOneStatus(0, 0)
-		}
-	}()
+		}()
 	} else {
 		fmt.Fprintf(os.Stdout, "Printing status from %s", s.FactomNodeName)
 		statusState = s
@@ -289,9 +290,9 @@ func WaitBlocks(s *state.State, blks int) {
 	for i := int(s.LLeaderHeight) + 1; i <= newBlock; i++ {
 		for int(s.LLeaderHeight) < i {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
+		}
+		TimeNow(s)
 	}
-	TimeNow(s)
-}
 }
 
 // Wait for a specific blocks
@@ -376,6 +377,7 @@ func CheckAuthoritySet(t *testing.T) {
 		t.Fail()
 	}
 }
+
 // We can only run 1 simtest!
 var ranSimTest = false
 
@@ -566,7 +568,7 @@ func TestLoadScrambled(t *testing.T) {
 	//TODO: Why does this run longer than expected?
 	CheckAuthoritySet(t)
 
-	runCmd("2")   // select 2
+	runCmd("2")     // select 2
 	runCmd("F1000") // set the message delay
 	runCmd("S10")   // delete 1% of the messages
 	runCmd("r")     // rotate the load around the network
@@ -683,8 +685,7 @@ func TestActivationHeightElection(t *testing.T) {
 	}
 
 	shutDownEverything(t)
-	}
-
+}
 
 func TestAnElection(t *testing.T) {
 	if ranSimTest {
@@ -814,7 +815,6 @@ func TestMultiple2Election(t *testing.T) {
 	runCmd("x")
 	runCmd("2")
 	runCmd("x")
-
 
 	runCmd("E")
 	runCmd("F")
@@ -1358,7 +1358,7 @@ func makeExpected(grants []state.HardGrant) []interfaces.ITransAddress {
 		rval = append(rval, factoid.NewOutAddress(g.Address, g.Amount))
 	}
 	return rval
-	}
+}
 
 func TestGrants(t *testing.T) {
 	if ranSimTest {

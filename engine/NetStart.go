@@ -566,6 +566,7 @@ func printGraphData(filename string, period int) {
 		time.Sleep(time.Duration(period) * time.Second)
 	} // for ever ...
 }
+
 //**********************************************************************
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.

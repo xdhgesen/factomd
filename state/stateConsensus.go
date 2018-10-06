@@ -2045,7 +2045,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		s.electionsQueue.Enqueue(InMsg)
 	}
 
-
 	// Put the stuff that executes once for set of DBSignatures (after I have them all) here
 	if !s.DBSigDone && s.DBSigProcessed >= s.DBSigLimit {
 		s.LogPrintf("dbsig-eom", "ProcessDBSig stop DBSig processing minute %d", s.CurrentMinute)

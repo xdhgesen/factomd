@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -34,8 +35,6 @@ import (
 	"github.com/FactomProject/factomd/util/atomic"
 	"github.com/FactomProject/factomd/wsapi"
 	"github.com/FactomProject/logrustash"
-
-	"path/filepath"
 
 	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
 	log "github.com/sirupsen/logrus"
@@ -124,7 +123,7 @@ type State struct {
 	serverPrt   string
 	StatusMutex sync.Mutex
 	StatusStrs  []string
-	starttime   time.Time
+	Starttime   time.Time
 	transCnt    int
 	lasttime    time.Time
 	tps         float64
@@ -396,7 +395,8 @@ type State struct {
 	StateProcessCnt       int64
 	StateUpdateState      int64
 	ValidatorLoopSleepCnt int64
-	processCnt            int64 // count of attempts to process .. so we can see if the thread is running
+	processCnt            int64                                       // count of attempts to process .. so we can see if the thread is running
+	MMRInfo                                                           // fields for MMR processing
 	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 }
 
@@ -998,7 +998,7 @@ func (s *State) Init() {
 		s.ExchangeRateAuthorityPublicKey = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
 	}
 	// end of FER removal
-	s.starttime = time.Now()
+	s.Starttime = time.Now()
 
 	if s.StateSaverStruct.FastBoot {
 		d, err := s.DB.FetchDBlockHead()
@@ -1035,6 +1035,7 @@ func (s *State) Init() {
 		}
 	}
 
+	s.startMMR()
 	if globals.Params.WriteProcessedDBStates {
 		path := filepath.Join(s.LdbPath, s.Network, "dbstates")
 		os.MkdirAll(path, 0777)
@@ -2393,7 +2394,7 @@ func (s *State) SetStringConsensus() {
 //		totalTPS	: Transaction rate over life of node (totaltime / totaltrans)
 //		instantTPS	: Transaction rate weighted over last 3 seconds
 func (s *State) CalculateTransactionRate() (totalTPS float64, instantTPS float64) {
-	runtime := time.Since(s.starttime)
+	runtime := time.Since(s.Starttime)
 	shorttime := time.Since(s.lasttime)
 	total := s.FactoidTrans + s.NewEntryChains + s.NewEntries
 	tps := float64(total) / float64(runtime.Seconds())
@@ -2741,6 +2742,11 @@ func (s *State) updateNetworkControllerConfig() {
 	}
 
 	s.NetworkController.ReloadSpecialPeers(newPeersConfig)
+}
+
+// Check and Add a hash to the network replay filter
+func (s *State) AddToReplayFilter(mask int, hash [32]byte, timestamp interfaces.Timestamp, systemtime interfaces.Timestamp) (rval bool) {
+	return s.Replay.IsTSValidAndUpdateState(constants.NETWORK_REPLAY, hash, timestamp, systemtime)
 }
 
 // Return if a feature is active for the current height
