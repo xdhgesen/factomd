@@ -319,7 +319,7 @@ func (e *Elections) LogPrintLeaders(log string) {
 		if i < len(e.Audit) {
 			a = fmt.Sprintf("%x", e.Audit[i].GetChainID().Bytes()[3:6])
 		}
-		e.LogPrintf(log, "%x | %x", f, a)
+		e.LogPrintf(log, "%s | %s", f, a)
 	}
 
 }
