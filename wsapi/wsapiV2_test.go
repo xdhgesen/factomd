@@ -104,11 +104,10 @@ func TestHandleV2GetRaw(t *testing.T) {
 	}
 	raw.Raw = primitives.EncodeBinary(hex)
 	toTest = append(toTest, raw) //5
-
-	////initializing server
-	//state := testHelper.CreateAndPopulateTestState()
-	//Start(state)
-	//
+//	//initializing server
+//	state := testHelper.CreateAndPopulateTestState()
+//	Start(state)
+//
 	for i, v := range toTest {
 		data := new(HashRequest)
 		data.Hash = v.Hash1
@@ -187,7 +186,6 @@ func TestHandleV2CommitEntry(t *testing.T) {
 		t.Errorf("Error: TxID returned during Commit Entry is incorrect - %v vs %v", respObj.TxID, txID)
 	}
 }
-
 func TestV2HandleEntryCreditBalance(t *testing.T) {
 	initfortest()
 	eckey := testHelper.NewECAddressPublicKeyString(0)
@@ -218,7 +216,6 @@ func TestV2HandleEntryCreditBalance(t *testing.T) {
 		t.Errorf("Invalid balance returned - %v vs %v", resp.(*EntryCreditBalanceResponse).Balance, expectedAmount)
 	}
 }
-
 func TestV2HandleFactoidBalance(t *testing.T) {
 	initfortest()
 	//state := testHelper.CreateAndPopulateTestState()
