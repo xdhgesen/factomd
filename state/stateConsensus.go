@@ -1316,15 +1316,49 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 }
 
 func (s *State) ProcessAddServer(dbheight uint32, addServerMsg interfaces.IMsg) bool {
+	s.LogPrintf("authSetAdds", "OldCurrent AuthSet Blk %d:", dbheight)
+	for _, v := range s.LeaderPL.FedServers {
+		s.LogPrintf("authSetAdds", "FED %s  %s", v.GetName(), v.GetChainID())
+	}
+	for _, v := range s.LeaderPL.AuditServers {
+		s.LogPrintf("authSetAdds", "AUD %s  %s", v.GetName(), v.GetChainID())
+	}
 	as, ok := addServerMsg.(*messages.AddServerMsg)
 	if ok && !ProcessIdentityToAdminBlock(s, as.ServerChainID, as.ServerType) {
 		//s.AddStatus(fmt.Sprintf("Failed to add %x as server type %d", as.ServerChainID.Bytes()[2:5], as.ServerType))
 		return false
 	}
+
+	s.LogPrintf("authSetAdds", "NewCurrent AuthSet Blk %d:", dbheight)
+	for _, v := range s.LeaderPL.FedServers {
+		s.LogPrintf("authSetAdds", "FED %s  %s", v.GetName(), v.GetChainID())
+	}
+	for _, v := range s.LeaderPL.AuditServers {
+		s.LogPrintf("authSetAdds", "AUD %s  %s", v.GetName(), v.GetChainID())
+	}
+
+	pln := s.ProcessLists.Get(dbheight + 1)
+	s.LogPrintf("authSetAdds", "Next AuthSet %d:", dbheight + 1)
+	for _, v := range pln.StartingFedServers {
+		s.LogPrintf("authSetAdds", "FED %s  %s", v.GetName(), v.GetChainID())
+	}
+	for _, v := range pln.StartingAuditServers {
+		s.LogPrintf("authSetAdds", "AUD %s  %s", v.GetName(), v.GetChainID())
+	}
+	s.LogPrintf("authSetAdds", "Should have added %s\n", as.ServerChainID.String())
+
 	return true
 }
 
 func (s *State) ProcessRemoveServer(dbheight uint32, removeServerMsg interfaces.IMsg) bool {
+	s.LogPrintf("authSetRems", "OldCurrent AuthSet %d:", dbheight)
+	for _, v := range s.LeaderPL.FedServers {
+		s.LogPrintf("authSetRems", "FED %s  %s\n", v.GetName(), v.GetChainID())
+	}
+	for _, v := range s.LeaderPL.AuditServers {
+		s.LogPrintf("authSetRems", "AUD %s  %s\n", v.GetName(), v.GetChainID())
+	}
+
 	rs, ok := removeServerMsg.(*messages.RemoveServerMsg)
 	if !ok {
 		return true
@@ -1342,6 +1376,24 @@ func (s *State) ProcessRemoveServer(dbheight uint32, removeServerMsg interfaces.
 		return true
 	}
 	s.LeaderPL.AdminBlock.RemoveFederatedServer(rs.ServerChainID)
+
+	s.LogPrintf("authSetRems", "NewCurrent AuthSet %d:", dbheight)
+	for _, v := range s.LeaderPL.FedServers {
+		s.LogPrintf("authSetRems", "FED %s  %s\n", v.GetName(), v.GetChainID())
+	}
+	for _, v := range s.LeaderPL.AuditServers {
+		s.LogPrintf("authSetRems", "AUD %s  %s\n", v.GetName(), v.GetChainID())
+	}
+
+	pln := s.ProcessLists.Get(dbheight + 1)
+	s.LogPrintf("authSetRems", "Next AuthSet %d:", dbheight + 1)
+	for _, v := range pln.StartingFedServers {
+		s.LogPrintf("authSetRems", "FED %s  %s", v.GetName(), v.GetChainID())
+	}
+	for _, v := range pln.StartingAuditServers {
+		s.LogPrintf("authSetRems", "AUD %s  %s", v.GetName(), v.GetChainID())
+	}
+	s.LogPrintf("authSetRems", "Should have removed %s\n", rs.ServerChainID.String())
 
 	return true
 }
