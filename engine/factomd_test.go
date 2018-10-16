@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	ed "github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -1312,6 +1313,97 @@ func makeExpected(grants []state.HardGrant) []interfaces.ITransAddress {
 		rval = append(rval, factoid.NewOutAddress(g.Address, g.Amount))
 	}
 	return rval
+}
+
+// construct a new factoid transaction
+func newTransaction(amt uint64, userPrivIn string, userPrivOut string, ecPrice uint64) (*factoid.Transaction, error) {
+
+	inSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userPrivIn))
+	outSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userPrivOut))
+
+	var sec [64]byte
+	copy(sec[:32], inSec.Bytes()) // pass 32 byte key in a 64 byte field for the crypto library
+
+	pub := ed.GetPublicKey(&sec) // get the public key for our FCT source address
+
+	rcd := factoid.NewRCD_1(pub[:]) // build the an RCD "redeem condition data structure"
+
+	inAdd, err := rcd.GetAddress()
+	if err != nil {
+		panic(err)
+	}
+
+	outAdd := factoid.NewAddress(outSec.Bytes())
+
+	trans := new(factoid.Transaction)
+	trans.AddInput(inAdd, amt)
+	trans.AddOutput(outAdd, amt)
+	println("------------")
+
+	// REVIEW: why is this different from engine.FundWallet() ?
+	//trans.AddRCD(rcd)
+	trans.AddAuthorization(rcd)
+	trans.SetTimestamp(primitives.NewTimestampNow())
+
+	fee, err := trans.CalculateFee(ecPrice)
+	if err != nil {
+		return trans, err
+	}
+
+	input, err := trans.GetInput(0)
+	if err != nil {
+		return trans, err
+	}
+	input.SetAmount(amt + fee)
+
+	dataSig, err := trans.MarshalBinarySig()
+	if err != nil {
+		return trans, err
+	}
+	sig := factoid.NewSingleSignatureBlock(inSec.Bytes(), dataSig)
+	trans.SetSignatureBlock(0, sig)
+
+	return trans, nil
+
+}
+
+
+func AssertEquals(t *testing.T, a interface{}, b interface{}) {
+	if a != b {
+		t.Fatalf("%v != %v", a, b)
+	}
+}
+
+
+func TestTxnCreate(t *testing.T) {
+	//var inputAmt uint64 = 100012000
+	var amt uint64 = 100000000
+	var ecPrice uint64 = 10000
+
+	inUser := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK"
+	outUser := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ"
+
+	txn, err := newTransaction(amt, inUser, outUser, ecPrice)
+	if err != nil {
+		t.Fatalf("failed to create Transaction %v", err)
+	}
+
+	if err := txn.ValidateSignatures(); err != nil {
+		t.Fatalf("created invalid signature: %v", err)
+	}
+
+	if err := txn.Validate(1); err != nil {
+		t.Fatalf("created invalid transaction: %v", err)
+	}
+
+	if err := txn.Validate(0); err == nil {
+		t.Fatalf("expected coinbase txn to error")
+	}
+
+}
+
+func TestProcessedBlockFailure(t *testing.T) {
+	// FIXME
 }
 
 func TestGrants(t *testing.T) {
