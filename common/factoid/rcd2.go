@@ -26,7 +26,7 @@ import (
 
 type RCD_2 struct {
 	M           int                   // Number signatures required
-	N           int                   // Total sigatures possible
+	N           int                   // Total signatures possible
 	N_Addresses []interfaces.IAddress // n addresses
 }
 

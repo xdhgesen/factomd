@@ -23,6 +23,8 @@ import (
 // In this case, we are simply validating one address to ensure it signed
 // this transaction.
 type RCD_1 struct {
+	// The version (1) goes here.  Unfortunately early on code was written to simply append the 1 to the
+	// address to get the bytes to be hashed.  This should be a field, and the appends updated appropriately.
 	PublicKey [constants.ADDRESS_LENGTH]byte
 	validSig  bool
 }
