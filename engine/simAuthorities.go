@@ -127,7 +127,7 @@ func FundWallet(st *state.State, amt uint64) (error, string) {
 // Entry Point where test code allows the transaction to have a time offset from the current time.
 func FundWalletTOFF(st *state.State, timeOffsetInMilliseconds int64, amt uint64) (error, string) {
 	inSec, _ := primitives.HexToHash("FB3B471B1DCDADFEB856BD0B02D8BF49ACE0EDD372A3D9F2A95B78EC12A324D6") // private key or FCT Source
-	outEC, _ := primitives.HexToHash("c23ae8eec2beb181a0da926bd2344e988149fbe839fbc7489f2096e7d6110243") // EC address
+	outEC, _ := primitives.HexToHash("c23ae8eec2beb181a0da926bd2344e988149fbe839fbc7489f2096e7d6110243") // public EC address
 
 	var sec [64]byte
 	copy(sec[:32], inSec.Bytes()) // pass 32 byte key in a 64 byte field for the crypto library
@@ -144,11 +144,12 @@ func FundWalletTOFF(st *state.State, timeOffsetInMilliseconds int64, amt uint64)
 	outAdd := factoid.NewAddress(outEC.Bytes())
 
 	trans := new(factoid.Transaction)
+	trans.Version = 3
+	trans.Coin = 0
 	trans.AddInput(inAdd, amt)
 	trans.AddECOutput(outAdd, amt)
 
 	trans.AddRCD(rcd)
-	trans.AddAuthorization(rcd)
 
 	// So what we are going to do is get the current time in ms, add to it the offset provided (usually zero, except
 	// for tests)

@@ -7,6 +7,8 @@ package interfaces
 type ITransaction interface {
 	BinaryMarshallable
 	Printable
+
+	// Debugging interface that returns a text form of the transaction
 	CustomMarshalText() ([]byte, error)
 
 	// Marshals the parts of the transaction that are signed to
@@ -48,8 +50,14 @@ type ITransaction interface {
 	GetOutputs() []ITransAddress
 	GetECOutputs() []ITransAddress
 	GetRCDs() []IRCD
+	GetCoin() int
+	GetCoinTarget() int
+	IsConversion() bool
 
+	// Version 2 : Once coin
+	// Version >2  : Indexed to Pegged Tokens
 	GetVersion() uint64
+
 	// Locktime serves as a nonce to make every transaction unique. Transactions
 	// that are more than 24 hours old are not included nor propagated through
 	// the network.

@@ -48,7 +48,7 @@ type ProcessList struct {
 	DBHeight uint32 // The directory block height for these lists
 
 	// Temporary balances from updating transactions in real time.
-	FactoidBalancesT      map[[32]byte]int64
+	FactoidBalancesT      []map[[32]byte]int64
 	FactoidBalancesTMutex sync.Mutex
 	ECBalancesT           map[[32]byte]int64
 	ECBalancesTMutex      sync.Mutex
@@ -1335,7 +1335,10 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 	pl.AuditServers = make([]interfaces.IServer, 0)
 	//pl.Requests = make(map[[20]byte]*Request)
 
-	pl.FactoidBalancesT = map[[32]byte]int64{}
+	for i := 0; i < constants.NumberOfCoins; i++ {
+		pl.FactoidBalancesT = append(pl.FactoidBalancesT, map[[32]byte]int64{})
+	}
+
 	pl.ECBalancesT = map[[32]byte]int64{}
 
 	if previous != nil {

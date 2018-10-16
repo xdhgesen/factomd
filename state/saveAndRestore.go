@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 
+	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -34,7 +35,7 @@ type SaveState struct {
 	AuditServers []interfaces.IServer
 
 	// The old balances must be restored
-	FactoidBalancesP map[[32]byte]int64
+	FactoidBalancesP []map[[32]byte]int64
 	ECBalancesP      map[[32]byte]int64
 
 	IdentityControl *IdentityManager // Identities
@@ -110,8 +111,8 @@ var _ interfaces.BinaryMarshallable = (*SaveState)(nil)
 var _ interfaces.Printable = (*SaveState)(nil)
 
 func (ss *SaveState) Init(s *State) {
-	if ss.FactoidBalancesP == nil {
-		ss.FactoidBalancesP = map[[32]byte]int64{}
+	for range s.FactoidBalancesP {
+		ss.FactoidBalancesP = append(ss.FactoidBalancesP, map[[32]byte]int64{})
 	}
 	if ss.ECBalancesP == nil {
 		ss.ECBalancesP = map[[32]byte]int64{}
@@ -155,9 +156,11 @@ func (a *SaveState) IsSameAs(b *SaveState) bool {
 	if len(a.FactoidBalancesP) != len(b.FactoidBalancesP) {
 		return false
 	}
-	for k := range a.FactoidBalancesP {
-		if a.FactoidBalancesP[k] != b.FactoidBalancesP[k] {
-			return false
+	for coin, fbp := range a.FactoidBalancesP {
+		for k, v := range fbp {
+			if v != b.FactoidBalancesP[coin][k] {
+				return false
+			}
 		}
 	}
 	if len(a.ECBalancesP) != len(b.ECBalancesP) {
@@ -325,9 +328,16 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.AuditServers = append(ss.AuditServers, pl.AuditServers...)
 
 	state.FactoidBalancesPMutex.Lock()
-	ss.FactoidBalancesP = make(map[[32]byte]int64, len(state.FactoidBalancesP))
-	for k := range state.FactoidBalancesP {
-		ss.FactoidBalancesP[k] = state.FactoidBalancesP[k]
+
+	for coin, fbp := range state.FactoidBalancesP {
+		if len(ss.FactoidBalancesP) <= coin {
+			ss.FactoidBalancesP = append(ss.FactoidBalancesP, map[[32]byte]int64{})
+		} else if ss.FactoidBalancesP[coin] == nil {
+			ss.FactoidBalancesP[coin] = make(map[[32]byte]int64)
+		}
+		for k, v := range fbp {
+			ss.FactoidBalancesP[coin][k] = v
+		}
 	}
 	state.FactoidBalancesPMutex.Unlock()
 
@@ -595,7 +605,9 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	pl.AuditServers = append(pl.AuditServers, ss.AuditServers...)
 
 	s.FactoidBalancesPMutex.Lock()
-	s.FactoidBalancesP = make(map[[32]byte]int64, 0)
+	for coin := range s.FactoidBalancesP {
+		s.FactoidBalancesP[coin] = make(map[[32]byte]int64, 0)
+	}
 	for k := range ss.FactoidBalancesP {
 		s.FactoidBalancesP[k] = ss.FactoidBalancesP[k]
 	}
@@ -723,10 +735,16 @@ func (ss *SaveState) MarshalBinary() (rval []byte, err error) {
 			return nil, err
 		}
 	}
-
-	err = PushBalanceMap(buf, ss.FactoidBalancesP)
+	err = buf.PushVarInt(uint64(constants.NumberOfCoins))
 	if err != nil {
 		return nil, err
+	}
+
+	for _, fbp := range ss.FactoidBalancesP {
+		err = PushBalanceMap(buf, fbp)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = PushBalanceMap(buf, ss.ECBalancesP)
@@ -922,7 +940,7 @@ func (ss *SaveState) MarshalBinary() (rval []byte, err error) {
 }
 
 func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
-	ss.FactoidBalancesP = map[[32]byte]int64{}
+	ss.FactoidBalancesP = ss.FactoidBalancesP[:0]
 	ss.ECBalancesP = map[[32]byte]int64{}
 	ss.Holding = map[[32]byte]interfaces.IMsg{}
 	ss.Acks = map[[32]byte]interfaces.IMsg{}
@@ -968,11 +986,18 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 		ss.AuditServers = append(ss.AuditServers, s)
 	}
 
-	ss.FactoidBalancesP, err = PopBalanceMap(buf)
+	nc, err := buf.PopVarInt()
 	if err != nil {
 		return
 	}
 
+	ss.FactoidBalancesP = make([]map[[32]byte]int64, nc, nc)
+	for i := 0; i < int(nc); i++ {
+		ss.FactoidBalancesP[i], err = PopBalanceMap(buf)
+		if err != nil {
+			return
+		}
+	}
 	ss.ECBalancesP, err = PopBalanceMap(buf)
 	if err != nil {
 		return

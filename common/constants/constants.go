@@ -385,3 +385,7 @@ const (
 	// Time window for identity to require registration: 24hours = 144 blocks
 	IDENTITY_REGISTRATION_BLOCK_WINDOW uint32 = 144
 )
+
+// Stable Coins
+var NumberOfCoins int = 3
+var CoinNames []string = []string{"FCT", "USD", "BTC", "Gold"}

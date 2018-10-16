@@ -603,7 +603,10 @@ func (s *State) AddDBState(isNew bool,
 			s.LeaderPL.ECBalancesTMutex.Lock()
 			defer s.LeaderPL.ECBalancesTMutex.Unlock()
 
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
+			s.LeaderPL.FactoidBalancesT = s.LeaderPL.FactoidBalancesT[:0]
+			for coin := 0; coin < constants.NumberOfCoins; coin++ {
+				s.LeaderPL.FactoidBalancesT = append(s.LeaderPL.FactoidBalancesT, map[[32]byte]int64{})
+			}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
 		}
 
@@ -2335,18 +2338,22 @@ func (s *State) GetHighestKnownBlock() uint32 {
 // If rt (return temp) is true, return the temp balance.  If false, return the perm balance (balance as of
 // the last completed block.
 func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
+	return s.GetCoin(0, rt, adr)
+}
+
+func (s *State) GetCoin(coin int, rt bool, adr [32]byte) (v int64) {
 	ok := false
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			v, ok = pl.FactoidBalancesT[adr]
+			v, ok = pl.FactoidBalancesT[coin][adr]
 			pl.FactoidBalancesTMutex.Unlock()
 		}
 	}
 	if !ok {
 		s.FactoidBalancesPMutex.Lock()
-		v = s.FactoidBalancesP[adr]
+		v = s.FactoidBalancesP[coin][adr]
 		s.FactoidBalancesPMutex.Unlock()
 	}
 
@@ -2354,18 +2361,22 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 
 }
 
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.PutFcoin(0, rt, adr, v)
+}
+
+// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+func (s *State) PutFcoin(coin int, rt bool, adr [32]byte, v int64) {
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
 			pl.FactoidBalancesTMutex.Lock()
-			pl.FactoidBalancesT[adr] = v
+			pl.FactoidBalancesT[coin][adr] = v
 			pl.FactoidBalancesTMutex.Unlock()
 		}
 	} else {
 		s.FactoidBalancesPMutex.Lock()
-		s.FactoidBalancesP[adr] = v
+		s.FactoidBalancesP[coin][adr] = v
 		s.FactoidBalancesPMutex.Unlock()
 	}
 }

@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"errors"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -25,6 +26,11 @@ type Transaction struct {
 
 	// Marshalled in MarshalBinary()
 	// version     uint64         Version of transaction. Hardcoded, naturally.
+	Coin       int  // Index of the coin source
+	CoinTarget int  // Index of the coin target (if a conversion)
+	Conversion bool // Conversion TX have only one input
+	Version    int  //Tx Version.  2 is single tx; 3 or greater is pegged tokens
+
 	MilliTimestamp uint64 `json:"millitimestamp"`
 	// #inputs     uint8          number of inputs
 	// #outputs    uint8          number of outputs
@@ -39,6 +45,18 @@ type Transaction struct {
 var _ interfaces.ITransaction = (*Transaction)(nil)
 var _ interfaces.Printable = (*Transaction)(nil)
 var _ interfaces.BinaryMarshallableAndCopyable = (*Transaction)(nil)
+
+func (t *Transaction) GetCoin() int {
+	return t.Coin
+}
+
+func (t *Transaction) GetCoinTarget() int {
+	return t.CoinTarget
+}
+
+func (t *Transaction) IsConversion() bool {
+	return t.Conversion
+}
 
 func (t *Transaction) IsSameAs(trans interfaces.ITransaction) bool {
 	if trans == nil {
@@ -116,8 +134,11 @@ func (t *Transaction) clearCaches() {
 	return
 }
 
-func (*Transaction) GetVersion() uint64 {
-	return 2
+func (t *Transaction) GetVersion() uint64 {
+	if t.Version == 0 {
+		t.Version = 3
+	}
+	return uint64(t.Version)
 }
 
 func (t *Transaction) GetTxID() interfaces.IHash {
@@ -303,6 +324,15 @@ func (t Transaction) TotalECs() (sum uint64, err error) {
 // to indicate it isn't a coinbase transaction.
 func (t Transaction) Validate(index int) error {
 	// Inputs, outputs, and ecoutputs, must be valid,
+
+	if t.Conversion {
+		if len(t.Inputs) != 1 && len(t.Outputs) != 0 {
+			return errors.New("A conversion has only one input and no outputs")
+		}
+		if t.Coin > 0 && len(t.OutECs) > 0 {
+			return errors.New("Entry Credits can only be purchased with Factoids")
+		}
+	}
 	tInputs, err := t.TotalInputs()
 	if err != nil {
 		return err
@@ -434,8 +464,29 @@ func (t *Transaction) UnmarshalBinaryData(data []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if v != t.GetVersion() {
+	if v != 1 && v != 2 && v != 3 {
 		return nil, fmt.Errorf("Wrong Transaction Version encountered. Expected %v and found %v", t.GetVersion(), v)
+	}
+	if v == 1 {
+		v = 2
+	}
+	t.Version = int(v)
+	if v == 3 {
+		t.Conversion, err = buf.PopBool()
+		if err != nil {
+			return nil, err
+		}
+		coin, err := buf.PopVarInt()
+		if err != nil {
+			return nil, err
+		}
+		t.Coin = int(coin)
+
+		coin, err = buf.PopVarInt()
+		if err != nil {
+			return nil, err
+		}
+		t.CoinTarget = int(coin)
 	}
 
 	hd, err := buf.PopUInt32()
@@ -532,6 +583,23 @@ func (t *Transaction) MarshalBinarySig() (rval []byte, err error) {
 	err = buf.PushVarInt(t.GetVersion())
 	if err != nil {
 		return nil, err
+	}
+
+	if t.GetVersion() == 3 {
+		err = buf.PushBool(t.Conversion)
+		if err != nil {
+			return nil, err
+		}
+
+		err = buf.PushVarInt(uint64(t.Coin))
+		if err != nil {
+			return nil, err
+		}
+
+		err = buf.PushVarInt(uint64(t.CoinTarget))
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	hd := uint32(t.MilliTimestamp >> 16)

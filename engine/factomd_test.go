@@ -928,10 +928,10 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		byteAcc := [32]byte{}
 		copy(byteAcc[:], primitives.ConvertUserStrToAddress(a))
 
-		PermBalance, pok := state0.FactoidBalancesP[byteAcc] // Gets the Balance of the Factoid address
+		PermBalance, pok := state0.FactoidBalancesP[0][byteAcc] // Gets the Balance of the Factoid address
 
 		if state0.FactoidBalancesPapi != nil {
-			if savedBal, ok := state0.FactoidBalancesPapi[byteAcc]; ok {
+			if savedBal, ok := state0.FactoidBalancesPapi[0][byteAcc]; ok {
 				PermBalance = savedBal
 			}
 		}
@@ -939,7 +939,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		pl := state0.ProcessLists.Get(currentHeight)
 		pl.FactoidBalancesTMutex.Lock()
 		// Gets the Temp Balance of the Factoid address
-		TempBalance, tok := pl.FactoidBalancesT[byteAcc]
+		TempBalance, tok := pl.FactoidBalancesT[0][byteAcc]
 		pl.FactoidBalancesTMutex.Unlock()
 
 		if tok != true && pok != true {
@@ -952,7 +952,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		} else if tok == false && pok == true {
 			plLastHeight := state0.ProcessLists.Get(currentHeight - 1)
 			plLastHeight.FactoidBalancesTMutex.Lock()
-			TempBalanceLastHeight, tokLastHeight := plLastHeight.FactoidBalancesT[byteAcc] // Gets the Temp Balance of the Factoid address
+			TempBalanceLastHeight, tokLastHeight := plLastHeight.FactoidBalancesT[0][byteAcc] // Gets the Temp Balance of the Factoid address
 			plLastHeight.FactoidBalancesTMutex.Unlock()
 			if tokLastHeight == false {
 				TempBalance = PermBalance
@@ -1143,7 +1143,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 		} else if tok == false && pok == true {
 			plLastHeight := state0.ProcessLists.Get(currentHeight - 1)
 			plLastHeight.FactoidBalancesTMutex.Lock()
-			TempBalanceLastHeight, tokLastHeight := plLastHeight.FactoidBalancesT[byteAcc] // Gets the Temp Balance of the Factoid address
+			TempBalanceLastHeight, tokLastHeight := plLastHeight.FactoidBalancesT[0][byteAcc] // Gets the Temp Balance of the Factoid address
 			plLastHeight.FactoidBalancesTMutex.Unlock()
 			if tokLastHeight == false {
 				TempBalance = PermBalance

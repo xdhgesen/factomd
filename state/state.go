@@ -309,8 +309,10 @@ type State struct {
 	NumTransactions int
 
 	// Permanent balances from processing blocks.
-	FactoidBalancesPapi   map[[32]byte]int64
-	FactoidBalancesP      map[[32]byte]int64
+	StableCoins           []string
+	USDValues             []float64
+	FactoidBalancesPapi   []map[[32]byte]int64
+	FactoidBalancesP      []map[[32]byte]int64
 	FactoidBalancesPMutex sync.Mutex
 	ECBalancesPapi        map[[32]byte]int64
 	ECBalancesP           map[[32]byte]int64
@@ -893,7 +895,11 @@ func (s *State) Init() {
 	s.Commits = NewSafeMsgMap("commits", s) //make(map[[32]byte]interfaces.IMsg)
 
 	// Setup the FactoidState and Validation Service that holds factoid and entry credit balances
-	s.FactoidBalancesP = map[[32]byte]int64{}
+
+	s.FactoidBalancesP = s.FactoidBalancesP[:0]
+	for i := 0; i < constants.NumberOfCoins; i++ {
+		s.FactoidBalancesP = append(s.FactoidBalancesP, map[[32]byte]int64{})
+	}
 	s.ECBalancesP = map[[32]byte]int64{}
 
 	fs := new(FactoidState)

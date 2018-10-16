@@ -96,34 +96,39 @@ func GetMapHash(dbheight uint32, bmap map[[32]byte]int64) interfaces.IHash {
 	return h
 }
 
-func (fs *FactoidState) GetBalanceHash(includeTemp bool) interfaces.IHash {
-	h1 := GetMapHash(fs.DBHeight, fs.State.FactoidBalancesP)
-	h2 := GetMapHash(fs.DBHeight, fs.State.ECBalancesP)
-	h3 := h1
-	h4 := h2
-	if includeTemp {
-		pl := fs.State.ProcessLists.Get(fs.DBHeight)
-		if pl == nil {
-			return primitives.NewZeroHash()
+func (fs *FactoidState) GetBalanceHash(includeTemp bool) (r interfaces.IHash) {
+	r = primitives.NewZeroHash()
+	for i := 0; i < constants.NumberOfCoins; i++ {
+		h1 := GetMapHash(fs.DBHeight, fs.State.FactoidBalancesP[i])
+		h2 := GetMapHash(fs.DBHeight, fs.State.ECBalancesP)
+		h3 := h1
+		h4 := h2
+		if includeTemp {
+			pl := fs.State.ProcessLists.Get(fs.DBHeight)
+			if pl == nil {
+				return primitives.NewZeroHash()
+			}
+			pl.ECBalancesTMutex.Lock()
+			pl.FactoidBalancesTMutex.Lock()
+			h3 = GetMapHash(fs.DBHeight, pl.FactoidBalancesT[i])
+			h4 = GetMapHash(fs.DBHeight, pl.ECBalancesT)
+			pl.ECBalancesTMutex.Unlock()
+			pl.FactoidBalancesTMutex.Unlock()
 		}
-		pl.ECBalancesTMutex.Lock()
-		pl.FactoidBalancesTMutex.Lock()
-		h3 = GetMapHash(fs.DBHeight, pl.FactoidBalancesT)
-		h4 = GetMapHash(fs.DBHeight, pl.ECBalancesT)
-		pl.ECBalancesTMutex.Unlock()
-		pl.FactoidBalancesTMutex.Unlock()
+		var b []byte
+		b = append(b, r.Bytes()...)
+		b = append(b, h1.Bytes()...)
+		b = append(b, h2.Bytes()...)
+		if includeTemp {
+			b = append(b, h3.Bytes()...)
+			b = append(b, h4.Bytes()...)
+		}
+		r = primitives.Sha(b)
+		// Debug aid for Balance Hashes
+		// fmt.Printf("%8d %x\n", fs.DBHeight, r.Bytes()[:16])
 	}
-	var b []byte
-	b = append(b, h1.Bytes()...)
-	b = append(b, h2.Bytes()...)
-	if includeTemp {
-		b = append(b, h3.Bytes()...)
-		b = append(b, h4.Bytes()...)
-	}
-	r := primitives.Sha(b)
-	// Debug aid for Balance Hashes
-	// fmt.Printf("%8d %x\n", fs.DBHeight, r.Bytes()[:16])
 	return r
+
 }
 
 // Reset this Factoid state to an empty state at a dbheight following the
@@ -313,7 +318,7 @@ func (fs *FactoidState) UpdateTransaction(rt bool, trans interfaces.ITransaction
 	// First check all inputs are good.
 	for _, input := range trans.GetInputs() {
 		adr := input.GetAddress().Fixed()
-		oldv := fs.State.GetF(rt, adr)
+		oldv := fs.State.GetCoin(trans.GetCoin(), rt, adr)
 		v := oldv - int64(input.GetAmount())
 		if v < 0 {
 			return fmt.Errorf("%29s dbht %d: Not enough factoids (%d) to cover a transaction (%d)",
@@ -326,7 +331,7 @@ func (fs *FactoidState) UpdateTransaction(rt bool, trans interfaces.ITransaction
 	// Then update the state for all inputs.
 	for _, input := range trans.GetInputs() {
 		adr := input.GetAddress().Fixed()
-		oldv := fs.State.GetF(rt, adr)
+		oldv := fs.State.GetCoin(trans.GetCoin(), rt, adr)
 		v := oldv - int64(input.GetAmount())
 		fs.State.PutF(rt, adr, v)
 	}
@@ -336,7 +341,7 @@ func (fs *FactoidState) UpdateTransaction(rt bool, trans interfaces.ITransaction
 
 	for _, output := range trans.GetOutputs() {
 		adr := output.GetAddress().Fixed()
-		oldv := fs.State.GetF(rt, adr)
+		oldv := fs.State.GetCoin(trans.GetCoin(), rt, adr)
 		fs.State.PutF(rt, adr, oldv+int64(output.GetAmount()))
 	}
 	for _, ecOut := range trans.GetECOutputs() {
@@ -396,7 +401,7 @@ func (fs *FactoidState) Validate(index int, trans interfaces.ITransaction) error
 		if err != nil {
 			return err
 		}
-		curbal := fs.State.GetF(true, input.GetAddress().Fixed())
+		curbal := fs.State.GetCoin(trans.GetCoin(), true, input.GetAddress().Fixed())
 		if int64(bal) > curbal {
 			return fmt.Errorf("%20s DBHT %d %s %d %s %d %s",
 				fs.State.GetFactomNodeName(),
@@ -513,6 +518,10 @@ func (fs *FactoidState) GetMultipleECBalances(singleAdd [32]byte) (uint32, uint3
 }
 
 func (fs *FactoidState) GetMultipleFactoidBalances(singleAdd [32]byte) (uint32, uint32, int64, int64, string) {
+	return fs.GetMultipleCoinBalances(0, singleAdd)
+}
+
+func (fs *FactoidState) GetMultipleCoinBalances(coin int, singleAdd [32]byte) (uint32, uint32, int64, int64, string) {
 
 	if fs.State.IgnoreDone != true || fs.State.DBFinished != true {
 		return 0, 0, 0, 0, "Not fully booted"
@@ -522,10 +531,10 @@ func (fs *FactoidState) GetMultipleFactoidBalances(singleAdd [32]byte) (uint32, 
 	heighestSavedHeight := fs.State.GetHighestSavedBlk()
 	errNotAcc := ""
 
-	PermBalance, pok := fs.State.FactoidBalancesP[singleAdd] // Gets the Balance of the Factoid address
+	PermBalance, pok := fs.State.FactoidBalancesP[coin][singleAdd] // Gets the Balance of the Factoid address
 
 	if fs.State.FactoidBalancesPapi != nil {
-		if savedBal, ok := fs.State.FactoidBalancesPapi[singleAdd]; ok {
+		if savedBal, ok := fs.State.FactoidBalancesPapi[coin][singleAdd]; ok {
 			PermBalance = savedBal
 		}
 	}
@@ -535,7 +544,7 @@ func (fs *FactoidState) GetMultipleFactoidBalances(singleAdd [32]byte) (uint32, 
 	pl := fs.State.ProcessLists.Get(currentHeight)
 	if pl != nil {
 		pl.FactoidBalancesTMutex.Lock()
-		TempBalance, tok = pl.FactoidBalancesT[singleAdd] // Gets the Temp Balance of the Factoid address
+		TempBalance, tok = pl.FactoidBalancesT[coin][singleAdd] // Gets the Temp Balance of the Factoid address
 		pl.FactoidBalancesTMutex.Unlock()
 	}
 
@@ -552,7 +561,7 @@ func (fs *FactoidState) GetMultipleFactoidBalances(singleAdd [32]byte) (uint32, 
 		pl2 := fs.State.ProcessLists.Get(currentHeight - 1)
 		if pl2 != nil {
 			pl2.FactoidBalancesTMutex.Lock()
-			TempBalance, tok = pl2.FactoidBalancesT[singleAdd] // Gets the Temp Balance of the Factoid address
+			TempBalance, tok = pl2.FactoidBalancesT[coin][singleAdd] // Gets the Temp Balance of the Factoid address
 			pl2.FactoidBalancesTMutex.Unlock()
 			if tok == false {
 				TempBalance = PermBalance
