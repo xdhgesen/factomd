@@ -1335,7 +1335,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 	pl.AuditServers = make([]interfaces.IServer, 0)
 	//pl.Requests = make(map[[20]byte]*Request)
 
-	for i := 0; i < constants.NumberOfCoins; i++ {
+	for i := 0; i < constants.NumberOfTokens; i++ {
 		pl.FactoidBalancesT = append(pl.FactoidBalancesT, map[[32]byte]int64{})
 	}
 

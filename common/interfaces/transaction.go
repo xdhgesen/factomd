@@ -54,10 +54,7 @@ type ITransaction interface {
 	GetCoinTarget() int
 	IsConversion() bool
 
-	// Version 2 : Once coin
-	// Version >2  : Indexed to Pegged Tokens
 	GetVersion() uint64
-
 	// Locktime serves as a nonce to make every transaction unique. Transactions
 	// that are more than 24 hours old are not included nor propagated through
 	// the network.

@@ -897,7 +897,7 @@ func (s *State) Init() {
 	// Setup the FactoidState and Validation Service that holds factoid and entry credit balances
 
 	s.FactoidBalancesP = s.FactoidBalancesP[:0]
-	for i := 0; i < constants.NumberOfCoins; i++ {
+	for i := 0; i < constants.NumberOfTokens; i++ {
 		s.FactoidBalancesP = append(s.FactoidBalancesP, map[[32]byte]int64{})
 	}
 	s.ECBalancesP = map[[32]byte]int64{}

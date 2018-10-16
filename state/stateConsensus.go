@@ -604,7 +604,7 @@ func (s *State) AddDBState(isNew bool,
 			defer s.LeaderPL.ECBalancesTMutex.Unlock()
 
 			s.LeaderPL.FactoidBalancesT = s.LeaderPL.FactoidBalancesT[:0]
-			for coin := 0; coin < constants.NumberOfCoins; coin++ {
+			for coin := 0; coin < constants.NumberOfTokens; coin++ {
 				s.LeaderPL.FactoidBalancesT = append(s.LeaderPL.FactoidBalancesT, map[[32]byte]int64{})
 			}
 			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}

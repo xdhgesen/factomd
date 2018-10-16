@@ -386,6 +386,6 @@ const (
 	IDENTITY_REGISTRATION_BLOCK_WINDOW uint32 = 144
 )
 
-// Stable Coins
-var NumberOfCoins int = 3
-var CoinNames []string = []string{"FCT", "USD", "BTC", "Gold"}
+// Tokens
+var NumberOfTokens int = 2
+var TokenNames []string = []string{"FCT", "EC"}

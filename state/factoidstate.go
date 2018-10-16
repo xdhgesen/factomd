@@ -98,7 +98,7 @@ func GetMapHash(dbheight uint32, bmap map[[32]byte]int64) interfaces.IHash {
 
 func (fs *FactoidState) GetBalanceHash(includeTemp bool) (r interfaces.IHash) {
 	r = primitives.NewZeroHash()
-	for i := 0; i < constants.NumberOfCoins; i++ {
+	for i := 0; i < constants.NumberOfTokens; i++ {
 		h1 := GetMapHash(fs.DBHeight, fs.State.FactoidBalancesP[i])
 		h2 := GetMapHash(fs.DBHeight, fs.State.ECBalancesP)
 		h3 := h1

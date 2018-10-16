@@ -735,7 +735,7 @@ func (ss *SaveState) MarshalBinary() (rval []byte, err error) {
 			return nil, err
 		}
 	}
-	err = buf.PushVarInt(uint64(constants.NumberOfCoins))
+	err = buf.PushVarInt(uint64(constants.NumberOfTokens))
 	if err != nil {
 		return nil, err
 	}

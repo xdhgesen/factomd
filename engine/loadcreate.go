@@ -36,7 +36,11 @@ type LoadGenerator struct {
 // NewLoadGenerator makes a new load generator. The state is used for funding the transaction
 func NewLoadGenerator(s *state.State) *LoadGenerator {
 	lg := new(LoadGenerator)
-	lg.ECKey, _ = primitives.NewPrivateKeyFromHex(ecSec)
+	var err error
+	lg.ECKey, err = primitives.NewPrivateKeyFromHex(ecSec)
+	if err != nil {
+		panic(err)
+	}
 	lg.stop = make(chan bool, 5)
 
 	return lg

@@ -1140,7 +1140,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// then look to list.State.FactoidBalancesP
 	list.State.FactoidBalancesPMutex.Lock()
 	list.State.FactoidBalancesPapi = list.State.FactoidBalancesPapi[:0]
-	for i := 0; i < constants.NumberOfCoins; i++ {
+	for i := 0; i < constants.NumberOfTokens; i++ {
 		list.State.FactoidBalancesPapi = append(list.State.FactoidBalancesPapi, make(map[[32]byte]int64, len(pl.FactoidBalancesT)))
 	}
 	for k := range pl.FactoidBalancesT {

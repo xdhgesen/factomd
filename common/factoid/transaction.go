@@ -465,7 +465,7 @@ func (t *Transaction) UnmarshalBinaryData(data []byte) ([]byte, error) {
 		return nil, err
 	}
 	if v != 1 && v != 2 && v != 3 {
-		return nil, fmt.Errorf("Wrong Transaction Version encountered. Expected %v and found %v", t.GetVersion(), v)
+		return nil, fmt.Errorf("Wrong Transaction Version encountered. Found %v but expected 1, 2, or 3", v)
 	}
 	if v == 1 {
 		v = 2
