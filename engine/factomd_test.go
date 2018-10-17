@@ -150,7 +150,6 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	state0.MessageTally = true
 	fmt.Printf("Starting timeout timer:  Expected test to take %s or %d blocks\n", Calctime.String(), height)
 	StatusEveryMinute(state0)
-	WaitMinutes(state0, 1) // wait till initial DBState message for the genesis block is processed
 	creatingNodes(GivenNodes, state0)
 
 	t.Logf("Allocated %d nodes", l)
@@ -162,10 +161,8 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 }
 
 func creatingNodes(creatingNodes string, state0 *state.State) {
-
 	runCmd(fmt.Sprintf("g%d", len(creatingNodes)))
 	WaitMinutes(state0, 1)
-
 	// Wait till all the entries from the g command are processed
 	simFnodes := GetFnodes()
 	nodes := len(simFnodes)
@@ -174,7 +171,6 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 		for _, s := range simFnodes {
 			iq += s.State.InMsgQueue().Length()
 		}
-
 		iq2 := 0
 		for _, s := range simFnodes {
 			iq2 += s.State.InMsgQueue2().Length()
@@ -386,7 +382,6 @@ func shutDownEverything(t *testing.T) {
 	fmt.Printf("Test took %d blocks and %s time\n", GetFnodes()[0].State.LLeaderHeight, time.Now().Sub(GetFnodes()[0].State.Starttime))
 
 }
-
 func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
 	j, err := json.Marshal(req)
 	if err != nil {
@@ -504,6 +499,7 @@ func TestSetupANetwork(t *testing.T) {
 	WaitBlocks(fn1.State, 3) // Waits for 3 blocks
 
 	shutDownEverything(t)
+
 }
 
 func TestLoad(t *testing.T) {
@@ -525,6 +521,38 @@ func TestLoad(t *testing.T) {
 	WaitBlocks(state0, 1)
 	shutDownEverything(t)
 } // testLoad(){...}
+
+func TestLoad2(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+	runCmd("Re")
+	state0 := SetupSim("LLLAAAFFF", map[string]string{}, 15, 0, 0, t)
+
+	runCmd("7") // select node 7
+	runCmd("x") // take out 7 from the network
+	WaitBlocks(state0, 1)
+	WaitForMinute(state0, 1)
+
+	runCmd("R30") // Feed load
+	WaitBlocks(state0, 3)
+	runCmd("Rt60")
+	runCmd("T20")
+	runCmd("R.5")
+	WaitBlocks(state0, 2)
+	runCmd("x")
+	WaitBlocks(state0, 3)
+	WaitMinutes(state0, 3)
+
+	ht7 := GetFnodes()[7].State.GetLLeaderHeight()
+	ht6 := GetFnodes()[6].State.GetLLeaderHeight()
+	if ht7 != ht6 {
+		t.Fatalf("Node 7 was at dbheight %d which didn't match Node 6 at dbheight %d", ht7, ht6)
+	}
+
+} // testLoad2(){...}
 
 // The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
 // the bug happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
@@ -705,6 +733,7 @@ func TestAnElection(t *testing.T) {
 	CheckAuthoritySet(t)
 
 	shutDownEverything(t)
+
 }
 
 func TestDBsigEOMElection(t *testing.T) {
@@ -768,6 +797,7 @@ func TestDBsigEOMElection(t *testing.T) {
 	WaitForAllNodes(state0)
 	CheckAuthoritySet(t)
 	shutDownEverything(t)
+
 }
 
 func TestMultiple2Election(t *testing.T) {
@@ -1326,6 +1356,7 @@ func TestDBSigElection(t *testing.T) {
 	for _, fn := range GetFnodes() {
 		fn.State.ShutdownChan <- 1
 	}
+
 	shutDownEverything(t)
 }
 
