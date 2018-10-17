@@ -113,8 +113,8 @@ func (m *Ack) Validate(s interfaces.IState) int {
 	msg, _ := s.GetMsg(m.VMIndex, int(m.DBHeight), int(m.Height))
 	if msg != nil {
 		if msg == m {
-			s.LogMessage("executeMsg", "Ack slot taken", m)
-			s.LogMessage("executeMsg", "found:", msg)
+		s.LogMessage("executeMsg", "Ack slot taken", m)
+		s.LogMessage("executeMsg", "found:", msg)
 		} else {
 			s.LogPrintf("executeMsg", "duplicate at %d/%d/%d", int(m.DBHeight), m.VMIndex, int(m.Height))
 		}
