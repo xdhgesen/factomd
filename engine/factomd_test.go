@@ -1431,11 +1431,11 @@ func TestProcessedBlockFailure(t *testing.T) {
 	var oneFct uint64 = factom.FactoidToFactoshi("1")
 
 	// NOTE: this address has a balance from genesis block
-	bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
+	//bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
 	bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
 
 	fromSecret := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ"  // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
-	fromAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u" // added hardcoded grants for this address
+	//fromAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u" // added hardcoded grants for this address
 
 	toSecret := "Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk" // FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD
 	toAddress := "FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD"
@@ -1444,11 +1444,12 @@ func TestProcessedBlockFailure(t *testing.T) {
 	go func() { // target back to bank
 		for {
 			// Fund from genesis block rather than waiting for a grant
-			sendTxn(state0, oneFct+ 2*ecPrice, bankSecret, fromAddress, ecPrice)
+			//sendTxn(state0, oneFct+ 2*ecPrice, bankSecret, fromAddress, ecPrice)
 
+			// wait for grant to fund FromAd
 			sendTxn(state0, oneFct+ecPrice, fromSecret, toAddress, ecPrice)
 			sendTxn(state0, oneFct, toSecret, bankAddress, ecPrice)
-			time.Sleep(time.Millisecond*2)
+			time.Sleep(time.Millisecond*500)
 		}
 	}()
 
