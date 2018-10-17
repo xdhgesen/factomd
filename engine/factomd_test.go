@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/FactomProject/factom"
+	"github.com/FactomProject/factomd/common/messages"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -62,10 +64,10 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		"--checkheads":          "false",
 		"--controlpanelsetting": "readwrite",
 		//"--debuglog":            ".",
-		"--logPort":          "37000",
-		"--port":             "37001",
-		"--controlpanelport": "37002",
-		"--networkport":      "37003",
+		//"--logPort":          "37000",
+		//"--port":             "37001",
+		//"--controlpanelport": "37002",
+		//"--networkport":      "37003",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
@@ -1316,10 +1318,10 @@ func makeExpected(grants []state.HardGrant) []interfaces.ITransAddress {
 }
 
 // construct a new factoid transaction
-func newTransaction(amt uint64, userPrivIn string, userPrivOut string, ecPrice uint64) (*factoid.Transaction, error) {
+func newTransaction(amt uint64, userSecretIn string, userPublicOut string, ecPrice uint64) (*factoid.Transaction, error) {
 
-	inSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userPrivIn))
-	outSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userPrivOut))
+	inSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userSecretIn))
+	outPub := factoid.NewAddress(primitives.ConvertUserStrToAddress(userPublicOut))
 
 	var sec [64]byte
 	copy(sec[:32], inSec.Bytes()) // pass 32 byte key in a 64 byte field for the crypto library
@@ -1333,12 +1335,16 @@ func newTransaction(amt uint64, userPrivIn string, userPrivOut string, ecPrice u
 		panic(err)
 	}
 
-	outAdd := factoid.NewAddress(outSec.Bytes())
-
 	trans := new(factoid.Transaction)
 	trans.AddInput(inAdd, amt)
-	trans.AddOutput(outAdd, amt)
-	println("------------")
+	trans.AddOutput(outPub, amt)
+
+	/*
+	userIn := primitives.ConvertFctAddressToUserStr(inAdd)
+	userOut := primitives.ConvertFctAddressToUserStr(outPub)
+	fmt.Printf("Txn %v %v -> %v\n", amt, userIn, userOut)
+	*/
+
 
 	// REVIEW: why is this different from engine.FundWallet() ?
 	//trans.AddRCD(rcd)
@@ -1374,36 +1380,81 @@ func AssertEquals(t *testing.T, a interface{}, b interface{}) {
 	}
 }
 
+func AssertNil(t *testing.T, a interface{}) {
+	AssertEquals(t, a, nil)
+}
 
 func TestTxnCreate(t *testing.T) {
-	//var inputAmt uint64 = 100012000
 	var amt uint64 = 100000000
 	var ecPrice uint64 = 10000
 
-	inUser := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK"
-	outUser := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ"
+	inUser := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
+	//outUser := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ" // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
+	outAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u"
 
-	txn, err := newTransaction(amt, inUser, outUser, ecPrice)
-	if err != nil {
-		t.Fatalf("failed to create Transaction %v", err)
-	}
+	txn, err := newTransaction(amt, inUser, outAddress, ecPrice)
+	AssertNil(t, err)
 
-	if err := txn.ValidateSignatures(); err != nil {
-		t.Fatalf("created invalid signature: %v", err)
-	}
+	err = txn.ValidateSignatures()
+	AssertNil(t, err)
 
-	if err := txn.Validate(1); err != nil {
-		t.Fatalf("created invalid transaction: %v", err)
-	}
+	err = txn.Validate(1)
+	AssertNil(t, err)
 
 	if err := txn.Validate(0); err == nil {
 		t.Fatalf("expected coinbase txn to error")
 	}
 
+	// test that we are sending to the address we thought
+	AssertEquals(t, outAddress, txn.Outputs[0].GetUserAddress())
+
+}
+
+func sendTxn(s *state.State, amt uint64, userSecretIn string, userSecretOut string, ecPrice uint64) (*factoid.Transaction, error) {
+	txn, _ := newTransaction(amt, userSecretIn, userSecretOut, ecPrice)
+	msg := new(messages.FactoidTransaction)
+	msg.SetTransaction(txn)
+	s.APIQueue().Enqueue(msg)
+	return txn, nil
 }
 
 func TestProcessedBlockFailure(t *testing.T) {
-	// FIXME
+	// test was for an existing non-zero balance after grant then trying to remove
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 300, 0, 0, t)
+	var ecPrice uint64 = state0.GetFactoshisPerEC() //10000
+	var oneFct uint64 = factom.FactoidToFactoshi("1")
+
+	// NOTE: this address has a balance from genesis block
+	bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
+	bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
+
+	fromSecret := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ"  // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
+	fromAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u" // added hardcoded grants for this address
+
+	toSecret := "Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk" // FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD
+	toAddress := "FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD"
+
+
+	go func() { // target back to bank
+		for {
+			// Fund from genesis block rather than waiting for a grant
+			sendTxn(state0, oneFct+ 2*ecPrice, bankSecret, fromAddress, ecPrice)
+
+			sendTxn(state0, oneFct+ecPrice, fromSecret, toAddress, ecPrice)
+			sendTxn(state0, oneFct, toSecret, bankAddress, ecPrice)
+			time.Sleep(time.Millisecond*2)
+		}
+	}()
+
+	WaitBlocks(state0, 100)
+	WaitForAllNodes(state0)
+	shutDownEverything(t)
 }
 
 func TestGrants(t *testing.T) {
