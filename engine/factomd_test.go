@@ -1553,7 +1553,6 @@ func TestProcessedBlockFailure(t *testing.T) {
 		}
 
 		waitForDeposit := func() {
-			TimeNow(state0)
 			balance := getBalance(state0, toAddress)
 			for balance <= 0 {
 				delay()
@@ -1563,35 +1562,42 @@ func TestProcessedBlockFailure(t *testing.T) {
 			TimeNow(state0)
 		}
 
+		_= waitForDeposit
+
 		waitForEmpty := func() {
-			TimeNow(state0)
 			balance := getBalance(state0, toAddress)
 			for balance > 0 {
 				delay()
 				balance = getBalance(state0, toAddress)
 			}
 			fmt.Printf("%v-%v pongDeposit %v %v \n", i, pingCount, toAddress, balance)
-			TimeNow(state0)
 		}
+
+		_= waitForEmpty
 
 		WaitForBlock(state0, waitBlock)
 		WaitForMinute(state0, waitMinute)
 		time.Sleep(time.Millisecond*time.Duration(additionalDelay))
 		for {
 			sendTxn(state0, sendAmt, bankSecret, toAddress, ecPrice)
-			go waitForDeposit()
+			waitForDeposit()
+			TimeNow(state0)
+
 			sendTxn(state0, returnAmt, fromSecret, bankAddress, ecPrice)
-			go waitForEmpty()
+			waitForEmpty()
+			TimeNow(state0)
+
 			pingCount += 1
 			//time.Sleep(time.Millisecond * 100)
 		}
 	}
 
 	_ = mkTransactionsAfterGrants
-	//go mkTransactionsAfterGrants(0, 17, 8)
-	//go mkTransactionsAfterGrants(1, 17, 9)
-	//go mkTransactionsAfterGrants(2, 18, 0)
+	go mkTransactionsAfterGrants(0, 17, 8)
+	go mkTransactionsAfterGrants(1, 17, 9)
+	go mkTransactionsAfterGrants(2, 18, 0)
 
+	// TODO: refactor to generate long chains of transactions
     go mkTransactions(3, 7, 9)
     go mkTransactions(4, 8, 0)
 
