@@ -1544,7 +1544,6 @@ func TestProcessedBlockFailure(t *testing.T) {
 	mkTransactions := func(i int, waitBlock int, waitMinute int) { // txnGenerator
 		pingCount := 0
 		sendAmt := oneFct - ecPrice*12 // FIXME tweak calculations
-		returnAmt := oneFct - ecPrice*24 // FIXME tweak calculations
 		toAddress := depositAddresses[i]
 		fromSecret := depositSecrets[i]
 
@@ -1552,7 +1551,7 @@ func TestProcessedBlockFailure(t *testing.T) {
 			time.Sleep(time.Millisecond * 10)
 		}
 
-		waitForDeposit := func() {
+		waitForDeposit := func() uint64 {
 			balance := getBalance(state0, toAddress)
 			for balance <= 0 {
 				delay()
@@ -1560,6 +1559,7 @@ func TestProcessedBlockFailure(t *testing.T) {
 			}
 			fmt.Printf("%v-%v pingDeposit %v %v \n", i, pingCount, toAddress, balance)
 			TimeNow(state0)
+			return uint64(balance)
 		}
 
 		_= waitForDeposit
@@ -1578,17 +1578,24 @@ func TestProcessedBlockFailure(t *testing.T) {
 		WaitForBlock(state0, waitBlock)
 		WaitForMinute(state0, waitMinute)
 		time.Sleep(time.Millisecond*time.Duration(additionalDelay))
-		for {
-			sendTxn(state0, sendAmt, bankSecret, toAddress, ecPrice)
-			waitForDeposit()
-			TimeNow(state0)
 
-			sendTxn(state0, returnAmt, fromSecret, bankAddress, ecPrice)
+		// NOTE: send return transaction before deposit
+		makeDeposit := func(amt uint64, from string, to string, returnFrom string, returnTo string) {
+			TimeNow(state0)
+			sendTxn(state0, amt-12*ecPrice, from, to, ecPrice)
+			sendTxn(state0, amt, returnFrom, returnTo, ecPrice)
+
+			waitForDeposit()
 			waitForEmpty()
 			TimeNow(state0)
 
 			pingCount += 1
 			//time.Sleep(time.Millisecond * 100)
+		}
+
+		for {
+			makeDeposit(sendAmt, fromSecret, bankAddress, bankSecret, toAddress)
+			sendAmt -= 12*ecPrice
 		}
 	}
 
