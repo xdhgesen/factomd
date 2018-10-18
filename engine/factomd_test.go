@@ -1471,10 +1471,8 @@ func TestProcessedBlockFailure(t *testing.T) {
 	var ecPrice uint64 = state0.GetFactoshisPerEC() //10000
 	var oneFct uint64 = factom.FactoidToFactoshi("1")
 
-	// from genesis block
-	//bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
-	//bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
-
+	bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK"
+	bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
 
 	var grantSecrets []string = []string{
 		"Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ",
@@ -1494,78 +1492,110 @@ func TestProcessedBlockFailure(t *testing.T) {
 		"Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk",
 		"Fs28Sn5SQpYQsHmXogseoe8kweCAwq76ZSTDv2RopLnhgZdigdDX",
 		"Fs3FztiJ2xVHHEUkg5hRCYikGr4LtF7pVqPzt9syH5dsjQye2K3p",
+		"Fs2d9VBdBN3xmdmWcrMV1Mw7WzMq3sZaD2a1LmfhncDwFGwdJnrs",
+		"Fs1j2DjuumzZck3P5K61jyo4xRwWTGHLGd6MTgLVvifRtRPgckZt",
 	}
 	_ = depositSecrets
+
 
 	var depositAddresses []string = []string{
 		"FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD",
 		"FA2imSqvmcaENqkSLFu6EW19eytxvSsM58R4Sq8Q5KkMr93LBmC4",
 		"FA32ZKrNXSh3WXnARih4oDuoy8BWZ3ad9LbTCnqSC8m39Nu9dWX5",
-	}
-
-	makeTransaction := func(i int) {
-		sendAmt := oneFct - ecPrice*12 // set total spend FIXME tweak calculations
-		fromAddress := grantAddresses[i]
-		toAddress := depositAddresses[i]
-		sendTxn(state0, sendAmt, grantSecrets[i], toAddress, ecPrice)
-
-		go func() {
-			fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
-			fmt.Printf("sent %v amount: %v ecPrice: %v\n", i, sendAmt, ecPrice)
-			TimeNow(state0)
-			time.Sleep(time.Millisecond * 100)
-			balance := getBalance(state0, toAddress)
-			for balance <= 0 {
-				time.Sleep(time.Millisecond * 100)
-				balance = getBalance(state0, toAddress)
-			}
-			TimeNow(state0)
-			fmt.Printf("%v depositAddr %v %v \n", i, toAddress, balance)
-			fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
-		}()
+		"FA2mpvrsw9FNempyM9TzXoCpx9kBfUWrdjuGAzJYwvCcTZwg2HWn",
+		"FA3Vatob7LQK8sTRRUED64XL7W8LhQRzwDYXYY1Sc3dGqm6Htk6B",
 	}
 
 	additionalDelay, _ := strconv.ParseInt(os.Getenv("TXNDELAY"),10, 64)
 	fmt.Printf("TXNDELAY: %v\n", additionalDelay)
 
-	txnGenerator := func(i int, waitBlock int, waitMinute int) { // txnGenerator
-		for {
-			abort := make(chan struct{})
-			go func() { // abort if timing overshoots next block
-				WaitForBlock(state0, waitBlock+1)
-				//WaitForMinute(state0, 1)
-				close(abort)
-			}()
+	var maxBlocks = 60
 
-			txnWait := make(chan struct{})
-			go func() { // wait for target
-				WaitForBlock(state0, waitBlock)
-				WaitForMinute(state0, waitMinute)
-				time.Sleep(time.Millisecond*time.Duration(additionalDelay))
-				close(txnWait)
-			}()
+	mkTransactionsAfterGrants := func(i int, waitBlock int, waitMinute int) { // txnGenerator
+		sendAmt := oneFct - ecPrice*12 // FIXME tweak calculations
+		fromAddress := grantAddresses[i]
+		toAddress := depositAddresses[i]
 
-			waitLoop:
-			for {
-				select {
-				case <-abort:
-				    println("overshot target window")
-					//t.FailNow()
-					break waitLoop
-				case <-txnWait:
-					break waitLoop
+		for waitBlock < maxBlocks {
+			WaitForBlock(state0, waitBlock)
+			WaitForMinute(state0, waitMinute)
+			time.Sleep(time.Millisecond*time.Duration(additionalDelay))
+
+			sendTxn(state0, sendAmt, grantSecrets[i], toAddress, ecPrice)
+
+			go func() {
+				fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
+				fmt.Printf("sent %v amount: %v ecPrice: %v\n", i, sendAmt, ecPrice)
+				TimeNow(state0)
+				time.Sleep(time.Millisecond * 100)
+				balance := getBalance(state0, toAddress)
+				for balance <= 0 {
+					time.Sleep(time.Millisecond * 100)
+					balance = getBalance(state0, toAddress)
 				}
-			}
-			makeTransaction(i)
+				TimeNow(state0)
+				fmt.Printf("%v depositAddr %v %v \n", i, toAddress, balance)
+				fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
+			}()
 			waitBlock += 5
 		}
 	}
 
-	go txnGenerator(0, 17, 8)
-	go txnGenerator(1, 17, 9)
-	go txnGenerator(2, 18, 0)
+	mkTransactions := func(i int, waitBlock int, waitMinute int) { // txnGenerator
+		sendAmt := oneFct - ecPrice*12 // FIXME tweak calculations
+		returnAmt := oneFct - ecPrice*24 // FIXME tweak calculations
+		toAddress := depositAddresses[i]
+		fromSecret := depositSecrets[i]
 
-	WaitBlocks(state0, 60)
+		delay := func() {
+			time.Sleep(time.Millisecond * 10)
+		}
+
+		waitForDeposit := func() {
+			TimeNow(state0)
+			balance := getBalance(state0, toAddress)
+			for balance <= 0 {
+				delay()
+				balance = getBalance(state0, toAddress)
+			}
+			fmt.Printf("%v pingDeposit %v %v \n", i, toAddress, balance)
+			TimeNow(state0)
+		}
+
+		waitForEmpty := func() {
+			TimeNow(state0)
+			balance := getBalance(state0, toAddress)
+			for balance > 0 {
+				delay()
+				balance = getBalance(state0, toAddress)
+			}
+			fmt.Printf("%v pongDeposit %v %v \n", i, toAddress, balance)
+			TimeNow(state0)
+		}
+
+		for waitBlock < maxBlocks {
+			WaitForBlock(state0, waitBlock)
+			WaitForMinute(state0, waitMinute)
+			time.Sleep(time.Millisecond*time.Duration(additionalDelay))
+
+			go func() {
+				sendTxn(state0, sendAmt, bankSecret, toAddress, ecPrice)
+				waitForDeposit()
+				sendTxn(state0, returnAmt, fromSecret, bankAddress, ecPrice)
+				waitForEmpty()
+			}()
+			waitBlock += 5
+		}
+	}
+
+	_ = mkTransactionsAfterGrants
+	//go mkTransactionsAfterGrants(0, 17, 8)
+	//go mkTransactionsAfterGrants(1, 17, 9)
+	//go mkTransactionsAfterGrants(2, 18, 0)
+    go mkTransactions(3, 7, 9)
+    go mkTransactions(4, 8, 0)
+
+	WaitBlocks(state0, maxBlocks)
 	WaitForAllNodes(state0)
 	shutDownEverything(t)
 }
