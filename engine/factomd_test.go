@@ -63,7 +63,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		"--stderrlog":           "out.txt",
 		"--checkheads":          "false",
 		"--controlpanelsetting": "readwrite",
-		"--debuglog":            "faulting|bad",
+		"--debuglog":            ".",
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
@@ -1469,103 +1469,101 @@ func TestProcessedBlockFailure(t *testing.T) {
 	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 300, 0, 0, t)
 
 	var ecPrice uint64 = state0.GetFactoshisPerEC() //10000
-	//var ecPrice uint64 = 10000
-	//var ecPrice uint64 = 0 // KLUDGE: don't inflate spend
 	var oneFct uint64 = factom.FactoidToFactoshi("1")
 
-	// NOTE: this address has a balance from genesis block
+	// from genesis block
 	//bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
 	//bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
 
-	fromSecret := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ" // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
-	//fromAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u" // added hardcoded grants for this address
 
-	//toSecret := "Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk" // FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD
-	toAddress := "FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD"
+	var grantSecrets []string = []string{
+		"Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ",
+		"Fs2m6eY8pkc7HZeTTf1BbriCxpEsFfRjoyvwQs77GPEwAMLaF7BL",
+		"Fs2sQazv5DQ36fW4isvLRYJ9314uy6iVjJT6ZstmbRVywXSMWAkK",
+	}
 
-	makeTransaction := func(i uint64) {
-		// Fund from genesis block rather than waiting for a grant
-		//sendTxn(state0, oneFct, bankSecret, fromAddress, ecPrice)
-		//i += 1
+	var grantAddresses []string = []string{
+		"FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u",
+		"FA2UEGEqpKEN85ffZrbFaXsoVQUbpfYikUimpguhMfqXgzpJfJHV",
+		"FA3nkFcswvtP6BQzVmMyTS5wEoaFKrPuKcGHvLtxXnHr6ruJvWT4",
+	}
+	_ = grantAddresses
 
-		//sendAmt := oneFct - i*ecPrice
-		sendAmt := oneFct - ecPrice*12 // set total spend
-		//returnAmt := oneFct - (i+1)*ecPrice
-		//fmt.Printf("send: %v return: %v \n", sendAmt, returnAmt)
-		//fmt.Printf("send: %v return: %v \n", sendAmt, returnAmt)
 
-		//if returnAmt <= 0 {
-		//	fmt.Printf("sent % transactions", i)
-		//}
+	var depositSecrets []string = []string{
+		"Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk",
+		"Fs28Sn5SQpYQsHmXogseoe8kweCAwq76ZSTDv2RopLnhgZdigdDX",
+		"Fs3FztiJ2xVHHEUkg5hRCYikGr4LtF7pVqPzt9syH5dsjQye2K3p",
+	}
+	_ = depositSecrets
 
-		//sendTxn(state0, returnAmt, toSecret, bankAddress, ecPrice) // try txn w/ insufficient fund first
-		//sendTxn(state0, sendAmt, bankSecret, toAddress, ecPrice)
-		//sendTxn(state0, returnAmt, toSecret, bankAddress, ecPrice)
+	var depositAddresses []string = []string{
+		"FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD",
+		"FA2imSqvmcaENqkSLFu6EW19eytxvSsM58R4Sq8Q5KkMr93LBmC4",
+		"FA32ZKrNXSh3WXnARih4oDuoy8BWZ3ad9LbTCnqSC8m39Nu9dWX5",
+	}
 
-		sendTxn(state0, sendAmt, fromSecret, toAddress, ecPrice)
+	makeTransaction := func(i int) {
+		sendAmt := oneFct - ecPrice*12 // set total spend FIXME tweak calculations
+		fromAddress := grantAddresses[i]
+		toAddress := depositAddresses[i]
+		sendTxn(state0, sendAmt, grantSecrets[i], toAddress, ecPrice)
 
 		go func() {
+			fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
 			fmt.Printf("sent %v amount: %v ecPrice: %v\n", i, sendAmt, ecPrice)
+			TimeNow(state0)
 			time.Sleep(time.Millisecond * 100)
-			fmt.Printf("balance %v %v \n", toAddress, getBalance(state0, toAddress))
+			balance := getBalance(state0, toAddress)
+			for balance <= 0 {
+				time.Sleep(time.Millisecond * 100)
+				balance = getBalance(state0, toAddress)
+			}
+			TimeNow(state0)
+			fmt.Printf("%v depositAddr %v %v \n", i, toAddress, balance)
+			fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
 		}()
 	}
 
-	/*
-		// NOTE: just trying to see some valid transactions
-		testGenerator := func() { // testGenerator
-			var i uint64 = 1
-			for {
-				makeTransaction(i)
-				time.Sleep(time.Second)
-				i += 1
-			}
-		}
-	*/
+	additionalDelay, _ := strconv.ParseInt(os.Getenv("TXNDELAY"),10, 64)
+	fmt.Printf("TXNDELAY: %v\n", additionalDelay)
 
-	txnGenerator := func() { // txnGenerator
-		block := 15
-		var i uint64 = 1
+	txnGenerator := func(i int, waitBlock int, waitMinute int) { // txnGenerator
 		for {
-			stop := make(chan struct{})
-			go func() { // stop after block
-				// wait for grant to fund from address
-				WaitForBlock(state0, block+1)
+			abort := make(chan struct{})
+			go func() { // abort if timing overshoots next block
+				WaitForBlock(state0, waitBlock+1)
 				//WaitForMinute(state0, 1)
-				close(stop)
+				close(abort)
 			}()
 
 			txnWait := make(chan struct{})
-			go func() { // stop after block
-				WaitForBlock(state0, block)
-				//time.Sleep(time.Second*5)
-				WaitForMinute(state0, 10)
+			go func() { // wait for target
+				WaitForBlock(state0, waitBlock)
+				WaitForMinute(state0, waitMinute)
+				time.Sleep(time.Millisecond*time.Duration(additionalDelay))
 				close(txnWait)
 			}()
 
-			//txnWait := time.After(time.Millisecond*10)
-
-		txnloop:
-			for { // make transactions until end of block
-
+			waitLoop:
+			for {
 				select {
-				case <-stop:
-					println("missedWindow")
-					break txnloop
-				//default:
+				case <-abort:
+				    println("overshot target window")
+					//t.FailNow()
+					break waitLoop
 				case <-txnWait:
-					println("inWindow")
-					break txnloop // KLUDGE just send once
+					break waitLoop
 				}
 			}
 			makeTransaction(i)
-			i += 1
-			block += 5
-			// TODO: read balance and move out remaining FCT
+			waitBlock += 5
 		}
 	}
 
-	go txnGenerator()
+	go txnGenerator(0, 17, 8)
+	go txnGenerator(1, 17, 9)
+	go txnGenerator(2, 18, 0)
 
 	WaitBlocks(state0, 60)
 	WaitForAllNodes(state0)
