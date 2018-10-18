@@ -22,12 +22,26 @@ func GetHardCodedGrants() []HardGrant {
 
 	switch globals.Params.NetworkName {
 	case "LOCAL":
-		hardcodegrants = []HardGrant{
-			// waiting for "real-ish" data from brian
-			HardGrant{21, 2, validateAddress("FA3oajkmHMfqkNMMShmqpwDThzMCuVrSsBwiXM2kYFVRz3MzxNAJ")}, // Pay Clay 2
-			HardGrant{31, 4, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 4
-			HardGrant{21, 3, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 3
-			HardGrant{11, 1, validateAddress("FA3GH7VEFKqTdJcmwGgDrcY4Xh9njQ4EWiJxhJeim6BCA7QuB388")}, // Pay Bill 1
+		testAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u"
+		var oneFct uint64 = 100000000 // Factoshis
+
+		hardcodegrants = []HardGrant{ // KLUDGE: try to add grants for a test address
+			HardGrant{6, 1*oneFct, validateAddress(testAddress)},
+			HardGrant{11, 1*oneFct, validateAddress(testAddress)},
+			HardGrant{16, 1*oneFct, validateAddress(testAddress)},
+
+			HardGrant{21, 1*oneFct, validateAddress(testAddress)},
+			HardGrant{26, 1*oneFct, validateAddress(testAddress)},
+			HardGrant{31, 1*oneFct, validateAddress(testAddress)},
+
+			HardGrant{36, 1*oneFct, validateAddress(testAddress)},
+			HardGrant{41, 1*oneFct, validateAddress(testAddress)},
+			HardGrant{46, 1*oneFct, validateAddress(testAddress)},
+
+			//HardGrant{21, 2, validateAddress("FA3oajkmHMfqkNMMShmqpwDThzMCuVrSsBwiXM2kYFVRz3MzxNAJ")}, // Pay Clay 2
+			//HardGrant{31, 4, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 4
+			//HardGrant{21, 3, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 3
+			//HardGrant{11, 1, validateAddress("FA3GH7VEFKqTdJcmwGgDrcY4Xh9njQ4EWiJxhJeim6BCA7QuB388")}, // Pay Bill 1
 		}
 	case "CUSTOM":
 		hardcodegrants = []HardGrant{}

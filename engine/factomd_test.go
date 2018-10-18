@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/FactomProject/factom"
+	"github.com/FactomProject/factomd/common/messages"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	ed "github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -242,7 +245,7 @@ func WaitForAllNodes(state *state.State) {
 }
 
 func TimeNow(s *state.State) {
-	fmt.Printf("%s:%d/%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
+	fmt.Printf("%s:%d-:-%d\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute)
 }
 
 var statusState *state.State
@@ -1349,6 +1352,224 @@ func makeExpected(grants []state.HardGrant) []interfaces.ITransAddress {
 		rval = append(rval, factoid.NewOutAddress(g.Address, g.Amount))
 	}
 	return rval
+}
+
+// construct a new factoid transaction
+func newTransaction(amt uint64, userSecretIn string, userPublicOut string, ecPrice uint64) (*factoid.Transaction, error) {
+
+	inSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userSecretIn))
+	outPub := factoid.NewAddress(primitives.ConvertUserStrToAddress(userPublicOut))
+
+	var sec [64]byte
+	copy(sec[:32], inSec.Bytes()) // pass 32 byte key in a 64 byte field for the crypto library
+
+	pub := ed.GetPublicKey(&sec) // get the public key for our FCT source address
+
+	rcd := factoid.NewRCD_1(pub[:]) // build the an RCD "redeem condition data structure"
+
+	inAdd, err := rcd.GetAddress()
+	if err != nil {
+		panic(err)
+	}
+
+	trans := new(factoid.Transaction)
+	trans.AddInput(inAdd, amt)
+	trans.AddOutput(outPub, amt)
+
+	/*
+		userIn := primitives.ConvertFctAddressToUserStr(inAdd)
+		userOut := primitives.ConvertFctAddressToUserStr(outPub)
+		fmt.Printf("Txn %v %v -> %v\n", amt, userIn, userOut)
+	*/
+
+	// REVIEW: why is this different from engine.FundWallet() ?
+	//trans.AddRCD(rcd)
+	trans.AddAuthorization(rcd)
+	trans.SetTimestamp(primitives.NewTimestampNow())
+
+	fee, err := trans.CalculateFee(ecPrice)
+	if err != nil {
+		return trans, err
+	}
+
+	input, err := trans.GetInput(0)
+	if err != nil {
+		return trans, err
+	}
+	input.SetAmount(amt + fee)
+
+	dataSig, err := trans.MarshalBinarySig()
+	if err != nil {
+		return trans, err
+	}
+	sig := factoid.NewSingleSignatureBlock(inSec.Bytes(), dataSig)
+	trans.SetSignatureBlock(0, sig)
+
+	return trans, nil
+
+}
+
+func AssertEquals(t *testing.T, a interface{}, b interface{}) {
+	if a != b {
+		t.Fatalf("%v != %v", a, b)
+	}
+}
+
+func AssertNil(t *testing.T, a interface{}) {
+	AssertEquals(t, a, nil)
+}
+
+func TestTxnCreate(t *testing.T) {
+	var amt uint64 = 100000000
+	//var ecPrice uint64 = 10000
+	var ecPrice uint64 = 0
+
+	inUser := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
+	//outUser := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ" // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
+	outAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u"
+
+	txn, err := newTransaction(amt, inUser, outAddress, ecPrice)
+	AssertNil(t, err)
+
+	err = txn.ValidateSignatures()
+	AssertNil(t, err)
+
+	err = txn.Validate(1)
+	AssertNil(t, err)
+
+	if err := txn.Validate(0); err == nil {
+		t.Fatalf("expected coinbase txn to error")
+	}
+
+	// test that we are sending to the address we thought
+	AssertEquals(t, outAddress, txn.Outputs[0].GetUserAddress())
+
+}
+
+func sendTxn(s *state.State, amt uint64, userSecretIn string, userSecretOut string, ecPrice uint64) (*factoid.Transaction, error) {
+	txn, _ := newTransaction(amt, userSecretIn, userSecretOut, ecPrice)
+	msg := new(messages.FactoidTransaction)
+	msg.SetTransaction(txn)
+	s.APIQueue().Enqueue(msg)
+	return txn, nil
+}
+
+func getBalance(s *state.State, userStr string) int64 {
+	return s.FactoidState.GetFactoidBalance(factoid.NewAddress(primitives.ConvertUserStrToAddress(userStr)).Fixed())
+}
+
+func TestProcessedBlockFailure(t *testing.T) {
+	// test was for an existing non-zero balance after grant then trying to remove
+	if ranSimTest {
+		return
+	}
+
+	ranSimTest = true
+
+	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 300, 0, 0, t)
+
+	var ecPrice uint64 = state0.GetFactoshisPerEC() //10000
+	//var ecPrice uint64 = 10000
+	//var ecPrice uint64 = 0 // KLUDGE: don't inflate spend
+	var oneFct uint64 = factom.FactoidToFactoshi("1")
+
+	// NOTE: this address has a balance from genesis block
+	//bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
+	//bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
+
+	fromSecret := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ" // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
+	//fromAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u" // added hardcoded grants for this address
+
+	//toSecret := "Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk" // FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD
+	toAddress := "FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD"
+
+	makeTransaction := func(i uint64) {
+		// Fund from genesis block rather than waiting for a grant
+		//sendTxn(state0, oneFct, bankSecret, fromAddress, ecPrice)
+		//i += 1
+
+		//sendAmt := oneFct - i*ecPrice
+		sendAmt := oneFct - ecPrice*12 // set total spend
+		//returnAmt := oneFct - (i+1)*ecPrice
+		//fmt.Printf("send: %v return: %v \n", sendAmt, returnAmt)
+		//fmt.Printf("send: %v return: %v \n", sendAmt, returnAmt)
+
+		//if returnAmt <= 0 {
+		//	fmt.Printf("sent % transactions", i)
+		//}
+
+		//sendTxn(state0, returnAmt, toSecret, bankAddress, ecPrice) // try txn w/ insufficient fund first
+		//sendTxn(state0, sendAmt, bankSecret, toAddress, ecPrice)
+		//sendTxn(state0, returnAmt, toSecret, bankAddress, ecPrice)
+
+		sendTxn(state0, sendAmt, fromSecret, toAddress, ecPrice)
+
+		go func() {
+			fmt.Printf("sent %v amount: %v ecPrice: %v\n", i, sendAmt, ecPrice)
+			time.Sleep(time.Millisecond * 100)
+			fmt.Printf("balance %v %v \n", toAddress, getBalance(state0, toAddress))
+		}()
+	}
+
+	/*
+		// NOTE: just trying to see some valid transactions
+		testGenerator := func() { // testGenerator
+			var i uint64 = 1
+			for {
+				makeTransaction(i)
+				time.Sleep(time.Second)
+				i += 1
+			}
+		}
+	*/
+
+	txnGenerator := func() { // txnGenerator
+		block := 15
+		var i uint64 = 1
+		for {
+			stop := make(chan struct{})
+			go func() { // stop after block
+				// wait for grant to fund from address
+				WaitForBlock(state0, block+1)
+				//WaitForMinute(state0, 1)
+				close(stop)
+			}()
+
+			txnWait := make(chan struct{})
+			go func() { // stop after block
+				WaitForBlock(state0, block)
+				//time.Sleep(time.Second*5)
+				WaitForMinute(state0, 10)
+				close(txnWait)
+			}()
+
+			//txnWait := time.After(time.Millisecond*10)
+
+		txnloop:
+			for { // make transactions until end of block
+
+				select {
+				case <-stop:
+					println("missedWindow")
+					break txnloop
+				//default:
+				case <-txnWait:
+					println("inWindow")
+					break txnloop // KLUDGE just send once
+				}
+			}
+			makeTransaction(i)
+			i += 1
+			block += 5
+			// TODO: read balance and move out remaining FCT
+		}
+	}
+
+	go txnGenerator()
+
+	WaitBlocks(state0, 60)
+	WaitForAllNodes(state0)
+	shutDownEverything(t)
 }
 
 func TestGrants(t *testing.T) {
