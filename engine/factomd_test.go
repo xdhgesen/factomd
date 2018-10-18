@@ -1487,23 +1487,41 @@ func TestProcessedBlockFailure(t *testing.T) {
 	}
 	_ = grantAddresses
 
-
 	var depositSecrets []string = []string{
 		"Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk",
 		"Fs28Sn5SQpYQsHmXogseoe8kweCAwq76ZSTDv2RopLnhgZdigdDX",
+		"Fs1suvivoTkDBhtUwVPSzyX7xp75whpdDCLQZyFGFmHxDue2RRBy",
+
 		"Fs3FztiJ2xVHHEUkg5hRCYikGr4LtF7pVqPzt9syH5dsjQye2K3p",
 		"Fs2d9VBdBN3xmdmWcrMV1Mw7WzMq3sZaD2a1LmfhncDwFGwdJnrs",
 		"Fs1j2DjuumzZck3P5K61jyo4xRwWTGHLGd6MTgLVvifRtRPgckZt",
+
+		"Fs2sMtc1Uy4tUCnH2UEjtuXW2NgXtUxtVQUYUS6e194M76ZdnR9p",
+		"Fs1Uhbhr4HwViZML8xZ6XW4g3uCDzmxY8sKk439LfEVoFX4eNtBj",
+		"Fs39pZj8zGU7hrTrHZp1aovmi4AXu4UcQBauiuTZ7rWfhH9umF6H",
+
+		"Fs3FRfwoA1ktjwjo51cxJe7gxHDhGMqJVEJHpNfVab2YQYAs5Pom",
+		"Fs2kkTSGes9nSvYyD1rCS53n6oPdMDTmLWAyvWERxj1ztdqYFypZ",
+		"Fs2iJPkytTCMAzQhmYYQtx6ZDioeBQiQvyWaZtho8uqYwKXfHsD7",
 	}
 	_ = depositSecrets
-
 
 	var depositAddresses []string = []string{
 		"FA2fSWi2cPdqRFxCHSa9EHSt22ueDtetCbsxM7mu3jadHFANUMcD",
 		"FA2imSqvmcaENqkSLFu6EW19eytxvSsM58R4Sq8Q5KkMr93LBmC4",
+		"FA2nWRFi4nN9mwFCYfe4BqqyKo65DQZaHxY5GqJnkh5D7T3VWMdj",
+
 		"FA32ZKrNXSh3WXnARih4oDuoy8BWZ3ad9LbTCnqSC8m39Nu9dWX5",
 		"FA2mpvrsw9FNempyM9TzXoCpx9kBfUWrdjuGAzJYwvCcTZwg2HWn",
 		"FA3Vatob7LQK8sTRRUED64XL7W8LhQRzwDYXYY1Sc3dGqm6Htk6B",
+
+		"FA2cBzw6uZcesfMssu1aEJxjSfjGcSRh7MwhFQNmxR1usqQ2BsyS",
+		"FA37zc6uyn8BPAp1SbCj4pT7HpKkppQ6MPd31VbZAaNo9Zc41H94",
+		"FA2B7T67sT5ywD5LPqbCDtoYRNzy2NjJSKDbJhLDDAmevQ8mSqZ1",
+
+		"FA2SXSXsydkeTDk7G9uLUhrHakgihDrqpGgScjm1r7gWKu5iNtPs",
+		"FA3PjmAQModGMRQ1c5F9ukj84dHSpHBLd5qFNfKzWJhukDvYF8fP",
+		"FA3TXHciP5BuuHXpK1q2RU8RRjvVWtFirqbbfwiNmuemz6k4s9GC",
 	}
 
 	additionalDelay, _ := strconv.ParseInt(os.Getenv("TXNDELAY"),10, 64)
@@ -1562,8 +1580,6 @@ func TestProcessedBlockFailure(t *testing.T) {
 			return uint64(balance)
 		}
 
-		_= waitForDeposit
-
 		waitForEmpty := func() {
 			balance := getBalance(state0, toAddress)
 			for balance > 0 {
@@ -1573,15 +1589,13 @@ func TestProcessedBlockFailure(t *testing.T) {
 			fmt.Printf("%v-%v pongDeposit %v %v \n", i, pingCount, toAddress, balance)
 		}
 
-		_= waitForEmpty
-
 		WaitForBlock(state0, waitBlock)
 		WaitForMinute(state0, waitMinute)
 		time.Sleep(time.Millisecond*time.Duration(additionalDelay))
 
-		// NOTE: send return transaction before deposit
 		makeDeposit := func(amt uint64, from string, to string, returnFrom string, returnTo string) {
 			TimeNow(state0)
+			// NOTE: purposely send return transaction before deposit
 			sendTxn(state0, amt-12*ecPrice, from, to, ecPrice)
 			sendTxn(state0, amt, returnFrom, returnTo, ecPrice)
 
@@ -1593,22 +1607,42 @@ func TestProcessedBlockFailure(t *testing.T) {
 			//time.Sleep(time.Millisecond * 100)
 		}
 
-		for {
+		for state0.LLeaderHeight < uint32(maxBlocks) {
 			makeDeposit(sendAmt, fromSecret, bankAddress, bankSecret, toAddress)
-			sendAmt -= 12*ecPrice
+			sendAmt -= 24*ecPrice
 		}
 	}
 
-	_ = mkTransactionsAfterGrants
+	runCommandAtBlock := func(cmd string, waitBlock int) {
+		WaitForBlock(state0, waitBlock)
+		runCmd(cmd)
+	}
+
+	// Ramp up load over time
+	go runCommandAtBlock("R5", 10)
+	go runCommandAtBlock("R10", 20)
+	go runCommandAtBlock("R15", 30)
+
+	// transact around grant boundaries
 	go mkTransactionsAfterGrants(0, 17, 8)
 	go mkTransactionsAfterGrants(1, 17, 9)
 	go mkTransactionsAfterGrants(2, 18, 0)
 
-	// TODO: refactor to generate long chains of transactions
+	// add groups of test transactions for non-grant addresses
     go mkTransactions(3, 7, 9)
     go mkTransactions(4, 8, 0)
+	go mkTransactions(5, 22, 9)
 
-	WaitBlocks(state0, maxBlocks)
+	go mkTransactions(6, 23, 0)
+	go mkTransactions(7, 22, 9)
+	go mkTransactions(8, 23, 0)
+
+	go mkTransactions(9, 23, 0)
+	go mkTransactions(10, 22, 9)
+	go mkTransactions(11, 23, 0)
+
+	WaitForBlock(state0, maxBlocks)
+	runCmd("R0") // Stop load
 	WaitForAllNodes(state0)
 	shutDownEverything(t)
 }
