@@ -1629,8 +1629,8 @@ func TestProcessedBlockFailure(t *testing.T) {
 	go mkTransactionsAfterGrants(2, 18, 0)
 
 	// add groups of test transactions for non-grant addresses
-    go mkTransactions(3, 7, 9)
-    go mkTransactions(4, 8, 0)
+	go mkTransactions(3, 7, 9)
+	go mkTransactions(4, 8, 0)
 	go mkTransactions(5, 22, 9)
 
 	go mkTransactions(6, 23, 0)
