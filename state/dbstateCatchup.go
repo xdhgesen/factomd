@@ -56,9 +56,8 @@ func (list *DBStateList) Catchup() {
 				// if the height of the next recieved state is not equal to the
 				// height of the current recieved state plus one then there is a
 				// gap in the recieved state list.
-				n := e.Value.(*ReceivedState).Height()
 				if e.Next() != nil {
-					for n+1 < e.Next().Value.(*ReceivedState).Height() {
+					for n := e.Value.(*ReceivedState).Height(); n+1 < e.Next().Value.(*ReceivedState).Height(); n++ {
 						missing.Notify <- NewMissingState(n + 1)
 					}
 				}
