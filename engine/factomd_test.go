@@ -1524,8 +1524,8 @@ func TestProcessedBlockFailure(t *testing.T) {
 		"FA3TXHciP5BuuHXpK1q2RU8RRjvVWtFirqbbfwiNmuemz6k4s9GC",
 	}
 
-	additionalDelay, _ := strconv.ParseInt(os.Getenv("TXNDELAY"),10, 64)
-	fmt.Printf("TXNDELAY: %v\n", additionalDelay)
+	maxAdditionalDelay, _ := strconv.ParseInt(os.Getenv("TXNDELAY"),10, 64)
+	fmt.Printf("MAX TXNDELAY: %v\n", maxAdditionalDelay)
 
 	var maxBlocks = 60
 
@@ -1534,26 +1534,34 @@ func TestProcessedBlockFailure(t *testing.T) {
 		fromAddress := grantAddresses[i]
 		toAddress := depositAddresses[i]
 
+		_ = fromAddress
 		for waitBlock < maxBlocks {
 			WaitForBlock(state0, waitBlock)
 			WaitForMinute(state0, waitMinute)
+			//additionalDelay := random.RandIntBetween(0, int(maxAdditionalDelay))
+			additionalDelay := maxAdditionalDelay
+			msgTime := time.Now().Unix()
+			fmt.Printf("TXNDELAY: %v %v\n", additionalDelay, msgTime)
+			TimeNow(state0)
 			time.Sleep(time.Millisecond*time.Duration(additionalDelay))
-
 			sendTxn(state0, sendAmt, grantSecrets[i], toAddress, ecPrice)
+			TimeNow(state0)
 
 			go func() {
-				fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
-				fmt.Printf("sent %v amount: %v ecPrice: %v\n", i, sendAmt, ecPrice)
-				TimeNow(state0)
-				time.Sleep(time.Millisecond * 100)
+				//fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
+				sendTime := time.Now().Unix()
+				fmt.Printf("sent %v amount: %v ecPrice: %v %v delay: %v\n", i, sendAmt, ecPrice, sendTime, sendTime-msgTime)
+				//TimeNow(state0)
+				//time.Sleep(time.Millisecond * 100)
 				balance := getBalance(state0, toAddress)
 				for balance <= 0 {
-					time.Sleep(time.Millisecond * 100)
+					//time.Sleep(time.Millisecond * 100)
 					balance = getBalance(state0, toAddress)
 				}
 				TimeNow(state0)
-				fmt.Printf("%v depositAddr %v %v \n", i, toAddress, balance)
-				fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
+				receivedTime := time.Now().Unix()
+				fmt.Printf("%v received %v %v %v delay: %v\n", i, toAddress, balance, receivedTime, receivedTime-sendTime)
+				//fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
 			}()
 			waitBlock += 5
 		}
@@ -1591,6 +1599,8 @@ func TestProcessedBlockFailure(t *testing.T) {
 
 		WaitForBlock(state0, waitBlock)
 		WaitForMinute(state0, waitMinute)
+		additionalDelay := random.RandIntBetween(0, int(maxAdditionalDelay))
+		fmt.Printf("TXNDELAY: %v\n", additionalDelay)
 		time.Sleep(time.Millisecond*time.Duration(additionalDelay))
 
 		makeDeposit := func(amt uint64, from string, to string, returnFrom string, returnTo string) {
@@ -1612,22 +1622,27 @@ func TestProcessedBlockFailure(t *testing.T) {
 			sendAmt -= 24*ecPrice
 		}
 	}
+	_ = mkTransactions
 
 	runCommandAtBlock := func(cmd string, waitBlock int) {
 		WaitForBlock(state0, waitBlock)
 		runCmd(cmd)
 	}
+	_ = runCommandAtBlock
 
+	/*
 	// Ramp up load over time
 	go runCommandAtBlock("R5", 10)
 	go runCommandAtBlock("R10", 20)
 	go runCommandAtBlock("R15", 30)
-
+*/
 	// transact around grant boundaries
-	go mkTransactionsAfterGrants(0, 17, 8)
+	go mkTransactionsAfterGrants(0, 17, 9)
+	/*
 	go mkTransactionsAfterGrants(1, 17, 9)
-	go mkTransactionsAfterGrants(2, 18, 0)
-
+	go mkTransactionsAfterGrants(2, 17, 9)
+	*/
+/*
 	// add groups of test transactions for non-grant addresses
 	go mkTransactions(3, 7, 9)
 	go mkTransactions(4, 8, 0)
@@ -1640,9 +1655,10 @@ func TestProcessedBlockFailure(t *testing.T) {
 	go mkTransactions(9, 23, 0)
 	go mkTransactions(10, 22, 9)
 	go mkTransactions(11, 23, 0)
+*/
 
 	WaitForBlock(state0, maxBlocks)
-	runCmd("R0") // Stop load
+	//runCmd("R0") // Stop load
 	WaitForAllNodes(state0)
 	shutDownEverything(t)
 }
