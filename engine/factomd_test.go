@@ -1419,10 +1419,25 @@ func AssertNil(t *testing.T, a interface{}) {
 	AssertEquals(t, a, nil)
 }
 
+func TestFeeTxnCreate(t *testing.T) {
+	var oneFct uint64 = 100000000 // Factoshis
+	var ecPrice uint64 = 10000
+
+	balance := oneFct
+	inUser := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
+	outAddress := "FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u"
+
+	for i:= 0; i < 10 ; i++ {
+		txn, _ := newTransaction(balance, inUser, outAddress, ecPrice)
+		fee, _ := txn.CalculateFee(ecPrice)
+		balance = balance - fee
+		println(balance, fee)
+	}
+}
+
 func TestTxnCreate(t *testing.T) {
 	var amt uint64 = 100000000
-	//var ecPrice uint64 = 10000
-	var ecPrice uint64 = 0
+	var ecPrice uint64 = 10000
 
 	inUser := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK" // FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q
 	//outUser := "Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ" // FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u
@@ -1446,8 +1461,9 @@ func TestTxnCreate(t *testing.T) {
 
 }
 
-func sendTxn(s *state.State, amt uint64, userSecretIn string, userSecretOut string, ecPrice uint64) (*factoid.Transaction, error) {
-	txn, _ := newTransaction(amt, userSecretIn, userSecretOut, ecPrice)
+func sendTxn(s *state.State, amt uint64, userSecretIn string, userPubOut string, ecPrice uint64) (*factoid.Transaction, error) {
+	//fmt.Printf("%v => %v\n", userPubOut, amt)
+	txn, _ := newTransaction(amt, userSecretIn, userPubOut, ecPrice)
 	msg := new(messages.FactoidTransaction)
 	msg.SetTransaction(txn)
 	s.APIQueue().Enqueue(msg)
@@ -1473,19 +1489,7 @@ func TestProcessedBlockFailure(t *testing.T) {
 
 	bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK"
 	bankAddress := "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"
-
-	var grantSecrets []string = []string{
-		"Fs2GCfAa2HBKaGEUWCtw8eGDkN1CfyS6HhdgLv8783shkrCgvcpJ",
-		"Fs2m6eY8pkc7HZeTTf1BbriCxpEsFfRjoyvwQs77GPEwAMLaF7BL",
-		"Fs2sQazv5DQ36fW4isvLRYJ9314uy6iVjJT6ZstmbRVywXSMWAkK",
-	}
-
-	var grantAddresses []string = []string{
-		"FA2s2SJ5Cxmv4MzpbGxVS9zbNCjpNRJoTX4Vy7EZaTwLq3YTur4u",
-		"FA2UEGEqpKEN85ffZrbFaXsoVQUbpfYikUimpguhMfqXgzpJfJHV",
-		"FA3nkFcswvtP6BQzVmMyTS5wEoaFKrPuKcGHvLtxXnHr6ruJvWT4",
-	}
-	_ = grantAddresses
+	_ = bankAddress
 
 	var depositSecrets []string = []string{
 		"Fs3CLRgDCxAM6TGpHDNfjLdEcbHZ1LyhUmMRG9w3aVTSPTeZ2hLk",
@@ -1524,141 +1528,82 @@ func TestProcessedBlockFailure(t *testing.T) {
 		"FA3TXHciP5BuuHXpK1q2RU8RRjvVWtFirqbbfwiNmuemz6k4s9GC",
 	}
 
-	maxAdditionalDelay, _ := strconv.ParseInt(os.Getenv("TXNDELAY"),10, 64)
-	fmt.Printf("MAX TXNDELAY: %v\n", maxAdditionalDelay)
-
 	var maxBlocks = 60
+	var depositCount int = 0
 
-	mkTransactionsAfterGrants := func(i int, waitBlock int, waitMinute int) { // txnGenerator
-		sendAmt := oneFct - ecPrice*12 // FIXME tweak calculations
-		fromAddress := grantAddresses[i]
-		toAddress := depositAddresses[i]
-
-		_ = fromAddress
-		for waitBlock < maxBlocks {
-			WaitForBlock(state0, waitBlock)
-			WaitForMinute(state0, waitMinute)
-			//additionalDelay := random.RandIntBetween(0, int(maxAdditionalDelay))
-			additionalDelay := maxAdditionalDelay
-			msgTime := time.Now().Unix()
-			fmt.Printf("TXNDELAY: %v %v\n", additionalDelay, msgTime)
-			TimeNow(state0)
-			time.Sleep(time.Millisecond*time.Duration(additionalDelay))
-			sendTxn(state0, sendAmt, grantSecrets[i], toAddress, ecPrice)
-			TimeNow(state0)
-
-			go func() {
-				//fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
-				sendTime := time.Now().Unix()
-				fmt.Printf("sent %v amount: %v ecPrice: %v %v delay: %v\n", i, sendAmt, ecPrice, sendTime, sendTime-msgTime)
-				//TimeNow(state0)
-				//time.Sleep(time.Millisecond * 100)
-				balance := getBalance(state0, toAddress)
-				for balance <= 0 {
-					//time.Sleep(time.Millisecond * 100)
-					balance = getBalance(state0, toAddress)
-				}
-				TimeNow(state0)
-				receivedTime := time.Now().Unix()
-				fmt.Printf("%v received %v %v %v delay: %v\n", i, toAddress, balance, receivedTime, receivedTime-sendTime)
-				//fmt.Printf("%v grantAddr %v %v \n", i, fromAddress, getBalance(state0, fromAddress))
-			}()
-			waitBlock += 5
+	waitForDeposit := func(i int, amt uint64) uint64 {
+		balance := getBalance(state0, depositAddresses[i])
+		//fmt.Printf("%v waitForDeposit %v %v - %v = %v \n", i, depositAddresses[i], balance, amt, balance-int64(amt))
+		for balance != int64(amt) {
+			balance = getBalance(state0, depositAddresses[i])
+			// TODO add timeout
 		}
+		depositCount++
+		//fmt.Printf("%v Deposit(%v) %v %v - %v = %v \n", i, depositCount, depositAddresses[i], balance, amt, balance-int64(amt))
+		//TimeNow(state0)
+		return uint64(balance)
 	}
 
-	mkTransactions := func(i int, waitBlock int, waitMinute int) { // txnGenerator
-		pingCount := 0
-		sendAmt := oneFct - ecPrice*12 // FIXME tweak calculations
-		toAddress := depositAddresses[i]
-		fromSecret := depositSecrets[i]
-
-		delay := func() {
-			time.Sleep(time.Millisecond * 10)
-		}
-
-		waitForDeposit := func() uint64 {
-			balance := getBalance(state0, toAddress)
-			for balance <= 0 {
-				delay()
-				balance = getBalance(state0, toAddress)
-			}
-			fmt.Printf("%v-%v pingDeposit %v %v \n", i, pingCount, toAddress, balance)
-			TimeNow(state0)
-			return uint64(balance)
-		}
-
-		waitForEmpty := func() {
-			balance := getBalance(state0, toAddress)
-			for balance > 0 {
-				delay()
-				balance = getBalance(state0, toAddress)
-			}
-			fmt.Printf("%v-%v pongDeposit %v %v \n", i, pingCount, toAddress, balance)
-		}
-
+	mkTransactions := func(waitBlock int, waitMinute int) { // txnGenerator
 		WaitForBlock(state0, waitBlock)
 		WaitForMinute(state0, waitMinute)
-		additionalDelay := random.RandIntBetween(0, int(maxAdditionalDelay))
-		fmt.Printf("TXNDELAY: %v\n", additionalDelay)
-		time.Sleep(time.Millisecond*time.Duration(additionalDelay))
 
-		makeDeposit := func(amt uint64, from string, to string, returnFrom string, returnTo string) {
-			TimeNow(state0)
-			// NOTE: purposely send return transaction before deposit
-			sendTxn(state0, amt-12*ecPrice, from, to, ecPrice)
-			sendTxn(state0, amt, returnFrom, returnTo, ecPrice)
+		// fund the start address
+		fee :=12*ecPrice
+		bal := 10*oneFct
 
-			waitForDeposit()
-			waitForEmpty()
-			TimeNow(state0)
+		sendTxn(state0, bal, bankSecret, depositAddresses[0], ecPrice)
+		waitForDeposit(0, bal)
 
-			pingCount += 1
-			//time.Sleep(time.Millisecond * 100)
-		}
+		println("->ping-pong<-")
 
-		for state0.LLeaderHeight < uint32(maxBlocks) {
-			makeDeposit(sendAmt, fromSecret, bankAddress, bankSecret, toAddress)
-			sendAmt -= 24*ecPrice
+		for bal>oneFct {
+			bal = bal-fee
+			pingBal := bal
+			bal = bal-fee
+			pongBal := bal
+
+			ping := func() { sendTxn(state0, pingBal, depositSecrets[0], depositAddresses[1], ecPrice) }
+
+			pong := func() { sendTxn(state0, pongBal, depositSecrets[1], depositAddresses[0], ecPrice) }
+
+			// REVIEW: test fails when this timeout is set too low
+			// meaning both addresses show a balance > 0 at the same time
+			delay := func() { time.Sleep(time.Millisecond*300) }
+
+			if random.RandInt()%2==0 {
+				// in order
+				ping()
+				pong()
+			} else {
+				// reverse order
+				pong()
+				ping()
+			}
+			delay()
 		}
 	}
 	_ = mkTransactions
 
-	runCommandAtBlock := func(cmd string, waitBlock int) {
-		WaitForBlock(state0, waitBlock)
-		runCmd(cmd)
+	go mkTransactions(6, 0)
+
+	ticker := time.NewTicker(time.Second)
+
+	for _ = range ticker.C {
+		bal0 := getBalance(state0, depositAddresses[0])
+		bal1 := getBalance(state0, depositAddresses[1])
+		fmt.Printf("%v => %v\n", depositAddresses[0], bal0)
+		fmt.Printf("%v => %v\n", depositAddresses[1], bal1)
+
+		// test that one address is always empty
+		if bal0 > bal1 {
+			AssertEquals(t, bal1, int64(0))
+		} else {
+			AssertEquals(t, bal0, int64(0))
+		}
 	}
-	_ = runCommandAtBlock
-
-	/*
-	// Ramp up load over time
-	go runCommandAtBlock("R5", 10)
-	go runCommandAtBlock("R10", 20)
-	go runCommandAtBlock("R15", 30)
-*/
-	// transact around grant boundaries
-	go mkTransactionsAfterGrants(0, 17, 9)
-	/*
-	go mkTransactionsAfterGrants(1, 17, 9)
-	go mkTransactionsAfterGrants(2, 17, 9)
-	*/
-/*
-	// add groups of test transactions for non-grant addresses
-	go mkTransactions(3, 7, 9)
-	go mkTransactions(4, 8, 0)
-	go mkTransactions(5, 22, 9)
-
-	go mkTransactions(6, 23, 0)
-	go mkTransactions(7, 22, 9)
-	go mkTransactions(8, 23, 0)
-
-	go mkTransactions(9, 23, 0)
-	go mkTransactions(10, 22, 9)
-	go mkTransactions(11, 23, 0)
-*/
 
 	WaitForBlock(state0, maxBlocks)
-	//runCmd("R0") // Stop load
 	WaitForAllNodes(state0)
 	shutDownEverything(t)
 }

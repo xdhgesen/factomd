@@ -189,6 +189,7 @@ func (fs *FactoidState) AddTransactionBlock(blk interfaces.IFBlock) error {
 		return err
 	}
 
+	// REVIEW: error here
 	transactions := blk.GetTransactions()
 	for _, trans := range transactions {
 		err := fs.UpdateTransaction(false, trans)
@@ -196,6 +197,7 @@ func (fs *FactoidState) AddTransactionBlock(blk interfaces.IFBlock) error {
 			return err
 		}
 	}
+	// REVIEW: ^ error here
 	fs.CurrentBlock = blk
 	//fs.State.SetFactoshisPerEC(blk.GetExchRate())
 
