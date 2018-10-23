@@ -432,6 +432,35 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 	return nil, nil
 }
 
+func TestDBStateCatchup(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+
+	state0 := SetupSim("LFF", map[string]string{"--debuglog": "."}, 100, 0, 0, t)
+	StatusEveryMinute(state0)
+	state1 := GetFnodes()[1].State
+
+	runCmd("R5") // Feed load
+
+	// disconnect follower
+	runCmd("1")
+	runCmd("x")
+	// wait for 20 blocks then re-connect follower
+	WaitBlocks(state0, 20)
+	runCmd("x")
+
+	WaitForBlock(state1, 50)
+
+	runCmd("R0") // stop load
+
+	t.Log("Shutting down the network")
+	for _, fn := range GetFnodes() {
+		fn.State.ShutdownChan <- 1
+	}
+}
+
 func TestSetupANetwork(t *testing.T) {
 	if ranSimTest {
 		return
@@ -1518,32 +1547,6 @@ func TestTestNetCoinBaseActivation(t *testing.T) {
 	WaitForAllNodes(state0)
 	CheckAuthoritySet(t) // check the authority set is as expected
 	shutDownEverything(t)
-}
-
-func TestDBStateCatchup(t *testing.T) {
-	if ranSimTest {
-		return
-	}
-	ranSimTest = true
-
-	state0 := SetupSim("LF", map[string]string{"--debuglog": "."}, 20, 0, 0, t)
-	StatusEveryMinute(state0)
-	state1 := GetFnodes()[1].State
-
-	// disconnect follower
-	runCmd("1")
-	runCmd("x")
-	// wait for 4 blocks then re-connect follower
-	WaitBlocks(state0, 4)
-	runCmd("x")
-
-	WaitForBlock(state1, 9)
-
-	t.Log("Shutting down the network")
-	for _, fn := range GetFnodes() {
-		fn.State.ShutdownChan <- 1
-	}
-
 }
 
 // Cheap tests for developing binary search commits algorithm

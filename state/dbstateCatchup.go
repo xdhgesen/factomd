@@ -104,8 +104,10 @@ func (list *DBStateList) Catchup() {
 				}
 			case m := <-recieved.Notify:
 				s := NewReceivedState(m)
-				waiting.Del(s.Height())
-				recieved.Add(s.Height(), s.Message())
+				if s != nil {
+					waiting.Del(s.Height())
+					recieved.Add(s.Height(), s.Message())
+				}
 			}
 		}
 	}()
@@ -289,6 +291,9 @@ type ReceivedState struct {
 
 // NewReceivedState creates a new member for the StatesReceived list
 func NewReceivedState(msg *messages.DBStateMsg) *ReceivedState {
+	if msg == nil {
+		return nil
+	}
 	s := new(ReceivedState)
 	s.height = msg.DirectoryBlock.GetHeader().GetDBHeight()
 	s.msg = msg
@@ -359,7 +364,8 @@ func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		s := e.Value.(*ReceivedState)
 		if height > s.Height() {
-			l.List.InsertAfter(NewReceivedState(msg), e)
+			n := NewReceivedState(msg)
+			l.List.InsertAfter(n, e)
 			return
 		} else if height == s.Height() {
 			return

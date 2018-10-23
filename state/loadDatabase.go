@@ -23,6 +23,8 @@ import (
 var _ = fmt.Print
 
 func LoadDatabase(s *State) {
+	defer os.Stderr.WriteString("LoadDatabase finished")
+
 	var blkCnt uint32
 
 	head, err := s.DB.FetchDBlockHead()
