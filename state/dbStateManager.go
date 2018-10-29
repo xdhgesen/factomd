@@ -1142,7 +1142,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	list.State.Balancehash = fs.GetBalanceHash(false)
 	list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x", dbht, list.State.Balancehash.Bytes()[0:4], tbh.Bytes()[0:4])
 	// Saving our state so we can reset it if we need to.
-	d.TmpSaveStruct = SaveFactomdState(list.State, d)
+	d.SaveStruct = SaveFactomdState(list.State, d)
 	return
 }
 
@@ -1482,9 +1482,11 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	// We will only save blocks marked to be saved.  As such, this must follow
 	// the "d.saved = true" above
 	if list.State.StateSaverStruct.FastBoot {
-		d.SaveStruct = d.TmpSaveStruct
+		//d.SaveStruct = d.TmpSaveStruct
 		err := list.State.StateSaverStruct.SaveDBStateList(list.State.DBStates, list.State.Network)
-		list.State.LogPrintf("dbstatesprocess", "Error while saving Fastboot %v", err)
+		if err != nil {
+			list.State.LogPrintf("dbstatesprocess", "Error while saving Fastboot %v", err)
+		}
 	}
 	// Now that we have saved the perm balances, we can clear the api hashmaps that held the differences
 	// between the actual saved block prior, and this saved block.  If you are looking for balances of

@@ -38,7 +38,7 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	hsb := int(ss.GetHighestSavedBlk())
 	//Save only every FastSaveRate states
 
-	if hsb%ss.State.FastSaveRate != 0 || hsb < ss.State.FastSaveRate {
+	if hsb%ss.State.FastSaveRate != 0 || hsb < ss.State.FastSaveRate || ss.State.DBFinished == true {
 		return nil
 	}
 
@@ -60,6 +60,7 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 		fmt.Fprintln(os.Stderr, "SaveState MarshalBinary Failed", err)
 		return err
 	}
+
 	//adding an integrity check
 	h := primitives.Sha(b)
 	b = append(h.Bytes(), b...)
@@ -67,12 +68,6 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	sss.TmpDBHt = ss.State.LLeaderHeight
 
 	{ /// Debug code, check if I can unmarshal the object myself.
-		test := new(DBStateList)
-		test.UnmarshalBinary(b)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "SaveState UnmarshalBinary Failed", err)
-		}
-
 		h := primitives.NewZeroHash()
 		b, err = h.UnmarshalBinaryData(b)
 		if err != nil {
@@ -82,6 +77,13 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 		if h.IsSameAs(h2) == false {
 			fmt.Fprintln(os.Stderr, "LoadDBStateList - Integrity hashes do not match!")
 			return nil
+		}
+
+		test := new(DBStateList)
+		test.State = ss.State
+		err = test.UnmarshalBinary(b)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "SaveState UnmarshalBinary Failed", err)
 		}
 	}
 	return nil
