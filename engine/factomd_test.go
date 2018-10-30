@@ -533,8 +533,8 @@ func TestLoad(t *testing.T) {
 	ranSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLF", map[string]string{}, 15, 0, 0, t)
-
+	state0 := SetupSim("LLF", map[string]string{"--debuglog": "."}, 15, 0, 0, t)
+	StatusEveryMinute(state0)
 	runCmd("2")   // select 2
 	runCmd("R30") // Feed load
 	WaitBlocks(state0, 10)
@@ -550,7 +550,7 @@ func TestLoad2(t *testing.T) {
 	ranSimTest = true
 
 	go runCmd("Re") // Turn on tight allocation of EC as soon as the simulator is up and running
-	state0 := SetupSim("LLLAAAFFF", map[string]string{"--debuglog": "."}, 24, 0, 0, t)
+	state0 := SetupSim("LLLAAAFFF", map[string]string{}, 24, 0, 0, t)
 	StatusEveryMinute(state0)
 
 	runCmd("7") // select node 1

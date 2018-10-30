@@ -222,7 +222,7 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 			for index, mmr := range mmrs {
 				s.LogMessage(logname, "sendout", mmr)
 				s.MissingRequestAskCnt++
-				mmr.SendOut(s, mmr)
+				//				mmr.SendOut(s, mmr)
 				delete(mmrs, index)
 			} // Send MMRs that were built
 
