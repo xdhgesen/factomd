@@ -251,6 +251,9 @@ func (b *Buffer) PopBytes() ([]byte, error) {
 		return nil, err
 	}
 
+	if l < 0 {
+		return nil, errors.New(fmt.Sprintf("PopBytes got a negative length %d", l))
+	}
 	if b.Len() < int(l) {
 		return nil, errors.New(fmt.Sprintf("End of Buffer Looking for %d but only have %d", l, b.Len()))
 	}

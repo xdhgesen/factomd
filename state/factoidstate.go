@@ -572,7 +572,7 @@ func (fs *FactoidState) GetMultipleFactoidBalances(singleAdd [32]byte) (uint32, 
 	return currentHeight, heighestSavedHeight, TempBalance, PermBalance, errNotAcc
 }
 
-//func (fs *FactoidState) GetFactiodAccounts(params interface{}) (uint32, []string) {
+//func (fs *FactoidState) GetFactoidAccounts(params interface{}) (uint32, []string) {
 //	name := fs.State.FactoidBalancesP
 //	height := fs.DBHeight
 //	list := make([]string, 0, len(name))

@@ -658,10 +658,14 @@ func (t *Transaction) CustomMarshalText() (text []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-
-	txid := fmt.Sprintf("%64s", "coinbase") //make it the same length as a real TXID
+	var txid string
 	if t.Txid != nil {
 		txid = fmt.Sprintf("%x", t.Txid.Bytes())
+	} else {
+		txid = fmt.Sprintf("%64s", "-nil-") //make it the same length as a TXID
+	}
+	if len(t.Inputs) == 0 {
+		txid += "(coinbase)"
 	}
 
 	var out primitives.Buffer

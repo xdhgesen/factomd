@@ -2404,7 +2404,6 @@ func (s *State) SetString() {
 	}
 
 	s.Status = 0
-
 }
 
 func (s *State) SummaryHeader() string {

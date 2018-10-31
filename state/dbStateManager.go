@@ -715,10 +715,10 @@ func containsServer(haystack []interfaces.IServer, needle interfaces.IServer) bo
 func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	// If this block is new, then make sure all hashes are fully computed.
 	if !d.IsNew || p == nil {
-		return
+		return false
 	}
 
-	list.State.LogPrintf("dbstate", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
+	list.State.LogPrintf("dbstateProcess", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
 	currentDBHeight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	previousDBHeight := p.DirectoryBlock.GetHeader().GetDBHeight()
 
@@ -1150,11 +1150,11 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 // If we do, we count that as progress.
 func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	dbheight := d.DirectoryBlock.GetHeader().GetDBHeight()
-	list.State.LogPrintf("dbstate", "SignDB(%d)", dbheight)
+	list.State.LogPrintf("dbstateProcess", "SignDB(%d)", dbheight)
 	if d.Signed {
 		//s := list.State
 		//		s.MoveStateToHeight(dbheight + 1)
-		list.State.LogPrintf("dbstate", "SignDB(%d) already signed", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SignDB(%d) already signed", d.DirectoryBlock.GetHeader().GetDBHeight())
 		return false
 	}
 
@@ -1163,30 +1163,30 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	if dbheight == 0 || list.Get(int(dbheight+1)) != nil || d.Repeat == true {
 		s := list.State
 		s.MoveStateToHeight(dbheight + 1)
-		list.State.LogPrintf("dbstate", "SignDB(%d) next blocks exists!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SignDB(%d) next blocks exists!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		d.Signed = true
 		return false
 	}
 
 	pl := list.State.ProcessLists.Get(dbheight)
 	if pl == nil {
-		list.State.LogPrintf("dbstate", "SignDB(%d) no processlist!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SignDB(%d) no processlist!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		return
 	} else if !pl.Complete() {
-		list.State.LogPrintf("dbstate", "SignDB(%d) processlist not complete!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SignDB(%d) processlist not complete!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		return
 	}
 
 	// If we don't have the next dbstate yet, see if we have all the signatures.
 	pl = list.State.ProcessLists.Get(dbheight + 1)
 	if pl == nil {
-		list.State.LogPrintf("dbstate", "SignDB(%d) missing next processlist!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SignDB(%d) missing next processlist!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		return
 	}
 
 	// Don't sign while negotiating the EOM
 	if list.State.EOM {
-		list.State.LogPrintf("dbstate", "SignDB(%d) negotiating the EOM!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SignDB(%d) negotiating the EOM!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		return
 	}
 
@@ -1257,7 +1257,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
 		return
 	}
-	list.State.LogPrintf("dbstate", "SaveDBStateToDB(%d)", d.DirectoryBlock.GetHeader().GetDBHeight())
+	list.State.LogPrintf("dbstateProcess", "SaveDBStateToDB(%d)", d.DirectoryBlock.GetHeader().GetDBHeight())
 
 	// If this is a repeated block, and I have already saved at this height, then we can safely ignore
 	// this dbstate.
@@ -1270,10 +1270,10 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if dbheight > 0 {
 		dp := list.State.GetDBState(uint32(dbheight - 1))
 		if dp == nil {
-			list.State.LogPrintf("dbstate", "SaveDBStateToDB(%d) no previous block!", d.DirectoryBlock.GetHeader().GetDBHeight())
+			list.State.LogPrintf("dbstateProcess", "SaveDBStateToDB(%d) no previous block!", d.DirectoryBlock.GetHeader().GetDBHeight())
 			return
 		} else if !dp.Saved {
-			list.State.LogPrintf("dbstate", "SaveDBStateToDB(%d) previous not saved!", d.DirectoryBlock.GetHeader().GetDBHeight())
+			list.State.LogPrintf("dbstateProcess", "SaveDBStateToDB(%d) previous not saved!", d.DirectoryBlock.GetHeader().GetDBHeight())
 			return
 		}
 	}
@@ -1287,7 +1287,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				d.DirectoryBlock.GetKeyMR().Bytes()))
 		}
 
-		list.State.LogPrintf("dbstate", "SaveDBStateToDB(%d) Already saved, add to replay!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		list.State.LogPrintf("dbstateProcess", "SaveDBStateToDB(%d) Already saved, add to replay!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		// Set the Block Replay flag for all these transactions that are already in the database.
 		for _, fct := range d.FactoidBlock.GetTransactions() {
 			list.State.FReplay.IsTSValidAndUpdateState(
@@ -1303,7 +1303,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
 	// have marked them all as saved to disk!  So we gotta save them to disk.  Or panic trying.
 
-	list.State.LogPrintf("dbstate", "SaveDBStateToDB(%d) %s\n", dbheight, d.String())
+	list.State.LogPrintf("dbstateProcess", "SaveDBStateToDB(%d) %s\n", dbheight, d.String())
 	// Only trim when we are really saving.
 	v := dbheight + int(list.State.IdentityChainID.Bytes()[4])
 	if v%4 == 0 {
@@ -1484,7 +1484,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if list.State.StateSaverStruct.FastBoot {
 		d.SaveStruct = d.TmpSaveStruct
 		err := list.State.StateSaverStruct.SaveDBStateList(list.State.DBStates, list.State.Network)
-		list.State.LogPrintf("dbstatesprocess", "Error while saving Fastboot %v", err)
+		list.State.LogPrintf("dbstateProcess", "Error while saving Fastboot %v", err)
 	}
 	// Now that we have saved the perm balances, we can clear the api hashmaps that held the differences
 	// between the actual saved block prior, and this saved block.  If you are looking for balances of
@@ -1507,6 +1507,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 
 	s := list.State
 	saved := 0
+	// debug code to create a printable list of DBSstates
 	if len(list.DBStates) != 0 {
 		l := "["
 		for _, d := range list.DBStates {
@@ -1517,46 +1518,34 @@ func (list *DBStateList) UpdateState() (progress bool) {
 			}
 		}
 		l += "]"
-		s.LogPrintf("dbstate", "updateState() %d %s", list.Base, l)
+		s.LogPrintf("dbstateProcess", "updateState() %d %s", list.Base, l)
 	}
-	for i, d := range list.DBStates {
-		// loop only thru this and future blocks
-		//for i := int(list.State.LLeaderHeight); i < int(list.Base)+len(list.DBStates); i++ {
-		//	d := list.Get(i)
+
+	//for i, d := range list.DBStates {
+	// loop only thru this and future blocks
+	for dbht := int(list.State.LLeaderHeight); dbht < int(list.Base)+len(list.DBStates); dbht++ {
+		d := list.Get(dbht)
 		//	//fmt.Printf("dddd %20s %10s --- %10s %10v %10s %10v \n", "DBStateList Update", list.State.FactomNodeName, "Looking at", i, "DBHeight", list.Base+uint32(i))
 
 		// Must process blocks in sequence.  Missing a block says we must stop.
 		if d == nil {
-			return
+			break
 		}
 
-		if i > 0 {
-			p := list.FixupLinks(list.DBStates[i-1], d)
-			if p && !progress {
-				progress = p
-			}
-		}
+		pd := list.Get(dbht - 1)
 
-		p := list.ProcessBlocks(d) || progress
-		if p && !progress {
-			progress = p
-		}
-		p = list.SignDB(d) || progress
-		if p && !progress {
-			progress = p
-		}
-		p = list.SaveDBStateToDB(d) || progress
-		if p && !progress {
-			progress = p
-		}
+		progress = list.FixupLinks(pd, d) || progress
+		progress = list.ProcessBlocks(d) || progress
+		progress = list.SignDB(d) || progress
+		progress = list.SaveDBStateToDB(d) || progress
 
 		// Make sure we move forward the Adminblock state in the process lists
-		list.State.ProcessLists.Get(d.DirectoryBlock.GetHeader().GetDBHeight() + 1)
+		list.State.ProcessLists.Get(uint32(dbht + 1))
 
 		if d.Saved {
-			saved = i
+			saved = dbht
 		}
-		if i-saved > 1 {
+		if dbht-saved > 1 {
 			break
 		}
 	}
@@ -1583,9 +1572,15 @@ func (list *DBStateList) Highest() uint32 {
 }
 
 // Return true if we actually added the dbstate to the list
-func (list *DBStateList) Put(dbState *DBState) bool {
+func (list *DBStateList) Put(dbState *DBState) (rval bool) {
+	var index int
+
 	dblk := dbState.DirectoryBlock
 	dbheight := dblk.GetHeader().GetDBHeight()
+
+	defer func(prval *bool, pindex *int) {
+		list.State.LogPrintf("dbstateProcess", "put(%d)=%v at %d", dbheight, *prval, *pindex)
+	}(&rval, &index)
 
 	// Count completed states, starting from the beginning (since base starts at
 	// zero.
@@ -1608,7 +1603,7 @@ searchLoop:
 		list.Complete = list.Complete - uint32(cnt) + keep
 	}
 
-	index := int(dbheight) - int(list.Base)
+	index = int(dbheight) - int(list.Base)
 
 	// If we have already processed this State, ignore it.
 	if index < int(list.Complete) {
@@ -1677,7 +1672,6 @@ func (list *DBStateList) NewDBState(isNew bool,
 			}
 		}
 	}
-
 	// Failed, so return nil
 	return nil
 }

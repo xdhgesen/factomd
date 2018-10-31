@@ -31,6 +31,8 @@ func (sss *StateSaverStruct) StopSaving() {
 }
 
 func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string) error {
+	s := ss.State
+	_ = s
 	//For now, to file. Later - to DB
 	if sss.Stop == true {
 		return nil
@@ -62,28 +64,11 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	}
 	//adding an integrity check
 	h := primitives.Sha(b)
+	// Prepend the hash so we can read it first then hash the savestate to check the data is right.
 	b = append(h.Bytes(), b...)
 	sss.TmpState = b
 	sss.TmpDBHt = ss.State.LLeaderHeight
 
-	{ /// Debug code, check if I can unmarshal the object myself.
-		test := new(DBStateList)
-		test.UnmarshalBinary(b)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "SaveState UnmarshalBinary Failed", err)
-		}
-
-		h := primitives.NewZeroHash()
-		b, err = h.UnmarshalBinaryData(b)
-		if err != nil {
-			return nil
-		}
-		h2 := primitives.Sha(b)
-		if h.IsSameAs(h2) == false {
-			fmt.Fprintln(os.Stderr, "LoadDBStateList - Integrity hashes do not match!")
-			return nil
-		}
-	}
 	return nil
 }
 

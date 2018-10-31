@@ -82,17 +82,27 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		return false
 	}
 
+	// account for the time in execute message
 	preExecuteMsgTime := time.Now()
+	defer func() {
+		executeMsgTime := time.Since(preExecuteMsgTime)
+		TotalExecuteMsgTime.Add(float64(executeMsgTime.Nanoseconds()))
+	}()
+
+	msgHashFixed := msg.GetMsgHash().Fixed()
+
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		consenLogger.WithFields(msg.LogFields()).Debug("executeMsg (Replay Invalid)")
-		s.LogMessage("executeMsg", "replayInvalid", msg)
+		s.LogMessage("executeMsg", "Drop, replayInvalid", msg)
+		delete(s.Holding, msgHashFixed)
 		return
 	}
+
 	s.SetString()
 	msg.ComputeVMIndex(s)
 
-	// never ignore DBState messages
+	// never ignore DBState messages because of age
 	if s.IgnoreMissing && msg.Type() != constants.DBSTATE_MSG {
 		now := s.GetTimestamp().GetTimeSeconds()
 		if now-msg.GetTimestamp().GetTimeSeconds() > 60*15 {
@@ -102,6 +112,18 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	}
 
 	valid := msg.Validate(s)
+	switch valid {
+	case -1:
+		s.LogMessage("executeMsg", "Invalid", msg)
+	case 0:
+		s.LogMessage("executeMsg", "Hold", msg)
+	case 1:
+		s.LogMessage("executeMsg", "Valid", msg)
+	default:
+		s.LogMessage("executeMsg", fmt.Sprintf("Unexpected return code from validate()=%d", valid), msg)
+	}
+
+	// if it's a valid message check if it was created with in an hour of the time the block started.
 	if valid == 1 {
 		if msg.Type() != constants.DBSTATE_MSG && msg.Type() != constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
 			// Make sure we don't put in an old ack (outside our repeat range)
@@ -113,21 +135,14 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 				// Make sure we don't put in an old msg (outside our repeat range)
 				Delta := blktime - msgtime
-				prev := s.GetDBState(s.LLeaderHeight - 1)
-				cur := s.GetDBState(s.LLeaderHeight)
-
-				s.LogPrintf("executeMsg", "prev %v", prev.DirectoryBlock.GetTimestamp().String())
-				if cur != nil {
-					s.LogPrintf("executeMsg", "curr %v ", cur.DirectoryBlock.GetTimestamp().String())
-				}
+				//prev := s.GetDBState(s.LLeaderHeight - 1)
+				//cur := s.GetDBState(s.LLeaderHeight)
+				//s.LogPrintf("executeMsg", "prev %v", prev.DirectoryBlock.GetTimestamp().String())
+				//if cur != nil {
+				//	s.LogPrintf("executeMsg", "curr %v ", cur.DirectoryBlock.GetTimestamp().String())
+				//}
 
 				if Delta > tlim || -Delta > tlim {
-					/*
-
-					   4031 11:24:44 48497-:-0 Block 48497 time 2018-09-28 22:52:00 -0500 CDT
-					                                       time 2018-10-09 11:24:56 delta %!d(MISSING)
-					   4031 11:24:44 48497-:-0 Block 48497 time 2018-09-28 22:52:00 -0500 CDT Msg 38343834383864393137623031346662376664353164633936623731333965666135383432313432343762376635623763393537353230656439356262363461 time 2018-10-09 11:24:56 delta %!d(MISSING)
-					*/
 					s.LogPrintf("executeMsg", "Block %d time %v Msg %x time %v delta %d",
 						s.LLeaderHeight, s.GetLeaderTimestamp().GetTime().String(), msg.GetHash(), msg.GetTimestamp().String(), Delta)
 
@@ -136,7 +151,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 						s.LogMessage("executeMsg", "Hold message from the future", msg)
 						valid = 0 // Future stuff I can hold for now.  It might be good later.
 					} else {
-						s.LogMessage("executeMsg", "Drop message because the msg is out of range", msg)
+						s.LogMessage("executeMsg", "Drop, old message", msg)
 						valid = -1 // Old messages are bad.
 					}
 				}
@@ -146,18 +161,23 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 	switch valid {
 	case 1:
-		// The highest block for which we have received a message.  Sometimes the same as
-		msg.SendOut(s, msg)
-
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
 			if !s.NoEntryYet(msg.GetHash(), nil) {
-				delete(s.Holding, msg.GetHash().Fixed())
-				s.Commits.Delete(msg.GetHash().Fixed())
+				s.LogMessage("executeMsg", "Drop, already commited", msg)
+				delete(s.Holding, msgHashFixed) // make sure this message not in holding
+				switch msg.Type() {
+				case constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
+					delete(s.Holding, msg.GetHash().Fixed()) // if I'm a commit make sure my reveal is not in holding too
+				}
+				s.Commits.Delete(msg.GetHash().Fixed()) // drop any associated commit as well
 				return true
 			}
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
+			// hold the message in case execution doesn't pan out
+			s.Holding[msgHashFixed] = msg
 		}
+
+		msg.SendOut(s, msg) //broadcast valid messages
 
 		var vml int
 		if vm == nil || vm.List == nil {
@@ -194,12 +214,14 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	case 0:
 		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
 		// this check makes sure we don't put them back in holding after just deleting them
-		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
-			TotalHoldingQueueInputs.Inc()
+		_, msgInHolding := s.Holding[msgHashFixed] // check if the message is already in holding
+		if msgInHolding {
 			TotalHoldingQueueRecycles.Inc()
-			s.Holding[msg.GetMsgHash().Fixed()] = msg
+			s.LogMessage("executeMsg", "Keep in holding", msg)
 		} else {
-			s.LogMessage("executeMsg", "drop, IReplay", msg)
+			s.LogMessage("executeMsg", "Add to holding", msg)
+			TotalHoldingQueueInputs.Inc()
+			s.Holding[msgHashFixed] = msg
 		}
 
 	default:
@@ -209,13 +231,10 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			s.LogMessage("executeMsg", "Send to InvalidMsgQueue", msg)
 			s.networkInvalidMsgQueue <- msg
 		}
+		delete(s.Holding, msgHashFixed)
 	}
 
-	executeMsgTime := time.Since(preExecuteMsgTime)
-	TotalExecuteMsgTime.Add(float64(executeMsgTime.Nanoseconds()))
-
 	return
-
 }
 
 func (s *State) Process() (progress bool) {
@@ -543,15 +562,15 @@ func (s *State) ReviewHolding() {
 }
 
 func (s *State) MoveStateToHeight(dbheight uint32) {
-	s.LogPrintf("dbstate", "MoveStateToHeight(%d) called from %s", dbheight, atomic.WhereAmIString(1))
+	s.LogPrintf("dbstateProcess", "MoveStateToHeight(%d) called from %s", dbheight, atomic.WhereAmIString(1))
 	if s.LLeaderHeight+1 != dbheight {
-		s.LogPrintf("dbstate", "State move between non-sequential heights from %d to %d", s.LLeaderHeight, dbheight)
+		s.LogPrintf("dbstateProcess", "State move between non-sequential heights from %d to %d", s.LLeaderHeight, dbheight)
 		if s.LLeaderHeight != dbheight {
 			fmt.Fprintf(os.Stderr, "State move between non-sequential heights from %d to %d\n", s.LLeaderHeight, dbheight)
 		}
 	}
 	if s.CurrentMinute != 0 {
-		s.LogPrintf("dbstate", "CurrentMinute not 0 %d", s.CurrentMinute)
+		s.LogPrintf("dbstateProcess", "CurrentMinute not 0 %d", s.CurrentMinute)
 		fmt.Fprintf(os.Stderr, "CurrentMinute not 0 %d\n", s.CurrentMinute)
 	}
 	s.LLeaderHeight = dbheight                       // Update leader height
@@ -569,7 +588,7 @@ func (s *State) AddDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
-	s.LogPrintf("dbstate", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
+	s.LogPrintf("dbstateProcess", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
 		isNew, directoryBlock.GetHeader().GetDBHeight(), directoryBlock.GetHash().Bytes()[:4],
 		adminBlock.GetHash().Bytes()[:4], factoidBlock.GetHash().Bytes()[:4], entryCreditBlock.GetHash().Bytes()[:4], len(eBlocks), len(entries))
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
@@ -577,6 +596,20 @@ func (s *State) AddDBState(isNew bool,
 	if dbState == nil {
 		//s.AddStatus(fmt.Sprintf("AddDBState(): Fail dbstate is nil at dbht: %d", directoryBlock.GetHeader().GetDBHeight()))
 		return nil
+	}
+
+	// debug code to create a printable list of DBSstates
+	if len(s.DBStates.DBStates) != 0 {
+		l := "["
+		for _, d := range s.DBStates.DBStates {
+			if d == nil {
+				l += "nil "
+			} else {
+				l += fmt.Sprintf("%d, ", d.DirectoryBlock.GetHeader().GetDBHeight())
+			}
+		}
+		l += "]"
+		s.LogPrintf("dbstateProcess", "AddDBState(%d) %d %s", directoryBlock.GetHeader().GetDBHeight(), s.DBStates.Base, l)
 	}
 
 	ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
@@ -589,13 +622,13 @@ func (s *State) AddDBState(isNew bool,
 
 	if ht == s.LLeaderHeight-1 || (ht == s.LLeaderHeight) {
 	} else {
-		s.LogPrintf("dbstate", "AddDBState out of order! at %d added %d", s.LLeaderHeight, ht)
+		s.LogPrintf("dbstateProcess", "AddDBState out of order! at %d added %d", s.LLeaderHeight, ht)
 		fmt.Fprintf(os.Stderr, "AddDBState() out of order! at %d added %d\n", s.LLeaderHeight, ht)
 		//panic("AddDBState out of order!")
 	}
 
 	if ht > s.LLeaderHeight {
-		s.LogPrintf("dbstate", "unexpected: ht > s.LLeaderHeight  at %d added %d", s.LLeaderHeight, ht)
+		s.LogPrintf("dbstateProcess", "unexpected: ht > s.LLeaderHeight  at %d added %d", s.LLeaderHeight, ht)
 		s.Syncing = false
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Add DBState: s.SigType(%v)", s.FactomNodeName, s.SigType))
 		s.CurrentMinute = 0
@@ -773,7 +806,10 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	dbheight := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
 
 	// ignore if too old. If its under EntryDBHeightComplete
-	if dbheight > 0 && dbheight <= s.GetHighestSavedBlk() && dbheight < s.EntryDBHeightComplete {
+	highestSavedBlk := s.GetHighestSavedBlk()
+
+	if dbheight > 0 && dbheight <= highestSavedBlk && dbheight < s.EntryDBHeightComplete {
+		s.LogMessage("dbstateProcess", "Drop, too old", msg)
 		return
 	}
 
@@ -781,28 +817,53 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 
 	pdbstate := s.DBStates.Get(int(dbheight - 1))
 
-	switch pdbstate.ValidNext(s, dbstatemsg) {
+	validNext := pdbstate.ValidNext(s, dbstatemsg)
+	if validNext == -1 {
+		validNext = pdbstate.ValidNext(s, dbstatemsg)
+	}
+
+	switch validNext {
+	case -1:
+		s.LogMessage("dbstateProcess", "not valid", msg)
+	case 0:
+		s.LogMessage("dbstateProcess", "hold", msg)
+	case 1:
+		s.LogMessage("dbstateProcess", "valid", msg)
+	default:
+		s.LogMessage("dbstateProcess", fmt.Sprintf("validNext unexpected value %d", validNext), msg)
+	}
+
+	switch validNext {
 	case 0:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState might be valid %d", dbheight))
 
 		// Don't add duplicate dbstate messages.
-		if s.DBStatesReceivedBase < int(s.GetHighestSavedBlk()) {
-			cut := int(s.GetHighestSavedBlk()) - s.DBStatesReceivedBase
+		if s.DBStatesReceivedBase < int(highestSavedBlk) {
+			cut := int(highestSavedBlk) - s.DBStatesReceivedBase
 			if len(s.DBStatesReceived) > cut {
 				s.DBStatesReceived = append(make([]*messages.DBStateMsg, 0), s.DBStatesReceived[cut:]...)
+				s.LogPrintf("dbstateProcess", "Trim %d from DBStatesReceived at %d", cut, s.DBStatesReceivedBase)
 			}
 			s.DBStatesReceivedBase += cut
 		}
+
 		ix := int(dbheight) - s.DBStatesReceivedBase
 		if ix < 0 {
 			// If we are missing entries at this DBState, we can apply the entries only
 			s.ExecuteEntriesInDBState(dbstatemsg)
+			s.LogPrintf("dbstateProcess", "Keep entries but drop state for %d", dbheight)
 			return
+		}
+
+		cnt := ix - len(s.DBStatesReceived)
+		if cnt > 1 {
+			s.LogPrintf("dbstateProcess", "Pad list with %d nils", cnt)
 		}
 		for len(s.DBStatesReceived) <= ix {
 			s.DBStatesReceived = append(s.DBStatesReceived, nil)
 		}
 		s.DBStatesReceived[ix] = dbstatemsg
+		s.LogPrintf("dbstateProcess", "Add DBstate %d at index %d", dbheight, ix)
 		return
 	case -1:
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
@@ -811,8 +872,11 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		if dbstatemsg.IsLast { // this is the last DBState in this load
 			s.DBFinished = true // Just in case we toss the last one for some reason
 		}
+		s.LogPrintf("dbstateProcess", "Drop, invalid %d", dbheight)
 		return
 	}
+
+	s.LogMessage("dbstateProcess", "Process", msg)
 
 	if dbstatemsg.IsLast { // this is the last DBState in this load
 		s.DBFinished = true // Normal case
@@ -848,6 +912,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	if dbstate == nil {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate fail at ht %d", dbheight))
 		cntFail()
+		s.LogPrintf("dbstateProcess", "Add state failed %d", dbheight)
 		return
 	}
 
@@ -861,7 +926,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			fct.GetTimestamp(),
 			dbstatemsg.DirectoryBlock.GetHeader().GetTimestamp())
 		// FD-682 on 09/27/18 there was a block 160181 that was more than 60 minutes long and this transaction is judged invalid because it was 88 minutes
-		// after the blcok start time. The transaction is valid.
+		// after the block start time. The transaction is valid.
 		if dbheight == 160181 && fixed == [32]byte{0xf9, 0x6a, 0xf0, 0x63, 0xff, 0xfd, 0x90, 0xe2, 0x61, 0xe4, 0x5c, 0xbc, 0xdf, 0x34, 0xc3, 0x95,
 			0x8c, 0xf5, 0x4e, 0x23, 0x88, 0xfd, 0x3f, 0x8e, 0xf9, 0x07, 0xdc, 0xa9, 0x03, 0xea, 0x2f, 0x2e} {
 			valid = true
@@ -872,6 +937,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		if i > 0 && // Don't test the coinbase TX
 			((dbheight > 0 && dbheight < 2000) || dbheight > 100000) && // Test the first 2000 blks, so we can unit test, then after
 			!valid { // 100K for the running system.  If a TX isn't valid, ignore.
+			s.LogPrintf("dbstateProcess", "Double Spend at %d", dbheight)
 			return //Totally ignore the block if it has a double spend.
 		}
 	}
@@ -966,7 +1032,7 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	// Drop the missing message response if it's already in the process list
 	_, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !valid {
-		s.LogMessage("executeMsg", "drop, INTERNAL_REPLAY", m)
+		s.LogMessage("executeMsg", "Drop, INTERNAL_REPLAY", m)
 		return
 	}
 
@@ -975,33 +1041,33 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 	ack, ok := mmr.AckResponse.(*messages.Ack)
 
 	if ack.DBHeight < s.DBHeightAtBoot+2 && ack.GetTimestamp().GetTimeMilli() < s.TimestampAtBoot.GetTimeMilli() {
-		s.LogMessage("executeMsg", "drop, too old", m)
+		s.LogMessage("executeMsg", "Drop, too old", m)
 		return
 	}
 
 	// If we don't need this message, we don't have to do everything else.
 	if !ok {
-		s.LogMessage("executeMsg", "Drop no ack", m)
+		s.LogMessage("executeMsg", "Drop, no ack", m)
 		return
 	}
 
 	// If we don't need this message, we don't have to do everything else.
 	if ack.Validate(s) == -1 {
-		s.LogMessage("executeMsg", "Drop ack invalid", m)
+		s.LogMessage("executeMsg", "Drop, ack invalid", m)
 		return
 	}
 	ack.Response = true
 	msg := mmr.MsgResponse
 
 	if msg == nil {
-		s.LogMessage("executeMsg", "Drop nil message", m)
+		s.LogMessage("executeMsg", "Drop, nil message", m)
 		return
 	}
 
 	pl := s.ProcessLists.Get(ack.DBHeight)
 
 	if pl == nil {
-		s.LogMessage("executeMsg", "Drop No Processlist", m)
+		s.LogMessage("executeMsg", "Drop, No Processlist", m)
 		return
 	}
 	_, okm := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
@@ -1587,8 +1653,8 @@ func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, inte
 		panic(err)
 	}
 	ack := s.NewAck(dbs, s.Balancehash).(*messages.Ack)
-	s.LogMessage("dbstate", "CreateDBSig", dbs)
-	s.LogPrintf("dbstate", dbstate.String())
+	s.LogMessage("dbstateProcess", "CreateDBSig", dbs)
+	s.LogPrintf("dbstateProcess", dbstate.String())
 	return dbs, ack
 }
 
@@ -1872,13 +1938,13 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 					panic(err)
 				}
 				//{ // debug
-				//	s.LogMessage("dbstate", "currentminute=10", dbs)
+				//	s.LogMessage("dbstateProcess", "currentminute=10", dbs)
 				//	dbs2, _ := s.CreateDBSig(s.LLeaderHeight, s.LeaderVMIndex)
 				//	dbs3 := dbs2.(*messages.DirectoryBlockSignature)
-				//	s.LogPrintf("dbstate", "issameas()=%v", dbs.IsSameAs(dbs3))
+				//	s.LogPrintf("dbstateProcess", "issameas()=%v", dbs.IsSameAs(dbs3))
 				//}
-				s.LogMessage("dbstate", "currentminute=10", dbs)
-				s.LogPrintf("dbstate", dbstate.String())
+				s.LogMessage("dbstateProcess", "currentminute=10", dbs)
+				s.LogPrintf("dbstateProcess", dbstate.String())
 				pldbs.DBSigAlreadySent = true
 
 				dbslog := consenLogger.WithFields(log.Fields{"func": "SendDBSig", "lheight": s.GetLeaderHeight(), "node-name": s.GetFactomNodeName()}).WithFields(dbs.LogFields())
@@ -2340,6 +2406,7 @@ func (s *State) GetHighestKnownBlock() uint32 {
 // If rt == true, read the Temp balances.  Otherwise read the Permanent balances.
 // concurrency safe to call
 func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
+	s.LogPrintf("threads", "GetF from %s", atomic.WhereAmIString(1))
 	ok := false
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
@@ -2372,6 +2439,7 @@ func (s *State) GetF(rt bool, adr [32]byte) (v int64) {
 // If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 // concurrency safe to call
 func (s *State) PutF(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("threads", "PutF from %s", atomic.WhereAmIString(1))
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
@@ -2394,6 +2462,7 @@ func (s *State) PutF(rt bool, adr [32]byte, v int64) {
 }
 
 func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
+	s.LogPrintf("threads", "GetE from %s", atomic.WhereAmIString(1))
 	ok := false
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
@@ -2424,6 +2493,8 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 // If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
 // concurrency safe to call
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
+	s.LogPrintf("threads", "PutE from %s", atomic.WhereAmIString(1))
+
 	if rt {
 		pl := s.ProcessLists.Get(s.LLeaderHeight)
 		if pl != nil {
