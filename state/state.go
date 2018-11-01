@@ -2504,7 +2504,8 @@ func (s *State) SetStringQueues() {
 	list := s.ProcessLists.Get(s.LLeaderHeight)
 	if found {
 		L = "L"
-		if list != nil {
+		if list == nil {
+			return
 		}
 	} else {
 		if list != nil {
@@ -2513,6 +2514,8 @@ func (s *State) SetStringQueues() {
 					L = "A"
 				}
 			}
+		} else {
+			return
 		}
 	}
 	if s.NetStateOff {

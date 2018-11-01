@@ -1171,6 +1171,7 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	s := list.State
 	s.MoveStateToHeight(dbheight + 1)
 	d.Signed = true
+	d.ProcessSteps = 3
 	return
 }
 
@@ -1535,7 +1536,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 			break
 		}
 	}
-	return
+	return false
 }
 
 func (list *DBStateList) Last() *DBState {
