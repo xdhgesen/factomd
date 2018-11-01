@@ -5,7 +5,6 @@
 package state
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -35,6 +34,8 @@ var _ = log.Print
 
 type DBState struct {
 	IsNew bool
+
+	ProcessSteps int
 
 	TmpSaveStruct *SaveState
 	SaveStruct    *SaveState
@@ -714,7 +715,8 @@ func containsServer(haystack []interfaces.IServer, needle interfaces.IServer) bo
 // p is previous, d is current
 func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	// If this block is new, then make sure all hashes are fully computed.
-	if !d.IsNew || p == nil {
+	if !d.IsNew || p == nil || d.ProcessSteps != 0 {
+		d.ProcessSteps = 1 // Don't need to call fixuplinks again on this block
 		return
 	}
 
@@ -886,6 +888,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	d.DirectoryBlock.BuildBodyMR()
 	d.DirectoryBlock.MarshalBinary()
 
+	d.ProcessSteps = 1 // Don't need to call fixup links again.
 	progress = true
 	d.IsNew = false
 	list.State.ResetTryCnt = 0
@@ -905,7 +908,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
-	if d.Locked || d.IsNew || d.Repeat {
+	if d.Locked || d.IsNew || d.Repeat || d.ProcessSteps != 1 {
+		d.ProcessSteps = 2 // Make sure we don't process this block twice.
 		s.LogPrintf("dbstateprocess", "Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v)", d.Locked, d.IsNew, d.Repeat)
 		return
 	}
@@ -914,6 +918,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// go forward. If dbHeight == list.ProcessHeight and current minute is 0, we want don't want to mark as a repeat,
 	// so we can avoid the Election in Minute 9 bug.
 	if dbht > 0 && (dbht < list.ProcessHeight || (dbht == list.ProcessHeight && list.State.CurrentMinute != 0)) {
+		d.ProcessSteps = 2 // make sure we don't process this block again.
 		progress = true
 		d.Repeat = true
 		return
@@ -949,27 +954,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		return
 	}
 
-	var out bytes.Buffer
-	out.WriteString("=== AdminBlock.UpdateState() Start ===\n")
-	prt := func(lable string, pl *ProcessList) {
-		if !list.State.DebugConsensus {
-			return
-		}
-		out.WriteString(fmt.Sprintf("%19s %20s (%4d)", list.State.FactomNodeName, lable, pl.DBHeight))
-		out.WriteString("Fed: ")
-		for _, f := range pl.FedServers {
-			out.WriteString(fmt.Sprintf("%x ", f.GetChainID().Bytes()[3:6]))
-		}
-		out.WriteString("---Audit: ")
-		for _, f := range pl.AuditServers {
-			out.WriteString(fmt.Sprintf("%x ", f.GetChainID().Bytes()[3:6]))
-		}
-		out.WriteString("\n")
-	}
-
-	prt("pl 1st", pl)
-	prt("pln 1st", pln)
-
 	//
 	// ***** Apply the AdminBlock changes to the next DBState
 	//
@@ -983,14 +967,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		panic(err)
 	}
 
-	prt("pl 2st", pl)
-	prt("pln 2st", pln)
-
 	pln2 := list.State.ProcessLists.Get(ht + 2)
 	pln2.FedServers = append(pln2.FedServers[:0], pln.FedServers...)
 	pln2.AuditServers = append(pln2.AuditServers[:0], pln.AuditServers...)
-
-	prt("pln2 3st", pln2)
 
 	pln2.SortAuditServers()
 	pln2.SortFedServers()
@@ -1003,15 +982,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// Now the authority lists are set, set the starting
 	pln.SetStartingAuthoritySet()
 	pln2.SetStartingAuthoritySet()
-
-	prt("pl 4th", pl)
-	prt("pln 4th", pln)
-	prt("pln2 4th", pln2)
-
-	if list.State.DebugConsensus {
-		out.WriteString("=== AdminBlock.UpdateState() End ===")
-		fmt.Println(out.String())
-	}
 
 	// get all the prior balances of the Factoid addresses that may have changed
 	// in this block.  If you want the balance of the highest saved block, look to
@@ -1143,15 +1113,22 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	list.State.LogPrintf("dbstateprocess", "dbht %d BalanceHash P %x T %x", dbht, list.State.Balancehash.Bytes()[0:4], tbh.Bytes()[0:4])
 	// Saving our state so we can reset it if we need to.
 	d.TmpSaveStruct = SaveFactomdState(list.State, d)
+	d.ProcessSteps = 2
 	return
 }
 
 // We don't really do the signing here, but just check that we have all the signatures.
 // If we do, we count that as progress.
 func (list *DBStateList) SignDB(d *DBState) (process bool) {
+
+	if d.ProcessSteps != 2 {
+		return
+	}
+
 	dbheight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	list.State.LogPrintf("dbstate", "SignDB(%d)", dbheight)
 	if d.Signed {
+		d.ProcessSteps = 3
 		//s := list.State
 		//		s.MoveStateToHeight(dbheight + 1)
 		list.State.LogPrintf("dbstate", "SignDB(%d) already signed", d.DirectoryBlock.GetHeader().GetDBHeight())

@@ -548,6 +548,7 @@ func (s *State) MoveStateToHeight(dbheight uint32) {
 		s.LogPrintf("dbstate", "State move between non-sequential heights from %d to %d", s.LLeaderHeight, dbheight)
 		if s.LLeaderHeight != dbheight {
 			fmt.Fprintf(os.Stderr, "State move between non-sequential heights from %d to %d\n", s.LLeaderHeight, dbheight)
+			return
 		}
 	}
 	if s.CurrentMinute != 0 {
