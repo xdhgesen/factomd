@@ -97,16 +97,31 @@ func (state *State) ValidatorLoop() {
 					break // no room
 				}
 
-				// This doesn't block so it intentionally returns nil, don't log nils
-				msg = state.InMsgQueue().Dequeue()
-				if msg != nil {
-					state.LogMessage("InMsgQueue", "dequeue", msg)
-				}
-				if msg == nil {
+				if state.Syncing || i&1 == 0 {
+					// This doesn't block so it intentionally returns nil, don't log nils
+					msg = state.InMsgQueue().Dequeue()
+					if msg != nil {
+						state.LogMessage("InMsgQueue", "dequeue", msg)
+					}
+					if msg == nil {
+						// This doesn't block so it intentionally returns nil, don't log nils
+						msg = state.InMsgQueue2().Dequeue()
+						if msg != nil {
+							state.LogMessage("InMsgQueue2", "dequeue", msg)
+						}
+					}
+				} else {
 					// This doesn't block so it intentionally returns nil, don't log nils
 					msg = state.InMsgQueue2().Dequeue()
 					if msg != nil {
-						state.LogMessage("InMsgQueue2", "dequeue", msg)
+						state.LogMessage("InMsgQueue", "dequeue", msg)
+					}
+					if msg == nil {
+						// This doesn't block so it intentionally returns nil, don't log nils
+						msg = state.InMsgQueue().Dequeue()
+						if msg != nil {
+							state.LogMessage("InMsgQueue2", "dequeue", msg)
+						}
 					}
 				}
 

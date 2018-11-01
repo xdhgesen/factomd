@@ -712,6 +712,7 @@ func containsServer(haystack []interfaces.IServer, needle interfaces.IServer) bo
 	return false
 }
 
+// FixedupLinks()
 // p is previous, d is current
 func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	// If this block is new, then make sure all hashes are fully computed.
@@ -897,7 +898,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	//authlistMsg := list.State.EFactory.NewAuthorityListInternal(currentFeds, currentAuds, currentDBHeight)
 	//list.State.ElectionsQueue().Enqueue(authlistMsg)
 
-	return
+	return true
 }
 
 func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
@@ -911,7 +912,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	if d.Locked || d.IsNew || d.Repeat || d.ProcessSteps != 1 {
 		d.ProcessSteps = 2 // Make sure we don't process this block twice.
 		s.LogPrintf("dbstateprocess", "Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v)", d.Locked, d.IsNew, d.Repeat)
-		return
+		return true
 	}
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
@@ -921,7 +922,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		d.ProcessSteps = 2 // make sure we don't process this block again.
 		progress = true
 		d.Repeat = true
-		return
+		return true
 	}
 
 	if dbht > 1 {
@@ -930,11 +931,11 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 			s.LogPrintf("dbstateprocess", "Skipping Prev Block Missing")
 			s.LogPrintf("dbstateprocess", "list: %v", list.State.DBStates.String())
 
-			return // Can't process out of order
+			return false // Can't process out of order
 		}
 		if !pd.Saved {
 			s.LogPrintf("dbstateprocess", "Skipping Prev Block not saved")
-			return // can't process till the prev is saved
+			return false // can't process till the prev is saved
 		}
 	}
 
@@ -951,7 +952,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	if pl == nil {
 		s.LogPrintf("dbstateprocess", "Skipping No ProcessList")
-		return
+		return false
 	}
 
 	//
@@ -1045,7 +1046,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		list.Complete = uint32(i)
 	}
 	list.ProcessHeight = dbht
-	progress = true
+
 	d.Locked = true // Only after all is done will I admit this state has been saved.
 
 	pln.SortFedServers()
@@ -1483,7 +1484,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 	list.Catchup(false)
 
 	s := list.State
-	saved := 0
+
 	if len(list.DBStates) != 0 {
 		l := "["
 		for _, d := range list.DBStates {
@@ -1530,10 +1531,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 		// Make sure we move forward the Adminblock state in the process lists
 		list.State.ProcessLists.Get(d.DirectoryBlock.GetHeader().GetDBHeight() + 1)
 
-		if d.Saved {
-			saved = i
-		}
-		if i-saved > 1 {
+		if !d.Saved {
 			break
 		}
 	}

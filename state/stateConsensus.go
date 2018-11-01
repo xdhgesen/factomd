@@ -227,6 +227,12 @@ func (s *State) Process() (progress bool) {
 	}
 
 	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
+
+	// Under some conditions, we don't have a process list.  Wait until we do.
+	if s.LeaderPL == nil {
+		return
+	}
+
 	now := s.GetTimestamp().GetTimeMilli() // Timestamps are in milliseconds, so wait 20
 
 	// If we are not running the leader, then look to see if we have waited long enough to
@@ -555,6 +561,7 @@ func (s *State) MoveStateToHeight(dbheight uint32) {
 		s.LogPrintf("dbstate", "CurrentMinute not 0 %d", s.CurrentMinute)
 		fmt.Fprintf(os.Stderr, "CurrentMinute not 0 %d\n", s.CurrentMinute)
 	}
+
 	s.LLeaderHeight = dbheight                       // Update leader height
 	s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight) // fix up cached values
 	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
@@ -590,13 +597,13 @@ func (s *State) AddDBState(isNew bool,
 
 	if ht == s.LLeaderHeight-1 || (ht == s.LLeaderHeight) {
 	} else {
-		s.LogPrintf("dbstate", "AddDBState out of order! at %d added %d", s.LLeaderHeight, ht)
-		fmt.Fprintf(os.Stderr, "AddDBState() out of order! at %d added %d\n", s.LLeaderHeight, ht)
+		s.LogPrintf("dbstate", "AddDBState in the future: Leader height %d height of block %d", s.LLeaderHeight, ht)
+		fmt.Fprintf(os.Stderr, "AddDBState in the future: Leader height %d  height of block %d\n", s.LLeaderHeight, ht)
 		//panic("AddDBState out of order!")
 	}
 
 	if ht > s.LLeaderHeight {
-		s.LogPrintf("dbstate", "unexpected: ht > s.LLeaderHeight  at %d added %d", s.LLeaderHeight, ht)
+		s.LogPrintf("dbstate", "future: ht > s.LLeaderHeight  at %d  height of block %d", s.LLeaderHeight, ht)
 		s.Syncing = false
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Add DBState: s.SigType(%v)", s.FactomNodeName, s.SigType))
 		s.CurrentMinute = 0
@@ -940,16 +947,15 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	}
 	s.DBStates.TimeToAsk = nil
 
-	if dbstatemsg.IsLocal() {
-		if s.StateSaverStruct.FastBoot {
-			dbstate.SaveStruct = SaveFactomdState(s, dbstate)
+	if s.StateSaverStruct.FastBoot {
+		dbstate.SaveStruct = SaveFactomdState(s, dbstate)
 
-			err := s.StateSaverStruct.SaveDBStateList(s.DBStates, s.Network)
-			if err != nil {
-				panic(err)
-			}
+		err := s.StateSaverStruct.SaveDBStateList(s.DBStates, s.Network)
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("Invalid SateSaverStruct: %v\n", err))
 		}
 	}
+
 }
 
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
