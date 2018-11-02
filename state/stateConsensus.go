@@ -541,11 +541,13 @@ func (s *State) ReviewHolding() {
 
 func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 	s.LogPrintf("dbstate", "MoveStateToHeight(%d-:-%d) called from %s", dbheight, newMinute, atomic.WhereAmIString(1))
-	if s.LLeaderHeight+1 != dbheight {
-		s.LogPrintf("dbstate", "State move between non-sequential heights from %d to %d", s.LLeaderHeight, dbheight)
-		if s.LLeaderHeight != dbheight {
-			fmt.Fprintf(os.Stderr, "State move between non-sequential heights from %d to %d\n", s.LLeaderHeight, dbheight)
-		}
+
+	// Its ok to move one minute or one block but anything else if noteable
+	if (s.LLeaderHeight == dbheight && s.CurrentMinute+1 == newMinute) || (s.LLeaderHeight+1 == dbheight && newMinute == 0) {
+		// this is the ok case
+	} else {
+		s.LogPrintf("dbstate", "State move between non-sequential heights from %d-:-%d to %d-:-%d", s.LLeaderHeight, s.CurrentMinute, dbheight, newMinute)
+		fmt.Fprintf(os.Stderr, "State move between non-sequential heights from %d-:-%d to %d-:-%d\n", s.LLeaderHeight, s.CurrentMinute, dbheight, newMinute)
 	}
 	// normally when loading by DBStates we jump from minute 0 to minute 0
 	// when following by minute we jump from minute 10 to minute 0
@@ -948,7 +950,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStates.UpdateState()
 	} else {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from local db at ht %d", dbheight))
-		dbstate.Saved = true
+		//dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false
 	}

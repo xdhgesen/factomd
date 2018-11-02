@@ -137,6 +137,13 @@ func DeepStateDisplayCopyDifference(s *State, prev *DisplayState) (*DisplayState
 		ds.PublicKey = pubkey
 	}
 
+	if s == nil {
+		return prev, nil
+	}
+	if s.LeaderPL == nil {
+		return prev, nil
+	}
+
 	vms := s.LeaderPL.VMs
 	for _, v := range vms {
 		list := v.List
