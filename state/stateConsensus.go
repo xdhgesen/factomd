@@ -121,6 +121,8 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 				//	s.LogPrintf("executeMsg", "curr %v ", cur.DirectoryBlock.GetTimestamp().String())
 				//}
 
+				s.LogPrintf("executeMsg", "%s %s %d %d", s.GetLeaderTimestamp().String(), msg.GetTimestamp().String(), Delta/1000000000, tlim/1000000000)
+
 				if Delta > tlim || -Delta > tlim {
 
 					//s.LogPrintf("executeMsg", "Block %d time %v Msg %x time %v delta %d",
@@ -557,25 +559,29 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight) // fix up cached values
 		s.ProcessLists.Get(s.LLeaderHeight + 1)          // Make sure next PL exists
 
-		// check if a DBState exists where we can get the timestamp
-		dbstate := s.DBStates.Get(int(dbheight))
-		if dbstate != nil {
-			s.SetLeaderTimestamp(dbstate.DirectoryBlock.GetTimestamp())
+		// if it's a clean boot the genisis block is not yet saved and is not in the dbstates list
+		if dbheight < 2 {
+			s.SetLeaderTimestamp(primitives.NewTimestampNow())
 		} else {
-			// check if the dbstate is in the database
-			dblock, err := s.DB.FetchDBlockByHeight(dbheight)
-
-			if dblock != nil && err == nil {
-				s.SetLeaderTimestamp(dblock.GetTimestamp())
+			// check if a DBState exists where we can get the timestamp
+			dbstate := s.DBStates.Get(int(dbheight))
+			if dbstate != nil {
+				s.SetLeaderTimestamp(dbstate.DirectoryBlock.GetTimestamp())
 			} else {
+				// check if the dbstate is in the database
+				dblock, err := s.DB.FetchDBlockByHeight(dbheight)
 
-				// Use the time stamp of the prev block until DBSig VM0 arrives
-				dbstate := s.DBStates.Get(int(dbheight - 1))
-				if dbstate != nil {
-					s.SetLeaderTimestamp(dbstate.DirectoryBlock.GetTimestamp())
+				if dblock != nil && err == nil {
+					s.SetLeaderTimestamp(dblock.GetTimestamp())
 				} else {
-					// What now?
-					panic("No prior state")
+
+					// Use the time stamp of the prev block until DBSig VM0 arrives
+					dbstate := s.DBStates.Get(int(dbheight - 1))
+					if dbstate != nil {
+						s.SetLeaderTimestamp(dbstate.DirectoryBlock.GetTimestamp())
+					} else {
+						panic("No prior state")
+					}
 				}
 			}
 		}

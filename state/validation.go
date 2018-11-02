@@ -73,15 +73,17 @@ func (state *State) ValidatorLoop() {
 		// Look for pending messages, and get one if there is one.
 		var msg interfaces.IMsg
 
-		for i := 0; i < 50; i++ {
+		for i := 0; i < 10; i++ {
 			//for state.Process() {}
 			//for state.UpdateState() {}
 			var progress bool
 			//for i := 0; progress && i < 100; i++ {
 			for state.Process() {
+				fmt.Print("p")
 				progress = true
 			}
 			for state.UpdateState() {
+				fmt.Print("u")
 				progress = true
 			}
 			//}
@@ -92,7 +94,7 @@ func (state *State) ValidatorLoop() {
 			default:
 			}
 
-			for i := 0; i < 1; i++ {
+			for i := 0; i < 50; i++ {
 				if ackRoom == 1 || msgRoom == 1 {
 					break // no room
 				}
@@ -135,7 +137,6 @@ func (state *State) ValidatorLoop() {
 				for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
 					time.Sleep(10 * time.Millisecond)
 				}
-
 			}
 		}
 
