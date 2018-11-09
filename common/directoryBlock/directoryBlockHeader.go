@@ -229,9 +229,9 @@ func (b *DBlockHeader) MarshalBinary() (rval []byte, err error) {
 		return nil, err
 	}
 
-	if b.BlockCount > 100000 {
-		panic("Send: Blockcount too great in directory block")
-	}
+	// if b.BlockCount > 100000 {
+	// 	panic("Send: Blockcount too great in directory block")
+	// }
 
 	return buf.DeepCopyBytes(), err
 }
@@ -278,9 +278,9 @@ func (b *DBlockHeader) UnmarshalBinaryData(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if b.BlockCount > 100000 {
-		panic("Receive: Blockcount too great in directory block" + fmt.Sprintf(":::: %d", b.BlockCount))
-	}
+	// if b.BlockCount > 100000 {
+	// 	panic("Receive: Blockcount too great in directory block" + fmt.Sprintf(":::: %d", b.BlockCount))
+	// }
 
 	return buf.DeepCopyBytes(), nil
 }
