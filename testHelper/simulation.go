@@ -25,14 +25,13 @@ import (
 // Pass in t for the testing as the 4th argument
 
 var par = globals.FactomParams{}
-
-var quit = make(chan struct{})
-
 var ExpectedHeight, Leaders, Audits, Followers int
 var startTime, endTime time.Time
+var quit chan struct{}
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
 func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
+	quit = make(chan struct{})
 	ExpectedHeight = height
 	l := len(GivenNodes)
 	CmdLineOptions := map[string]string{

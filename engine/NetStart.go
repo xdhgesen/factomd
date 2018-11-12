@@ -311,7 +311,8 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	// Actually setup the Network
 	//************************************************
 
-	// Make p.cnt Factom nodes
+  // REVIEW
+	fnodes = fnodes[:0]
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
 	}
@@ -547,6 +548,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	// Start prometheus on port
 	launchPrometheus(9876)
+
 	// Start Package's prometheus
 	state.RegisterPrometheus()
 	p2p.RegisterPrometheus()
