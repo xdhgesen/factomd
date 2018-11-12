@@ -13,11 +13,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 )
+var prometheusStarted bool = false
+var pprofStarted bool = false
 
 // StartProfiler runs the go pprof tool
 // `go tool pprof http://localhost:6060/debug/pprof/profile`
 // https://golang.org/pkg/net/http/pprof/
 func StartProfiler(mpr int, expose bool) {
+	if pprofStarted {
+		return // don't start twice - this would only happen in testing
+	}
 	_ = log.Print
 	runtime.MemProfileRate = mpr
 	pre := "localhost"
@@ -29,6 +34,10 @@ func StartProfiler(mpr int, expose bool) {
 }
 
 func launchPrometheus(port int) {
+	if prometheusStarted {
+		return // don't start twice - this would only happen in testing
+	}
 	http.Handle("/metrics", prometheus.Handler())
 	go http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
+	prometheusStarted = true
 }
