@@ -313,7 +313,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	// Actually setup the Network
 	//************************************************
 
-  // REVIEW
 	fnodes = fnodes[:0]
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
@@ -624,19 +623,18 @@ func worker (fnode *FactomNode, doWork func() error) {
 func StartFnode(i int, loadDB bool) {
 	fnode := fnodes[i]
 
-	if i > 0 {
-    	fnode.State.Init()
-	}
 	if loadDB {
-		go state.LoadDatabase(fnode.State)
+		state.LoadDatabase(fnode.State)
 	}
 
 	go func() {
-		fnode.State.ValidatorLoop()
 		fnode.Running = true
+		fmt.Printf("FNode%v: START\n", i)
+		fnode.State.ValidatorLoop()
+		fmt.Printf("FNode%v: STOP\n", i)
+		fnode.Running = false
 		// workers exit when validator exits
 		for _, wc := range fnode.workers {
-			fnode.Running = false
 			wc <- 0
 		}
 	}()

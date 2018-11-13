@@ -292,6 +292,12 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 // signal Fnode state to shutdown
 func StopNode(offset int, typeCode rune) {
 	engine.GetFnodes()[offset].State.ShutdownChan <- 0
+	_ = typeCode // REVIEW: should we account for this stopped node ?
+}
+
+func StartNode(offset int, typeCode rune) {
+	engine.StartFnode(offset, true)
+	_ = typeCode // REVIEW: should we account for this started node ?
 }
 
 func creatingNodes(creatingNodes string, state0 *state.State) {
