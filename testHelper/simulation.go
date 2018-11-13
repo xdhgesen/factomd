@@ -289,13 +289,11 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 	return nil, nil
 }
 
-
 func creatingNodes(creatingNodes string, state0 *state.State) {
 	RunCmd(fmt.Sprintf("g%d", len(creatingNodes)))
 	WaitMinutes(state0, 1)
 	// Wait till all the entries from the g command are processed
 	simFnodes := engine.GetFnodes()
-	nodes := len(simFnodes)
 	for {
 		iq := 0
 		for _, s := range simFnodes {
@@ -334,7 +332,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 			RunCmd("o")
 			Audits++
 		case 'F', 'f':
-			RunCmd(fmt.Sprintf("%d", (i+1)%nodes))
+			RunCmd(fmt.Sprintf("%d", (i+1)%len(simFnodes)))
 			Followers++
 			break
 		default:

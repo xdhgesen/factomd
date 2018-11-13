@@ -41,6 +41,7 @@ type FactomNode struct {
 	Peers    []interfaces.IPeer
 	MLog     *MsgLog
 	P2PIndex int
+	workers []chan int
 }
 
 var fnodes []*FactomNode
@@ -568,38 +569,82 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 func makeServer(s *state.State) *FactomNode {
 	// All other states are clones of the first state.  Which this routine
 	// gets passed to it.
-	newState := s
-
 	if len(fnodes) > 0 {
-		newState = s.Clone(len(fnodes)).(*state.State)
-		newState.EFactory = new(electionMsgs.ElectionsFactory) // not an elegant place but before we let the messages hit the state
-		time.Sleep(10 * time.Millisecond)
-		newState.Init()
-		newState.EFactory = new(electionMsgs.ElectionsFactory)
+		return AddFnode(s.Clone(len(fnodes)).(*state.State))
+	} else {
+		return AddFnode(s)
 	}
+}
 
+func AddFnode(s *state.State) *FactomNode {
 	fnode := new(FactomNode)
-	fnode.State = newState
-	fnodes = append(fnodes, fnode)
+	fnode.State = s
 	fnode.MLog = mLog
 
+	if len(fnodes) > 0 {
+		// not an elegant place but before we let the messages hit the state
+		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
+		time.Sleep(10 * time.Millisecond)
+		fnode.State.Init() // REVIEW: State.Init() is called again in StartFnode()
+		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
+  }
+
+	fnodes = append(fnodes, fnode)
 	return fnode
 }
 
-func startServers(load bool) {
-	for i, fnode := range fnodes {
-		if i > 0 {
-			fnode.State.Init()
-		}
-		go NetworkProcessorNet(fnode)
-		if load {
-			go state.LoadDatabase(fnode.State)
-		}
-		go fnode.State.GoSyncEntries()
-		go Timer(fnode.State)
-		go fnode.State.ValidatorLoop()
-		go elections.Run(fnode.State)
+func startServers(loadDB bool) {
+	for i := range fnodes {
+		StartFnode(i, loadDB)
 	}
+}
+
+// register workers with node
+func worker (fnode *FactomNode, doWork func() error) {
+	quit := make(chan int)
+	fnode.workers = append(fnode.workers, quit)
+	var err error
+
+	go func() {
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				err = doWork()
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}()
+}
+
+func StartFnode(i int, loadDB bool) {
+	fnode := fnodes[i]
+
+	if i > 0 {
+    	fnode.State.Init()
+	}
+	if loadDB {
+		go state.LoadDatabase(fnode.State)
+	}
+
+	go func() {
+		fnode.State.ValidatorLoop()
+		// workers exit when validator exits
+		for _, wc := range fnode.workers {
+			wc <- 0
+		}
+	}()
+
+	worker(fnode, PeersWorker(fnode))
+	worker(fnode, NetworkOutputWorker(fnode))
+	worker(fnode, InvalidOutputWorker(fnode))
+	worker(fnode, fnode.State.MissingEntryRequestWorker())
+	worker(fnode, fnode.State.SyncEntryWorker())
+	worker(fnode, Timer(fnode.State))
+	worker(fnode, elections.ElectionWorker(fnode.State))
 }
 
 func setupFirstAuthority(s *state.State) {
