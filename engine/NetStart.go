@@ -41,6 +41,7 @@ type FactomNode struct {
 	Peers    []interfaces.IPeer
 	MLog     *MsgLog
 	P2PIndex int
+	Running bool
 	workers []chan int
 }
 
@@ -632,8 +633,10 @@ func StartFnode(i int, loadDB bool) {
 
 	go func() {
 		fnode.State.ValidatorLoop()
+		fnode.Running = true
 		// workers exit when validator exits
 		for _, wc := range fnode.workers {
+			fnode.Running = false
 			wc <- 0
 		}
 	}()

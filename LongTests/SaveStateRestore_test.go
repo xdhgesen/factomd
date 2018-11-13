@@ -31,10 +31,11 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 	}
 
 	reloadFollowerWithFastBoot := func(i int) {
-		// TODO:  load saved state and add a new fnode
-		//err := s.StateSaverStruct.LoadDBStateListFromFile(s.DBStates, fastBootFile)
-		//assert.Nil(t, err)
-		assert.Nil(t, nil)
+		// FIXME
+		// stop/remove node
+		// load saved state and add a new fnode
+		// add/enable node again
+		StopNode(1,'F')
 	}
 
 	t.Run("test that sim will complete", func(t *testing.T) {

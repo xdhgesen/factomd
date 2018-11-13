@@ -289,6 +289,11 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 	return nil, nil
 }
 
+// signal Fnode state to shutdown
+func StopNode(offset int, typeCode rune) {
+	engine.GetFnodes()[offset].State.ShutdownChan <- 0
+}
+
 func creatingNodes(creatingNodes string, state0 *state.State) {
 	RunCmd(fmt.Sprintf("g%d", len(creatingNodes)))
 	WaitMinutes(state0, 1)
@@ -357,7 +362,7 @@ func WaitForAllNodes(state *state.State) {
 		}
 		s := simFnodes[i].State
 		height = ""
-		if s.LLeaderHeight != blk { // if not caught up, start over
+		if simFnodes[i].Running && s.LLeaderHeight != blk { // if not caught up, start over
 			time.Sleep(100 * time.Millisecond)
 			i = 0 // start over
 			continue
