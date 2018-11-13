@@ -30,7 +30,6 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		state0 = nil
 	}
 
-
 	t.Run("after restart node should catch up", func(t *testing.T) {
 		startSim("LF", 20)
 		StopNode(1,'F')
@@ -39,17 +38,23 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		stopSim()
 	})
 
-	t.Run("run sim to create Fastboot", func(t *testing.T) {
+	t.Run("run sim to create fastboot", func(t *testing.T) {
 		startSim("LF", 20)
 		WaitForBlock(state0, saveRate*2+2)
+		StopNode(1, 'F')
+
 		t.Run("reload follower with fastboot", func(t *testing.T) {
 			fastBootFile = state.NetworkIDToFilename(state0.Network, state0.FastBootLocation)
 			assert.FileExists(t, fastBootFile)
-			StopNode(1, 'F')
-			WaitBlocks(state0, 5)
-			// FIXME: load saved state and add a new fnode
-			StartNode(1, 'F')
+
+			// FIXME: this breaks fnode1
+			// prohibits node1 from catching up & seems to reset at height 0
+			s := GetNode(1).State
+			err := s.StateSaverStruct.LoadDBStateListFromFile(s.DBStates, fastBootFile)
+			assert.Nil(t, err)
 		})
+
+		StartNode(1, 'F')
 		stopSim()
 	})
 }

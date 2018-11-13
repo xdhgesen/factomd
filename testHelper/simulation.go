@@ -289,6 +289,10 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 	return nil, nil
 }
 
+func GetNode(offset int) *engine.FactomNode {
+	return engine.GetFnodes()[offset]
+}
+
 // signal Fnode state to shutdown
 func StopNode(offset int, typeCode rune) {
 	engine.GetFnodes()[offset].State.ShutdownChan <- 0
