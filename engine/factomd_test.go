@@ -223,7 +223,7 @@ var ranSimTest = false
 
 func runCmd(cmd string) {
 	os.Stderr.WriteString("Executing: " + cmd + "\n")
-	InputChan <- cmd
+	globals.InputChan <- cmd
 	return
 }
 
@@ -1312,4 +1312,72 @@ func TestRandom(t *testing.T) {
 		t.Fatal("Failed")
 	}
 
+}
+
+func TestSimCtrl(t *testing.T) {
+	if ranSimTest {
+		return
+	}
+	ranSimTest = true
+
+	state0 := SetupSim("LLLLLAAF", "LOCAL", map[string]string{"--debuglog": ".*"}, t)
+	CheckAuthoritySet(5, 2, t)
+
+	type walletcallHelper struct {
+		Status string `json:"status"`
+	}
+	type walletcall struct {
+		Jsonrpc string           `json:"jsonrps"`
+		Id      int              `json:"id"`
+		Result  walletcallHelper `json:"result"`
+	}
+
+	apiCall := func(cmd string) {
+		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/debug"
+		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "sim-ctrl", "params":{"commands": ["` + cmd + `"]}}`)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+		req.Header.Set("content-type", "text/plain;")
+		if err != nil {
+			t.Error(err)
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		resp2 := new(walletcall)
+		err1 := json.Unmarshal([]byte(body), &resp2)
+		if err1 != nil {
+			t.Error(err1)
+		}
+
+		fmt.Println("resp2: ", resp2)
+	}
+
+	WaitForMinute(state0, 2)
+	apiCall("1")
+	apiCall("x")
+	apiCall("2")
+	apiCall("x")
+	WaitForMinute(state0, 1)
+	apiCall("1")
+	apiCall("x")
+	apiCall("2")
+	apiCall("x")
+
+	apiCall("E")
+	apiCall("F")
+	apiCall("0")
+	apiCall("p")
+
+	WaitBlocks(state0, 2)
+	WaitForMinute(state0, 1)
+	WaitForAllNodes(state0)
+	CheckAuthoritySet(5, 2, t)
+	//shutDownEverything(t)
 }
