@@ -9,6 +9,7 @@ import (
 )
 
 func TestFastBootSaveAndRestore(t *testing.T) {
+  panic("this testing doesn't seem stable - dropping back to v6.0.1")
 	var saveRate = 4
 	var state0 *state.State
 	var fastBootFile string
