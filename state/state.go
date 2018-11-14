@@ -751,8 +751,8 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		if len(cfg.App.CorsDomains) > 0 {
 			domains := strings.Split(cfg.App.CorsDomains, ",")
 			s.CorsDomains = make([]string, len(domains))
-			for _, domain := range domains {
-				s.CorsDomains = append(s.CorsDomains, strings.Trim(domain, " "))
+			for i, domain := range domains {
+				s.CorsDomains[i] = strings.Trim(domain, " ")
 			}
 		}
 
