@@ -294,6 +294,8 @@ func GetNode(offset int) *engine.FactomNode {
 
 // signal Fnode state to shutdown
 func StopNode(offset int, typeCode rune) {
+	RunCmd(fmt.Sprintf("%v", offset))
+	RunCmd("x")
 	fnode := engine.GetFnodes()[offset]
 	fnode.State.ShutdownChan <- 0
 	for fnode.Running {
@@ -304,6 +306,8 @@ func StopNode(offset int, typeCode rune) {
 }
 
 func StartNode(offset int, typeCode rune) {
+	RunCmd(fmt.Sprintf("%v", offset))
+	RunCmd("x")
 	engine.StartFnode(offset, true)
 	_ = typeCode // REVIEW: should we account for this started node ?
 }
