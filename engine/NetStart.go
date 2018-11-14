@@ -637,7 +637,10 @@ func StartFnode(i int, loadDB bool) {
 		for _, wc := range fnode.workers {
 			wc <- 0
 		}
+		fmt.Printf("FNode%v: STOPPED\n", i)
 	}()
+
+	fnode.workers = fnode.workers[:0] // remove old channels
 
 	worker(fnode, PeersWorker(fnode))
 	worker(fnode, NetworkOutputWorker(fnode))

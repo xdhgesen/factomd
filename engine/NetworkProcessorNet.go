@@ -412,12 +412,16 @@ func NetworkOutputWorker(fnode *FactomNode) func() error {
 	}
 }
 
-// Just throw away the trash
 func InvalidOutputWorker(fnode *FactomNode) func() error {
 	return func() error {
-		time.Sleep(1 * time.Millisecond)
-		_ = <-fnode.State.NetworkInvalidMsgQueue()
-		return nil
+		select {
+			case <-fnode.State.NetworkInvalidMsgQueue():
+				// Just throw away the trash
+				return nil
+			default:
+				time.Sleep(500 * time.Millisecond)
+				return nil
+		}
 		//fmt.Println(invalidMsg)
 
 		// The following code was giving a demerit for each instance of a message in the NetworkInvalidMsgQueue.
