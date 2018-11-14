@@ -9,8 +9,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/log"
-
-	"gopkg.in/gcfg.v1"
+	gcfg "gopkg.in/gcfg.v1"
 )
 
 var _ = fmt.Print
@@ -64,6 +63,7 @@ type FactomdConfig struct {
 		FactomdTlsPublicCert    string
 		FactomdRpcUser          string
 		FactomdRpcPass          string
+		CorsDomains             string
 
 		ChangeAcksHeight uint32
 	}
@@ -160,6 +160,10 @@ FactomdTlsPublicCert                  = "/full/path/to/factomdAPIpub.cert"
 ; This file is also used by factom-cli and factom-walletd to determine what login to use
 FactomdRpcUser                        = ""
 FactomdRpcPass                        = ""
+
+; This paramater allows Cross-Origin Resource Sharing (CORS) so web browsers will use data returned from the API when called from the listed URLs
+; Example paramaters are "http://www.example.com, http://anotherexample.com, *"
+CorsDomains                           = ""
 
 ; Specifying when to change ACKs for switching leader servers
 ChangeAcksHeight                      = 0
