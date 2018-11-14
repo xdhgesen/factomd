@@ -13,7 +13,6 @@ func TestChainedTransactions(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	// a genesis block address w/ funding
 	bankSecret := "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK"

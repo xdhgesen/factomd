@@ -28,9 +28,11 @@ var par = globals.FactomParams{}
 var ExpectedHeight, Leaders, Audits, Followers int
 var startTime, endTime time.Time
 var quit chan struct{}
+var RanSimTest = false
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
 func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
+	RanSimTest = true
 	quit = make(chan struct{})
 	ExpectedHeight = height
 	l := len(GivenNodes)
@@ -231,9 +233,6 @@ func CheckAuthoritySet(t *testing.T) {
 	}
 }
 
-// We can only run 1 simtest!
-var RanSimTest = false
-
 func RunCmd(cmd string) {
 	os.Stdout.WriteString("Executing: " + cmd + "\n")
 	os.Stderr.WriteString("Executing: " + cmd + "\n")
@@ -295,7 +294,12 @@ func GetNode(offset int) *engine.FactomNode {
 
 // signal Fnode state to shutdown
 func StopNode(offset int, typeCode rune) {
-	engine.GetFnodes()[offset].State.ShutdownChan <- 0
+	fnode := engine.GetFnodes()[offset]
+	fnode.State.ShutdownChan <- 0
+	for fnode.Running {
+		time.Sleep(time.Microsecond*10)
+	}
+	println("FULLSTOP")
 	_ = typeCode // REVIEW: should we account for this stopped node ?
 }
 

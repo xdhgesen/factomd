@@ -557,7 +557,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	RegisterPrometheus()
 
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
-
 	go SimControl(p.ListenTo, listenToStdin)
 
 }
@@ -600,10 +599,11 @@ func startServers(loadDB bool) {
 }
 
 // register workers with node
-func worker (fnode *FactomNode, doWork func() error) {
+func (fnode *FactomNode) addWorker (doWork func() error) {
 	quit := make(chan int)
 	fnode.workers = append(fnode.workers, quit)
 	var err error
+	//var workerID = len(fnode.workers)
 
 	go func() {
 		for {
@@ -611,6 +611,7 @@ func worker (fnode *FactomNode, doWork func() error) {
 			case <-quit:
 				return
 			default:
+				//fmt.Printf("Fnode:%v worker:%v\n", fnode.Index, workerID)
 				err = doWork()
 				if err != nil {
 					panic(err)
@@ -618,6 +619,17 @@ func worker (fnode *FactomNode, doWork func() error) {
 			}
 		}
 	}()
+}
+
+func (fnode *FactomNode) stopWorker(i int) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			fmt.Printf("stopWorker recovered: %v", err)
+		}
+	}()
+
+	fnode.workers[i] <- 0
 }
 
 func StartFnode(i int, loadDB bool) {
@@ -630,25 +642,23 @@ func StartFnode(i int, loadDB bool) {
 	go func() {
 		fnode.Running = true
 		fmt.Printf("FNode%v: START\n", i)
-		fnode.State.ValidatorLoop()
+		fnode.State.ValidatorLoop() // blocks until there is a shutdown signal
+		for i := range fnode.workers {
+			go fnode.stopWorker(i) // workers exit when validator exits
+		}
 		fmt.Printf("FNode%v: STOP\n", i)
 		fnode.Running = false
-		// workers exit when validator exits
-		for _, wc := range fnode.workers {
-			wc <- 0
-		}
-		fmt.Printf("FNode%v: STOPPED\n", i)
 	}()
 
 	fnode.workers = fnode.workers[:0] // remove old channels
 
-	worker(fnode, PeersWorker(fnode))
-	worker(fnode, NetworkOutputWorker(fnode))
-	worker(fnode, InvalidOutputWorker(fnode))
-	worker(fnode, fnode.State.MissingEntryRequestWorker())
-	worker(fnode, fnode.State.SyncEntryWorker())
-	worker(fnode, Timer(fnode.State))
-	worker(fnode, elections.ElectionWorker(fnode.State))
+	fnode.addWorker(PeersWorker(fnode))
+	fnode.addWorker(NetworkOutputWorker(fnode))
+	fnode.addWorker(InvalidOutputWorker(fnode))
+	fnode.addWorker(fnode.State.MissingEntryRequestWorker())
+	fnode.addWorker(fnode.State.SyncEntryWorker())
+	fnode.addWorker(Timer(fnode.State))
+	fnode.addWorker(elections.ElectionWorker(fnode.State))
 }
 
 func setupFirstAuthority(s *state.State) {

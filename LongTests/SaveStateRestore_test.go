@@ -31,7 +31,11 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 	}
 
 	t.Run("after restart node should catch up", func(t *testing.T) {
-		startSim("LF", 20)
+		if RanSimTest {
+			return
+		}
+
+		startSim("LF", 200)
 		StopNode(1,'F')
 		WaitBlocks(state0, 5)
 		StartNode(1,'F')
@@ -39,6 +43,10 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 	})
 
 	t.Run("run sim to create fastboot", func(t *testing.T) {
+		if RanSimTest {
+			return
+		}
+
 		startSim("LF", 20)
 		WaitForBlock(state0, saveRate*2+2)
 		StopNode(1, 'F')

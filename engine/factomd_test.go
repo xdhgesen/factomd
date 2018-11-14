@@ -30,8 +30,6 @@ func TestSetupANetwork(t *testing.T) {
 		return
 	}
 
-	RanSimTest = true
-
 	state0 := SetupSim("LLLLAAAFFF", map[string]string{}, 14, 0, 0, t)
 
 	RunCmd("9")  // Puts the focus on node 9
@@ -120,8 +118,6 @@ func TestLoad(t *testing.T) {
 		return
 	}
 
-	RanSimTest = true
-
 	// use a tree so the messages get reordered
 	state0 := SetupSim("LLF", map[string]string{"--debuglog": "."}, 15, 0, 0, t)
 
@@ -137,7 +133,6 @@ func TestLoad2(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	go RunCmd("Re") // Turn on tight allocation of EC as soon as the simulator is up and running
 	state0 := SetupSim("LLLAAAFFF", map[string]string{"--debuglog": "."}, 24, 0, 0, t)
@@ -182,8 +177,6 @@ func TestLoadScrambled(t *testing.T) {
 		}
 	}()
 
-	RanSimTest = true
-
 	// use a tree so the messages get reordered
 	state0 := SetupSim("LLFFFFFF", map[string]string{"--net": "tree"}, 32, 0, 0, t)
 	//TODO: Why does this run longer than expected?
@@ -201,13 +194,9 @@ func TestLoadScrambled(t *testing.T) {
 } // testLoad(){...}
 
 func TestMakeALeader(t *testing.T) {
-
-
 	if RanSimTest {
 		return
 	}
-
-	RanSimTest = true
 
 	state0 := SetupSim("LF", map[string]string{}, 5, 0, 0, t)
 
@@ -226,8 +215,6 @@ func TestActivationHeightElection(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
-	RanSimTest = true
 
 	state0 := SetupSim("LLLLLAAF", map[string]string{}, 16, 2, 2, t)
 
@@ -311,8 +298,6 @@ func TestAnElection(t *testing.T) {
 		return
 	}
 
-	RanSimTest = true
-
 	state0 := SetupSim("LLLAAF", map[string]string{}, 9, 1, 1, t)
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
@@ -349,8 +334,6 @@ func TestDBsigEOMElection(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
-	RanSimTest = true
 
 	state0 := SetupSim("LLLLLAAF", map[string]string{}, 9, 4, 4, t)
 
@@ -413,8 +396,6 @@ func TestMultiple2Election(t *testing.T) {
 		return
 	}
 
-	RanSimTest = true
-
 	state0 := SetupSim("LLLLLAAF", map[string]string{"--debuglog": ".*"}, 7, 2, 2, t)
 
 	WaitForMinute(state0, 2)
@@ -446,8 +427,6 @@ func TestMultiple3Election(t *testing.T) {
 		return
 	}
 
-	RanSimTest = true
-
 	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{"--debuglog": ".*"}, 9, 3, 3, t)
 
 	RunCmd("1")
@@ -476,9 +455,6 @@ func TestMultiple7Election(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
-	RanSimTest = true
-
 	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAF", map[string]string{"--blktime": "25"}, 7, 7, 7, t)
 
 	WaitForMinute(state0, 2)
@@ -508,7 +484,6 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--blktime": "15"}, 6, 0, 0, t)
 	WaitForMinute(state0, 1)
@@ -698,7 +673,6 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--blktime": "15"}, 6, 0, 0, t)
 	WaitForMinute(state0, 1)
@@ -903,8 +877,6 @@ func TestDBsigElectionEvery2Block_long(t *testing.T) {
 		return
 	}
 
-	RanSimTest = true
-
 	iterations := 1
 	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 32, 6, 6, t)
 
@@ -945,7 +917,6 @@ func TestDBSigElection(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	state0 := SetupSim("LLLAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 8, 1, 1, t)
 
@@ -983,8 +954,6 @@ func TestGrants_long(t *testing.T) {
 	}
 		return rval
 	}
-
-	RanSimTest = true
 
 	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 300, 0, 0, t)
 
@@ -1090,8 +1059,6 @@ func TestCoinbaseCancel(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
-	RanSimTest = true
 
 	state0 := SetupSim("LFFFFF", map[string]string{"-blktime": "5"}, 30, 0, 0, t)
 	// Make it quicker
@@ -1231,7 +1198,6 @@ func TestTestNetCoinBaseActivation_long(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	// reach into the activation an hack the TESTNET_COINBASE_PERIOD to be early so I can check it worked.
 	activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"] = 22
@@ -1284,7 +1250,6 @@ func TestElection9(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	state0 := SetupSim("LLAL", map[string]string{"--debuglog": ".|fault|badmsg|network|process|dbsig", "--faulttimeout": "10"}, 8, 1, 1, t)
 	StatusEveryMinute(state0)
@@ -1316,7 +1281,6 @@ func TestPass(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
 	RanSimTest = true
 
 }
@@ -1325,7 +1289,6 @@ func TestFail(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
 	RanSimTest = true
 	t.Fatal("Failed")
 
@@ -1335,9 +1298,7 @@ func TestRandom(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
 	RanSimTest = true
-
 	if random.RandUInt8() > 200 {
 		t.Fatal("Failed")
 	}
@@ -1347,7 +1308,6 @@ func TestFactoidDBState(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
 
 	state0 := SetupSim("LAF", map[string]string{"--debuglog": "fault|badmsg|network|process|dbsig", "--faulttimeout": "10", "--blktime": "5"}, 120, 0, 0, t)
 	WaitForBlock(state0, 5)
@@ -1375,8 +1335,6 @@ func TestNoMMR(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-	RanSimTest = true
-
 	state0 := SetupSim("LLLAAFFFFF", map[string]string{"--debuglog": "fault|badmsg|network|process|exec|missing", "--blktime": "20"}, 10, 0, 0, t)
 	state.MMR_enable = false // turn off MMR processing
 	StatusEveryMinute(state0)
