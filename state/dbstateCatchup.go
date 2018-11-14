@@ -38,7 +38,7 @@ func (list *DBStateList) Catchup() {
 			// remove any states from the missing list that have been saved.
 			for e := missing.List.Front(); e != nil; e = e.Next() {
 				s := e.Value.(*MissingState)
-				if s.Height() <= recieved.Base() {
+				if recieved.Has(s.Height()) {
 					missing.Del(s.Height())
 				}
 			}
@@ -46,7 +46,7 @@ func (list *DBStateList) Catchup() {
 			// remove any states from the waiting list that have been saved.
 			for e := waiting.List.Front(); e != nil; e = e.Next() {
 				s := e.Value.(*WaitingState)
-				if s.Height() <= recieved.Base() {
+				if recieved.Has(s.Height()) {
 					waiting.Del(s.Height())
 				}
 			}
@@ -72,10 +72,10 @@ func (list *DBStateList) Catchup() {
 		}
 	}()
 
+	// watch the waiting list and move any requests that have timed out back
+	// into the missing list.
 	go func() {
 		for {
-			// check the waiting list and move any requests that have timed out
-			// back into the missing list.
 			for e := waiting.List.Front(); e != nil; e = e.Next() {
 				s := e.Value.(*WaitingState)
 				if s.RequestAge() > requestTimeout {
@@ -105,6 +105,7 @@ func (list *DBStateList) Catchup() {
 			case m := <-recieved.Notify:
 				s := NewReceivedState(m)
 				if s != nil {
+					missing.Del(s.Height())
 					waiting.Del(s.Height())
 					recieved.Add(s.Height(), s.Message())
 				}
@@ -392,6 +393,20 @@ func (l *StatesReceived) Get(height uint32) *ReceivedState {
 		}
 	}
 	return nil
+}
+
+func (l *StatesReceived) Has(height uint32) bool {
+	if height <= l.Base() {
+		return true
+	}
+
+	for e := l.List.Front(); e != nil; e = e.Next() {
+		s := e.Value.(*ReceivedState)
+		if s.Height() == height {
+			return true
+		}
+	}
+	return false
 }
 
 func (l *StatesReceived) GetNext() *ReceivedState {
