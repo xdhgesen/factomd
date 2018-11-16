@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
-	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
 )
@@ -34,7 +33,7 @@ type LoadGenerator struct {
 }
 
 // NewLoadGenerator makes a new load generator. The state is used for funding the transaction
-func NewLoadGenerator(s *state.State) *LoadGenerator {
+func NewLoadGenerator() *LoadGenerator {
 	lg := new(LoadGenerator)
 	lg.ECKey, _ = primitives.NewPrivateKeyFromHex(ecSec)
 	lg.stop = make(chan bool, 5)
@@ -121,6 +120,7 @@ func (lg *LoadGenerator) NewRevealEntry(entry *entryBlock.Entry) *messages.Revea
 }
 
 var cnt int
+var goingUp bool
 
 func (lg *LoadGenerator) GetECs(tight bool, c int) {
 	s := fnodes[wsapiNode].State
@@ -136,7 +136,16 @@ func (lg *LoadGenerator) GetECs(tight bool, c int) {
 	}
 
 	cnt++
-	if (ecBal > int64(c) && ecBal > 15) || (!tight && ecBal > 2000) {
+
+	if goingUp && ecBal > 500 {
+		if cnt%1000 == 0 {
+			os.Stderr.WriteString(fmt.Sprintf("%d purchases, not buying %d cause the balance is %d \n", cnt, c, ecBal))
+		}
+		goingUp = false
+		return
+	}
+
+	if !goingUp && ecBal > int64(c) {
 		if cnt%1000 == 0 {
 			os.Stderr.WriteString(fmt.Sprintf("%d purchases, not buying %d cause the balance is %d \n", cnt, c, ecBal))
 		}
@@ -146,7 +155,7 @@ func (lg *LoadGenerator) GetECs(tight bool, c int) {
 	os.Stderr.WriteString(fmt.Sprintf("%d purchases, buying %d and balance is %d \n", cnt, c, ecBal))
 
 	FundWalletTOFF(s, lg.txoffset, uint64(c)*ecPrice)
-
+	goingUp = true
 }
 
 func (lg *LoadGenerator) NewCommitChain(entry *entryBlock.Entry) *messages.CommitChainMsg {
