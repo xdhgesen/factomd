@@ -11,9 +11,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"runtime/debug"
 	"sort"
-	"time"
 
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -23,8 +21,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 )
-
-var _ = debug.PrintStack
 
 var FACTOID_CHAINID_HASH = primitives.NewHash(constants.FACTOID_CHAINID)
 
@@ -198,12 +194,16 @@ func (fs *FactoidState) AddTransactionBlock(blk interfaces.IFBlock) error {
 	}
 
 	transactions := blk.GetTransactions()
+	fs.State.LogPrintf("factoids_trans", "Start Process Transactions for %d", fs.DBHeight)
 	for _, trans := range transactions {
+		fs.State.LogPrintf("factoids_trans", "%s", trans.String())
 		err := fs.UpdateTransaction(false, trans)
 		if err != nil {
+			fs.State.LogPrintf("factoids_trans", "Error: %v", err)
 			return err
 		}
 	}
+	fs.State.LogPrintf("factoids_trans", "End Process Transactions for %d", fs.DBHeight)
 	fs.CurrentBlock = blk
 	//fs.State.SetFactoshisPerEC(blk.GetExchRate())
 
@@ -213,12 +213,16 @@ func (fs *FactoidState) AddTransactionBlock(blk interfaces.IFBlock) error {
 func (fs *FactoidState) AddECBlock(blk interfaces.IEntryCreditBlock) error {
 	transactions := blk.GetBody().GetEntries()
 
+	fs.State.LogPrintf("entrycredits_trans", "Start Process Transactions for %d", fs.DBHeight)
 	for _, trans := range transactions {
+		fs.State.LogPrintf("entrycredits_trans", "%s", trans.String())
 		err := fs.UpdateECTransaction(false, trans)
 		if err != nil {
+			fs.State.LogPrintf("entrycredits_trans", "Error: %v", err)
 			return err
 		}
 	}
+	fs.State.LogPrintf("entrycredits_trans", "End Process Transactions for %d", fs.DBHeight)
 
 	return nil
 }
@@ -314,6 +318,7 @@ func (fs *FactoidState) UpdateECTransaction(rt bool, trans interfaces.IECBlockEn
 
 // Assumes validation has already been done.
 func (fs *FactoidState) UpdateTransaction(rt bool, trans interfaces.ITransaction) error {
+	fs.State.LogPrintf("factoids", "At %d process rt =%v %s", fs.DBHeight, rt, trans.String())
 
 	// First check all inputs are good.
 	for _, input := range trans.GetInputs() {
@@ -343,6 +348,9 @@ func (fs *FactoidState) UpdateTransaction(rt bool, trans interfaces.ITransaction
 		adr := output.GetAddress().Fixed()
 		oldv := fs.State.GetCoin(trans.GetCoin(), rt, adr)
 		fs.State.PutF(rt, adr, oldv+int64(output.GetAmount()))
+	}
+	if len(trans.GetECOutputs()) > 0 {
+		fs.State.LogPrintf("entrycredits", "At %d process %s", fs.DBHeight, trans.String())
 	}
 	for _, ecOut := range trans.GetECOutputs() {
 		ecbal := int64(ecOut.GetAmount()) / int64(fs.State.FactoshisPerEC)
@@ -389,7 +397,6 @@ func (fs *FactoidState) ProcessEndOfBlock(state interfaces.IState) {
 	fs.UpdateTransaction(true, t)
 
 	fs.DBHeight++
-	fs.State.CurrentBlockStartTime = time.Now().UnixNano()
 }
 
 // Returns an error message about what is wrong with the transaction if it is

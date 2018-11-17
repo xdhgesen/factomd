@@ -386,6 +386,10 @@ const (
 	IDENTITY_REGISTRATION_BLOCK_WINDOW uint32 = 144
 )
 
+//Fast boot save state version (savestate)
+//To be increased whenever the data being saved changes from the last version
+const SaveStateVersion = 10
+
 // Tokens
 var NumberOfTokens int = 2
 var TokenNames []string = []string{"FCT", "EC"}

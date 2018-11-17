@@ -63,7 +63,7 @@ func (m *FedVoteLevelMsg) String() string {
 		"Fed VoteLevelMsg",
 		m.DBHeight,
 		m.Minute,
-		m.Signer.Bytes()[3:5],
+		m.Signer.Bytes()[3:6],
 		m.Volunteer.ServerName,
 		m.Committed,
 		m.Level,
@@ -131,7 +131,7 @@ func (m *FedVoteLevelMsg) processIfCommitted(is interfaces.IState, elect interfa
 			m.Volunteer.FedIdx, m.Volunteer.FedID.Bytes()[3:6],
 			m.Volunteer.ServerIdx, m.Volunteer.ServerID.Bytes()[3:6])
 
-		e.LogPrintf("election", "LeaderSwapState %d/%d/%d", m.VMIndex, m.DBHeight, m.Minute)
+		e.LogPrintf("election", "LeaderSwapState %d/%d/%d", m.DBHeight, m.VMIndex, m.Minute)
 		e.LogPrintf("election", "Demote  %x", e.Federated[m.Volunteer.FedIdx].GetChainID().Bytes()[3:6])
 		e.LogPrintf("election", "Promote %x", e.Audit[m.Volunteer.ServerIdx].GetChainID().Bytes()[3:6])
 
@@ -214,7 +214,7 @@ func (m *FedVoteLevelMsg) FollowerExecute(is interfaces.IState) {
 			m.Volunteer.FedIdx, m.Volunteer.FedID.Bytes()[3:6],
 			m.Volunteer.ServerIdx, m.Volunteer.ServerID.Bytes()[3:6])
 
-		s.LogPrintf("executeMsg", "LeaderSwapState %d/%d/%d", m.VMIndex, m.DBHeight, m.Minute)
+		s.LogPrintf("executeMsg", "LeaderSwapState %d/%d/%d", m.DBHeight, m.VMIndex, m.Minute)
 		s.LogPrintf("executeMsg", "Demote  %x", pl.FedServers[m.Volunteer.FedIdx].GetChainID().Bytes()[3:6])
 		s.LogPrintf("executeMsg", "Promote %x", pl.AuditServers[m.Volunteer.ServerIdx].GetChainID().Bytes()[3:6])
 
@@ -222,14 +222,24 @@ func (m *FedVoteLevelMsg) FollowerExecute(is interfaces.IState) {
 			pl.AuditServers[m.Volunteer.ServerIdx], pl.FedServers[m.Volunteer.FedIdx]
 
 		// Add to the process list and immediately process
-		pl.AddToProcessList(m.Volunteer.Ack.(*messages.Ack), m.Volunteer.Missing)
+		pl.AddToProcessList(pl.State, m.Volunteer.Ack.(*messages.Ack), m.Volunteer.Missing)
 		is.UpdateState()
 	} else {
 		is.ElectionsQueue().Enqueue(m)
 	}
 
 	// reset my leader variables, cause maybe we changed...
-	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(int(m.Minute), s.IdentityChainID)
+	Leader, LeaderVMIndex := s.LeaderPL.GetVirtualServers(int(m.Minute), s.IdentityChainID)
+	{ // debug
+		if s.Leader != Leader {
+			s.LogPrintf("executeMsg", "FedVoteLevelMsg.FollowerExecute() unexpectedly setting s.Leader to %v", Leader)
+			s.Leader = Leader
+		}
+		if s.LeaderVMIndex != LeaderVMIndex {
+			s.LogPrintf("executeMsg", "FedVoteLevelMsg.FollowerExecute() unexpectedly setting s.LeaderVMIndex to %v", LeaderVMIndex)
+			s.LeaderVMIndex = LeaderVMIndex
+		}
+	}
 }
 
 var _ interfaces.IMsg = (*FedVoteVolunteerMsg)(nil)
