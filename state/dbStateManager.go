@@ -988,74 +988,12 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	pln.SetStartingAuthoritySet()
 	pln2.SetStartingAuthoritySet()
 
-	// *******************
-	// Factoid Block Processing
-	// *******************
-	fs := list.State.GetFactoidState()
-	fs.(*FactoidState).DBHeight = dbht
-
-	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Process Factoids dbht %d factoid",
-		dbht, fs.(*FactoidState).DBHeight)
-
-	// get all the prior balances of the Factoid addresses that may have changed
-	// in this block.  If you want the balance of the highest saved block, look to
-	// list.State.FactoidBalancesPapi if it is not null.  If you have no entry there,
-	// then look to list.State.FactoidBalancesP
-	list.State.FactoidBalancesPMutex.Lock()
-	list.State.FactoidBalancesPapi = make(map[[32]byte]int64, len(pl.FactoidBalancesT))
-	for k := range pl.FactoidBalancesT {
-		list.State.FactoidBalancesPapi[k] = list.State.FactoidBalancesP[k]
-	}
-	list.State.FactoidBalancesPMutex.Unlock()
-
-	// get all the prior balances of the entry credit addresses that may have changed
-	// in this block.  If you want the balance of the highest saved block, look to
-	// list.State.ECBalancesPapi if it is not null.  If you have no entry there,
-	// then look to list.State.ECBalancesP
-	list.State.ECBalancesPMutex.Lock()
-	list.State.ECBalancesPapi = make(map[[32]byte]int64, len(pl.ECBalancesT))
-	for k := range pl.ECBalancesT {
-		list.State.ECBalancesPapi[k] = list.State.ECBalancesP[k]
-	}
-	list.State.ECBalancesPMutex.Unlock()
-
-	// Process the Factoid End of Block
-	err = fs.AddTransactionBlock(d.FactoidBlock)
-	if err != nil {
-		panic(err)
-	}
-	err = fs.AddECBlock(d.EntryCreditBlock)
-	if err != nil {
-		panic(err)
-	}
-
-	if list.State.DBFinished {
-		list.State.Balancehash = fs.GetBalanceHash(false)
-	}
-
-	// Make the current exchange rate whatever we had in the previous block.
-	// UNLESS there was a FER entry processed during this block  changeheight will be left at 1 on a change block
-	if list.State.FERChangeHeight == 1 {
-		list.State.FERChangeHeight = 0
-	} else {
-		if list.State.FactoshisPerEC != d.FactoidBlock.GetExchRate() {
-			//list.State.AddStatus(fmt.Sprint("PROCESSBLOCKS:  setting rate", list.State.FactoshisPerEC,
-			//	" to ", d.FactoidBlock.GetExchRate(),
-			//	" - Height ", d.DirectoryBlock.GetHeader().GetDBHeight()))
-		}
-		list.State.FactoshisPerEC = d.FactoidBlock.GetExchRate()
-	}
-
-	fs.ProcessEndOfBlock(list.State)
-
-	// Promote the currently scheduled next FER
-
-	list.State.ProcessRecentFERChainEntries()
 	// Step my counter of Complete blocks
 	i := d.DirectoryBlock.GetHeader().GetDBHeight() - list.Base
 	if uint32(i) > list.Complete {
 		list.Complete = uint32(i)
 	}
+
 	list.ProcessHeight = dbht
 	progress = true
 	d.Locked = true // Only after all is done will I admit this state has been saved.
@@ -1116,6 +1054,8 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	if list.State.DBFinished && globals.Params.WriteProcessedDBStates {
 		list.WriteDBStateToDebugFile(d)
 	}
+
+	fs := list.State.FactoidState
 
 	tbh := list.State.FactoidState.GetBalanceHash(true) // recompute temp balance hash here
 	list.State.Balancehash = fs.GetBalanceHash(false)
@@ -1287,13 +1227,14 @@ func ReadDBStateFromDebugFile(filename string) (*WholeBlock, error) {
 
 func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	dbheight := int(d.DirectoryBlock.GetHeader().GetDBHeight())
+	s := list.State
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.
 
-	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
+	if !d.Signed || !d.ReadyToSave || s.DB == nil {
 		return
 	}
-	list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d)", d.DirectoryBlock.GetHeader().GetDBHeight())
+	s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d)", d.DirectoryBlock.GetHeader().GetDBHeight())
 
 	// If this is a repeated block, and I have already saved at this height, then we can safely ignore
 	// this dbstate.
@@ -1304,29 +1245,29 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	}
 
 	if dbheight > 0 {
-		dp := list.State.GetDBState(uint32(dbheight - 1))
+		dp := s.GetDBState(uint32(dbheight - 1))
 		if dp == nil {
-			list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) no previous block!", d.DirectoryBlock.GetHeader().GetDBHeight())
+			s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) no previous block!", d.DirectoryBlock.GetHeader().GetDBHeight())
 			return
 		} else if !dp.Saved {
-			list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) previous not saved!", d.DirectoryBlock.GetHeader().GetDBHeight())
+			s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) previous not saved!", d.DirectoryBlock.GetHeader().GetDBHeight())
 			return
 		}
 	}
 
 	if d.Saved {
-		Havedblk, err := list.State.DB.DoesKeyExist(databaseOverlay.DIRECTORYBLOCK, d.DirectoryBlock.GetKeyMR().Bytes())
+		Havedblk, err := s.DB.DoesKeyExist(databaseOverlay.DIRECTORYBLOCK, d.DirectoryBlock.GetKeyMR().Bytes())
 		if err != nil || !Havedblk {
 			panic(fmt.Sprintf("Claimed to be found on %s DBHeight %d Hash %x",
-				list.State.FactomNodeName,
+				s.FactomNodeName,
 				d.DirectoryBlock.GetHeader().GetDBHeight(),
 				d.DirectoryBlock.GetKeyMR().Bytes()))
 		}
 
-		//		list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Already saved, add to replay!", d.DirectoryBlock.GetHeader().GetDBHeight())
+		//		s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Already saved, add to replay!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		// Set the Block Replay flag for all these transactions that are already in the database.
 		for _, fct := range d.FactoidBlock.GetTransactions() {
-			list.State.FReplay.IsTSValidAndUpdateState(
+			s.FReplay.IsTSValidAndUpdateState(
 				constants.BLOCK_REPLAY,
 				fct.GetSigHash().Fixed(),
 				fct.GetTimestamp(),
@@ -1339,38 +1280,38 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
 	// have marked them all as saved to disk!  So we gotta save them to disk.  Or panic trying.
 
-	//	list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) %s\n", dbheight, d.String())
+	//	s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) %s\n", dbheight, d.String())
 	// Only trim when we are really saving.
-	v := dbheight + int(list.State.IdentityChainID.Bytes()[4])
+	v := dbheight + int(s.IdentityChainID.Bytes()[4])
 	if v%4 == 0 {
-		list.State.DB.Trim()
+		s.DB.Trim()
 	}
 
 	// Save
-	list.State.DB.StartMultiBatch()
+	s.DB.StartMultiBatch()
 
-	if err := list.State.DB.ProcessABlockMultiBatch(d.AdminBlock); err != nil {
+	if err := s.DB.ProcessABlockMultiBatch(d.AdminBlock); err != nil {
 		panic(err.Error())
 	}
 
-	if err := list.State.DB.ProcessFBlockMultiBatch(d.FactoidBlock); err != nil {
+	if err := s.DB.ProcessFBlockMultiBatch(d.FactoidBlock); err != nil {
 		panic(err.Error())
 	}
 
-	if err := list.State.DB.ProcessECBlockMultiBatch(d.EntryCreditBlock, false); err != nil {
+	if err := s.DB.ProcessECBlockMultiBatch(d.EntryCreditBlock, false); err != nil {
 		panic(err.Error())
 	}
 
 	for _, en := range d.EntryCreditBlock.GetEntries() {
 		switch en.ECID() {
 		case constants.ECIDChainCommit:
-			list.State.NumNewChains++
+			s.NumNewChains++
 		case constants.ECIDEntryCommit:
-			list.State.NumNewEntries++
+			s.NumNewEntries++
 		}
 	}
 
-	pl := list.State.ProcessLists.Get(uint32(dbheight))
+	pl := s.ProcessLists.Get(uint32(dbheight))
 
 	allowedEBlocks := make(map[[32]byte]struct{})
 	allowedEntries := make(map[[32]byte]struct{})
@@ -1392,7 +1333,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				allowedEntries[e.Fixed()] = struct{}{}
 			}
 		} else {
-			list.State.LogPrintf("dbstateprocess", "Error putting entries in allowedmap, as Eblock is not in Dblock")
+			s.LogPrintf("dbstateprocess", "Error putting entries in allowedmap, as Eblock is not in Dblock")
 		}
 	}
 
@@ -1404,25 +1345,25 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		}
 		// If it's in the DBlock
 		if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
-			if err := list.State.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
+			if err := s.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
 				panic(err.Error())
 			}
 		} else {
-			list.State.LogPrintf("dbstateprocess", "Error saving eblock from dbstate, eblock not allowed")
+			s.LogPrintf("dbstateprocess", "Error saving eblock from dbstate, eblock not allowed")
 		}
 	}
 	for _, e := range d.Entries {
 		// If it's in the DBlock
 		if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
-			if err := list.State.DB.InsertEntryMultiBatch(e); err != nil {
+			if err := s.DB.InsertEntryMultiBatch(e); err != nil {
 				panic(err.Error())
 			}
 		} else {
-			list.State.LogPrintf("dbstateprocess", "Error saving entry from dbstate, entry not allowed")
+			s.LogPrintf("dbstateprocess", "Error saving entry from dbstate, entry not allowed")
 		}
 	}
-	list.State.NumEntries += len(d.Entries)
-	list.State.NumEntryBlocks += len(d.EntryBlocks)
+	s.NumEntries += len(d.Entries)
+	s.NumEntryBlocks += len(d.EntryBlocks)
 
 	// Info from ProcessList
 	if pl != nil {
@@ -1432,21 +1373,21 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				panic(err)
 			}
 			if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
-				if err := list.State.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
+				if err := s.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
 					panic(err.Error())
 				}
 
 				for _, e := range eb.GetBody().GetEBEntries() {
 					if _, ok := allowedEntries[e.Fixed()]; ok {
-						if err := list.State.DB.InsertEntryMultiBatch(pl.GetNewEntry(e.Fixed())); err != nil {
+						if err := s.DB.InsertEntryMultiBatch(pl.GetNewEntry(e.Fixed())); err != nil {
 							panic(err.Error())
 						}
 					} else {
-						list.State.LogPrintf("dbstateprocess", "Error saving entry from process list, entry not allowed")
+						s.LogPrintf("dbstateprocess", "Error saving entry from process list, entry not allowed")
 					}
 				}
 			} else {
-				list.State.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
+				s.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
 			}
 		}
 		pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
@@ -1456,59 +1397,124 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	d.EntryBlocks = make([]interfaces.IEntryBlock, 0)
 	d.Entries = make([]interfaces.IEBEntry, 0)
 
-	if err := list.State.DB.ProcessDBlockMultiBatch(d.DirectoryBlock); err != nil {
+	if err := s.DB.ProcessDBlockMultiBatch(d.DirectoryBlock); err != nil {
 		panic(err.Error())
 	}
 
-	if err := list.State.DB.ExecuteMultiBatch(); err != nil {
+	if err := s.DB.ExecuteMultiBatch(); err != nil {
 		panic(err.Error())
 	}
 
 	// Not activated.  Set to true if you want extra checking of the data saved to the database.
 	if false {
 		good := true
-		mr, err := list.State.DB.FetchDBKeyMRByHeight(uint32(dbheight))
+		mr, err := s.DB.FetchDBKeyMRByHeight(uint32(dbheight))
 		if err != nil {
-			list.State.LogPrintf("dbstateprocess", err.Error())
+			s.LogPrintf("dbstateprocess", err.Error())
 			return
-			panic(fmt.Sprintf("%20s At Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			panic(fmt.Sprintf("%20s At Directory Block Height %d", s.FactomNodeName, dbheight))
 		}
 		if mr == nil {
-			list.State.LogPrintf("dbstateprocess", "There is no mr returned by list.State.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
+			s.LogPrintf("dbstateprocess", "There is no mr returned by s.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
 			mr = d.DirectoryBlock.GetKeyMR()
 			good = false
 		}
 
-		td, err := list.State.DB.FetchDBlock(mr)
+		td, err := s.DB.FetchDBlock(mr)
 		if err != nil || td == nil {
 			if err != nil {
-				list.State.LogPrintf("dbstateprocess", err.Error())
+				s.LogPrintf("dbstateprocess", err.Error())
 			} else {
-				list.State.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
+				s.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
 			}
 			return
-			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", s.FactomNodeName, dbheight))
 		}
 		if td.GetKeyMR().Fixed() != mr.Fixed() {
-			list.State.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
+			s.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
 			return
-			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", s.FactomNodeName, dbheight))
 		}
 		if !good {
 			return
 		}
 	}
 
+	// *******************
+	// Factoid Block Processing
+	// *******************
+	dbht := uint32(dbheight)
+	fs := s.GetFactoidState()
+	fs.(*FactoidState).DBHeight = dbht
+
+	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Process Factoids dbht %d factoid",
+		dbht, fs.(*FactoidState).DBHeight)
+
+	// get all the prior balances of the Factoid addresses that may have changed
+	// in this block.  If you want the balance of the highest saved block, look to
+	// s.FactoidBalancesPapi if it is not null.  If you have no entry there,
+	// then look to s.FactoidBalancesP
+	s.FactoidBalancesPMutex.Lock()
+	s.FactoidBalancesPapi = make(map[[32]byte]int64, len(pl.FactoidBalancesT))
+	for k := range pl.FactoidBalancesT {
+		s.FactoidBalancesPapi[k] = s.FactoidBalancesP[k]
+	}
+	s.FactoidBalancesPMutex.Unlock()
+
+	// get all the prior balances of the entry credit addresses that may have changed
+	// in this block.  If you want the balance of the highest saved block, look to
+	// s.ECBalancesPapi if it is not null.  If you have no entry there,
+	// then look to s.ECBalancesP
+	s.ECBalancesPMutex.Lock()
+	s.ECBalancesPapi = make(map[[32]byte]int64, len(pl.ECBalancesT))
+	for k := range pl.ECBalancesT {
+		s.ECBalancesPapi[k] = s.ECBalancesP[k]
+	}
+	s.ECBalancesPMutex.Unlock()
+
+	// Process the Factoid End of Block
+	err := fs.AddTransactionBlock(d.FactoidBlock)
+	if err != nil {
+		panic(err)
+	}
+	err = fs.AddECBlock(d.EntryCreditBlock)
+	if err != nil {
+		panic(err)
+	}
+
+	if s.DBFinished {
+		s.Balancehash = fs.GetBalanceHash(false)
+	}
+
+	// Make the current exchange rate whatever we had in the previous block.
+	// UNLESS there was a FER entry processed during this block  changeheight will be left at 1 on a change block
+	if s.FERChangeHeight == 1 {
+		s.FERChangeHeight = 0
+	} else {
+		if s.FactoshisPerEC != d.FactoidBlock.GetExchRate() {
+			//s.AddStatus(fmt.Sprint("PROCESSBLOCKS:  setting rate", s.FactoshisPerEC,
+			//	" to ", d.FactoidBlock.GetExchRate(),
+			//	" - Height ", d.DirectoryBlock.GetHeader().GetDBHeight()))
+		}
+		s.FactoshisPerEC = d.FactoidBlock.GetExchRate()
+	}
+
+	fs.ProcessEndOfBlock(s)
+
+	// Promote the currently scheduled next FER
+
+	s.ProcessRecentFERChainEntries()
+
 	// Set the Block Replay flag for all these transactions we are saving to the database.
 	for _, fct := range d.FactoidBlock.GetTransactions() {
-		list.State.FReplay.IsTSValidAndUpdateState(
+		s.FReplay.IsTSValidAndUpdateState(
 			constants.BLOCK_REPLAY,
 			fct.GetSigHash().Fixed(),
 			fct.GetTimestamp(),
 			d.DirectoryBlock.GetHeader().GetTimestamp())
 	}
 
-	list.State.NumFCTTrans += len(d.FactoidBlock.GetTransactions()) - 1
+	s.NumFCTTrans += len(d.FactoidBlock.GetTransactions()) - 1
 
 	list.SavedHeight = uint32(dbheight)
 	progress = true
@@ -1517,23 +1523,23 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 
 	// We will only save blocks marked to be saved.  As such, this must follow
 	// the "d.saved = true" above
-	if list.State.StateSaverStruct.FastBoot {
+	if s.StateSaverStruct.FastBoot {
 		d.SaveStruct = d.TmpSaveStruct
-		err := list.State.StateSaverStruct.SaveDBStateList(list.State.DBStates, list.State.Network)
-		list.State.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
+		err := s.StateSaverStruct.SaveDBStateList(s.DBStates, s.Network)
+		s.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
 	}
 	// Now that we have saved the perm balances, we can clear the api hashmaps that held the differences
 	// between the actual saved block prior, and this saved block.  If you are looking for balances of
 	// the highest saved block, you first look to see that one of the "<fct or ec>Papi" maps exist, then
 	// if that map has a value for your address.  If it doesn't exist, or doesn't have a value, then look
 	// in the "<fct or ec>P" map.
-	list.State.FactoidBalancesPMutex.Lock()
-	list.State.FactoidBalancesPapi = nil
-	list.State.FactoidBalancesPMutex.Unlock()
+	s.FactoidBalancesPMutex.Lock()
+	s.FactoidBalancesPapi = nil
+	s.FactoidBalancesPMutex.Unlock()
 
-	list.State.ECBalancesPMutex.Lock()
-	list.State.ECBalancesPapi = nil
-	list.State.ECBalancesPMutex.Unlock()
+	s.ECBalancesPMutex.Lock()
+	s.ECBalancesPapi = nil
+	s.ECBalancesPMutex.Unlock()
 
 	return
 }
