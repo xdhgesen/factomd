@@ -1019,18 +1019,19 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	}
 	list.State.ECBalancesPMutex.Unlock()
 
-	// Process the Factoid End of Block
 	fs := list.State.GetFactoidState()
-	fs.(*FactoidState).DBHeight = dbht
-	err = fs.AddTransactionBlock(d.FactoidBlock)
-	if err != nil {
-		panic(err)
+	if dbht < 2 {
+		// Process the Factoid End of Block
+		fs.(*FactoidState).DBHeight = dbht
+		err = fs.AddTransactionBlock(d.FactoidBlock)
+		if err != nil {
+			panic(err)
+		}
+		err = fs.AddECBlock(d.EntryCreditBlock)
+		if err != nil {
+			panic(err)
+		}
 	}
-	err = fs.AddECBlock(d.EntryCreditBlock)
-	if err != nil {
-		panic(err)
-	}
-
 	if list.State.DBFinished {
 		list.State.Balancehash = fs.GetBalanceHash(false)
 	}
@@ -1318,189 +1319,188 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		}
 	}
 
-	if d.Saved {
-		Havedblk, err := s.DB.DoesKeyExist(databaseOverlay.DIRECTORYBLOCK, d.DirectoryBlock.GetKeyMR().Bytes())
-		if err != nil || !Havedblk {
-			panic(fmt.Sprintf("Claimed to be found on %s DBHeight %d Hash %x",
-				s.FactomNodeName,
-				d.DirectoryBlock.GetHeader().GetDBHeight(),
-				d.DirectoryBlock.GetKeyMR().Bytes()))
-		}
-
-		//		s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Already saved, add to replay!", d.DirectoryBlock.GetHeader().GetDBHeight())
-		// Set the Block Replay flag for all these transactions that are already in the database.
-		for _, fct := range d.FactoidBlock.GetTransactions() {
-			s.FReplay.IsTSValidAndUpdateState(
-				constants.BLOCK_REPLAY,
-				fct.GetSigHash().Fixed(),
-				fct.GetTimestamp(),
-				d.DirectoryBlock.GetHeader().GetTimestamp())
-		}
-
-		return
-	}
-
-	// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
-	// have marked them all as saved to disk!  So we gotta save them to disk.  Or panic trying.
-
-	//	s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) %s\n", dbheight, d.String())
-	// Only trim when we are really saving.
-	v := dbheight + int(s.IdentityChainID.Bytes()[4])
-	if v%4 == 0 {
-		s.DB.Trim()
-	}
-
-	// Save
-	s.DB.StartMultiBatch()
-
-	if err := s.DB.ProcessABlockMultiBatch(d.AdminBlock); err != nil {
-		panic(err.Error())
-	}
-
-	if err := s.DB.ProcessFBlockMultiBatch(d.FactoidBlock); err != nil {
-		panic(err.Error())
-	}
-
-	if err := s.DB.ProcessECBlockMultiBatch(d.EntryCreditBlock, false); err != nil {
-		panic(err.Error())
-	}
-
-	for _, en := range d.EntryCreditBlock.GetEntries() {
-		switch en.ECID() {
-		case constants.ECIDChainCommit:
-			s.NumNewChains++
-		case constants.ECIDEntryCommit:
-			s.NumNewEntries++
-		}
-	}
-
 	pl := s.ProcessLists.Get(uint32(dbheight))
 
-	allowedEBlocks := make(map[[32]byte]struct{})
-	allowedEntries := make(map[[32]byte]struct{})
+	if !d.Saved {
 
-	// Eblocks from DBlock
-	for _, eb := range d.DirectoryBlock.GetEBlockDBEntries() {
-		allowedEBlocks[eb.GetKeyMR().Fixed()] = struct{}{}
-	}
+		// Past this point, we cannot Return without recording the transactions in the dbstate.  This is because we
+		// have marked them all as saved to disk!  So we gotta save them to disk.  Or panic trying.
 
-	// Go through eblocks to build allowed entry map
-	for _, eb := range d.EntryBlocks {
-		keymr, err := eb.KeyMR()
-		if err != nil {
-			panic(err)
+		//	s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) %s\n", dbheight, d.String())
+		// Only trim when we are really saving.
+		v := dbheight + int(s.IdentityChainID.Bytes()[4])
+		if v%4 == 0 {
+			s.DB.Trim()
 		}
-		// If its a good eblock, add it's entries to the allowed
-		if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
-			for _, e := range eb.GetEntryHashes() {
-				allowedEntries[e.Fixed()] = struct{}{}
+
+		// Save
+		s.DB.StartMultiBatch()
+
+		if err := s.DB.ProcessABlockMultiBatch(d.AdminBlock); err != nil {
+			panic(err.Error())
+		}
+
+		if err := s.DB.ProcessFBlockMultiBatch(d.FactoidBlock); err != nil {
+			panic(err.Error())
+		}
+
+		if err := s.DB.ProcessECBlockMultiBatch(d.EntryCreditBlock, false); err != nil {
+			panic(err.Error())
+		}
+
+		for _, en := range d.EntryCreditBlock.GetEntries() {
+			switch en.ECID() {
+			case constants.ECIDChainCommit:
+				s.NumNewChains++
+			case constants.ECIDEntryCommit:
+				s.NumNewEntries++
 			}
-		} else {
-			s.LogPrintf("dbstateprocess", "Error putting entries in allowedmap, as Eblock is not in Dblock")
 		}
-	}
 
-	// Info from DBState
-	for _, eb := range d.EntryBlocks {
-		keymr, err := eb.KeyMR()
-		if err != nil {
-			panic(err)
-		}
-		// If it's in the DBlock
-		if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
-			if err := s.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
-				panic(err.Error())
-			}
-		} else {
-			s.LogPrintf("dbstateprocess", "Error saving eblock from dbstate, eblock not allowed")
-		}
-	}
-	for _, e := range d.Entries {
-		// If it's in the DBlock
-		if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
-			if err := s.DB.InsertEntryMultiBatch(e); err != nil {
-				panic(err.Error())
-			}
-		} else {
-			s.LogPrintf("dbstateprocess", "Error saving entry from dbstate, entry not allowed")
-		}
-	}
-	s.NumEntries += len(d.Entries)
-	s.NumEntryBlocks += len(d.EntryBlocks)
+		allowedEBlocks := make(map[[32]byte]struct{})
+		allowedEntries := make(map[[32]byte]struct{})
 
-	// Info from ProcessList
-	if pl != nil {
-		for _, eb := range pl.NewEBlocks {
+		// Eblocks from DBlock
+		for _, eb := range d.DirectoryBlock.GetEBlockDBEntries() {
+			allowedEBlocks[eb.GetKeyMR().Fixed()] = struct{}{}
+		}
+
+		// Go through eblocks to build allowed entry map
+		for _, eb := range d.EntryBlocks {
 			keymr, err := eb.KeyMR()
 			if err != nil {
 				panic(err)
 			}
+			// If its a good eblock, add it's entries to the allowed
+			if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
+				for _, e := range eb.GetEntryHashes() {
+					allowedEntries[e.Fixed()] = struct{}{}
+				}
+			} else {
+				s.LogPrintf("dbstateprocess", "Error putting entries in allowedmap, as Eblock is not in Dblock")
+			}
+		}
+
+		// Info from DBState
+		for _, eb := range d.EntryBlocks {
+			keymr, err := eb.KeyMR()
+			if err != nil {
+				panic(err)
+			}
+			// If it's in the DBlock
 			if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
 				if err := s.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
 					panic(err.Error())
 				}
-
-				for _, e := range eb.GetBody().GetEBEntries() {
-					if _, ok := allowedEntries[e.Fixed()]; ok {
-						if err := s.DB.InsertEntryMultiBatch(pl.GetNewEntry(e.Fixed())); err != nil {
-							panic(err.Error())
-						}
-					} else {
-						s.LogPrintf("dbstateprocess", "Error saving entry from process list, entry not allowed")
-					}
+			} else {
+				s.LogPrintf("dbstateprocess", "Error saving eblock from dbstate, eblock not allowed")
+			}
+		}
+		for _, e := range d.Entries {
+			// If it's in the DBlock
+			if _, ok := allowedEntries[e.GetHash().Fixed()]; ok {
+				if err := s.DB.InsertEntryMultiBatch(e); err != nil {
+					panic(err.Error())
 				}
 			} else {
-				s.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
+				s.LogPrintf("dbstateprocess", "Error saving entry from dbstate, entry not allowed")
 			}
 		}
-		pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-		pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
-	}
+		s.NumEntries += len(d.Entries)
+		s.NumEntryBlocks += len(d.EntryBlocks)
 
-	d.EntryBlocks = make([]interfaces.IEntryBlock, 0)
-	d.Entries = make([]interfaces.IEBEntry, 0)
+		// Info from ProcessList
+		if pl != nil {
+			for _, eb := range pl.NewEBlocks {
+				keymr, err := eb.KeyMR()
+				if err != nil {
+					panic(err)
+				}
+				if _, ok := allowedEBlocks[keymr.Fixed()]; ok {
+					if err := s.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
+						panic(err.Error())
+					}
 
-	if err := s.DB.ProcessDBlockMultiBatch(d.DirectoryBlock); err != nil {
-		panic(err.Error())
-	}
-
-	if err := s.DB.ExecuteMultiBatch(); err != nil {
-		panic(err.Error())
-	}
-
-	// Not activated.  Set to true if you want extra checking of the data saved to the database.
-	if false {
-		good := true
-		mr, err := s.DB.FetchDBKeyMRByHeight(uint32(dbheight))
-		if err != nil {
-			s.LogPrintf("dbstateprocess", err.Error())
-			return
-			panic(fmt.Sprintf("%20s At Directory Block Height %d", s.FactomNodeName, dbheight))
+					for _, e := range eb.GetBody().GetEBEntries() {
+						if _, ok := allowedEntries[e.Fixed()]; ok {
+							if err := s.DB.InsertEntryMultiBatch(pl.GetNewEntry(e.Fixed())); err != nil {
+								panic(err.Error())
+							}
+						} else {
+							s.LogPrintf("dbstateprocess", "Error saving entry from process list, entry not allowed")
+						}
+					}
+				} else {
+					s.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
+				}
+			}
+			pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
+			pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 		}
-		if mr == nil {
-			s.LogPrintf("dbstateprocess", "There is no mr returned by s.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
-			mr = d.DirectoryBlock.GetKeyMR()
-			good = false
+
+		d.EntryBlocks = make([]interfaces.IEntryBlock, 0)
+		d.Entries = make([]interfaces.IEBEntry, 0)
+
+		if err := s.DB.ProcessDBlockMultiBatch(d.DirectoryBlock); err != nil {
+			panic(err.Error())
 		}
 
-		td, err := s.DB.FetchDBlock(mr)
-		if err != nil || td == nil {
+		if err := s.DB.ExecuteMultiBatch(); err != nil {
+			panic(err.Error())
+		}
+
+		// Not activated.  Set to true if you want extra checking of the data saved to the database.
+		if false {
+			good := true
+			mr, err := s.DB.FetchDBKeyMRByHeight(uint32(dbheight))
 			if err != nil {
 				s.LogPrintf("dbstateprocess", err.Error())
-			} else {
-				s.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
+				return
+				panic(fmt.Sprintf("%20s At Directory Block Height %d", s.FactomNodeName, dbheight))
 			}
-			return
-			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", s.FactomNodeName, dbheight))
+			if mr == nil {
+				s.LogPrintf("dbstateprocess", "There is no mr returned by s.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
+				mr = d.DirectoryBlock.GetKeyMR()
+				good = false
+			}
+
+			td, err := s.DB.FetchDBlock(mr)
+			if err != nil || td == nil {
+				if err != nil {
+					s.LogPrintf("dbstateprocess", err.Error())
+				} else {
+					s.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
+				}
+				return
+				panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", s.FactomNodeName, dbheight))
+			}
+			if td.GetKeyMR().Fixed() != mr.Fixed() {
+				s.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
+				return
+				panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", s.FactomNodeName, dbheight))
+			}
+			if !good {
+				return
+			}
 		}
-		if td.GetKeyMR().Fixed() != mr.Fixed() {
-			s.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
-			return
-			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", s.FactomNodeName, dbheight))
-		}
-		if !good {
-			return
-		}
+	}
+
+	Havedblk, err := s.DB.DoesKeyExist(databaseOverlay.DIRECTORYBLOCK, d.DirectoryBlock.GetKeyMR().Bytes())
+	if err != nil || !Havedblk {
+		panic(fmt.Sprintf("Claimed to be found on %s DBHeight %d Hash %x",
+			s.FactomNodeName,
+			d.DirectoryBlock.GetHeader().GetDBHeight(),
+			d.DirectoryBlock.GetKeyMR().Bytes()))
+	}
+
+	//		s.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Already saved, add to replay!", d.DirectoryBlock.GetHeader().GetDBHeight())
+	// Set the Block Replay flag for all these transactions that are already in the database.
+	for _, fct := range d.FactoidBlock.GetTransactions() {
+		s.FReplay.IsTSValidAndUpdateState(
+			constants.BLOCK_REPLAY,
+			fct.GetSigHash().Fixed(),
+			fct.GetTimestamp(),
+			d.DirectoryBlock.GetHeader().GetTimestamp())
 	}
 
 	// *******************
@@ -1539,7 +1539,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	s.ECBalancesPMutex.Unlock()
 
 	// Process the Factoid End of Block
-	err := fs.AddTransactionBlock(d.FactoidBlock)
+	err = fs.AddTransactionBlock(d.FactoidBlock)
 	if err != nil {
 		panic(err)
 	}

@@ -111,6 +111,14 @@ func (m *FactoidTransaction) Validate(state interfaces.IState) int {
 	if err != nil {
 		return 0 // Well, mumble.  Might be out of order.
 	}
+
+	if m.Transaction.IsConversion() {
+		tx := m.Transaction.(*factoid.Transaction)
+		if len(tx.Inputs) != 1 || len(tx.OutECs) != 0 || len(tx.Outputs) != 0 {
+			return -1
+		}
+	}
+
 	return 1
 }
 

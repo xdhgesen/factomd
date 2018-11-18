@@ -312,7 +312,7 @@ type State struct {
 	NumTransactions int
 
 	// Permanent balances from processing blocks.
-	StableCoins           []string
+	TokenNames            []string
 	USDValues             []float64
 	FactoidBalancesPapi   []map[[32]byte]int64
 	FactoidBalancesP      []map[[32]byte]int64
@@ -932,6 +932,16 @@ func (s *State) Init() {
 		s.FactoidBalancesP = append(s.FactoidBalancesP, map[[32]byte]int64{})
 	}
 	s.ECBalancesP = map[[32]byte]int64{}
+
+	for _, tokenName := range constants.TokenNames {
+		s.TokenNames = append(s.TokenNames, tokenName)
+	}
+	if len(constants.TokenNames) != constants.NumberOfTokens {
+		panic("Need a name for every toke")
+	}
+	for range constants.TokenNames {
+		s.USDValues = append(s.USDValues, 1)
+	}
 
 	fs := new(FactoidState)
 	fs.State = s
