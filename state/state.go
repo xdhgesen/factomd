@@ -383,6 +383,7 @@ type State struct {
 	HighestCompletedTorrent uint32
 	FastBoot                bool
 	FastBootLocation        string
+	FastSaveRate            int
 
 	// These stats are collected when we write the dbstate to the database.
 	NumNewChains   int // Number of new Chains in this block
@@ -522,6 +523,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 
 	newState.CorsDomains = s.CorsDomains
 
+	newState.FastSaveRate = s.FastSaveRate
 	switch newState.DBType {
 	case "LDB":
 		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
@@ -1051,7 +1053,7 @@ func (s *State) Init() {
 			panic(err)
 		}
 
-		if d == nil || d.GetDatabaseHeight() < 2000 {
+		if d == nil || int(d.GetDatabaseHeight()) < s.FastSaveRate {
 			//If we have less than 2k blocks, we wipe SaveState
 			//This is to ensure we don't accidentally keep SaveState while deleting a database
 			s.StateSaverStruct.DeleteSaveState(s.Network)
