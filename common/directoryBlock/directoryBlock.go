@@ -292,7 +292,6 @@ func (e *DirectoryBlock) String() string {
 	}
 
 	return (string)(out.DeepCopyBytes())
-
 }
 
 func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
