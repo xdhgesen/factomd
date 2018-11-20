@@ -57,7 +57,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
 	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
 		for key, value := range UserAddedOptions {
-			if key != "--debuglog" {
+			if key != "--debuglog" && value != "" {
 				CmdLineOptions[key] = value
 			} else {
 				CmdLineOptions[key] = CmdLineOptions[key] + "|" + value // add debug log flags to the default
@@ -123,8 +123,8 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	et := elections.FaultTimeout
 	startTime = time.Now()
 	state0 := engine.Factomd(params, false).(*state.State)
-	//	statusState = state0
-	calctime := time.Duration(float64((height*blkt)+(electionsCnt*et)+(RoundsCnt*roundt))*1.1) * time.Second
+	// allot 50% extra time to run
+	calctime := time.Duration(float64((height*blkt)+(electionsCnt*et)+(RoundsCnt*roundt))*1.5) * time.Second
 	endTime = time.Now().Add(calctime)
 	fmt.Println("endTime: ", endTime.String(), "duration:", calctime.String())
 
@@ -134,13 +134,13 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 			case <-quit:
 				return
 			default:
-				if int(state0.GetLLeaderHeight()) > height {
-					fmt.Printf("Test Timeout: Expected %d blocks\n", height)
-					panic("Exceeded expected height")
+				if int(state0.GetLLeaderHeight())-3 > height { // always give us 3 extra block to finish
+					fmt.Printf("Test Timeout: Expected %d blocks (%s)\n", height, calctime.String())
+					panic(fmt.Sprintf("Test Timeout: Expected %d blocks (%s)\n", height, calctime.String()))
 				}
 				if time.Now().After(endTime) {
-					fmt.Printf("Test Timeout: Expected it to take %s\n", calctime.String())
-					panic("TOOK TOO LONG")
+					fmt.Printf("Test Timeout: Expected it to take %s (%d blocks)\n", calctime.String(), height)
+					panic(fmt.Sprintf("Test Timeout: Expected it to take %s (%d blocks)\n", calctime.String(), height))
 				}
 				time.Sleep(1 * time.Second)
 			}
@@ -148,9 +148,9 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	}()
 	state0.MessageTally = true
 	fmt.Printf("Starting timeout timer:  Expected test to take %s or %d blocks\n", calctime.String(), height)
-	//	StatusEveryMinute(state0)
+	StatusEveryMinute(state0)
 	WaitMinutes(state0, 1) // wait till initial DBState message for the genesis block is processed
-	creatingNodes(GivenNodes, state0)
+	creatingNodes(GivenNodes, state0, t)
 
 	t.Logf("Allocated %d nodes", l)
 	if len(engine.GetFnodes()) != l {
@@ -291,12 +291,15 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 }
 
 
-func creatingNodes(creatingNodes string, state0 *state.State) {
+func creatingNodes(creatingNodes string, state0 *state.State, t *testing.T) {
 	RunCmd(fmt.Sprintf("g%d", len(creatingNodes)))
 	WaitMinutes(state0, 1)
 	// Wait till all the entries from the g command are processed
 	simFnodes := engine.GetFnodes()
 	nodes := len(simFnodes)
+	if len(creatingNodes) > nodes {
+		t.Fatalf("Should have allocated %d nodes", len(creatingNodes))
+	}
 	for {
 		iq := 0
 		for _, s := range simFnodes {
@@ -323,19 +326,23 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 		WaitMinutes(state0, 1)
 
 	}
-	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitBlocks(state0, 2) // Wait for 2 blocks because ID scans is for block N-1
 	WaitForMinute(state0, 1)
-	RunCmd("0")
 	for i, c := range []byte(creatingNodes) {
+		if i == 0 {
+			Leaders++
+			continue
+		}
 		switch c {
 		case 'L', 'l':
+			RunCmd(fmt.Sprintf("%d", i))
 			RunCmd("l")
 			Leaders++
 		case 'A', 'a':
+			RunCmd(fmt.Sprintf("%d", i))
 			RunCmd("o")
 			Audits++
 		case 'F', 'f':
-			RunCmd(fmt.Sprintf("%d", (i+1)%nodes))
 			Followers++
 			break
 		default:
@@ -344,6 +351,7 @@ func creatingNodes(creatingNodes string, state0 *state.State) {
 	}
 	WaitBlocks(state0, 1) // Wait for 1 block
 	WaitForMinute(state0, 1)
+	WaitForAllNodes(state0) // make sure everyone is caught up
 }
 
 func WaitForAllNodes(state *state.State) {
