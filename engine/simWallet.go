@@ -103,6 +103,7 @@ func RandomFctAddressPair() (string, string) {
 }
 
 // construct a new factoid transaction
+// this adds the EC fee on top of the input amount
 func NewTransaction(amt uint64, userSecretIn string, userPublicOut string, ecPrice uint64) (*factoid.Transaction, error) {
 
 	inSec := factoid.NewAddress(primitives.ConvertUserStrToAddress(userSecretIn))
