@@ -141,7 +141,7 @@ func TestLoad2(t *testing.T) {
 	RanSimTest = true
 
 	go RunCmd("Re") // Turn on tight allocation of EC as soon as the simulator is up and running
-	state0 := SetupSim("LLLAAAFFF", map[string]string{"--debuglog": "."}, 24, 0, 0, t)
+	state0 := SetupSim("LLLAAAFFF", map[string]string{"--blktime": "20"}, 24, 0, 0, t)
 	StatusEveryMinute(state0)
 
 	RunCmd("7") // select node 1
@@ -152,7 +152,6 @@ func TestLoad2(t *testing.T) {
 	RunCmd("R30") // Feed load
 	WaitBlocks(state0, 3)
 	RunCmd("Rt60")
-	RunCmd("T20")
 	RunCmd("R.5")
 	WaitBlocks(state0, 2)
 	RunCmd("x")
@@ -480,7 +479,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAF", map[string]string{"--blktime": "25"}, 7, 7, 7, t)
+	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "60"}, 10, 7, 7, t)
 
 	WaitForMinute(state0, 2)
 
