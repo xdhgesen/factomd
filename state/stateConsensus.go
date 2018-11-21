@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"hash"
 	"os"
-	"reflect"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -81,7 +80,7 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
-	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
+	if msg.GetHash().IsHashNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
 		return false
 	}
@@ -2472,7 +2471,12 @@ func (s *State) GetDirectoryBlock() interfaces.IDirectoryBlock {
 	return s.DBStates.Last().DirectoryBlock
 }
 
-func (s *State) GetNewHash() interfaces.IHash {
+func (s *State) GetNewHash() (rval interfaces.IHash) {
+	defer func() {
+		if rval.IsHashNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+		}
+	}()
 	return new(primitives.Hash)
 }
 
