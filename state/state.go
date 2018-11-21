@@ -125,7 +125,7 @@ type State struct {
 	serverPrt   string
 	StatusMutex sync.Mutex
 	StatusStrs  []string
-	starttime   time.Time
+	Starttime   time.Time
 	transCnt    int
 	lasttime    time.Time
 	tps         float64
@@ -394,11 +394,13 @@ type State struct {
 	NumFCTTrans    int // Number of Factoid Transactions in this block
 
 	// debug message about state status rolling queue for ControlPanel
-	pstate              string
-	SyncingState        [256]string
-	SyncingStateCurrent int
-	processCnt          int64 // count of attempts to process .. so we can see if the thread is running
-
+	pstate                string
+	SyncingState          [256]string
+	SyncingStateCurrent   int
+	ProcessListProcessCnt int64 // count of attempts to process .. so we can see if the thread is running
+	StateProcessCnt       int64
+	StateUpdateState      int64
+	ValidatorLoopSleepCnt int64
 	reportedActivations [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 }
 
@@ -970,26 +972,6 @@ func (s *State) Init() {
 	}
 
 	if s.CheckChainHeads.CheckChainHeads {
-		if s.CheckChainHeads.Fix {
-			// Set dblock head to 184 if 184 is present and head is not 184
-			d, err := s.DB.FetchDBlockHead()
-			if err != nil {
-				// We should have a dblock head...
-				panic(fmt.Errorf("Error loading dblock head: %s\n", err.Error()))
-			}
-
-			if d != nil {
-				if d.GetDatabaseHeight() == 160183 {
-					// Our head is less than 160184, do we have 160184?
-					if d2, err := s.DB.FetchDBlockByHeight(160184); d2 != nil && err == nil {
-						err := s.DB.(*databaseOverlay.Overlay).SaveDirectoryBlockHead(d2)
-						if err != nil {
-							panic(err)
-						}
-					}
-				}
-			}
-		}
 		correctChainHeads.FindHeads(s.DB.(*databaseOverlay.Overlay), correctChainHeads.CorrectChainHeadConfig{
 			PrintFreq: 5000,
 			Fix:       s.CheckChainHeads.Fix,
@@ -1046,7 +1028,7 @@ func (s *State) Init() {
 		s.ExchangeRateAuthorityPublicKey = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
 	}
 	// end of FER removal
-	s.starttime = time.Now()
+	s.Starttime = time.Now()
 
 	if s.StateSaverStruct.FastBoot {
 		d, err := s.DB.FetchDBlockHead()
@@ -1859,6 +1841,7 @@ func (s *State) GetDirectoryBlockByHeight(height uint32) interfaces.IDirectoryBl
 }
 
 func (s *State) UpdateState() (progress bool) {
+	s.StateUpdateState++
 	dbheight := s.GetHighestSavedBlk()
 	plbase := s.ProcessLists.DBHeightBase
 	if dbheight == 0 {
@@ -2496,11 +2479,11 @@ func (s *State) SetStringConsensus() {
 //		totalTPS	: Transaction rate over life of node (totaltime / totaltrans)
 //		instantTPS	: Transaction rate weighted over last 3 seconds
 func (s *State) CalculateTransactionRate() (totalTPS float64, instantTPS float64) {
-	runtime := time.Since(s.starttime)
+	runtime := time.Since(s.Starttime)
+	shorttime := time.Since(s.lasttime)
 	total := s.FactoidTrans + s.NewEntryChains + s.NewEntries
 	tps := float64(total) / float64(runtime.Seconds())
 	TotalTransactionPerSecond.Set(tps) // Prometheus
-	shorttime := time.Since(s.lasttime)
 	if shorttime >= time.Second*3 {
 		delta := (s.FactoidTrans + s.NewEntryChains + s.NewEntries) - s.transCnt
 		s.tps = ((float64(delta) / float64(shorttime.Seconds())) + 2*s.tps) / 3

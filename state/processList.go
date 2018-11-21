@@ -867,9 +867,9 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 		p.State.LogPrintf("process", "Unexpected 0x%03x %v", xx, x)
 		s = "Unknown"
 	}
-	// divide processCnt by a big number to make it not change the status string very often
+	// divide ProcessListProcessCnt by a big number to make it not change the status string very often
 	return fmt.Sprintf("SyncingStatus: %d-:-%d 0x%03x %25s EOM/DBSIG %02d/%02d of %02d -- %d",
-		p.State.LeaderPL.DBHeight, p.State.CurrentMinute, xx, s, EOMProcessed, DBSigProcessed, FedServers, p.State.processCnt/5000)
+		p.State.LeaderPL.DBHeight, p.State.CurrentMinute, xx, s, EOMProcessed, DBSigProcessed, FedServers, p.State.ProcessListProcessCnt/5000)
 
 }
 
@@ -900,15 +900,17 @@ func (p *ProcessList) Process(state *State) (progress bool) {
 
 	VMListLoop:
 		for j := vm.Height; j < len(vm.List); j++ {
-			state.processCnt++
-			x := p.decodeState(state.Syncing, state.DBSig, state.EOM, state.DBSigDone, state.EOMDone,
-				len(state.LeaderPL.FedServers), state.EOMProcessed, state.DBSigProcessed)
+			state.ProcessListProcessCnt++
+			if state.DebugExec() {
+				x := p.decodeState(state.Syncing, state.DBSig, state.EOM, state.DBSigDone, state.EOMDone,
+					len(state.LeaderPL.FedServers), state.EOMProcessed, state.DBSigProcessed)
 
-			// Compute a syncing state string and report if it has changed
-			if state.SyncingState[state.SyncingStateCurrent] != x {
-				state.LogPrintf("processStatus", x)
-				state.SyncingStateCurrent = (state.SyncingStateCurrent + 1) % len(state.SyncingState)
-				state.SyncingState[state.SyncingStateCurrent] = x
+				// Compute a syncing state string and report if it has changed
+				if state.SyncingState[state.SyncingStateCurrent] != x {
+					state.LogPrintf("processStatus", x)
+					state.SyncingStateCurrent = (state.SyncingStateCurrent + 1) % len(state.SyncingState)
+					state.SyncingState[state.SyncingStateCurrent] = x
+				}
 			}
 			if vm.List[j] == nil {
 				//p.State.AddStatus(fmt.Sprintf("ProcessList.go Process: Found nil list at vm %d vm height %d ", i, j))
@@ -1401,8 +1403,6 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		}
 	}
 	pl.ResetDiffSigTally()
-
-	pl.DirectoryBlock.GetHeader().SetTimestamp(now) // Well this is awkwardly after it's created but ....
 
 	if err != nil {
 		panic(err.Error())
