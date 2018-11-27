@@ -337,19 +337,9 @@ func (b *FBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	// txLimit is the maximum number of transactions (min 78 bytes) that could
-	// fit into the remaining unread portion of the buffer.
-	txLimit := uint32(buf.Len() / 78)
 	txCount, err := buf.PopUInt32()
 	if err != nil {
 		return nil, err
-	}
-	if txCount > txLimit {
-		return nil, fmt.Errorf(
-			"Error: FBlock.Unmarshal: transaction count %d higher than space "+
-				"in body %d (uint underflow?)",
-			txCount, txLimit,
-		)
 	}
 
 	// Just skip the size... We don't really need it.
@@ -360,9 +350,7 @@ func (b *FBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
 
 	// txLimit is the maximum number of transactions (min 20 bytes for an empty
 	// coinbase tx) that could fit into the unread portion of the buffer.
-	l := buf.Len()
-	txLimit := uint32(l / 20)
-
+	txLimit := uint32(buf.Len() / 20)
 	if txCount > txLimit {
 		return nil, fmt.Errorf(
 			"Error: FBlock.Unmarshal: transaction count %d higher than space "+
