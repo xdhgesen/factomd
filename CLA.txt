@@ -29,4 +29,5 @@ Name                                       Github Account                       
 ===================================        ======================================       =====================================        ================================
 Paul Snow                                  PaulSnow                                     Factom Inc.                                  Founder and Architect of Factom
 Brian Deery                                carryforward                                 Factom Inc.
+Samuel Vanderwaal                          samuelvanderwaal                             Canonical Ledgers
 Paul Bernier                               PaulBernier                                  Luciap Technology Inc.
