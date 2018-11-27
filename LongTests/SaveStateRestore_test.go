@@ -14,9 +14,10 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 	var fastBootFile string
 
 	startSim := func(nodes string, maxHeight int) {
+		RanSimTest = true
 		state0 = SetupSim(
 			nodes,
-			map[string]string{"--debuglog": ".", "--fastsaverate": fmt.Sprintf("%v", saveRate) },
+			map[string]string{"--debuglog": ".", "--fastsaverate": fmt.Sprintf("%v", saveRate)},
 			maxHeight,
 			0,
 			0,
@@ -29,18 +30,6 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		ShutDownEverything(t)
 		state0 = nil
 	}
-
-	t.Run("after restart node should catch up", func(t *testing.T) {
-		if RanSimTest {
-			return
-		}
-
-		startSim("LF", 200)
-		StopNode(1,'F')
-		WaitBlocks(state0, 5)
-		StartNode(1,'F')
-		stopSim()
-	})
 
 	// FIXME:
 	// this test currently fails which either means:
