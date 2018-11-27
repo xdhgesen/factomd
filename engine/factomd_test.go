@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/factoid"
-	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -1434,13 +1433,13 @@ func TestTxnCreate(t *testing.T) {
 }
 
 func TestBadDBStateUnderflow(t *testing.T) {
-	if ranSimTest {
+	if RanSimTest {
 		return
 	}
 
-	ranSimTest = true
+	RanSimTest = true
 
-	state0 := SetupSim("LF", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LF", map[string]string{}, 6, 0, 0, t)
 
 	msg, err := state0.LoadDBState(state0.GetDBHeightComplete() - 1)
 	if err != nil {
@@ -1464,17 +1463,17 @@ func TestBadDBStateUnderflow(t *testing.T) {
 
 	WaitForMinute(state0, 1)
 	WaitForAllNodes(state0)
-	CheckAuthoritySet(2, 0, t)
+	CheckAuthoritySet(t)
 }
 
 func TestBadDBStateMemLeak(t *testing.T) {
-	if ranSimTest {
+	if RanSimTest {
 		return
 	}
 
-	ranSimTest = true
+	RanSimTest = true
 
-	state0 := SetupSim("LF", "LOCAL", map[string]string{}, t)
+	state0 := SetupSim("LF", map[string]string{}, 5, 0, 0, t)
 
 	msg, err := state0.LoadDBState(state0.GetDBHeightComplete() - 1)
 	if err != nil {
@@ -1507,11 +1506,11 @@ func TestBadDBStateMemLeak(t *testing.T) {
 	WaitForMinute(state0, 1)
 
 	runtime.ReadMemStats(&m)
-	fmt.Printf("%+v", m)
-	WaitForMinute(state0, 30)
+	fmt.Printf("%+v\n", m)
+	WaitForMinute(state0, 3)
 	runtime.ReadMemStats(&m)
-	fmt.Printf("%+v", m)
+	fmt.Printf("%+v\n", m)
 
 	WaitForAllNodes(state0)
-	CheckAuthoritySet(2, 0, t)
+	CheckAuthoritySet(t)
 }
