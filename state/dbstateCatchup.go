@@ -420,11 +420,17 @@ func (l *StatesReceived) GetNext() *ReceivedState {
 	e := l.List.Front()
 	if e != nil {
 		s := e.Value.(*ReceivedState)
+
+		if s == nil {
+			return nil
+		}
+
 		if s.Height() == l.Base()+1 {
 			l.SetBase(s.Height())
 			l.List.Remove(e)
 			return s
 		}
+
 		if s.Height() <= l.Base() {
 			l.List.Remove(e)
 		}
