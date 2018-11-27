@@ -448,3 +448,28 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 	}
 	return nil, nil
 }
+
+func GetNode(offset int) *engine.FactomNode {
+	return engine.GetFnodes()[offset]
+}
+
+// signal Fnode state to shutdown
+func StopNode(offset int, typeCode rune) {
+	RunCmd(fmt.Sprintf("%v", offset))
+	RunCmd("x")
+	fnode := engine.GetFnodes()[offset]
+	fnode.State.ShutdownChan <- 0
+	for fnode.Running {
+		time.Sleep(time.Microsecond * 10)
+	}
+	println("FULLSTOP")
+	_ = typeCode // REVIEW: should we account for this stopped node ?
+}
+
+func StartNode(offset int, typeCode rune) {
+	RunCmd(fmt.Sprintf("%v", offset))
+	RunCmd("x")
+	engine.StartFnode(offset, true)
+	_ = typeCode // REVIEW: should we account for this started node ?
+}
+

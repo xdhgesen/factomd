@@ -12,12 +12,10 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	//"github.com/FactomProject/factomd/engine"
-	//"github.com/FactomProject/factomd/log"
+
 	"time"
 
 	"github.com/FactomProject/factomd/state"
-	//"fmt"
 	"fmt"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"os"

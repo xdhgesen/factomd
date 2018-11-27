@@ -5,7 +5,6 @@ import (
 	"github.com/FactomProject/factomd/engine"
 
 	"github.com/FactomProject/ed25519"
-	//"github.com/FactomProject/factomd/common/factoid/wallet"
 	"encoding/hex"
 	"fmt"
 	"testing"

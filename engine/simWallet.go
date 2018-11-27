@@ -80,7 +80,6 @@ func FundWalletTOFF(st *state.State, timeOffsetInMilliseconds int64, amt uint64)
 	return nil, fmt.Sprintf("%v", trans.GetTxID())
 }
 
-
 func SendTxn(s *state.State, amt uint64, userSecretIn string, userPubOut string, ecPrice uint64) (*factoid.Transaction, error) {
 	txn, _ := NewTransaction(amt, userSecretIn, userPubOut, ecPrice)
 	msg := new(messages.FactoidTransaction)
@@ -97,9 +96,9 @@ func GetBalance(s *state.State, userStr string) int64 {
 func RandomFctAddressPair() (string, string) {
 	pkey := primitives.RandomPrivateKey()
 	privUserStr, _ := primitives.PrivateKeyStringToHumanReadableFactoidPrivateKey(pkey.PrivateKeyString())
-	_, _, pubUserStr,_ := factoid.PrivateKeyStringToEverythingString(pkey.PrivateKeyString())
+	_, _, pubUserAddr, _ := factoid.PrivateKeyStringToEverythingString(pkey.PrivateKeyString())
 
-	return privUserStr, pubUserStr
+	return privUserStr, pubUserAddr
 }
 
 // construct a new factoid transaction

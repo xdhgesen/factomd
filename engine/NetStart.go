@@ -41,6 +41,8 @@ type FactomNode struct {
 	Peers    []interfaces.IPeer
 	MLog     *MsgLog
 	P2PIndex int
+	Running  bool
+	workers  []chan int
 }
 
 var fnodes []*FactomNode
@@ -311,7 +313,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	// Actually setup the Network
 	//************************************************
 
-	// Make p.cnt Factom nodes
+	fnodes = fnodes[:0]
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
 	}
@@ -557,7 +559,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	RegisterPrometheus()
 
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
-
 	go SimControl(p.ListenTo, listenToStdin)
 
 }
@@ -581,38 +582,97 @@ func printGraphData(filename string, period int) {
 func makeServer(s *state.State) *FactomNode {
 	// All other states are clones of the first state.  Which this routine
 	// gets passed to it.
-	newState := s
-
 	if len(fnodes) > 0 {
-		newState = s.Clone(len(fnodes)).(*state.State)
-		newState.EFactory = new(electionMsgs.ElectionsFactory) // not an elegant place but before we let the messages hit the state
-		time.Sleep(10 * time.Millisecond)
-		newState.Init()
-		newState.EFactory = new(electionMsgs.ElectionsFactory)
+		return AddFnode(s.Clone(len(fnodes)).(*state.State))
+	} else {
+		return AddFnode(s)
 	}
+}
 
+func AddFnode(s *state.State) *FactomNode {
 	fnode := new(FactomNode)
-	fnode.State = newState
-	fnodes = append(fnodes, fnode)
+	fnode.State = s
 	fnode.MLog = mLog
 
+	if len(fnodes) > 0 {
+		// not an elegant place but before we let the messages hit the state
+		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
+		time.Sleep(10 * time.Millisecond)
+		fnode.State.Init() // REVIEW: State.Init() is called again in StartFnode()
+		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
+	}
+
+	fnodes = append(fnodes, fnode)
 	return fnode
 }
 
-func startServers(load bool) {
-	for i, fnode := range fnodes {
-		if i > 0 {
-			fnode.State.Init()
-		}
-		go NetworkProcessorNet(fnode)
-		if load {
-			go state.LoadDatabase(fnode.State)
-		}
-		go fnode.State.GoSyncEntries()
-		go Timer(fnode.State)
-		go elections.Run(fnode.State)
-		go fnode.State.ValidatorLoop()
+func startServers(loadDB bool) {
+	for i := range fnodes {
+		StartFnode(i, loadDB)
 	}
+}
+
+// register workers with node
+func (fnode *FactomNode) addWorker(doWork func() error) {
+	quit := make(chan int)
+	fnode.workers = append(fnode.workers, quit)
+	var err error
+	//var workerID = len(fnode.workers)
+
+	go func() {
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				//fmt.Printf("Fnode:%v worker:%v\n", fnode.Index, workerID)
+				err = doWork()
+				if err != nil {
+					panic(err)
+				}
+			}
+		}
+	}()
+}
+
+func (fnode *FactomNode) stopWorker(i int) {
+	defer func() {
+		err := recover()
+		if err != nil {
+			fmt.Printf("stopWorker recovered: %v", err)
+		}
+	}()
+
+	fnode.workers[i] <- 0
+}
+
+func StartFnode(i int, loadDB bool) {
+	fnode := fnodes[i]
+
+	if loadDB {
+		state.LoadDatabase(fnode.State)
+	}
+
+	go func() {
+		fnode.Running = true
+		fmt.Printf("FNode%v: START\n", i)
+		fnode.State.ValidatorLoop() // blocks until there is a shutdown signal
+		for i := range fnode.workers {
+			go fnode.stopWorker(i) // workers exit when validator exits
+		}
+		fmt.Printf("FNode%v: STOP\n", i)
+		fnode.Running = false
+	}()
+
+	fnode.workers = fnode.workers[:0] // remove old channels
+
+	fnode.addWorker(PeersWorker(fnode))
+	fnode.addWorker(NetworkOutputWorker(fnode))
+	fnode.addWorker(InvalidOutputWorker(fnode))
+	fnode.addWorker(fnode.State.MissingEntryRequestWorker())
+	fnode.addWorker(fnode.State.SyncEntryWorker())
+	fnode.addWorker(Timer(fnode.State))
+	fnode.addWorker(elections.ElectionWorker(fnode.State))
 }
 
 func setupFirstAuthority(s *state.State) {
