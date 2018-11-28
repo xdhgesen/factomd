@@ -579,22 +579,36 @@ func printGraphData(filename string, period int) {
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
 //**********************************************************************
-func makeServer(s *state.State) *FactomNode {
+func makeServer(s *state.State) (*FactomNode, int) {
 	// All other states are clones of the first state.  Which this routine
 	// gets passed to it.
-	if len(fnodes) > 0 {
-		return AddFnode(s.Clone(len(fnodes)).(*state.State))
+	var f  *FactomNode
+
+	newIndex := len(fnodes)
+	if newIndex == 0 {
+		f, _ = AddFnode(s)
 	} else {
-		return AddFnode(s)
+		f, _ = AddFnode(s.Clone(newIndex).(*state.State))
 	}
+
+	return f, newIndex
 }
 
-func AddFnode(s *state.State) *FactomNode {
+func AddServer(s *state.State) (*FactomNode, int) {
+	f, i := makeServer(s)
+	fnodes[i].State.IntiateNetworkSkeletonIdentity()
+	fnodes[i].State.InitiateNetworkIdentityRegistration()
+	return f, i
+}
+
+// return fnode and it's index in fnodes list
+func AddFnode(s *state.State) (*FactomNode, int) {
 	fnode := new(FactomNode)
 	fnode.State = s
 	fnode.MLog = mLog
+	fnodeLen := len(fnodes)
 
-	if len(fnodes) > 0 {
+	if fnodeLen > 0 {
 		// not an elegant place but before we let the messages hit the state
 		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
 		time.Sleep(10 * time.Millisecond)
@@ -603,7 +617,7 @@ func AddFnode(s *state.State) *FactomNode {
 	}
 
 	fnodes = append(fnodes, fnode)
-	return fnode
+	return fnode, fnodeLen
 }
 
 func startServers(loadDB bool) {

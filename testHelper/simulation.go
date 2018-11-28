@@ -473,3 +473,11 @@ func StartNode(offset int, typeCode rune) {
 	_ = typeCode // REVIEW: should we account for this started node ?
 }
 
+func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
+	fnodes := engine.GetFnodes()
+	newIndex := len(fnodes)
+	newState := fnodes[i].State.Clone(newIndex).(*state.State)
+	f, newIndex := engine.AddServer(newState)
+	StartNode(newIndex, typeCode)
+	return f, newIndex
+}
