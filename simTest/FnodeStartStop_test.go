@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestFastBootSaveAndRestore(t *testing.T) {
+func TestFnodeStartStop(t *testing.T) {
 	var state0 *state.State
 
 	startSim := func(nodes string, maxHeight int) {
@@ -32,7 +32,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			return
 		}
 
-		startSim("LF", 200)
+		startSim("LF", 10)
 		StopNode(1, 'F')
 		WaitBlocks(state0, 5)
 		StartNode(1, 'F')
