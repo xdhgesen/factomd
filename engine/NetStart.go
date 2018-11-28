@@ -48,6 +48,8 @@ type FactomNode struct {
 var fnodes []*FactomNode
 
 var networkpattern string
+var networkpatternfile string
+
 var mLog = new(MsgLog)
 var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
@@ -406,11 +408,14 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		go networkHousekeeping() // This goroutine executes once a second to keep the proxy apprised of the network status.
 	}
 
-	setupNetwork(p)
+	networkpattern = p.Net
+	networkpatternfile = p.Fnet
+	SetupNetwork()
+
 	// Initiate dbstate plugin if enabled. Only does so for first node,
 	// any more nodes on sim control will use default method
-	fnodes[0].State.SetTorrentUploader(p.TorUpload)
 	if p.TorManage {
+		fnodes[0].State.SetTorrentUploader(p.TorUpload)
 		fnodes[0].State.SetUseTorrent(true)
 		manager, err := LaunchDBStateManagePlugin(p.PluginPath, fnodes[0].State.InMsgQueue(), fnodes[0].State, fnodes[0].State.GetServerPrivateKey(), p.MemProfileRate)
 		if err != nil {
@@ -444,15 +449,14 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
 	go SimControl(p.ListenTo, listenToStdin)
-
 }
 
-func setupNetwork(p *FactomParams) {
-	networkpattern = p.Net
+func SetupNetwork() {
+	count := len(fnodes)
 
-	switch p.Net {
+	switch networkpattern {
 	case "file":
-		file, err := os.Open(p.Fnet)
+		file, err := os.Open(networkpatternfile)
 		if err != nil {
 			panic(fmt.Sprintf("File network.txt failed to open: %s", err.Error()))
 		} else if file == nil {
@@ -468,7 +472,7 @@ func setupNetwork(p *FactomParams) {
 			}
 		}
 	case "square":
-		side := int(math.Sqrt(float64(p.Cnt)))
+		side := int(math.Sqrt(float64(count)))
 
 		for i := 0; i < side; i++ {
 			AddSimPeer(fnodes, i*side, (i+1)*side-1)
@@ -482,20 +486,20 @@ func setupNetwork(p *FactomParams) {
 		}
 	case "long":
 		fmt.Println("Using long Network")
-		for i := 1; i < p.Cnt; i++ {
+		for i := 1; i < count; i++ {
 			AddSimPeer(fnodes, i-1, i)
 		}
 		// Make long into a circle
 	case "loops":
 		fmt.Println("Using loops Network")
-		for i := 1; i < p.Cnt; i++ {
+		for i := 1; i < count; i++ {
 			AddSimPeer(fnodes, i-1, i)
 		}
-		for i := 0; (i+17)*2 < p.Cnt; i += 17 {
-			AddSimPeer(fnodes, i%p.Cnt, (i+5)%p.Cnt)
+		for i := 0; (i+17)*2 < count; i += 17 {
+			AddSimPeer(fnodes, i%count, (i+5)%count)
 		}
-		for i := 0; (i+13)*2 < p.Cnt; i += 13 {
-			AddSimPeer(fnodes, i%p.Cnt, (i+7)%p.Cnt)
+		for i := 0; (i+13)*2 < count; i += 13 {
+			AddSimPeer(fnodes, i%count, (i+7)%count)
 		}
 	case "alot":
 		n := len(fnodes)
@@ -551,7 +555,7 @@ func setupNetwork(p *FactomParams) {
 		}
 	default:
 		fmt.Println("Didn't understand network type. Known types: mesh, long, circles, tree, loops.  Using a Long Network")
-		for i := 1; i < p.Cnt; i++ {
+		for i := 1; i < count; i++ {
 			AddSimPeer(fnodes, i-1, i)
 		}
 

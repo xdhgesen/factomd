@@ -32,12 +32,12 @@ func TestFnodeStartStop(t *testing.T) {
 			return
 		}
 
-		startSim("LF", 10)
+		startSim("LF", 30)
 		StopNode(1, 'F')
-		// FIXME disabled to test reafactor changes
-		//CloneNode(1, 'F')
+		CloneNode(1, 'F')
 		WaitBlocks(state0, 2)
 		StartNode(1, 'F')
+		WaitForAllNodes(state0)
 		stopSim()
 	})
 }
