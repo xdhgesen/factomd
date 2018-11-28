@@ -479,5 +479,6 @@ func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
 	newState := fnodes[i].State.Clone(newIndex).(*state.State)
 	f, newIndex := engine.AddServer(newState)
 	StartNode(newIndex, typeCode)
+	// TODO: do we need to generate + attach new identity?
 	return f, newIndex
 }

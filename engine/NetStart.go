@@ -406,6 +406,48 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		go networkHousekeeping() // This goroutine executes once a second to keep the proxy apprised of the network status.
 	}
 
+	setupNetwork(p)
+	// Initiate dbstate plugin if enabled. Only does so for first node,
+	// any more nodes on sim control will use default method
+	fnodes[0].State.SetTorrentUploader(p.TorUpload)
+	if p.TorManage {
+		fnodes[0].State.SetUseTorrent(true)
+		manager, err := LaunchDBStateManagePlugin(p.PluginPath, fnodes[0].State.InMsgQueue(), fnodes[0].State, fnodes[0].State.GetServerPrivateKey(), p.MemProfileRate)
+		if err != nil {
+			panic("Encountered an error while trying to use torrent DBState manager: " + err.Error())
+		}
+		fnodes[0].State.DBStateManager = manager
+	} else {
+		fnodes[0].State.SetUseTorrent(false)
+	}
+
+	if p.Journal != "" {
+		go LoadJournal(s, p.Journal)
+		startServers(false)
+	} else {
+		startServers(true)
+	}
+
+	// Start the webserver
+	wsapi.Start(fnodes[0].State)
+	if fnodes[0].State.DebugExec() && messages.CheckFileName("graphData.txt") {
+		go printGraphData("graphData.txt", 30)
+	}
+
+	// Start prometheus on port
+	launchPrometheus(9876)
+	// Start Package's prometheus
+	state.RegisterPrometheus()
+	p2p.RegisterPrometheus()
+	leveldb.RegisterPrometheus()
+	RegisterPrometheus()
+
+	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+	go SimControl(p.ListenTo, listenToStdin)
+
+}
+
+func setupNetwork(p *FactomParams) {
 	networkpattern = p.Net
 
 	switch p.Net {
@@ -523,43 +565,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		}
 		fmt.Printf("Paste the network info above into http://arborjs.org/halfviz to visualize the network\n")
 	}
-	// Initiate dbstate plugin if enabled. Only does so for first node,
-	// any more nodes on sim control will use default method
-	fnodes[0].State.SetTorrentUploader(p.TorUpload)
-	if p.TorManage {
-		fnodes[0].State.SetUseTorrent(true)
-		manager, err := LaunchDBStateManagePlugin(p.PluginPath, fnodes[0].State.InMsgQueue(), fnodes[0].State, fnodes[0].State.GetServerPrivateKey(), p.MemProfileRate)
-		if err != nil {
-			panic("Encountered an error while trying to use torrent DBState manager: " + err.Error())
-		}
-		fnodes[0].State.DBStateManager = manager
-	} else {
-		fnodes[0].State.SetUseTorrent(false)
-	}
-
-	if p.Journal != "" {
-		go LoadJournal(s, p.Journal)
-		startServers(false)
-	} else {
-		startServers(true)
-	}
-
-	// Start the webserver
-	wsapi.Start(fnodes[0].State)
-	if fnodes[0].State.DebugExec() && messages.CheckFileName("graphData.txt") {
-		go printGraphData("graphData.txt", 30)
-	}
-
-	// Start prometheus on port
-	launchPrometheus(9876)
-	// Start Package's prometheus
-	state.RegisterPrometheus()
-	p2p.RegisterPrometheus()
-	leveldb.RegisterPrometheus()
-	RegisterPrometheus()
-
-	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
-	go SimControl(p.ListenTo, listenToStdin)
 
 }
 
