@@ -535,11 +535,11 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	switch newState.DBType {
 	case "LDB":
 		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
-		newState.StateSaverStruct.FastBootLocation = newState.LdbPath
+		newState.StateSaverStruct.FastBootLocation = newState.LdbPath // TODO is this correct?
 		break
 	case "Bolt":
 		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
-		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath
+		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath // TODO is this correct?
 		break
 	}
 	if globals.Params.WriteProcessedDBStates {
