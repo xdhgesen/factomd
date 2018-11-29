@@ -60,32 +60,35 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		startSim("LF", 20)
 		WaitForBlock(state0, saveRate*2)
 		mkTransactions() // REVIEW: should this happen in other
-		WaitBlocks(state0, 2)
+		WaitMinutes(state0, 1)
 		StopNode(1, 'F')
 
-		t.Run("reload follower with fastboot", func(t *testing.T) {
+		t.Run("create fnode02 from clone without fastboot", func(t *testing.T) {
+			_, n2 := CloneNode(1, 'F')
+			engine.StartFnode(n2, true)
+			assert.Equal(t, 2, n2)
+		})
 
-			// clone fnode1
-			node, i := CloneNode(1, 'F')
-			newState := node.State
-
+		t.Run("create fnode03 with copy of fastboot & db from fnode01", func(t *testing.T) {
 			s := GetNode(1).State
+
+			// create fnode03
+			node, i := CloneNode(1, 'F')
+			assert.Equal(t, 3, i)
+			newState := node.State
 
 			// restore savestate from node01
 			newState.StateSaverStruct.LoadDBStateListFromBin(newState.DBStates, s.StateSaverStruct.TmpState)
 
 			// transplant database
-			// FIXME: is this being shared w/ node1
-			db := s.GetMapDB()
-			assert.NotNil(t, db)
-			newState.SetMapDB(db)
+			newState.SetMapDB(s.GetMapDB()) // FIXME: don't share db w/ fnode01
 
 			// start new node
 			engine.StartFnode(i, true)
 
 		})
-		// old node 1 has DB re-initialized
-		// so db is not being shared
+
+		WaitBlocks(state0, 2)
 		StartNode(1, 'F')
 		stopSim()
 
