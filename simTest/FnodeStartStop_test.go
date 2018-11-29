@@ -1,6 +1,7 @@
 package simtest
 
 import (
+	"github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
 	"testing"
@@ -34,7 +35,11 @@ func TestFnodeStartStop(t *testing.T) {
 
 		startSim("LF", 30)
 		StopNode(1, 'F')
-		CloneNode(1, 'F')
+
+		// Add another Node
+		_, i := CloneNode(1, 'F')
+		engine.StartFnode(i, true)
+
 		WaitBlocks(state0, 2)
 		StartNode(1, 'F')
 		WaitForAllNodes(state0)

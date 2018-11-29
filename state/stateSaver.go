@@ -96,11 +96,7 @@ func (sss *StateSaverStruct) DeleteSaveState(networkName string) error {
 func (sss *StateSaverStruct) LoadDBStateList(ss *DBStateList, networkName string) error {
 	filename := NetworkIDToFilename(networkName, sss.FastBootLocation)
 	fmt.Println(ss.State.FactomNodeName, "Loading from", filename)
-	return sss.LoadDBStateListFromFile(ss, networkName)
-}
-
-func (sss *StateSaverStruct) LoadDBStateListFromFile(ss *DBStateList, filepath string) error {
-	b, err := LoadFromFile(filepath)
+	b, err := LoadFromFile(filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "LoadDBStateList error:", err)
 		return err
@@ -109,8 +105,12 @@ func (sss *StateSaverStruct) LoadDBStateListFromFile(ss *DBStateList, filepath s
 		fmt.Fprintln(os.Stderr, "LoadDBStateList LoadFromFile returned nil")
 		return errors.New("failed to load from file")
 	}
+	return sss.LoadDBStateListFromBin(ss, b)
+}
+
+func (sss *StateSaverStruct) LoadDBStateListFromBin(ss *DBStateList, b []byte) error {
 	h := primitives.NewZeroHash()
-	b, err = h.UnmarshalBinaryData(b)
+	b, err := h.UnmarshalBinaryData(b)
 	if err != nil {
 		return err
 	}

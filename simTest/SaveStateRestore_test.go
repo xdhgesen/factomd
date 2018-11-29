@@ -13,7 +13,6 @@ import (
 func TestFastBootSaveAndRestore(t *testing.T) {
 	var saveRate = 4
 	var state0 *state.State
-	//var fastBootFile string
 	var bankSecret string = "Fs3E9gV6DXsYzf7Fqx1fVBQPQXV695eP3k5XbmHEZVRLkMdD9qCK"
 	var depositAddresses []string
 	var numAddresses = 1
@@ -59,22 +58,34 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		}
 
 		startSim("LF", 20)
-		WaitForBlock(state0, saveRate*2+2)
+		WaitForBlock(state0, saveRate*2)
+		mkTransactions() // REVIEW: should this happen in other
+		WaitBlocks(state0, 2)
 		StopNode(1, 'F')
-		mkTransactions()
 
-		/*
-		TODO: copy db & restore stavestate
 		t.Run("reload follower with fastboot", func(t *testing.T) {
-			fastBootFile = state.NetworkIDToFilename(state0.Network, state0.FastBootLocation)
-			assert.FileExists(t, fastBootFile)
+
+			// clone fnode1
+			node, i := CloneNode(1, 'F')
+			newState := node.State
 
 			s := GetNode(1).State
-			err := s.StateSaverStruct.LoadDBStateListFromFile(s.DBStates, fastBootFile)
-			assert.Nil(t, err)
-		})
-		*/
 
+			// restore savestate from node01
+			newState.StateSaverStruct.LoadDBStateListFromBin(newState.DBStates, s.StateSaverStruct.TmpState)
+
+			// transplant database
+			// FIXME: is this being shared w/ node1
+			db := s.GetMapDB()
+			assert.NotNil(t, db)
+			newState.SetMapDB(db)
+
+			// start new node
+			engine.StartFnode(i, true)
+
+		})
+		// old node 1 has DB re-initialized
+		// so db is not being shared
 		StartNode(1, 'F')
 		stopSim()
 

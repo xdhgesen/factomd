@@ -285,6 +285,7 @@ type State struct {
 
 	// Database
 	DB     interfaces.DBOverlaySimple
+	dbase  *mapdb.MapDB
 	Anchor interfaces.IAnchor
 
 	// Directory Block State
@@ -2454,9 +2455,21 @@ func (s *State) InitMapDB() error {
 
 	dbase := new(mapdb.MapDB)
 	dbase.Init(nil)
+	return s.SetMapDB(dbase)
+}
+
+func (s *State) SetMapDB(dbase *mapdb.MapDB) error {
+	s.dbase = dbase
 	s.DB = databaseOverlay.NewOverlay(dbase)
 	return nil
 }
+
+// allow access to object behind DB Overlay
+// useful mostly for testing
+func (s *State) GetMapDB() *mapdb.MapDB {
+	return s.dbase
+}
+
 
 func (s *State) String() string {
 	str := "\n===============================================================\n" + s.serverPrt

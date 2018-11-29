@@ -485,6 +485,5 @@ func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
 	f, newIndex := engine.AddServer(newState)
 	Followers++
 	engine.SetupNetwork()
-	engine.StartFnode(newIndex, true)
 	return f, newIndex
 }
