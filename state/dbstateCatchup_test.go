@@ -18,9 +18,26 @@ func TestStatesRecieved(t *testing.T) {
 	}()
 
 	l := NewStatesReceived()
+	rs := make([]*ReceivedState, 0)
+
+	rs = append(rs, l.GetNext())
+	if rs[0] != nil {
+		t.Error("should be nil: ", rs[0])
+	}
+
+	t.Log(l.Get(1))
 
 	l.Add(1, nil)
 	l.Add(2, nil)
 	l.Del(1)
 	l.Add(3, nil)
+	t.Log(l.Get(2))
+	t.Log(l.Get(1))
+	t.Log(l.Get(4))
+
+	for i := 1; i < 10; i++ {
+		r := l.GetNext()
+		rs = append(rs, r)
+	}
+	t.Log(rs)
 }

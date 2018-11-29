@@ -362,6 +362,10 @@ func (l *StatesReceived) HeighestRecieved() uint32 {
 
 // Add adds a new recieved state to the list.
 func (l *StatesReceived) Add(height uint32, msg *messages.DBStateMsg) {
+	if msg == nil {
+		return
+	}
+
 	for e := l.List.Back(); e != nil; e = e.Prev() {
 		s := e.Value.(*ReceivedState)
 		if s == nil {
@@ -395,10 +399,16 @@ func (l *StatesReceived) Del(height uint32) {
 // Get returns a member from the StatesReceived list
 func (l *StatesReceived) Get(height uint32) *ReceivedState {
 	for e := l.List.Back(); e != nil; e = e.Prev() {
-		if e.Value.(*ReceivedState).Height() == height {
-			return e.Value.(*ReceivedState)
+		s := e.Value.(*ReceivedState)
+		if s == nil {
+			return nil
+		}
+
+		if s.Height() == height {
+			return s
 		}
 	}
+
 	return nil
 }
 
@@ -422,6 +432,7 @@ func (l *StatesReceived) GetNext() *ReceivedState {
 		s := e.Value.(*ReceivedState)
 
 		if s == nil {
+			l.List.Remove(e)
 			return nil
 		}
 

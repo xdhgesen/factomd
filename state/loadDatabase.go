@@ -23,7 +23,7 @@ import (
 var _ = fmt.Print
 
 func LoadDatabase(s *State) {
-	defer os.Stderr.WriteString("LoadDatabase finished")
+	defer os.Stderr.WriteString("LoadDatabase finished\n")
 
 	var blkCnt uint32
 
