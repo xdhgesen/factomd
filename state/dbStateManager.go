@@ -204,11 +204,6 @@ func (a *DBState) IsSameAs(b *DBState) bool {
 }
 
 func (dbs *DBState) MarshalBinary() (rval []byte, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("DBState.MarshalBinary panic Error Marshalling a dbstate %v", r)
-		}
-	}()
 
 	defer func(pe *error) {
 		if *pe != nil {
@@ -1583,6 +1578,18 @@ func (list *DBStateList) UpdateState() (progress bool) {
 					status[4] = 'D'
 				}
 				l += fmt.Sprintf("%d%s, ", d.DirectoryBlock.GetHeader().GetDBHeight(), string(status))
+			}
+			if d.Saved && d.Locked {
+				if s.StateSaverStruct.FastBoot {
+					d.SaveStruct = SaveFactomdState(s, d)
+
+					if d.SaveStruct != nil {
+						err := s.StateSaverStruct.SaveDBStateList(s.DBStates, s.Network)
+						if err != nil {
+							s.LogPrintf("dbstateprocess", "Error trying to save a DBStateList %e", err)
+						}
+					}
+				}
 			}
 		}
 		l += "]"
