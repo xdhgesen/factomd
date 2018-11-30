@@ -264,3 +264,17 @@ func (db *MapDB) DoesKeyExist(bucket, key []byte) (bool, error) {
 	}
 	return true, nil
 }
+
+func (db *MapDB) Clone() (*MapDB, error) {
+	n := new(MapDB)
+	n.Init(nil)
+	for b, m := range db.Cache {
+		n.Cache[b] = map[string][]byte{}
+		for k, v := range m {
+			c := []byte{}
+			copy(c, v)
+			n.Cache[b][k] = c
+		}
+	}
+	return n, nil
+}

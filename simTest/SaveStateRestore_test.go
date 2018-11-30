@@ -81,7 +81,8 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			newState.StateSaverStruct.LoadDBStateListFromBin(newState.DBStates, s.StateSaverStruct.TmpState)
 
 			// transplant database
-			newState.SetMapDB(s.GetMapDB()) // FIXME: don't share db w/ fnode01
+			db, _ := s.GetMapDB().Clone()
+			newState.SetMapDB(db)
 
 			// start new node
 			engine.StartFnode(i, true)
