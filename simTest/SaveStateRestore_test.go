@@ -57,11 +57,12 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			return
 		}
 
-		startSim("LF", 20)
-		WaitForBlock(state0, saveRate*2)
+		//state1 := GetNode(1).State
+		startSim("LL", 20)
+		WaitForBlock(state0, saveRate*2+2)
 		mkTransactions() // REVIEW: should this happen in other
 		WaitMinutes(state0, 1)
-		StopNode(1, 'F')
+		//StopNode(0, 'F')
 
 		t.Run("create fnode02 from clone without fastboot", func(t *testing.T) {
 			_, n2 := CloneNode(1, 'F')
@@ -70,18 +71,23 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		})
 
 		t.Run("create fnode03 with copy of fastboot & db from fnode01", func(t *testing.T) {
-			s := GetNode(1).State
+			//s := GetNode(1).State
 
 			// create fnode03
 			node, i := CloneNode(1, 'F')
 			assert.Equal(t, 3, i)
 			newState := node.State
 
+			assert.NotNil(t, state0.StateSaverStruct.TmpState)
 			// restore savestate from node01
-			newState.StateSaverStruct.LoadDBStateListFromBin(newState.DBStates, s.StateSaverStruct.TmpState)
+			newState.StateSaverStruct.LoadDBStateListFromBin(newState.DBStates, state0.StateSaverStruct.TmpState)
+			fmt.Printf("\nrestored dbHeight: %v\n", newState.DBHeightAtBoot)
+
+			assert.Equal(t, 5, newState.DBHeightAtBoot, "Failed to restore node to db height=5 on fnode03")
+			assert.True(t, newState.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
 
 			// transplant database
-			db, _ := s.GetMapDB().Clone()
+			db, _:= state0.GetMapDB().Clone() //FIXME clone doesn't work
 			newState.SetMapDB(db)
 
 			// start new node
@@ -90,7 +96,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		})
 
 		WaitBlocks(state0, 2)
-		StartNode(1, 'F')
+		//StartNode(0, 'F')
 		stopSim()
 
 		t.Run("check permanent balances for addresses on each node", func(t *testing.T) {
