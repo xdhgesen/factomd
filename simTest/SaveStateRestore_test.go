@@ -74,7 +74,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			//s := GetNode(1).State
 
 			// create fnode03
-			node, i := CloneNode(1, 'F')
+			node, i := CloneNode(0, 'F')
 			assert.Equal(t, 3, i)
 			newState := node.State
 
@@ -87,7 +87,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			assert.True(t, newState.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
 
 			// transplant database
-			db, _:= state0.GetMapDB().Clone() //FIXME clone doesn't work
+			db, _:= state0.GetMapDB().Clone()
 			newState.SetMapDB(db)
 
 			// start new node
@@ -95,19 +95,27 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 
 		})
 
-		WaitBlocks(state0, 2)
+		WaitBlocks(state0, 4)
 		//StartNode(0, 'F')
-		stopSim()
 
 		t.Run("check permanent balances for addresses on each node", func(t *testing.T) {
+			var fail bool = false
 			for i, node := range engine.GetFnodes() {
 				for _, addr := range depositAddresses {
 					bal := engine.GetBalance(node.State, addr)
-					msg := fmt.Sprintf("Node%v %v => balance: %v expected: %v \n", i, addr, bal, depositCount)
+					msg := fmt.Sprintf("CHKBAL Node%v %v => balance: %v expected: %v \n", i, addr, bal, depositCount)
+					println(msg)
+					if bal != depositCount {
+						fail = true
+					}
 					assert.Equal(t, depositCount, bal, msg)
 				}
 			}
-
+			if fail {
+				t.Fatal("balance mismatch")
+			}
 		})
+
+		stopSim()
 	})
 }

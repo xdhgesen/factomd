@@ -266,6 +266,8 @@ func (db *MapDB) DoesKeyExist(bucket, key []byte) (bool, error) {
 }
 
 func (db *MapDB) Clone() (*MapDB, error) {
+	db.Sem.Lock()
+	defer db.Sem.Unlock()
 	n := new(MapDB)
 	n.Init(nil)
 	for b, m := range db.Cache {
