@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
@@ -19,9 +20,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
-
-	//"github.com/FactomProject/factomd/database/databaseOverlay"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -394,7 +392,10 @@ func (p *ProcessList) SetStartingAuthoritySet() {
 // Add the given serverChain to this processlist as a Federated Server, and return
 // the server index number of the added server
 func (p *ProcessList) AddFedServer(identityChainID interfaces.IHash) int {
-	p.SortFedServers()
+	// We stop sorting here on DATE at TIME ... TODO: change this activation description
+	if !p.State.IsActive(activations.ELECTION_NO_SORT) {
+		p.SortFedServers()
+	}
 	found, i := p.GetFedServerIndexHash(identityChainID)
 	if found {
 		//p.State.AddStatus(fmt.Sprintf("ProcessList.AddFedServer Server already there %x at height %d", identityChainID.Bytes()[2:6], p.DBHeight))

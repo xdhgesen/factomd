@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
@@ -23,7 +24,6 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -689,8 +689,11 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 
 		s.CurrentMinuteStartTime = time.Now().UnixNano()
 		// If an election took place, our lists will be unsorted. Fix that
-		s.LeaderPL.SortAuditServers()
-		s.LeaderPL.SortFedServers()
+		// We stop sorting here on DATE at TIME ... TODO: change this activation description
+		if !s.IsActive(activations.ELECTION_NO_SORT) {
+			s.LeaderPL.SortAuditServers()
+			s.LeaderPL.SortFedServers()
+		}
 	}
 
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", dbheight, newMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
