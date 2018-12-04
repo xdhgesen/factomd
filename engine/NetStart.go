@@ -321,7 +321,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	}
 	// Modify Identities of new nodes
 	if len(fnodes) > 1 && len(s.Prefix) == 0 {
-		modifyLoadIdentities() // We clone s to make all of our servers
+		ModifyLoadIdentities() // We clone s to make all of our servers
 	}
 
 	// Setup the Skeleton Identity & Registration

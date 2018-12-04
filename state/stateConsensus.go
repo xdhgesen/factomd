@@ -949,6 +949,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		s.DBStatesReceived[ix] = dbstatemsg
 		return
 	case -1:
+		// REVIEW
 		s.LogPrintf("dbstateprocess", "FollowerExecuteDBState Invalid %d", dbheight)
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): DBState is invalid at ht %d", dbheight))
 		// Do nothing because this dbstate looks to be invalid

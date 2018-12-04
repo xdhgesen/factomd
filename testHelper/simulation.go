@@ -475,15 +475,19 @@ func StartNode(offset int, typeCode rune) {
 
 // NOTE: this clones the node but not the DB
 func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
+	fnodes := engine.GetFnodes()
+
+	RunCmd(fmt.Sprintf("g%d", len(fnodes)+1)) // REVIEW: is this needed/correct?
+
 	if typeCode != 'F' {
 		panic("currently only support cloning followers")
 	}
 
-	fnodes := engine.GetFnodes()
 	newIndex := len(fnodes)
 	newState := fnodes[i].State.Clone(newIndex).(*state.State)
 	f, newIndex := engine.AddServer(newState)
 	Followers++
 	engine.SetupNetwork()
+	engine.ModifyLoadIdentities()
 	return f, newIndex
 }
