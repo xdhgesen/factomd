@@ -2101,8 +2101,13 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			return false
 		}
 
+		// DBSig valid, add it to state and also to database
 		dbs.Matches = true
 		s.AddDBSig(dbheight, dbs.ServerIdentityChainID, dbs.DBSignature)
+		err = s.DB.SaveDirectoryBlockSignature(dbs, dbs.DBHeight)
+		if err != nil {
+			s.LogPrintf("dbsig-eom", "Failed to save dbsig %v\nerror: %v", dbs.String(), err.Error())
+		}
 
 		s.DBSigProcessed++
 		//fmt.Println(fmt.Sprintf("Process DBSig %10s vm %2v DBSigProcessed++ (%2d)", s.FactomNodeName, dbs.VMIndex, s.DBSigProcessed))
@@ -2150,6 +2155,12 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		s.ReviewHolding()
 		s.Saving = false
 		s.DBSigDone = true // p
+
+		// Only keep the top 2 blocks of DBSig messages
+		err := s.DB.DropDirectoryBlockSignatures(dbs.DBHeight - 2)
+		if err != nil {
+			s.LogPrintf("dbsig-eom", "Failed to drop dbsig bucket at height %v\nerror: %v", dbs.DBHeight - 2, err.Error())
+		}
 		//		s.LogPrintf("dbsig-eom", "DBSIGDone written %v @ %s", s.DBSigDone, atomic.WhereAmIString(0))
 	}
 	return false

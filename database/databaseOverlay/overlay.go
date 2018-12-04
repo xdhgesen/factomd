@@ -69,6 +69,9 @@ var (
 	PAID_FOR = []byte("PaidFor")
 
 	KEY_VALUE_STORE = []byte("KeyValueStore")
+
+	// Directory Block Signatures -- bucket = []byte(DirectoryBlockSignature) + big endian uint32 block height
+	DIRECTORYBLOCKSIGNATURE = []byte("DirectoryBlockSignature")
 )
 
 var ConstantNamesMap map[string]string
@@ -108,6 +111,8 @@ func init() {
 
 	ConstantNamesMap[string(PAID_FOR)] = "PaidFor"
 	ConstantNamesMap[string(KEY_VALUE_STORE)] = "KeyValueStore"
+
+	ConstantNamesMap[string(DIRECTORYBLOCKSIGNATURE)] = "DirectoryBlockSignature"
 
 	RegisterPrometheus()
 }

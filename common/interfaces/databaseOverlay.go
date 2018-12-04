@@ -49,6 +49,9 @@ type DBOverlaySimple interface {
 	FetchKeyValueStore(key []byte, dst BinaryMarshallable) (BinaryMarshallable, error)
 	SaveDatabaseEntryHeight(height uint32) error
 	FetchDatabaseEntryHeight() (uint32, error)
+	FetchDirectoryBlockSignatures(height uint32) ([]IMsg, error)
+	SaveDirectoryBlockSignature(dbSig IMsg, height uint32) error
+	DropDirectoryBlockSignatures(height uint32) error
 }
 
 // Db defines a generic interface that is used to request and insert data into db
@@ -262,6 +265,11 @@ type DBOverlay interface {
 	FetchKeyValueStore(key []byte, dst BinaryMarshallable) (BinaryMarshallable, error)
 	SaveDatabaseEntryHeight(height uint32) error
 	FetchDatabaseEntryHeight() (uint32, error)
+
+	//******************************DirectoryBlockSignature**********************************//
+	FetchDirectoryBlockSignatures(height uint32) ([]IMsg, error)
+	SaveDirectoryBlockSignature(dbSig IMsg, height uint32) error
+	DropDirectoryBlockSignatures(height uint32) error
 }
 
 type ISCDatabaseOverlay interface {
