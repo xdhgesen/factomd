@@ -104,6 +104,10 @@ func (dbs *DBState) Init() {
 	if dbs.NextTimestamp == nil {
 		dbs.NextTimestamp = primitives.NewTimestampFromMilliseconds(0)
 	}
+	if dbs.SaveStruct == nil {
+		dbs.SaveStruct = new(SaveState)
+		dbs.SaveStruct.Init()
+	}
 }
 
 func (a *DBState) IsSameAs(b *DBState) bool {

@@ -1896,7 +1896,7 @@ func (s *State) UpdateState() (progress bool) {
 		s.CalculateTransactionRate()
 	}
 
-	// check to see ig a holding queue list request has been made
+	// check to see if a holding queue list request has been made
 	s.fillHoldingMap()
 	s.fillAcksMap()
 

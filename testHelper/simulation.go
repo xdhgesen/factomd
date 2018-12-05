@@ -161,7 +161,11 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		t.Fatalf("Should have allocated %d nodes", l)
 		t.Fail()
 	}
-	CheckAuthoritySet(t)
+	if Audits == 0 && Leaders == 0 {
+		// if no requested promotions then assume we loaded from a database and the test will check
+	} else {
+		CheckAuthoritySet(t)
+	}
 	return state0
 }
 

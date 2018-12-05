@@ -111,7 +111,7 @@ type SaveState struct {
 var _ interfaces.BinaryMarshallable = (*SaveState)(nil)
 var _ interfaces.Printable = (*SaveState)(nil)
 
-func (ss *SaveState) Init(s *State) {
+func (ss *SaveState) Init() {
 	if ss.FactoidBalancesP == nil {
 		ss.FactoidBalancesP = map[[32]byte]int64{}
 	}
@@ -125,7 +125,7 @@ func (ss *SaveState) Init(s *State) {
 		ss.Acks = map[[32]byte]interfaces.IMsg{}
 	}
 	if ss.Commits == nil {
-		ss.Commits = NewSafeMsgMap("sscommits", s) // map[[32]byte]interfaces.IMsg{}
+		ss.Commits = NewSafeMsgMap("sscommits", nil) // map[[32]byte]interfaces.IMsg{}
 	}
 	if ss.InvalidMessages == nil {
 		ss.InvalidMessages = map[[32]byte]interfaces.IMsg{}
@@ -135,6 +135,12 @@ func (ss *SaveState) Init(s *State) {
 		ss.IdentityControl = NewIdentityManager()
 	}
 
+	if ss.Replay == nil {
+		ss.Replay = new(Replay)
+	}
+	if ss.LeaderTimestamp == nil {
+		ss.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(0)
+	}
 	ss.IdentityControl.Init()
 
 }
@@ -301,7 +307,7 @@ func (a *SaveState) IsSameAs(b *SaveState) bool {
 }
 
 func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
-	state.LogPrintf("dbstateprocess", "SaveFactomdState called from %s", atomic.WhereAmIString(1))
+	state.LogPrintf("dbstateprocess", "SaveFactomdState(%d) called from %s", d.DirectoryBlock.GetHeader().GetDBHeight(), atomic.WhereAmIString(1))
 
 	ss = new(SaveState)
 	ss.DBHeight = d.DirectoryBlock.GetHeader().GetDBHeight()
@@ -346,6 +352,13 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 		ss.ECBalancesP[k] = state.ECBalancesP[k]
 	}
 	state.ECBalancesPMutex.Unlock()
+
+	{ // debug
+		s := state
+		h1 := GetMapHash(ss.DBHeight, ss.FactoidBalancesP)
+		h2 := GetMapHash(ss.DBHeight, ss.ECBalancesP)
+		s.LogPrintf("balanceHash", "SaveFactomdState(%d)    PF=%x PE=%x ", ss.DBHeight, h1.Bytes()[:4], h2.Bytes()[:4])
+	}
 
 	ss.IdentityControl = state.IdentityControl
 	ss.AuthorityServerCount = state.AuthorityServerCount
@@ -628,6 +641,12 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 		s.LogPrintf("entrycredits", "%x<%s> = %d", k, primitives.ConvertECAddressToUserStr(factoid.NewAddress(k[:])), s.ECBalancesP[k])
 	}
 	s.ECBalancesPMutex.Unlock()
+
+	{ // debug
+		h1 := GetMapHash(ss.DBHeight, ss.FactoidBalancesP)
+		h2 := GetMapHash(ss.DBHeight, ss.ECBalancesP)
+		s.LogPrintf("balanceHash", "RestoreFactomdState(%d) PF=%x PE=%x ", ss.DBHeight, h1.Bytes()[:4], h2.Bytes()[:4])
+	}
 
 	// Restore IDControl
 	s.IdentityControl = ss.IdentityControl
