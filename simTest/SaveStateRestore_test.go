@@ -58,7 +58,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		}
 
 		startSim("LF", 20)
-		//state1 := GetNode(1).State
+		state1 := GetNode(1).State
 
 		t.Run("add transactions to fastboot block", func(t *testing.T) {
 			mkTransactions()
@@ -71,10 +71,10 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		})
 
 		engine.StartFnode(2, true)
-		db1 := state0.GetMapDB()
+		db1 := state1.GetMapDB()
 		snapshot, _:= db1.Clone()
-		WaitForBlock(state0, saveRate*2+2)
-		assert.NotNil(t, state0.StateSaverStruct.TmpState)
+		WaitForBlock(state1, saveRate*2+2)
+		assert.NotNil(t, state1.StateSaverStruct.TmpState)
 		mkTransactions()
 
 		//WaitBlocks(state0, 4)
@@ -82,12 +82,12 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		t.Run("create fnode03 with copy of fastboot & db from fnode01", func(t *testing.T) {
 
 			// create Fnode03
-			node, _ := CloneNode(0, 'F')
+			node, _ := CloneNode(1, 'F')
 
 			// FIXME restoring savestate causes node never to sync
 			// restore savestate from fnode0
-			node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, state0.StateSaverStruct.TmpState)
-			assert.False(t, node.State.IsLeader())
+			node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, state1.StateSaverStruct.TmpState)
+			assert.False(t, node.State.IsLeader(), "expected new node to be a follower")
 			fmt.Printf("RESTORED DBHeight: %v\n", node.State.DBHeightAtBoot)
 
 			assert.Equal(t, 5, int(node.State.DBHeightAtBoot), "Failed to restore node to db height=5 on fnode03")
