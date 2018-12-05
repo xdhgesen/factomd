@@ -57,8 +57,8 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			return
 		}
 
+		startSim("LF", 20)
 		//state1 := GetNode(1).State
-		startSim("LL", 20)
 
 		t.Run("add transactions to fastboot block", func(t *testing.T) {
 			mkTransactions()
@@ -71,8 +71,8 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		})
 
 		engine.StartFnode(2, true)
-		db0 := state0.GetMapDB()
-		snapshot, _:= db0.Clone()
+		db1 := state0.GetMapDB()
+		snapshot, _:= db1.Clone()
 		WaitForBlock(state0, saveRate*2+2)
 		assert.NotNil(t, state0.StateSaverStruct.TmpState)
 		mkTransactions()
@@ -82,43 +82,45 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		t.Run("create fnode03 with copy of fastboot & db from fnode01", func(t *testing.T) {
 
 			// create Fnode03
-			CloneNode(0, 'F')
-			node := GetNode(3)
+			node, _ := CloneNode(0, 'F')
 
+			// FIXME restoring savestate causes node never to sync
 			// restore savestate from fnode0
-			/* FIXME this causes node never to sync
 			node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, state0.StateSaverStruct.TmpState)
-			fmt.Printf("\nrestored dbHeight: %v\n", node.State.DBHeightAtBoot)
+			assert.False(t, node.State.IsLeader())
+			fmt.Printf("RESTORED DBHeight: %v\n", node.State.DBHeightAtBoot)
 
-			assert.Equal(t, 5, node.State.DBHeightAtBoot, "Failed to restore node to db height=5 on fnode03")
+			assert.Equal(t, 5, int(node.State.DBHeightAtBoot), "Failed to restore node to db height=5 on fnode03")
 			assert.True(t, node.State.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
 
-			// transplant database
-			node.State.SetMapDB(snapshot)
-			*/
-			_ = snapshot
+			if node.State.DBHeightAtBoot == 0 {
+				// Don't do more testing fastboot did not restore properly
+				ShutDownEverything(t)
+				return
+			} else {
+				// transplant database
+				node.State.SetMapDB(snapshot)
+				_ = snapshot
 
-			engine.StartFnode(3, true)
-			assert.True(t, node.Running)
+				engine.StartFnode(3, true)
+				assert.True(t, node.Running)
+
+				WaitForBlock(node.State, 9) // node is moving
+
+				// FIXME test hangs here because nodes never sync
+				stopSim()
+			}
 		})
 
-		stopSim() // FIXME test hangs here because nodes never sync
 
 		t.Run("check permanent balances for addresses on each node", func(t *testing.T) {
-			var fail bool = false
 			for i, node := range engine.GetFnodes() {
 				for _, addr := range depositAddresses {
 					bal := engine.GetBalance(node.State, addr)
-					msg := fmt.Sprintf("CHKBAL Node%v %v => balance: %v expected: %v \n", i, addr, bal, depositCount)
+					msg := fmt.Sprintf("CHKBAL Node%v %v => balance: %v expect: %v \n", i, addr, bal, depositCount)
 					println(msg)
-					if bal != depositCount {
-						fail = true
-					}
 					assert.Equal(t, depositCount, bal, msg)
 				}
-			}
-			if fail {
-				t.Fatal("balance mismatch")
 			}
 		})
 

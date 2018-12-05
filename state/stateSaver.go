@@ -118,12 +118,11 @@ func (sss *StateSaverStruct) LoadDBStateListFromBin(ss *DBStateList, b []byte) e
 	if h.IsSameAs(h2) == false {
 		fmt.Fprintf(os.Stderr, "LoadDBStateList - Integrity hashes do not match!")
 		return errors.New("fastboot file does not match its hash")
-		//return fmt.Errorf("Integrity hashes do not match")
 	}
 
 	ss.UnmarshalBinary(b)
 	for _, v := range ss.DBStates {
-		if v.SaveStruct != nil {
+		if v.SaveStruct != nil { // KLUDGE using the oldest
 			v.SaveStruct.RestoreFactomdState(ss.State)
 			break
 		}
