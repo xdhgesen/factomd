@@ -55,6 +55,8 @@ var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
 var logPort string
 
+var StateTemplate *state.State
+
 func GetFnodes() []*FactomNode {
 	return fnodes
 }
@@ -316,6 +318,8 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	//************************************************
 
 	fnodes = fnodes[:0]
+	StateTemplate = s.Clone(666).(*state.State)
+
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
 	}
@@ -592,6 +596,10 @@ func makeServer(s *state.State) (*FactomNode, int) {
 	// All other states are clones of the first state.  Which this routine
 	// gets passed to it.
 	var f  *FactomNode
+
+	if StateTemplate == nil {
+		panic("StateTemplate not yet initialized")
+	}
 
 	newIndex := len(fnodes)
 	if newIndex == 0 {

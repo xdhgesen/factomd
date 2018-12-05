@@ -483,9 +483,10 @@ func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
 		panic("currently only support cloning followers")
 	}
 
+	// FIXME refactor to remove this param if it is unused
+	_ = i
 	newIndex := len(fnodes)
-	newState := fnodes[i].State.Clone(newIndex).(*state.State)
-	f, newIndex := engine.AddServer(newState)
+	f, newIndex := engine.AddServer(engine.StateTemplate)
 	Followers++
 	engine.SetupNetwork()
 	engine.ModifyLoadIdentities()
