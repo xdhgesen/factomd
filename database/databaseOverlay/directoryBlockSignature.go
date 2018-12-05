@@ -18,7 +18,7 @@ func (db *Overlay) SaveDirectoryBlockSignature(dbSig interfaces.IMsg, height uin
 	exists, err := db.DoesKeyExist(bucket, dbSig.GetRepeatHash().Bytes())
 	if err != nil {
 		return err
-	} else if !exists {
+	} else if exists {
 		return nil
 	}
 
