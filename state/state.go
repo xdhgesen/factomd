@@ -501,8 +501,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.EOMfaultIndex = s.EOMfaultIndex
 
 	if !config {
-		newState.IdentityChainID = primitives.Sha([]byte(newState.FactomNodeName))
-		//generate and use a new deterministic PrivateKey for this clone
+		newState.IdentityChainID = primitives.Sha([]byte(newState.FactomNodeName)) //generate and use a new deterministic PrivateKey for this clone
 		shaHashOfNodeName := primitives.Sha([]byte(newState.FactomNodeName)) //seed the private key with node name
 		clonePrivateKey := primitives.NewPrivateKeyFromHexBytes(shaHashOfNodeName.Bytes())
 		newState.LocalServerPrivKey = clonePrivateKey.PrivateKeyString()
@@ -531,18 +530,21 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.factomdTLSCertFile = s.factomdTLSCertFile
 	newState.FactomdLocations = s.FactomdLocations
 
+	newState.FastBoot = s.FastBoot
+	newState.StateSaverStruct.FastBoot = s.FastBoot
+
 	newState.FastSaveRate = s.FastSaveRate
 	newState.CorsDomains = s.CorsDomains
+
 	switch newState.DBType {
 	case "LDB":
-		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
-		newState.StateSaverStruct.FastBootLocation = newState.LdbPath // TODO is this correct?
+		newState.StateSaverStruct.FastBootLocation = newState.LdbPath
 		break
 	case "Bolt":
-		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
-		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath // TODO is this correct?
+		newState.StateSaverStruct.FastBootLocation = newState.BoltDBPath
 		break
 	}
+
 	if globals.Params.WriteProcessedDBStates {
 		path := filepath.Join(newState.LdbPath, newState.Network, "dbstates")
 		os.MkdirAll(path, 0775)
