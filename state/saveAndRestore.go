@@ -598,7 +598,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	//s.AddStatus(fmt.Sprintf("SAVESTATE Restoring the State to dbht: %d", ss.DBHeight))
 
 	s.LogPrintf("dbstateprocess", "restoring to DBH %d", ss.DBHeight)
-	s.Replay = ss.Replay.Save()
+	//s.Replay = ss.Replay.Save()
 	s.Replay.s = s
 	s.Replay.name = "Replay"
 

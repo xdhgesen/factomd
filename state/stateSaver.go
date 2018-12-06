@@ -122,12 +122,12 @@ func (sss *StateSaverStruct) LoadDBStateListFromBin(ss *DBStateList, b []byte) e
 
 	ss.UnmarshalBinary(b)
 	for _, v := range ss.DBStates {
-		if v.SaveStruct != nil { // KLUDGE using the oldest
+		if v.SaveStruct != nil && v.Saved && v.Signed && v.Locked {
 			v.SaveStruct.RestoreFactomdState(ss.State)
-			break
+			return nil
 		}
 	}
-	return nil
+	return errors.New("could not find a complete dbstate")
 }
 
 func NetworkIDToFilename(networkName string, fileLocation string) string {

@@ -482,14 +482,14 @@ func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
 	_ = i
 	return AddNode()
 }
+
 func AddNode() (*engine.FactomNode, int) {
 	fnodes := engine.GetFnodes()
 	newIndex := len(fnodes)
-	RunCmd(fmt.Sprintf("g%d", newIndex+1)) // REVIEW: is this needed/correct?
 
 	f, newIndex := engine.AddServer(engine.StateTemplate)
 	Followers++
 	engine.SetupNetwork()
-	engine.ModifyLoadIdentities()
+	//engine.ModifyLoadIdentities()
 	return f, newIndex
 }
