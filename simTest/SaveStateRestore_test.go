@@ -80,36 +80,35 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		// REVIEW: is this needed/correct? if we are adding identities
 		// RunCmd(fmt.Sprintf("g%d", newIndex+1))
 
-		// clone db from state0
-		db1 := state0.GetMapDB()
-		snapshot, _:= db1.Clone()
+		targetState := GetNode(0).State
 
 		// wait for first savestate write
-		WaitForBlock(state0, saveRate*2+2)
+		WaitForBlock(targetState, saveRate*2+2)
 
-		assert.NotNil(t, state0.StateSaverStruct.TmpState)
+		//snapshot, _ := targetState.GetMapDB().Clone()
+
+		assert.NotNil(t, targetState.StateSaverStruct.TmpState)
 		mkTransactions()
 
-		// REVIEW: seems like missing messages are used before node is booted - asks for 1 then 6
 		t.Run("create fnode03", func(t *testing.T) {
+			_, i := AddNode()
+			engine.StartFnode(i, true)
+		})
+
+		t.Run("create fnode04", func(t *testing.T) {
+
 			node, i := AddNode()
 
+			/*
 			// transplant database
 			node.State.SetMapDB(snapshot)
-
-			// KLUDGE start Fnode03 before loading fastboot
-			engine.StartFnode(i, true)
-			assert.True(t, node.Running)
-
 			t.Run("restore state from fastboot", func(t *testing.T) {
 
-
 				// restore savestate from fnode0
-				//err := node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, state0.StateSaverStruct.TmpState)
-				//assert.Nil(t, err)
+				err := node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, targetState.StateSaverStruct.TmpState)
+				assert.Nil(t, err)
 
 				assert.False(t, node.State.IsLeader())
-				/*
 				assert.True(t, node.State.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
 
 				if node.State.DBHeightAtBoot == 0 {
@@ -117,8 +116,12 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 				} else {
 					fmt.Printf("RESTORED DBHeight: %v\n", node.State.DBHeightAtBoot)
 				}
-				*/
+
 			})
+			*/
+
+			engine.StartFnode(i, true)
+			assert.True(t, node.Running)
 
 			WaitBlocks(state0, 1)
 
@@ -130,8 +133,6 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 
 			if len(node.State.Holding) > 40 {
 				abortSim("holding queue is backed up")
-			} else {
-				stopSim() // graceful stop
 			}
 
 		})
@@ -145,6 +146,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 				}
 			}
 		})
+		stopSim() // graceful stop
 
 	})
 }

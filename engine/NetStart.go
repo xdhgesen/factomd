@@ -318,7 +318,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	//************************************************
 
 	fnodes = fnodes[:0]
-	StateTemplate = s.Clone(666).(*state.State)
+	StateTemplate = s.Clone(0).(*state.State)
 
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
