@@ -52,12 +52,17 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		state0 = nil
 	}
 
+	abortSim := func(msg string) {
+		ShutDownEverything(t)
+		t.Fatal(msg)
+	}
+
 	t.Run("run sim to create fastboot", func(t *testing.T) {
 		if RanSimTest {
 			return
 		}
 
-		startSim("LF", 20)
+		startSim("LF", 30)
 		//state1 := GetNode(1).State
 
 		t.Run("add transactions to fastboot block", func(t *testing.T) {
@@ -79,41 +84,51 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 
 		//WaitBlocks(state0, 4)
 		// REVIEW: seems like missing messages are used before node is booted - asks for 1 then 6
-		t.Run("create fnode03 with copy of fastboot & db from fnode01", func(t *testing.T) {
+		t.Run("create fnode03 using fastboot", func(t *testing.T) {
 
 			// create Fnode03
-			node, _ := CloneNode(0, 'F')
+			node, _ := AddNode()
 
-			// FIXME restoring savestate causes node never to sync
+			// transplant database
+			node.State.SetMapDB(snapshot)
+
 			// restore savestate from fnode0
 			node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, state0.StateSaverStruct.TmpState)
+
 			assert.False(t, node.State.IsLeader())
 			fmt.Printf("RESTORED DBHeight: %v\n", node.State.DBHeightAtBoot)
 
 			assert.Equal(t, 5, int(node.State.DBHeightAtBoot), "Failed to restore node to db height=5 on fnode03")
 			assert.True(t, node.State.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
+			assert.False(t, node.State.DBFinished, "expected DBfinished to be true")
 
 			if node.State.DBHeightAtBoot == 0 {
-				// Don't do more testing fastboot did not restore properly
-				ShutDownEverything(t)
-				return
-			} else {
-				// transplant database
-				node.State.SetMapDB(snapshot)
-				_ = snapshot
-
-				engine.StartFnode(3, true)
-				assert.True(t, node.Running)
-
-				WaitForBlock(node.State, 9) // node is moving
-
-				// FIXME test hangs here because nodes never sync
-				stopSim()
+				abortSim("Fastboot was not restored properly")
 			}
+
+			engine.StartFnode(3, true)
+			assert.True(t, node.Running)
+
+			// wait for DB finished
+			for node.State.GetHighestSavedBlk() < 12 {
+				if node.State.DBFinished {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+
+			if ! node.State.DBFinished {
+				abortSim("DBFinished is not set")
+			}
+
+			if len(node.State.Holding) > 50 {
+				abortSim("holding queue is backed up")
+			} else {
+				stopSim() // graceful stop
+			}
+
 		})
-
-
-		t.Run("check permanent balances for addresses on each node", func(t *testing.T) {
+		t.Run("compare permanent balances on each node", func(t *testing.T) {
 			for i, node := range engine.GetFnodes() {
 				for _, addr := range depositAddresses {
 					bal := engine.GetBalance(node.State, addr)

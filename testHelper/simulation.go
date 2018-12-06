@@ -473,19 +473,20 @@ func StartNode(offset int, typeCode rune) {
 	_ = typeCode // REVIEW: should we account for this started node ?
 }
 
-// NOTE: this clones the node but not the DB
 func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
-	fnodes := engine.GetFnodes()
-
-	RunCmd(fmt.Sprintf("g%d", len(fnodes)+1)) // REVIEW: is this needed/correct?
+	// FIXME doesn't really clone
 
 	if typeCode != 'F' {
-		panic("currently only support cloning followers")
+		panic("currently only support adding followers")
 	}
-
-	// FIXME refactor to remove this param if it is unused
 	_ = i
+	return AddNode()
+}
+func AddNode() (*engine.FactomNode, int) {
+	fnodes := engine.GetFnodes()
 	newIndex := len(fnodes)
+	RunCmd(fmt.Sprintf("g%d", newIndex+1)) // REVIEW: is this needed/correct?
+
 	f, newIndex := engine.AddServer(engine.StateTemplate)
 	Followers++
 	engine.SetupNetwork()
