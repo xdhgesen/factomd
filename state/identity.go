@@ -7,16 +7,15 @@ package state
 import (
 	"bytes"
 	"errors"
+	"fmt"
+	"reflect"
+	"sort"
 
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/identity"
 	. "github.com/FactomProject/factomd/common/identityEntries"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-
-	"sort"
-
-	"fmt"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -67,7 +66,14 @@ func (st *State) GetSigningKey(id interfaces.IHash) (interfaces.IHash, int) {
 	return nil, -1
 }
 
-func (st *State) GetNetworkSkeletonKey() interfaces.IHash {
+func (st *State) GetNetworkSkeletonKey() (rval interfaces.IHash) {
+	defer func() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+			primitives.LogNilHashBug("State.GetNetworkSkeletonKey() saw an interface that was nil")
+		}
+	}()
+
 	id := st.IdentityControl.GetIdentity(st.GetNetworkSkeletonIdentity())
 	if id == nil {
 		// There should always be a skeleton identity. It cannot be removed
@@ -155,21 +161,24 @@ func ProcessIdentityToAdminBlock(st *State, chainID interfaces.IHash, servertype
 
 	err := st.AddIdentityFromChainID(chainID)
 	if err != nil {
-		flog.Errorf("Failed to process AddServerMessage for %s : %s", chainID.String()[:10], err.Error())
-		return true
+		flog.Errorf("Failed to process AddServerMessage AddIdentityFromChainID for %s : %s", chainID.String()[:10], err.Error())
+		st.LogPrintf("process", "Failed to process AddServerMessage for %s : %s", chainID.String()[:10], err.Error())
+		return false
 	}
 
 	id := st.IdentityControl.GetIdentity(chainID)
 
 	if id != nil {
 		if ok, err := id.IsPromteable(); !ok {
-			flog.Errorf("Failed to process AddServerMessage for %s : %s", chainID.String()[:10], err.Error())
-			return true
+			flog.Errorf("Failed to process AddServerMessage id.IsPromteable for %s : %s", chainID.String()[:10], err.Error())
+			st.LogPrintf("process", "Failed to process AddServerMessage for %s : %s", chainID.String()[:10], err.Error())
+			return false
 		}
 
 	} else {
-		flog.Errorf("Failed to process AddServerMessage: %s", "New Fed/Audit server ["+chainID.String()[:10]+"] does not have an identity associated to it")
-		return true
+		flog.Errorf("Failed to process AddServerMessage: IdentityControl.GetIdentity %s", "New Fed/Audit server ["+chainID.String()[:10]+"] does not have an identity associated to it")
+		st.LogPrintf("process", "Failed to process AddServerMessage: %s", "New Fed/Audit server ["+chainID.String()[:10]+"] does not have an identity associated to it")
+		return false
 	}
 
 	// Add to admin block

@@ -175,6 +175,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	if p.FastLocation != "" {
 		s.StateSaverStruct.FastBootLocation = p.FastLocation
 	}
+	if p.FastSaveRate < 2 || p.FastSaveRate > 5000 {
+		panic("FastSaveRate must be between 2 and 5000")
+	}
+	s.FastSaveRate = p.FastSaveRate
 
 	s.CheckChainHeads.CheckChainHeads = p.CheckChainHeads
 	s.CheckChainHeads.Fix = p.FixChainHeads
@@ -267,6 +271,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "node", p.ListenTo))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %s\n", "prefix", p.Prefix))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "node count", p.Cnt))
+	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "FastSaveRate", p.FastSaveRate))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "net spec", pnet))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "Msgs droped", p.DropRate))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "journal", p.Journal))
@@ -288,6 +293,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "tls", s.FactomdTLSEnable))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "selfaddr", s.FactomdLocations))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "rpcuser", s.RpcUser))
+	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "corsdomains", s.CorsDomains))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "Start 2nd Sync at ht", s.EntryDBHeightComplete))
 
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "faultTimeout", elections.FaultTimeout))
@@ -538,6 +544,9 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	// Start the webserver
 	wsapi.Start(fnodes[0].State)
+	if fnodes[0].State.DebugExec() && messages.CheckFileName("graphData.txt") {
+		go printGraphData("graphData.txt", 30)
+	}
 
 	// Start prometheus on port
 	launchPrometheus(9876)
@@ -551,6 +560,18 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	go SimControl(p.ListenTo, listenToStdin)
 
+}
+
+func printGraphData(filename string, period int) {
+	downscale := int64(1)
+	messages.LogPrintf(filename, "\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s", "Dbh-:-min", "Node", "ProcessCnt", "ListPCnt", "UpdateState", "SleepCnt")
+	for {
+		for _, f := range fnodes {
+			s := f.State
+			messages.LogPrintf(filename, "\t%9s\t%9s\t%9d\t%9d\t%9d\t%9d", fmt.Sprintf("%d-:-%d", s.LLeaderHeight, s.CurrentMinute), s.FactomNodeName, s.StateProcessCnt/downscale, s.ProcessListProcessCnt/downscale, s.StateUpdateState/downscale, s.ValidatorLoopSleepCnt/downscale)
+		}
+		time.Sleep(time.Duration(period) * time.Second)
+	} // for ever ...
 }
 
 //**********************************************************************
@@ -589,8 +610,8 @@ func startServers(load bool) {
 		}
 		go fnode.State.GoSyncEntries()
 		go Timer(fnode.State)
-		go fnode.State.ValidatorLoop()
 		go elections.Run(fnode.State)
+		go fnode.State.ValidatorLoop()
 	}
 }
 
