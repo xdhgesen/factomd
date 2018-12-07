@@ -163,7 +163,7 @@ func (t *Timer) timer(s *State, min int) {
 		eom.Sign(s)
 		eom.SetLocal(true)
 		consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
-
+		s.LogMessage("msgQueue", "enqueue", eom)
 		s.MsgQueue() <- eom
 	}
 }
