@@ -1581,6 +1581,9 @@ func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, inte
 	}
 	ack := s.NewAck(dbs, s.Balancehash).(*messages.Ack)
 
+	s.LogMessage("balancehash", "CreateDBSig", dbs)
+	s.LogPrintf("balancehash", "Using %x", s.Balancehash.Bytes()[:4])
+
 	s.LogMessage("dbstate", "CreateDBSig", dbs)
 	s.LogPrintf("dbstate", dbstate.String())
 
