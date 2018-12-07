@@ -649,6 +649,9 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	if m.IsLocal() {
+		//if it's local and a leader message then hold on to it.
+		//s.AddToHolding(m.GetMsgHash().Fixed(), m)
+		s.Holding[m.GetMsgHash().Fixed()] = m
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
 
