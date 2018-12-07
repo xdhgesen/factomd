@@ -37,8 +37,8 @@ func LoadDatabase(s *State) {
 
 	//msg, err := s.LoadDBState(blkCnt)
 	start := s.GetDBHeightComplete()
-	if start > 10 {
-		start = start - 10
+	if start > 0 { // 0 can mean no states or 1 state so just leave 0 alone.
+		start = start + 1 // If we restored to stateN start the load at N+1
 	}
 
 	for i := int(start); i <= int(blkCnt); i++ {
