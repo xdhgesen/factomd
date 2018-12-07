@@ -97,6 +97,26 @@ func LoadDatabase(s *State) {
 		dbstate.IsLast = true // this is the last DBState in this load
 		// this will cause s.DBFinished to go true
 		s.InMsgQueue().Enqueue(msg)
+	} else {
+		// Broadcast a DBState message for the highest block that we have in our database,
+		// so long as we also have some DBSigs for it as well (blkCnt + 1 because the dbSigs for block x actually resides in block x + 1)
+		dbSigs, err := s.DB.FetchDirectoryBlockSignatures(blkCnt + 1)
+		if err != nil {
+			os.Stderr.WriteString(fmt.Sprintf("%20s Error fetching DirectoryBlock Signatures for highest saved block %d\n", s.FactomNodeName, blkCnt))
+		} else if len(dbSigs) > 0 {
+			msg, err := s.LoadDBState(blkCnt)
+			if err != nil {
+				os.Stderr.WriteString(fmt.Sprintf("%20s Error reading database at block %d: %s\n", s.FactomNodeName, blkCnt, err.Error()))
+			} else if msg != nil {
+				msg.SetNoResend(false)
+				msg.SendOut(s, msg)
+				for _, dbSig := range dbSigs {
+					dbSig.SendOut(s, dbSig)
+				}
+				os.Stderr.WriteString(fmt.Sprintf( "Broadcasted highest DBState (%d) and its corresponding Directory Block Signatures", blkCnt))
+			}
+
+		}
 	}
 	s.Println(fmt.Sprintf("Loaded %d directory blocks on %s", blkCnt, s.FactomNodeName))
 }
