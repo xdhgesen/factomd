@@ -58,13 +58,17 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 		t.Fatal(msg)
 	}
 
+	newState := func() (*state.State, int){
+		index := len(engine.GetFnodes())
+		newState := state0.Clone(index)
+		return newState.(*state.State), index
+	}
 	t.Run("run sim to create fastboot", func(t *testing.T) {
 		if RanSimTest {
 			return
 		}
 
 		startSim("LF", 25)
-		//state1 := GetNode(1).State
 
 		t.Run("add transactions to fastboot block", func(t *testing.T) {
 			mkTransactions()
@@ -72,54 +76,52 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			mkTransactions()
 			WaitForBlock(state0, 6)
 
-			// create Fnode02
-			node, i := AddNode()
+			s, _ := newState()
+			_, i := AddNode(s)
 			engine.StartFnode(i, true)
-			assert.True(t, node.State.StateSaverStruct.FastBoot, "expected fnode02 to have fastboot enabled")
 		})
-		// REVIEW: is this needed/correct? if we are adding identities
-		// RunCmd(fmt.Sprintf("g%d", newIndex+1))
 
 		targetState := GetNode(0).State
 
-		// wait for first savestate write
 		WaitForBlock(targetState, saveRate*2+2)
 
-		//snapshot, _ := targetState.GetMapDB().Clone()
+		snapshot, _ := targetState.GetMapDB().Clone()
 
 		assert.NotNil(t, targetState.StateSaverStruct.TmpState)
 		mkTransactions()
 
-		t.Run("create fnode03", func(t *testing.T) {
-			_, i := AddNode()
+		t.Run("create fnode02 without fastboot", func(t *testing.T) {
+			s, _ := newState()
+			_, i := AddNode(s)
 			engine.StartFnode(i, true)
 		})
 
-		t.Run("create fnode04", func(t *testing.T) {
+		t.Run("create fnode03 with fastboot", func(t *testing.T) {
 
-			node, i := AddNode()
+			// transplant database to new node
+			s, _ := newState()
 
 			/*
-			// transplant database
-			node.State.SetMapDB(snapshot)
-			t.Run("restore state from fastboot", func(t *testing.T) {
+				t.Run("restore state from fastboot", func(t *testing.T) {
 
-				// restore savestate from fnode0
-				err := node.State.StateSaverStruct.LoadDBStateListFromBin(node.State.DBStates, targetState.StateSaverStruct.TmpState)
-				assert.Nil(t, err)
+					// restore savestate
+					err := s.StateSaverStruct.LoadDBStateListFromBin(s.DBStates, targetState.StateSaverStruct.TmpState)
+					assert.Nil(t, err)
 
-				assert.False(t, node.State.IsLeader())
-				assert.True(t, node.State.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
+					assert.False(t, s.IsLeader())
+					assert.True(t, s.DBHeightAtBoot > 0, "Failed to restore db height on fnode03")
 
-				if node.State.DBHeightAtBoot == 0 {
-					abortSim("Fastboot was not restored properly")
-				} else {
-					fmt.Printf("RESTORED DBHeight: %v\n", node.State.DBHeightAtBoot)
-				}
+					if s.DBHeightAtBoot == 0 {
+						abortSim("Fastboot was not restored properly")
+					} else {
+						fmt.Printf("RESTORED DBHeight: %v\n", s.DBHeightAtBoot)
+					}
 
-			})
+				})
+
 			*/
-
+			node, i := AddNode(s)
+			s.SetMapDB(snapshot)
 			engine.StartFnode(i, true)
 			assert.True(t, node.Running)
 
@@ -134,9 +136,10 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			if len(node.State.Holding) > 40 {
 				abortSim("holding queue is backed up")
 			}
-
 		})
+
 		t.Run("compare permanent balances on each node", func(t *testing.T) {
+			stopSim() // graceful stop
 			for i, node := range engine.GetFnodes() {
 				for _, addr := range depositAddresses {
 					bal := engine.GetBalance(node.State, addr)
@@ -146,7 +149,6 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 				}
 			}
 		})
-		stopSim() // graceful stop
 
 	})
 }

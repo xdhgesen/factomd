@@ -55,8 +55,6 @@ var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
 var logPort string
 
-var StateTemplate *state.State
-
 func GetFnodes() []*FactomNode {
 	return fnodes
 }
@@ -318,7 +316,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	//************************************************
 
 	fnodes = fnodes[:0]
-	StateTemplate = s.Clone(0).(*state.State)
 
 	for i := 0; i < p.Cnt; i++ {
 		makeServer(s) // We clone s to make all of our servers
@@ -597,10 +594,6 @@ func makeServer(s *state.State) (*FactomNode, int) {
 	// gets passed to it.
 	var f  *FactomNode
 
-	if StateTemplate == nil {
-		panic("StateTemplate not yet initialized")
-	}
-
 	newIndex := len(fnodes)
 	if newIndex == 0 {
 		f, _ = AddFnode(s)
@@ -609,13 +602,6 @@ func makeServer(s *state.State) (*FactomNode, int) {
 	}
 
 	return f, newIndex
-}
-
-func AddServer(s *state.State) (*FactomNode, int) {
-	f, i := makeServer(s)
-	fnodes[i].State.IntiateNetworkSkeletonIdentity()
-	fnodes[i].State.InitiateNetworkIdentityRegistration()
-	return f, i
 }
 
 // return fnode and it's index in fnodes list
@@ -629,7 +615,7 @@ func AddFnode(s *state.State) (*FactomNode, int) {
 		// not an elegant place but before we let the messages hit the state
 		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
 		time.Sleep(10 * time.Millisecond)
-		fnode.State.Init() // REVIEW: State.Init() is called again in StartFnode()
+		fnode.State.Init()
 		fnode.State.EFactory = new(electionMsgs.ElectionsFactory)
 	}
 

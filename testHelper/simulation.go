@@ -453,18 +453,6 @@ func GetNode(offset int) *engine.FactomNode {
 	return engine.GetFnodes()[offset]
 }
 
-// signal Fnode state to shutdown
-func StopNode(offset int, typeCode rune) {
-	RunCmd(fmt.Sprintf("%v", offset))
-	RunCmd("x")
-	fnode := engine.GetFnodes()[offset]
-	fnode.State.ShutdownChan <- 0
-	for fnode.Running {
-		time.Sleep(time.Microsecond * 10)
-	}
-	println("FULLSTOP")
-	_ = typeCode // REVIEW: should we account for this stopped node ?
-}
 
 func StartNode(offset int, typeCode rune) {
 	RunCmd(fmt.Sprintf("%v", offset))
@@ -473,21 +461,10 @@ func StartNode(offset int, typeCode rune) {
 	_ = typeCode // REVIEW: should we account for this started node ?
 }
 
-func CloneNode(i int, typeCode rune) (*engine.FactomNode, int) {
-	// FIXME doesn't really clone
 
-	if typeCode != 'F' {
-		panic("currently only support adding followers")
-	}
-	_ = i
-	return AddNode()
-}
-
-func AddNode() (*engine.FactomNode, int) {
+func AddNode(s *state.State) (*engine.FactomNode, int) {
 	fnodes := engine.GetFnodes()
-	newIndex := len(fnodes)
-
-	f, newIndex := engine.AddServer(engine.StateTemplate)
+	f, newIndex := engine.AddFnode(s)
 	Followers++
 	engine.SetupNetwork()
 	//engine.ModifyLoadIdentities()
