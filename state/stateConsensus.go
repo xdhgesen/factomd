@@ -638,14 +638,16 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		}
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight block
 		s.ProcessLists.Get(dbheight + 1)                                                       // Make sure next PL exists
-		s.Syncing = false
-		s.EOM = false
-		s.DBSig = false
-		s.DBSigDone = false
-		s.EOMProcessed = 0
-		s.DBSigProcessed = 0
+
+		s.Syncing = false                       // movestatetoheight
+		s.EOM = false                           // movestatetoheight
+		s.EOMDone = false                       // movestatetoheight
+		s.DBSig = false                         // movestatetoheight
+		s.DBSigDone = false                     // movestatetoheight
+		s.EOMProcessed = 0                      // movestatetoheight
+		s.DBSigProcessed = 0                    // movestatetoheight
 		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
-		s.DBSigLimit = s.EOMLimit
+		s.DBSigLimit = s.EOMLimit               // We add or remove server only on block boundaries
 
 		// update cached values that change with height
 		// check if a DBState exists where we can get the timestamp
@@ -811,6 +813,12 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	if m.IsLocal() {
+		//if it's local and a leader message then hold on to it.
+		switch m.Type() {
+		case constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG:
+			s.AddToHolding(m.GetMsgHash().Fixed(), m)
+		}
+
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
 
@@ -1053,12 +1061,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	}
 
 	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Clear SigType follower execute DBState:  !s.SigType(%v)", s.FactomNodeName, s.SigType))
-	s.EOM = false
-	s.EOMDone = false
-	s.DBSig = false
-	s.DBSigDone = false
 	s.Saving = true
-	s.Syncing = false
 
 	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.
 	if s.DBStates.LastEnd < int(dbheight) {
@@ -1359,25 +1362,25 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	// Put the System Height and Serial Hash into the EOM
 	eom.SysHeight = uint32(pl.System.Height)
 
-	if s.Syncing && vm.Synced {
-		return
-	} else if !s.Syncing {
-		s.Syncing = true
-		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s LeaderExecuteEOM: !s.SigType(%v)", s.FactomNodeName, s.SigType))
-		s.EOM = true
-		s.EOMsyncing = true
-		s.EOMProcessed = 0
-		for _, vm := range pl.VMs {
-			vm.Synced = false
-		}
-		s.EOMLimit = len(pl.FedServers)
-		s.EOMMinute = int(s.CurrentMinute)
-	}
-
-	if vm.EomMinuteIssued >= s.CurrentMinute+1 {
-		//os.Stderr.WriteString(fmt.Sprintf("Bump detected %s minute %2d\n", s.FactomNodeName, s.CurrentMinute))
-		return
-	}
+	//if s.Syncing && vm.Synced {
+	//	return
+	//} else if !s.Syncing {
+	//	s.Syncing = true
+	//	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s LeaderExecuteEOM: !s.SigType(%v)", s.FactomNodeName, s.SigType))
+	//	s.EOM = true
+	//	s.EOMsyncing = true
+	//	s.EOMProcessed = 0
+	//	for _, vm := range pl.VMs {
+	//		vm.Synced = false
+	//	}
+	//	s.EOMLimit = len(pl.FedServers)
+	//	s.EOMMinute = int(s.CurrentMinute)
+	//}
+	//
+	//if vm.EomMinuteIssued >= s.CurrentMinute+1 {
+	//	//os.Stderr.WriteString(fmt.Sprintf("Bump detected %s minute %2d\n", s.FactomNodeName, s.CurrentMinute))
+	//	return
+	//}
 
 	//_, vmindex := pl.GetVirtualServers(s.EOMMinute, s.IdentityChainID)
 
@@ -2101,7 +2104,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 	}
 
 	// Put the stuff that only executes once at the start of DBSignatures here
-	if !s.DBSig {
+	if !s.DBSigDone && !s.DBSig {
 		s.LogPrintf("dbsig-eom", "ProcessDBSig start DBSig processing for %d", dbs.Minute)
 
 		//fmt.Printf("ProcessDBSig(): %s Start DBSig %s\n", s.FactomNodeName, dbs.String())
@@ -2109,7 +2112,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		s.DBSigProcessed = 0
 		s.DBSig = true
 		s.Syncing = true
-		s.DBSigDone = false // p
 		//		s.LogPrintf("dbsig-eom", "DBSIGDone written %v @ %s", s.DBSigDone, atomic.WhereAmIString(0))
 		for _, vm := range pl.VMs {
 			vm.Synced = false

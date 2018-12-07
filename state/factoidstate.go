@@ -21,6 +21,7 @@ import (
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var FACTOID_CHAINID_HASH = primitives.NewHash(constants.FACTOID_CHAINID)
@@ -144,7 +145,7 @@ func (fs *FactoidState) GetBalanceHash(includeTemp bool) (rval interfaces.IHash)
 				pl.FactoidBalancesTMutex.Unlock()
 			}
 		}
-		fs.State.LogPrintf("balanceHash", "Computed dbht = %6d PF=%x PE=%x  TF=%x TE=%x", fs.DBHeight, h1.Bytes()[:4], h2.Bytes()[:4], h3.Bytes()[:4], h4.Bytes()[:4])
+		fs.State.LogPrintf("balanceHash", "GetBalanceHash(%6v %6d)  PF=%x PE=%x  TF=%x TE=%x from %s", includeTemp, fs.DBHeight, h1.Bytes()[:4], h2.Bytes()[:4], h3.Bytes()[:4], h4.Bytes()[:4], atomic.WhereAmIString(1))
 	}
 	return r
 }

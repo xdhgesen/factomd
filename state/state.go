@@ -181,8 +181,8 @@ type State struct {
 	JournalFile  string
 	Journaling   bool
 
-	serverPrivKey         *primitives.PrivateKey
-	serverPubKey          *primitives.PublicKey
+	ServerPrivKey         *primitives.PrivateKey
+	ServerPubKey          *primitives.PublicKey
 	serverPendingPrivKeys []*primitives.PrivateKey
 	serverPendingPubKeys  []*primitives.PublicKey
 
@@ -482,6 +482,8 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.CustomSpecialPeers = s.CustomSpecialPeers
 	newState.StartDelayLimit = s.StartDelayLimit
 	newState.CustomNetworkID = s.CustomNetworkID
+	newState.CustomBootstrapIdentity = s.CustomBootstrapIdentity
+	newState.CustomBootstrapKey = s.CustomBootstrapKey
 
 	newState.DirectoryBlockInSeconds = s.DirectoryBlockInSeconds
 	newState.PortNumber = s.PortNumber
@@ -505,14 +507,15 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 		shaHashOfNodeName := primitives.Sha([]byte(newState.FactomNodeName)) //seed the private key with node name
 		clonePrivateKey := primitives.NewPrivateKeyFromHexBytes(shaHashOfNodeName.Bytes())
 		newState.LocalServerPrivKey = clonePrivateKey.PrivateKeyString()
+		s.initServerKeys()
 	}
 
 	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
 	newState.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
 	newState.TimestampAtBoot = primitives.NewTimestampFromMilliseconds(s.TimestampAtBoot.GetTimeMilliUInt64())
 
-	//serverPrivKey primitives.PrivateKey
-	//serverPubKey  primitives.PublicKey
+	//ServerPrivKey primitives.PrivateKey
+	//ServerPubKey  primitives.PublicKey
 
 	newState.FactoshisPerEC = s.FactoshisPerEC
 
@@ -2024,11 +2027,11 @@ func (s *State) SetDirectoryBlockInSeconds(t int) {
 }
 
 func (s *State) GetServerPrivateKey() *primitives.PrivateKey {
-	return s.serverPrivKey
+	return s.ServerPrivKey
 }
 
 func (s *State) GetServerPublicKey() *primitives.PublicKey {
-	return s.serverPubKey
+	return s.ServerPubKey
 }
 
 func (s *State) GetAnchor() interfaces.IAnchor {
@@ -2057,11 +2060,11 @@ func (s *State) GetFactomdVersion() string {
 
 func (s *State) initServerKeys() {
 	var err error
-	s.serverPrivKey, err = primitives.NewPrivateKeyFromHex(s.LocalServerPrivKey)
+	s.ServerPrivKey, err = primitives.NewPrivateKeyFromHex(s.LocalServerPrivKey)
 	if err != nil {
 		//panic("Cannot parse Server Private Key from configuration file: " + err.Error())
 	}
-	s.serverPubKey = s.serverPrivKey.Pub
+	s.ServerPubKey = s.ServerPrivKey.Pub
 }
 
 func (s *State) Log(level string, message string) {
@@ -2117,7 +2120,7 @@ func (s *State) GetTimeOffset() interfaces.Timestamp {
 }
 
 func (s *State) Sign(b []byte) interfaces.IFullSignature {
-	return s.serverPrivKey.Sign(b)
+	return s.ServerPrivKey.Sign(b)
 }
 
 func (s *State) GetFactoidState() interfaces.IFactoidState {
