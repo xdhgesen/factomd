@@ -76,6 +76,7 @@ func TestFastBootSaveAndRestore(t *testing.T) {
 			mkTransactions()
 			WaitForBlock(state0, 6)
 
+			// add an extra node
 			s, _ := newState()
 			_, i := AddNode(s)
 			engine.StartFnode(i, true)

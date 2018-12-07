@@ -463,7 +463,6 @@ func StartNode(offset int, typeCode rune) {
 
 
 func AddNode(s *state.State) (*engine.FactomNode, int) {
-	fnodes := engine.GetFnodes()
 	f, newIndex := engine.AddFnode(s)
 	Followers++
 	engine.SetupNetwork()
