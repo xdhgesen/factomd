@@ -161,14 +161,16 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 	vlog := func(format string, args ...interface{}) {
 		dLogger.WithFields(log.Fields{"func": "Validate", "msgheight": m.DBHeight, "lheight": state.GetLeaderHeight()})
 	}
-
+	s := state
+	_ = s
 	// if we already did all the checks just be valid
 	if m.IsValid() {
 		return 1
 	}
 
 	// is the dbsig is old, just drop it
-	if m.DBHeight <= state.GetHighestSavedBlk() {
+	highestSavedBlk := state.GetHighestSavedBlk()
+	if m.DBHeight <= highestSavedBlk {
 		return -1
 	}
 

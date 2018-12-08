@@ -135,8 +135,11 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 				if Delta > tlim || -Delta > tlim {
 
-					s.LogPrintf("executeMsg", "Block %d time %v Msg %x time %v delta %d",
-						s.LLeaderHeight, s.GetLeaderTimestamp().GetTime().String(), msg.GetHash(), msg.GetTimestamp().String(), Delta)
+					s.LogPrintf("executeMsg", "block %d, filter %v Msg M-%x time %v delta %d",
+						s.LLeaderHeight, s.GetMessageFilterTimestamp().GetTime().String(), msg.GetHash().Bytes()[:4], msg.GetTimestamp().String(), Delta)
+
+					s.LogPrintf("executeMsg", "Leader  %s", s.GetLeaderTimestamp().GetTime().String())
+					s.LogPrintf("executeMsg", "Message %s", s.GetMessageFilterTimestamp().GetTime().String())
 
 					// Delta is is negative its greater than blktime then it is future.
 					if Delta < 0 {
@@ -813,12 +816,7 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	if m.IsLocal() {
-		//if it's local and a leader message then hold on to it.
-		switch m.Type() {
-		case constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG:
-			s.AddToHolding(m.GetMsgHash().Fixed(), m)
-		}
-
+		s.AddToHolding(m.GetMsgHash().Fixed(), m)
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
 
@@ -1082,7 +1080,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 			if dbstate.SaveStruct != nil {
 				err := s.StateSaverStruct.SaveDBStateList(s.DBStates, s.Network)
 				if err != nil {
-					s.LogPrintf("dbstateprocess", "Error trying to save a DBStateList %e", err)
+					s.LogPrintf("dbstateprocess", "Error trying to save a DBStateList %v", err)
 				}
 			}
 		}
@@ -1718,6 +1716,9 @@ func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, inte
 	if err != nil {
 		panic(err)
 	}
+	s.LogMessage("balancehash", "CreateDBSig", dbs)
+	s.LogPrintf("balancehash", "Using %x", s.Balancehash.Bytes()[:4])
+
 	ack := s.NewAck(dbs, s.Balancehash).(*messages.Ack)
 	s.LogMessage("dbstateprocess", "CreateDBSig", dbs)
 	s.LogPrintf("dbstateprocess", dbstate.String())
@@ -1736,6 +1737,11 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 	if dbheight <= ht { // if it's in the past, just return.
 		return
 	}
+
+	if dbheight < s.DBHeightAtBoot { // if it's in the past as the DB knows it
+		return
+	}
+
 	if s.CurrentMinute != 0 {
 		s.LogPrintf("executeMsg", "SendDBSig(%d,%d) Only generate DBSig in minute 0 @ %s", dbheight, vmIndex, atomic.WhereAmIString(1))
 		return

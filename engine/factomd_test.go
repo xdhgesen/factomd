@@ -451,11 +451,6 @@ func TestMultiple2Election(t *testing.T) {
 	RunCmd("2")
 	RunCmd("x")
 
-	RunCmd("E")
-	RunCmd("F")
-	RunCmd("0")
-	RunCmd("p")
-
 	WaitBlocks(state0, 2)
 	WaitForMinute(state0, 1)
 	WaitForAllNodes(state0)
@@ -1115,7 +1110,7 @@ func TestCoinbaseCancel(t *testing.T) {
 
 	WaitMinutes(state0, 2)
 	RunCmd("g10") // Adds 10 identities to your identity pool.
-	WaitBlocks(state0, 1)
+	WaitBlocks(state0, 2)
 	// Assign identities
 	RunCmd("1")
 	RunCmd("t")
@@ -1141,7 +1136,6 @@ func TestCoinbaseCancel(t *testing.T) {
 	RunCmd("5")
 	RunCmd("o")
 
-	WaitBlocks(state0, 3)
 	WaitForBlock(state0, 15)
 	WaitMinutes(state0, 1)
 	// Cancel coinbase of 18 (14+ delay of 4) with a majority of the authority set, should succeed
@@ -1434,11 +1428,11 @@ func SystemCall(cmd string) {
 	out, err := exec.Command("sh", "-c", cmd).Output()
 	if err != nil {
 		foo := err.Error()
-		fmt.Println(string(foo))
+		fmt.Println(foo)
 		os.Exit(1)
 		panic(err)
 	}
-	fmt.Print(out)
+	fmt.Print(string(out))
 }
 
 func TestSaveState1(t *testing.T) {
@@ -1450,11 +1444,12 @@ func TestSaveState1(t *testing.T) {
 	// remove all the old database files
 	SystemCall("find  test/.factom/m2 -name LOCAL | xargs rm -rvf ")
 
-	state0 := SetupSim("LAFL", map[string]string{"--debuglog": ".", "--fastsaverate": "4", "--db": "LDB", "--factomhome": "test"}, 10, 0, 0, t)
+	state0 := SetupSim("LAFL", map[string]string{"--debuglog": ".", "--fastsaverate": "4", "--db": "LDB", "--factomhome": "test"}, 12, 0, 0, t)
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
-	//RunCmd("R5")
-	//WaitForBlock(state0, 10)
+	RunCmd("R5")
+	WaitForBlock(state0, 11)
+	WaitMinutes(state0, 1)
 	WaitForAllNodes(state0)
 	PrintOneStatus(0, 0)
 	ShutDownEverything(t)
@@ -1508,5 +1503,10 @@ func TestSaveState2(t *testing.T) {
 	WaitForBlock(state0, 10)
 	WaitForAllNodes(state0)
 	PrintOneStatus(0, 0)
+
+	Audits = 1
+	Leaders = 2
+	CheckAuthoritySet(t)
+
 	ShutDownEverything(t)
 }

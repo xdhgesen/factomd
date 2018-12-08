@@ -510,9 +510,9 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 		s.initServerKeys()
 	}
 
-	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
-	newState.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
 	newState.TimestampAtBoot = primitives.NewTimestampFromMilliseconds(s.TimestampAtBoot.GetTimeMilliUInt64())
+	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
+	newState.SetMessageFilterTimestamp(s.MessageFilterTimestamp)
 
 	//ServerPrivKey primitives.PrivateKey
 	//ServerPubKey  primitives.PublicKey
@@ -2199,8 +2199,9 @@ func (s *State) SetMessageFilterTimestamp(requestedTs interfaces.Timestamp) {
 
 	oneHourAgo := primitives.NewTimestampNow() // now() - one hour
 	oneHourAgo.SetTimeMilli(oneHourAgo.GetTimeMilli() - 60*60*1000)
+	ts := new(primitives.Timestamp)
+	ts.SetTimestamp(requestedTs)
 
-	ts := requestedTs
 	if ts.GetTimeMilli() < s.TimestampAtBoot.GetTimeMilli() {
 		ts.SetTimestamp(s.TimestampAtBoot)
 	}
@@ -2214,11 +2215,10 @@ func (s *State) SetMessageFilterTimestamp(requestedTs interfaces.Timestamp) {
 		ts.SetTimestamp(s.LeaderTimestamp)
 	}
 
-	s.LeaderTimestamp.SetTimestamp(ts) //SetLeaderTimestamp()
 	s.LogPrintf("executeMsg", "Set MessageFilterTimestamp(%s) @ dbht %d using %s for %s", requestedTs, s.LLeaderHeight, ts.String(), atomic.WhereAmIString(1))
 
 	if s.MessageFilterTimestamp == nil {
-		s.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(uint64(ts.GetTimeMilli()))
+		s.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64())
 	} else {
 		s.MessageFilterTimestamp.SetTimestamp(ts)
 	}

@@ -575,6 +575,8 @@ func (d *DBState) ValidNext(state *State, next *messages.DBStateMsg) int {
 
 	valid := next.ValidateSignatures(state)
 	if !next.IsInDB && !next.IgnoreSigs && valid != 1 {
+		valid := next.ValidateSignatures(state)
+
 		return valid
 	}
 
