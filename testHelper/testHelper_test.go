@@ -1,20 +1,18 @@
 package testHelper_test
 
 import (
+	"bytes"
 	"crypto/rand"
-
-	"github.com/FactomProject/factomd/engine"
-
-	"github.com/FactomProject/ed25519"
-	//"github.com/FactomProject/factomd/common/factoid/wallet"
 	"encoding/hex"
 	"fmt"
-	"testing"
-
+	"github.com/FactomProject/ed25519"
+	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/engine"
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 /*
@@ -173,5 +171,30 @@ func TestTxnCreate(t *testing.T) {
 
 	// test that we are sending to the address we thought
 	assert.Equal(t, outAddress, txn.Outputs[0].GetUserAddress())
+}
 
+
+func TestEntryCreation(t *testing.T) {
+
+	pkey := primitives.RandomPrivateKey()
+	//ecPriv, _:= primitives.PrivateKeyStringToHumanReadableECPrivateKey(pkey.PrivateKeyString())
+	//ecAdd, _ := factoid.PublicKeyStringToECAddressString(pkey.PublicKeyString())
+	//fmt.Printf("%v\n%v\n%v\n", ecPriv, ecPub, ecAdd)
+
+	encode := func(s string) []byte {
+		b := bytes.Buffer{}
+		b.WriteString(s)
+		return b.Bytes()
+	}
+
+	e := factom.Entry{
+		ChainID: hex.EncodeToString(encode("chainfoo")),
+		ExtIDs:  [][]byte{encode("foo"), encode("bar")},
+		Content: encode("Hello World!"),
+	}
+
+	commit, _ := ComposeCommitEntryMsg(pkey, e)
+
+	assert.True(t, commit.CommitEntry.IsValid())
+	assert.True(t, commit.IsValid())
 }
