@@ -3,10 +3,13 @@ package testHelper
 //A package for functions used multiple times in tests that aren't useful in production code.
 
 import (
+	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/entryBlock"
+	"github.com/FactomProject/factomd/common/entryCreditBlock"
+	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -372,3 +375,27 @@ func PrintList(title string, list map[string]uint64) {
 		fmt.Printf("%v - %v:%v\n", title, addr, amt)
 	}
 }
+
+func ComposeCommitEntryMsg(pkey *primitives.PrivateKey, e factom.Entry) (*messages.CommitEntryMsg, error) {
+
+	ecPub, _ := factoid.PublicKeyStringToECAddress(pkey.PublicKeyString())
+
+	addr := factom.ECAddress{ &[32]byte{}, &[64]byte{} }
+	copy(addr.Pub[:], ecPub.Bytes())
+	copy(addr.Sec[:], pkey.Key[:])
+	msg, err := factom.EntryCommitMessage(&e, &addr)
+
+	if err != nil {
+		return nil, err
+	}
+
+	commit := entryCreditBlock.NewCommitEntry()
+	commit.UnmarshalBinaryData(msg.Bytes())
+
+	m := new(messages.CommitEntryMsg)
+	m.CommitEntry = commit
+	m.SetValid()
+	return m, nil
+
+}
+
