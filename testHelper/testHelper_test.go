@@ -174,7 +174,7 @@ func TestTxnCreate(t *testing.T) {
 }
 
 
-func TestEntryCreation(t *testing.T) {
+func TestCommitEntry(t *testing.T) {
 
 	pkey := primitives.RandomPrivateKey()
 	//ecPriv, _:= primitives.PrivateKeyStringToHumanReadableECPrivateKey(pkey.PrivateKeyString())
@@ -198,3 +198,49 @@ func TestEntryCreation(t *testing.T) {
 	assert.True(t, commit.CommitEntry.IsValid())
 	assert.True(t, commit.IsValid())
 }
+
+// KLUDGE this is likely duplicated code
+func encode(s string) []byte {
+	b := bytes.Buffer{}
+	b.WriteString(s)
+	return b.Bytes()
+}
+
+func TestRevealEntry(t *testing.T) {
+	pkey := primitives.RandomPrivateKey()
+
+	e := factom.Entry{
+		ChainID: hex.EncodeToString(encode("chainfoo")),
+		ExtIDs:  [][]byte{encode("foo"), encode("bar")},
+		Content: encode("Hello World!"),
+	}
+
+	reveal, err := ComposeRevealEntryMsg(pkey, e)
+	assert.Nil(t, err)
+	assert.True(t, reveal.IsValid())
+	//println(reveal.String())
+	//println(reveal.Entry.String())
+}
+
+func TestAccountHelper(t *testing.T) {
+	fctS := "Fs1d5u3kambHECzarPsXWQTtYyf7womvg9u6kmFDm8F9cv5bSysh"
+	a := AccountFromFctSecret(fctS)
+	assert.Equal(t, a.FctPriv(), fctS)
+}
+
+func TestChainCommit(t *testing.T) {
+	b := GetBankAccount()
+	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
+    extids := [][]byte{encode("foo"), encode("bar")}
+
+	e := factom.Entry{ ChainID: id, ExtIDs:  extids, Content: encode("Hello World!"), }
+	c := factom.NewChain(&e)
+	assert.Equal(t, c.ChainID, id)
+
+	m, err := ComposeChainCommit(b.Priv, c)
+
+	assert.Nil(t, err)
+	assert.True(t, m.CommitChain.IsValid())
+	assert.True(t, m.IsValid())
+}
+
