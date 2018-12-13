@@ -1074,18 +1074,19 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	// Ok, I just added a valid state to the list so go process it now so it doesn't have to wait on the other messages
 	s.DBStates.UpdateState()
 
-	if dbstatemsg.IsLocal() {
-		if s.StateSaverStruct.FastBoot {
-			dbstate.SaveStruct = SaveFactomdState(s, dbstate)
-
-			if dbstate.SaveStruct != nil {
-				err := s.StateSaverStruct.SaveDBStateList(s, s.DBStates, s.Network)
-				if err != nil {
-					s.LogPrintf("dbstateprocess", "Error trying to save a DBStateList %v", err)
-				}
-			}
-		}
-	}
+	//d := dbstate
+	//if dbstatemsg.IsLocal() {
+	//	if s.StateSaverStruct.FastBoot && d.DirectoryBlock.GetHeader().GetDBHeight() != 0 {
+	//		dbstate.SaveStruct = SaveFactomdState(s, dbstate)
+	//
+	//		if dbstate.SaveStruct != nil {
+	//			err := s.StateSaverStruct.SaveDBStateList(s, s.DBStates, s.Network)
+	//			if err != nil {
+	//				s.LogPrintf("dbstateprocess", "Error trying to save a DBStateList %v", err)
+	//			}
+	//		}
+	//	}
+	//}
 }
 
 func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
