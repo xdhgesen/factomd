@@ -2,6 +2,7 @@ package simtest
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
@@ -58,6 +59,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	extids := [][]byte{encode("foo"), encode("bar")}
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
+	numEntries := 21 // including head entry
 
 	t.Run("generate accounts", func(t *testing.T) {
 		println(b.String())
@@ -72,10 +74,26 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			WaitForAllNodes(state0)
 		}
 
-		t.Run("Fund EC Address", func(t *testing.T) {
-			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), 444*state0.GetFactoshisPerEC())
-			bal := waitForEcBalance(state0, a.EcPub())
-			assert.Equal(t, bal, int64(444))
+		t.Run("Create Entries Before Chain", func(t *testing.T) {
+
+			publish := func(i int) {
+				e := factom.Entry{
+					ChainID: id,
+					ExtIDs:  extids,
+					Content: encode(fmt.Sprintf("hello@%v", i)), // ensure no duplicate msg hashes
+				}
+				i++
+
+				commit, _ := ComposeCommitEntryMsg(a.Priv, e)
+				reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
+
+				state0.APIQueue().Enqueue(commit)
+				state0.APIQueue().Enqueue(reveal)
+			}
+
+			for x:= 1; x < numEntries; x++ {
+				publish(x)
+			}
 		})
 
 		t.Run("Create Chain", func(t *testing.T) {
@@ -94,20 +112,10 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			state0.APIQueue().Enqueue(reveal)
 		})
 
-		t.Run("Create Entries", func(t *testing.T) {
-
-			e := factom.Entry{
-				ChainID: id,
-				ExtIDs:  extids,
-				Content: encode("Hello Again!"),
-			}
-			// NOTE: content must be different to avoid duplicating first entry
-
-			commit, _ := ComposeCommitEntryMsg(a.Priv, e)
-			reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
-
-			state0.APIQueue().Enqueue(commit)
-			state0.APIQueue().Enqueue(reveal)
+		t.Run("Fund EC Address", func(t *testing.T) {
+			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), 444*state0.GetFactoshisPerEC())
+			bal := waitForEcBalance(state0, a.EcPub())
+			assert.Equal(t, bal, int64(444))
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
@@ -117,11 +125,15 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 		t.Run("Verify Entries", func(t *testing.T) {
 
+			bal := engine.GetBalanceEC(state0, a.EcPub())
+			assert.Equal(t, int64(444-numEntries-10), bal, "EC spend mismatch")
+
 			for _, v := range state0.Holding {
 				s, _ := v.JSONString()
 				println(s)
 			}
 
+			// TODO: actually check for confirmed entries
 			assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
 		})
 
