@@ -400,6 +400,13 @@ func RunCmd(cmd string) {
 	return
 }
 
+// shut down simulation and kill test
+func Abort(t *testing.T, msg string) {
+	fmt.Printf("Abort: %v", msg)
+	ShutDownEverything(t)
+	t.Fatal(msg)
+}
+
 func ShutDownEverything(t *testing.T) {
 	CheckAuthoritySet(t)
 	quit <- struct{}{}

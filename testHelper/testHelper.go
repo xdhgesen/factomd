@@ -3,27 +3,19 @@ package testHelper
 //A package for functions used multiple times in tests that aren't useful in production code.
 
 import (
-	"bytes"
-	"encoding/binary"
-	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/entryBlock"
-	"github.com/FactomProject/factomd/common/entryCreditBlock"
-	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
 
-	//"github.com/FactomProject/factomd/engine"
-	//"github.com/FactomProject/factomd/log"
 	"time"
 
 	"github.com/FactomProject/factomd/state"
-	//"fmt"
 	"fmt"
 	"os"
 
@@ -381,61 +373,3 @@ func PrintList(title string, list map[string]uint64) {
 		fmt.Printf("%v - %v:%v\n", title, addr, amt)
 	}
 }
-
-// KLUDGE duplicates code from: factom lib
-// TODO: refactor factom package to export these functions
-func milliTime() (r []byte) {
-	buf := new(bytes.Buffer)
-	t := time.Now().UnixNano()
-	m := t / 1e6
-	binary.Write(buf, binary.BigEndian, m)
-	return buf.Bytes()[2:]
-}
-
-// KLUDGE duplicates code from: factom.ComposeEntryCommit()
-// TODO: refactor factom package to export these functions
-func commitEntryMsg(addr *factom.ECAddress, e *factom.Entry) (*bytes.Buffer, error) {
-		buf := new(bytes.Buffer)
-
-		// 1 byte version
-		buf.Write([]byte{0})
-
-		// 6 byte milliTimestamp (truncated unix time)
-		buf.Write(milliTime())
-
-		// 32 byte Entry Hash
-		buf.Write(e.Hash())
-
-		// 1 byte number of entry credits to pay
-		if c, err := factom.EntryCost(e); err != nil {
-			return nil, err
-		} else {
-			buf.WriteByte(byte(c))
-		}
-
-		// 32 byte Entry Credit Address Public Key + 64 byte Signature
-		sig := addr.Sign(buf.Bytes())
-		buf.Write(addr.PubBytes())
-		buf.Write(sig[:])
-
-		return buf, nil
-}
-
-
-func ComposeCommitEntryMsg(pkey *primitives.PrivateKey, e factom.Entry) (*messages.CommitEntryMsg, error) {
-	ecPub, _ := factoid.PublicKeyStringToECAddress(pkey.PublicKeyString())
-
-	addr := factom.ECAddress{ &[32]byte{}, &[64]byte{} }
-	copy(addr.Pub[:], ecPub.Bytes())
-	copy(addr.Sec[:], pkey.Key[:])
-	msg, err := commitEntryMsg(&addr, &e)
-
-	commit := entryCreditBlock.NewCommitEntry()
-	commit.UnmarshalBinaryData(msg.Bytes())
-
-	m := new(messages.CommitEntryMsg)
-	m.CommitEntry = commit
-	m.SetValid()
-	return m, err
-}
-
