@@ -99,8 +99,9 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			e := factom.Entry{
 				ChainID: id,
 				ExtIDs:  extids,
-				Content: encode("Hello World!"),
+				Content: encode("Hello Again!"),
 			}
+			// NOTE: content must be different to avoid duplicating first entry
 
 			commit, _ := ComposeCommitEntryMsg(a.Priv, e)
 			reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
