@@ -174,36 +174,8 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			//s.Holding[msg.GetMsgHash().Fixed()] = msg
 		}
 
-		var vml int
-		if vm == nil || vm.List == nil {
-			vml = 0
-		} else {
-			vml = len(vm.List)
-		}
-		local := msg.IsLocal()
-		vmi := msg.GetVMIndex()
-		hkb := s.GetHighestKnownBlock()
-
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving &&
-			vm != nil && int(vm.Height) == vml &&
-			(!s.Syncing || !vm.Synced) &&
-			(local || vmi == s.LeaderVMIndex) &&
-			s.LeaderPL.DBHeight+1 >= hkb {
-			if vml == 0 {
-				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
-				TotalXReviewQueueInputs.Inc()
-				s.XReview = append(s.XReview, msg)
-				s.LogMessage("executeMsg", "XReview", msg)
-			} else {
-				s.LogMessage("executeMsg", "LeaderExecute", msg)
-				msg.LeaderExecute(s)
-			}
-		} else {
-			s.LogMessage("executeMsg", "FollowerExecute2", msg)
-			msg.FollowerExecute(s)
-		}
+		s.LogMessage("executeMsg", "FollowerExecute2", msg)
+		msg.FollowerExecute(s)
 
 		ret = true
 
@@ -261,14 +233,7 @@ func (s *State) Process() (progress bool) {
 		Leader, LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
 	}
 	if s.LLeaderHeight != 0 { // debug
-		if s.Leader != Leader {
-			s.LogPrintf("executeMsg", "State.Process() unexpectedly setting s.Leader to %v", Leader)
-			s.Leader = Leader
-		}
-		if s.LeaderVMIndex != LeaderVMIndex {
-			s.LogPrintf("executeMsg", "State.Process()  unexpectedly setting s.LeaderVMIndex to %v", LeaderVMIndex)
-			s.LeaderVMIndex = LeaderVMIndex
-		}
+		s.Leader = Leader
 	}
 
 	if !s.RunLeader {
@@ -288,11 +253,6 @@ func (s *State) Process() (progress bool) {
 	}
 
 	process := []interfaces.IMsg{}
-
-	var vm *VM
-	if s.Leader && s.RunLeader {
-		vm = s.LeaderPL.VMs[s.LeaderVMIndex]
-	}
 
 	hsb := s.GetHighestSavedBlk()
 
@@ -324,7 +284,7 @@ func (s *State) Process() (progress bool) {
 
 			if msg := s.DBStatesReceived[ix]; msg != nil {
 				s.LogPrintf("dbstateprocess", "Trying to process DBStatesReceived %d", s.DBStatesReceivedBase+ix)
-				s.executeMsg(vm, msg)
+				s.executeMsg(nil, msg)
 			}
 
 			// if we can not process a DBStatesReceived then go process some messages
@@ -340,7 +300,7 @@ emptyLoop:
 		select {
 		case msg := <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
-			progress = s.executeMsg(vm, msg) || progress
+			progress = s.executeMsg(nil, msg) || progress
 		default:
 			break emptyLoop
 		}
@@ -370,7 +330,7 @@ ackLoop:
 			if s.IgnoreMissing {
 				if (now/1000 - ack.GetTimestamp().GetTimeSeconds()) < 60*15 {
 					s.LogMessage("ackQueue", "Execute", ack)
-					progress = s.executeMsg(vm, ack) || progress
+					progress = s.executeMsg(nil, ack) || progress
 				} else {
 					s.LogMessage("ackQueue", "drop Too Old", ack)
 				}
@@ -378,7 +338,7 @@ ackLoop:
 			}
 
 			s.LogMessage("ackQueue", "Execute2", ack)
-			progress = s.executeMsg(vm, ack) || progress
+			progress = s.executeMsg(nil, ack) || progress
 
 		default:
 			break ackLoop
@@ -492,7 +452,6 @@ func (s *State) ReviewHolding() {
 			s.LogMessage("executeMsg", "expire from holding", v)
 			s.ExpireCnt++
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "expired")
 			continue
 		}
@@ -501,7 +460,6 @@ func (s *State) ReviewHolding() {
 		case -1:
 			s.LogMessage("executeMsg", "invalid from holding", v)
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "invalid from holding")
 			continue
 		case 0:
@@ -512,14 +470,12 @@ func (s *State) ReviewHolding() {
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "HKB-HSB>1000")
 		}
 
 		eom, ok := v.(*messages.EOM)
 		if ok && ((eom.DBHeight <= saved && saved > 0) || int(eom.Minute) < s.CurrentMinute) {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "old EOM")
 			continue
 		}
@@ -527,7 +483,6 @@ func (s *State) ReviewHolding() {
 		dbsmsg, ok := v.(*messages.DBStateMsg)
 		if ok && (dbsmsg.DirectoryBlock.GetHeader().GetDBHeight() < saved-1 && saved > 0) {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "old DBState")
 			continue
 		}
@@ -535,7 +490,6 @@ func (s *State) ReviewHolding() {
 		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
 		if ok && ((dbsigmsg.DBHeight <= saved && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "Old DBSig")
 			continue
 		}
@@ -543,15 +497,12 @@ func (s *State) ReviewHolding() {
 		_, ok = s.Replay.Valid(constants.INTERNAL_REPLAY, v.GetRepeatHash().Fixed(), v.GetTimestamp(), s.GetTimestamp())
 		if !ok {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "INTERNAL_REPLAY")
-
 			continue
 		}
 		ok2 := s.FReplay.IsHashUnique(constants.BLOCK_REPLAY, v.GetRepeatHash().Fixed())
 		if !ok2 {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "BLOCK_REPLAY")
 			continue
 		}
@@ -563,7 +514,7 @@ func (s *State) ReviewHolding() {
 			x := s.NoEntryYet(ce.CommitEntry.EntryHash, ce.CommitEntry.GetTimestamp())
 			if !x {
 				TotalHoldingQueueOutputs.Inc()
-				//delete(s.Holding, k) // Drop commits with the same entry hash from holding because they are blocked by a previous entry
+				// Drop commits with the same entry hash from holding because they are blocked by a previous entry
 				s.DeleteFromHolding(k, v, "already committed")
 				continue
 			}
@@ -576,7 +527,7 @@ func (s *State) ReviewHolding() {
 			x := s.NoEntryYet(cc.CommitChain.EntryHash, cc.CommitChain.GetTimestamp())
 			if !x {
 				TotalHoldingQueueOutputs.Inc()
-				//delete(s.Holding, k) // Drop commits with the same entry hash from holding because they are blocked by a previous entry
+				// Drop commits with the same entry hash from holding because they are blocked by a previous entry
 				s.DeleteFromHolding(k, v, "already committed")
 				continue
 			}
@@ -589,14 +540,9 @@ func (s *State) ReviewHolding() {
 				s.Commits.Delete(re.GetHash().Fixed())
 				continue
 			}
-			// Only reprocess if at the top of a new minute, and if we are a leader.
-			//if processMinute > 10 {
-			//	continue // No need for followers to review Reveal Entry messages
-			//}
-			// Needs to be our VMIndex as well, or ignore.
-			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
-				continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
-			}
+
+			continue // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+
 		}
 
 		TotalXReviewQueueInputs.Inc()
@@ -1842,14 +1788,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 			s.SendHeartBeat() // Only do this once per minute
 			s.LogPrintf("dbsig-eom", "ProcessEOM complete for %d", e.Minute)
-			if !s.Leader {
-				if s.CurrentMinute != int(e.Minute) {
-					s.LogPrintf("dbsig-eom", "Follower jump to minute %d from %d", s.CurrentMinute, int(e.Minute))
-				}
-				s.MoveStateToHeight(e.DBHeight, int(e.Minute+1))
-			} else {
-				s.MoveStateToHeight(s.LLeaderHeight, s.CurrentMinute+1)
-			}
+
+			s.MoveStateToHeight(s.LLeaderHeight, s.CurrentMinute+1)
 
 			if s.EOM || s.EOMDone || s.Syncing || s.EOMProcessed != 0 {
 				s.LogPrintf("executeMsg", "unexpected")
@@ -1877,18 +1817,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 				if s.LeaderPL != LeaderPL {
 					s.LogPrintf("ExecuteMsg", "ProcessEOM: Unexpected change in LeaderPL")
 					s.LeaderPL = LeaderPL
-				}
-
-				Leader, LeaderVMIndex := s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
-				{ // debug
-					if s.Leader != Leader {
-						s.LogPrintf("executeMsg", "State.ProcessEOM() unexpectedly setting s.Leader to %v", Leader)
-						s.Leader = Leader
-					}
-					if s.LeaderVMIndex != LeaderVMIndex {
-						s.LogPrintf("executeMsg", "State.ProcessEOM()  unexpectedly setting s.LeaderVMIndex to %v", LeaderVMIndex)
-						s.LeaderVMIndex = LeaderVMIndex
-					}
 				}
 
 			case s.CurrentMinute == 10:

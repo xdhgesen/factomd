@@ -1877,10 +1877,8 @@ func (s *State) UpdateState() (progress bool) {
 		ProcessLists.Str = ProcessLists.String()
 	}
 
-	if plbase <= dbheight { // TODO: This is where we have to fix the fact that syncing with dbstates can fail to transition to messages
-		if !s.Leader || s.RunLeader {
-			progress = ProcessLists.UpdateState(dbheight)
-		}
+	if plbase <= dbheight {
+		progress = ProcessLists.UpdateState(dbheight)
 	}
 
 	p2 := s.DBStates.UpdateState()
@@ -1982,10 +1980,6 @@ func (s *State) GetOnlineAuditServers(dbheight uint32) []interfaces.IServer {
 		}
 	}
 	return onlineAuditServers
-}
-
-func (s *State) IsLeader() bool {
-	return s.Leader
 }
 
 func (s *State) GetVirtualServers(dbheight uint32, minute int, identityChainID interfaces.IHash) (bool, int) {
@@ -2548,9 +2542,7 @@ func (s *State) CalculateTransactionRate() (totalTPS float64, instantTPS float64
 
 func (s *State) SetStringQueues() {
 	vmi := -1
-	if s.Leader && s.LeaderVMIndex >= 0 {
-		vmi = s.LeaderVMIndex
-	}
+
 	vmt0 := s.ProcessLists.Get(s.LLeaderHeight)
 	var vmt *VM
 	lmin := "-"

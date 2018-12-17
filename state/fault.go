@@ -86,10 +86,6 @@ func markFault(pl *ProcessList, vmIndex int, faultReason int) {
 		return
 	}
 
-	if pl.State.Leader && pl.State.LeaderVMIndex == vmIndex {
-		return
-	}
-
 	now := time.Now().Unix()
 	vm := pl.VMs[vmIndex]
 

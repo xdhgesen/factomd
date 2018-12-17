@@ -165,8 +165,6 @@ type IState interface {
 	// These are methods run by the consensus algorithm to track what servers are the leaders
 	// and what lists they are responsible for.
 	ComputeVMIndex(hash []byte) int // Returns the VMIndex determined by some hash (usually) for the current processlist
-	IsLeader() bool                 // Returns true if this is the leader in the current minute
-	GetLeaderVM() int               // Get the Leader VM (only good within a minute)
 	// Returns the list of VirtualServers at a given directory block height and minute
 	GetVirtualServers(dbheight uint32, minute int, identityChainID IHash) (found bool, index int)
 	// Returns true if between minutes

@@ -219,7 +219,7 @@ func (s *State) uploadDBState(sequence uint32) error {
 			}
 			fullData = append(fullData, data...)
 		}
-		if s.IsLeader() || s.TorrentUploader() {
+		if  s.TorrentUploader() {
 			err := s.DBStateManager.UploadDBStateBytes(fullData, true)
 			if err != nil {
 				return fmt.Errorf("[TorrentUpload] Torrent failed to upload: %s\n", err.Error())

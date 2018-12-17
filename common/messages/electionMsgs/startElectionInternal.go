@@ -25,7 +25,6 @@ type StartElectionInternal struct {
 	DBHeight       uint32
 	PreviousDBHash interfaces.IHash
 	SigType        bool
-	IsLeader       bool
 }
 
 var _ interfaces.IMsg = (*StartElectionInternal)(nil)
@@ -62,7 +61,7 @@ func (m *StartElectionInternal) LeaderExecute(state interfaces.IState) {
 
 func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	s := is.(*state.State)
-	m.IsLeader = is.IsLeader()
+
 	// TODO: State related things about starting an election
 	pl := s.ProcessLists.Get(m.DBHeight)
 	if pl == nil {
