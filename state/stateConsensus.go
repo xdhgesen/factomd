@@ -225,16 +225,6 @@ func (s *State) Process() (progress bool) {
 	// If we are not running the leader, then look to see if we have waited long enough to
 	// start running the leader.  If we are, start the clock on Ignoring Missing Messages.  This
 	// is so we don't conflict with past version of the network if we have to reboot the network.
-	var Leader bool
-	var LeaderVMIndex int
-	if s.CurrentMinute > 9 {
-		Leader, LeaderVMIndex = s.LeaderPL.GetVirtualServers(9, s.IdentityChainID)
-	} else {
-		Leader, LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
-	}
-	if s.LLeaderHeight != 0 { // debug
-		s.Leader = Leader
-	}
 
 	if !s.RunLeader {
 		if now-s.StartDelay > s.StartDelayLimit {
@@ -372,12 +362,6 @@ ackLoop:
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
 	preProcessProcChanTime := time.Now()
-	for _, msg := range process {
-		newProgress := s.executeMsg(vm, msg)
-		progress = newProgress || progress //
-		//		s.LogMessage("executeMsg", fmt.Sprintf("From processq : %t", newProgress), msg)
-		s.UpdateState()
-	} // processLoop for{...}
 
 	processProcChanTime := time.Since(preProcessProcChanTime)
 	TotalProcessProcChanTime.Add(float64(processProcChanTime.Nanoseconds()))
