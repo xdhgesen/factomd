@@ -11,6 +11,8 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/FactomProject/factomd/common/messages"
+
 	"sort"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -214,13 +216,26 @@ func (im *IdentityManager) Init() {
 }
 
 func (im *IdentityManager) SetIdentity(chainID interfaces.IHash, id *Identity) {
+	s := fmt.Sprintf("%x", chainID.Bytes())
+	_ = s
+	defer func() {
+		messages.LogPrintf("identity", "SetIdentity(ChainID %x to ID(%p) %x %s)", chainID, id, id.IdentityChainID.Bytes()[3:6], id.String())
+	}()
 	im.Init()
 	im.Mutex.Lock()
 	defer im.Mutex.Unlock()
 	im.Identities[chainID.Fixed()] = id
 }
 
-func (im *IdentityManager) RemoveIdentity(chainID interfaces.IHash) bool {
+func (im *IdentityManager) RemoveIdentity(chainID interfaces.IHash) (rval bool) {
+
+	defer func(r *bool) {
+		id, ok := im.Identities[chainID.Fixed()]
+		if ok {
+			messages.LogPrintf("identity", "RemoveIdentity(ChainID %x to ID(%p) %x %s) = %v", chainID, id, id.IdentityChainID.Bytes()[3:6], id.String(), *r)
+		}
+	}(&rval)
+
 	im.Init()
 	im.Mutex.Lock()
 	defer im.Mutex.Unlock()
@@ -274,6 +289,7 @@ func (im *IdentityManager) GetSortedRegistrations() []*identityEntries.RegisterF
 	sort.Sort(identityEntries.RegisterFactomIdentityStructureSort(list))
 	return list
 }
+
 func (im *IdentityManager) GetRegistrations() []*identityEntries.RegisterFactomIdentityStructure {
 	im.Mutex.RLock()
 	defer im.Mutex.RUnlock()
@@ -299,13 +315,24 @@ func (im *IdentityManager) GetIdentities() []*Identity {
 }
 
 func (im *IdentityManager) SetAuthority(chainID interfaces.IHash, auth *Authority) {
+	defer func() {
+		messages.LogPrintf("identity", "SetAuthority(ChainID %x to ID(%p) %x)", chainID, auth, auth.AuthorityChainID.Bytes()[3:6])
+	}()
+
 	im.Init()
 	im.Mutex.Lock()
 	defer im.Mutex.Unlock()
 	im.Authorities[chainID.Fixed()] = auth
 }
 
-func (im *IdentityManager) RemoveAuthority(chainID interfaces.IHash) bool {
+func (im *IdentityManager) RemoveAuthority(chainID interfaces.IHash) (rval bool) {
+	defer func(r *bool) {
+		id, ok := im.Identities[chainID.Fixed()]
+		if ok {
+			messages.LogPrintf("identity", "RemoveAuthority(ChainID %x to ID(%p) %x %s) = %v", chainID, id, id.IdentityChainID.Bytes()[3:6], id.String(), *r)
+		}
+	}(&rval)
+
 	im.Init()
 	_, ok := im.Authorities[chainID.Fixed()]
 	if !ok {

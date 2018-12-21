@@ -11,6 +11,8 @@ import (
 	"os"
 	"sort"
 
+	"github.com/FactomProject/go-spew/spew"
+
 	"github.com/FactomProject/factomd/common/factoid"
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -307,6 +309,10 @@ func (a *SaveState) IsSameAs(b *SaveState) bool {
 	return true
 }
 
+func init() {
+	spew.Config.SortKeys = true
+}
+
 func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	state.LogPrintf("dbstateprocess", "SaveFactomdState(%d) called from %s", d.DirectoryBlock.GetHeader().GetDBHeight(), atomic.WhereAmIString(1))
 
@@ -345,6 +351,7 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.FedServers = append(ss.FedServers, pln.FedServers...)
 	ss.AuditServers = append(ss.AuditServers, pln.AuditServers...)
 	state.LogPrintf("dbstateprocess", "SaveFactomdState(%d) saving  %d/%d authset", d.DirectoryBlock.GetHeader().GetDBHeight(), len(ss.FedServers), len(ss.AuditServers))
+	state.LogPrintf("savestate", "SaveFactomdState(%d) saving  %d/%d authset", d.DirectoryBlock.GetHeader().GetDBHeight(), len(ss.FedServers), len(ss.AuditServers))
 
 	state.FactoidBalancesPMutex.Lock()
 	ss.FactoidBalancesP = make(map[[32]byte]int64, len(state.FactoidBalancesP))
@@ -361,6 +368,10 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	state.ECBalancesPMutex.Unlock()
 
 	ss.IdentityControl = state.IdentityControl.Clone()
+	spew.Config.SortKeys = true
+	state.LogPrintf("savestate", "IdentityControl %s", spew.Sdump(state.IdentityControl))
+	state.LogPrintf("savestate", "IdentityControlClone %s", spew.Sdump(ss.IdentityControl))
+
 	if ss.IdentityControl == nil {
 		atomic.WhereAmIMsg("no identity manager")
 	}
@@ -620,6 +631,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	//s.AddStatus(fmt.Sprintf("SAVESTATE Restoring the State to dbht: %d", ss.DBHeight))
 
 	s.LogPrintf("dbstateprocess", "restoring to DBH %d", ss.DBHeight)
+	s.LogPrintf("savestate", "restoring to DBH %d", ss.DBHeight)
 	s.Replay = ss.Replay.Save()
 	s.Replay.s = s
 	s.Replay.name = "Replay"
@@ -652,6 +664,8 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	// Restore IDControl
 	// TODO: Should this clone?
 	s.IdentityControl = ss.IdentityControl
+	s.LogPrintf("savestate", "IdentityControl %s", spew.Sdump(s.IdentityControl))
+
 	if s.IdentityControl == nil {
 		atomic.WhereAmIMsg("Missing IdentityControl")
 	}
