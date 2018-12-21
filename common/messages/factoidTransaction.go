@@ -32,6 +32,10 @@ type FactoidTransaction struct {
 
 var _ interfaces.IMsg = (*FactoidTransaction)(nil)
 
+func (m *FactoidTransaction) AckMatch() bool {
+	return true
+}
+
 func (a *FactoidTransaction) IsSameAs(b *FactoidTransaction) bool {
 	if b == nil {
 		return false

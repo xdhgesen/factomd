@@ -49,6 +49,10 @@ var _ interfaces.IMsg = (*Ack)(nil)
 var _ interfaces.Signable = (*Ack)(nil)
 var AckBalanceHash = true
 
+func (m *Ack) AckMatch() bool {
+	return true
+}
+
 func (m *Ack) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {

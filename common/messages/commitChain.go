@@ -35,6 +35,10 @@ type CommitChainMsg struct {
 var _ interfaces.IMsg = (*CommitChainMsg)(nil)
 var _ interfaces.Signable = (*CommitChainMsg)(nil)
 
+func (m *CommitChainMsg) AckMatch() bool {
+	return true
+}
+
 func (a *CommitChainMsg) IsSameAs(b *CommitChainMsg) bool {
 	if a == nil || b == nil {
 		if a == nil && b == nil {

@@ -100,7 +100,6 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		return false
 	}
 
-	preExecuteMsgTime := time.Now()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 	if !ok {
 		consenLogger.WithFields(msg.LogFields()).Debug("executeMsg (Replay Invalid)")
@@ -114,10 +113,29 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 	if s.IgnoreMissing && msg.Type() != constants.DBSTATE_MSG {
 		now := s.GetTimestamp().GetTimeSeconds()
 		if now-msg.GetTimestamp().GetTimeSeconds() > 60*15 {
+			s.Holding
 			s.LogMessage("executeMsg", "ignoreMissing", msg)
 			return
 		}
 	}
+
+	if msg.AckMatch() {
+		ack, m := vm.Match(msg)
+		if m != nil {
+			s.executeMsg2(vm, msg)
+		}
+		if ack != nil {
+			s.executeMsg2(vm, ack)
+		}
+		return true
+	}
+	return s.executeMsg2(vm, msg)
+
+}
+
+func (s *State) executeMsg2(vm *VM, msg interfaces.IMsg) (ret bool) {
+
+	preExecuteMsgTime := time.Now()
 
 	valid := msg.Validate(s)
 	if valid == 1 {
@@ -412,7 +430,7 @@ func (s *State) ReviewHolding() {
 	// Set the resend time at the END of the function. This prevents the time it takes to execute this function
 	// from reducing the time we allow before another review
 	defer func() {
-		s.ResendHolding = now
+		s.ResendHolding = s.GetTimestamp()
 	}()
 	// Anything we are holding, we need to reprocess.
 	s.XReview = make([]interfaces.IMsg, 0)

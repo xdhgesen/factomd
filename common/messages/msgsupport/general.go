@@ -28,7 +28,7 @@ func CreateMsg(messageType byte) interfaces.IMsg {
 	case constants.ACK_MSG:
 		return new(messages.Ack)
 	case constants.AUDIT_SERVER_FAULT_MSG:
-		return new(messages.AuditServerFault)
+		return nil
 	case constants.COMMIT_CHAIN_MSG:
 		return new(messages.CommitChainMsg)
 	case constants.COMMIT_ENTRY_MSG:
@@ -50,7 +50,7 @@ func CreateMsg(messageType byte) interfaces.IMsg {
 	case constants.REVEAL_ENTRY_MSG:
 		return new(messages.RevealEntryMsg)
 	case constants.REQUEST_BLOCK_MSG:
-		return new(messages.RequestBlock)
+		return nil
 	case constants.DBSTATE_MISSING_MSG:
 		return new(messages.DBStateMissing)
 	case constants.DBSTATE_MSG:

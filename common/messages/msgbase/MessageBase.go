@@ -42,6 +42,10 @@ type MessageBase struct {
 	Sigvalid    bool
 }
 
+func (m *MessageBase) AckMatch() bool {
+	return false
+}
+
 func (m *MessageBase) StringOfMsgBase() string {
 
 	rval := fmt.Sprintf("origin %s(%d), LChain=%x resendCnt=%d", m.NetworkOrigin, m.Origin, m.LeaderChainID.Bytes()[3:6], m.ResendCnt)

@@ -44,6 +44,10 @@ func (m *AddServerMsg) GetRepeatHash() (rval interfaces.IHash) {
 	return m.GetMsgHash()
 }
 
+func (m *AddServerMsg) AckMatch() bool {
+	return true
+}
+
 func (m *AddServerMsg) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {

@@ -114,6 +114,38 @@ type VM struct {
 	HighestAsk      int                  // highest ask sent to MMR for this VM
 	HighestNil      int                  // Debug highest nil reported
 	p               *ProcessList         // processList this VM part of
+
+	Acks map[[32]byte]*messages.Ack // As a follower, we want to "pre match" messages with their acks
+	Msgs map[[32]byte]interfaces.IMsg
+}
+
+func (vm *VM) Match(msg interfaces.IMsg) (*messages.Ack, interfaces.IMsg) {
+
+	// If the message does not need a match to an Ack (doesn't go in the process list) then just return a nil for the ack
+	if !msg.AckMatch() || vm == nil {
+		return nil, msg
+	}
+
+	// Is this message really an Ack?
+	ack, ok := msg.(*messages.Ack)
+
+	// If this is an Ack, then look and see if we have the message.  Return nil, nil if we don't, or both the msg and the ack if we do.
+	if ok {
+		msg := vm.Msgs[ack.GetHash().Fixed()]
+		if msg != nil {
+			return ack, msg
+		}
+		vm.Acks[ack.GetHash().Fixed()] = ack
+		return nil, nil
+	}
+
+	ack = vm.Acks[msg.GetHash().Fixed()]
+	if ack != nil {
+		return ack, msg
+	}
+
+	vm.Msgs[msg.GetHash().Fixed()] = msg
+	return nil, nil
 }
 
 func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
@@ -877,6 +909,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 					s.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
 					delete(s.Acks, msgHashFixed)
+					delete(vm.Acks(msg.GetHash()))
+					delete(vm.Msgs(msg.GetHash()))
 					//delete(s.Holding, msgHashFixed)
 
 					s.DeleteFromHolding(msgHashFixed, msg, "msg.Process done")
@@ -1224,6 +1258,7 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 
 	now := state.GetTimestamp()
 	// We just make lots of VMs as they have nearly no impact if not used.
+	plp := state.(*State).ProcessLists.Get(dbheight - 1)
 	pl.VMs = make([]*VM, 65)
 	for i := 0; i < 65; i++ {
 		pl.VMs[i] = new(VM)
@@ -1233,6 +1268,13 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.VMs[i].ProcessTime = now
 		pl.VMs[i].VmIndex = i
 		pl.VMs[i].p = pl
+		if plp == nil || plp.VMs[i] == nil {
+			pl.VMs[i].Acks = make(map[[32]byte]*messages.Ack, 0)
+			pl.VMs[i].Msgs = make(map[[32]byte]interfaces.IMsg, 0)
+		} else {
+			pl.VMs[i].Acks = plp.VMs[i].Acks
+			pl.VMs[i].Msgs = plp.VMs[i].Msgs
+		}
 	}
 
 	pl.DBHeight = dbheight

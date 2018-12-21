@@ -35,6 +35,10 @@ type ChangeServerKeyMsg struct {
 var _ interfaces.IMsg = (*ChangeServerKeyMsg)(nil)
 var _ interfaces.Signable = (*ChangeServerKeyMsg)(nil)
 
+func (m *ChangeServerKeyMsg) AckMatch() bool {
+	return true
+}
+
 func (m *ChangeServerKeyMsg) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {

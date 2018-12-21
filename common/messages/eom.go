@@ -44,6 +44,10 @@ type EOM struct {
 var _ interfaces.Signable = (*EOM)(nil)
 var _ interfaces.IMsg = (*EOM)(nil)
 
+func (m *EOM) AckMatch() bool {
+	return true
+}
+
 func (a *EOM) IsSameAs(b *EOM) bool {
 	if b == nil {
 		return false
