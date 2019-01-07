@@ -1395,8 +1395,19 @@ func HandleV2Diagnostics(state interfaces.IState, params interface{}) (interface
 	resp.LeaderHeight = state.GetTrueLeaderHeight()
 	resp.CurrentHeight = state.GetLLeaderHeight()
 	resp.CurrentMinute = state.GetCurrentMinute()
-	resp.CurrentMinuteDuration = time.Now().UnixNano() - state.GetCurrentMinuteStartTime()
-	resp.PrevMinuteDuration = state.GetCurrentMinuteStartTime() - state.GetPreviousMinuteStartTime()
+
+	// Check if we have enough information to calculate minute durations
+	if state.GetCurrentMinuteStartTime() == 0 {
+		resp.CurrentMinuteDuration = 0
+	} else {
+		resp.CurrentMinuteDuration = time.Now().UnixNano() - state.GetCurrentMinuteStartTime()
+	}
+	if state.GetPreviousMinuteStartTime() == 0 {
+		resp.PrevMinuteDuration = 0
+	} else {
+		resp.PrevMinuteDuration = state.GetCurrentMinuteStartTime() - state.GetPreviousMinuteStartTime()
+	}
+
 	resp.BalanceHash = state.GetFactoidState().GetBalanceHash(false).String()
 	resp.TempBalanceHash = state.GetFactoidState().GetBalanceHash(true).String()
 	resp.LastBlockFromDBState = state.DidCreateLastBlockFromDBState()
