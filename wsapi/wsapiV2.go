@@ -1400,12 +1400,14 @@ func HandleV2Diagnostics(state interfaces.IState, params interface{}) (interface
 	if state.GetCurrentMinuteStartTime() == 0 {
 		resp.CurrentMinuteDuration = 0
 	} else {
-		resp.CurrentMinuteDuration = time.Now().UnixNano() - state.GetCurrentMinuteStartTime()
+		duration := time.Duration(time.Now().UnixNano() - state.GetCurrentMinuteStartTime())
+		resp.CurrentMinuteDuration = duration.Seconds()
 	}
 	if state.GetPreviousMinuteStartTime() == 0 {
 		resp.PrevMinuteDuration = 0
 	} else {
-		resp.PrevMinuteDuration = state.GetCurrentMinuteStartTime() - state.GetPreviousMinuteStartTime()
+		duration := time.Duration(state.GetCurrentMinuteStartTime() - state.GetPreviousMinuteStartTime())
+		resp.PrevMinuteDuration = duration.Seconds()
 	}
 
 	resp.BalanceHash = state.GetFactoidState().GetBalanceHash(false).String()

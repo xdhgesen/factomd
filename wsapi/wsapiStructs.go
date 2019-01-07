@@ -310,14 +310,14 @@ type DiagnosticsResponse struct {
 	PublicKey string `json:"publickey,omitempty"`
 	Role      string `json:"role"`
 
-	LeaderHeight          uint32 `json:"leaderheight"`
-	CurrentHeight         uint32 `json:"currentheight"`
-	CurrentMinute         int    `json:"currentminute"`
-	CurrentMinuteDuration int64  `json:"currentminuteduration"`
-	PrevMinuteDuration    int64  `json:"previousminuteduration"`
-	BalanceHash           string `json:"balancehash"`
-	TempBalanceHash       string `json:"tempbalancehash"`
-	LastBlockFromDBState  bool   `json:"lastblockfromdbstate"`
+	LeaderHeight          uint32  `json:"leaderheight"`
+	CurrentHeight         uint32  `json:"currentheight"`
+	CurrentMinute         int     `json:"currentminute"`
+	CurrentMinuteDuration float64 `json:"currentminuteduration"`
+	PrevMinuteDuration    float64 `json:"previousminuteduration"`
+	BalanceHash           string  `json:"balancehash"`
+	TempBalanceHash       string  `json:"tempbalancehash"`
+	LastBlockFromDBState  bool    `json:"lastblockfromdbstate"`
 
 	SyncInfo     *SyncInfo     `json:"syncing"`
 	AuthSet      *AuthSet      `json:"authset"`
