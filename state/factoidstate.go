@@ -97,8 +97,13 @@ func GetMapHash(dbheight uint32, bmap map[[32]byte]int64) interfaces.IHash {
 }
 
 func (fs *FactoidState) GetBalanceHash(includeTemp bool) interfaces.IHash {
+	fs.State.ECBalancesPMutex.Lock()
+	fs.State.FactoidBalancesPMutex.Lock()
 	h1 := GetMapHash(fs.DBHeight, fs.State.FactoidBalancesP)
 	h2 := GetMapHash(fs.DBHeight, fs.State.ECBalancesP)
+	fs.State.ECBalancesPMutex.Unlock()
+	fs.State.FactoidBalancesPMutex.Unlock()
+
 	h3 := h1
 	h4 := h2
 	if includeTemp {
