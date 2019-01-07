@@ -1392,7 +1392,8 @@ func HandleV2Diagnostics(state interfaces.IState, params interface{}) (interface
 	resp.ID = state.GetIdentityChainID().String()
 	resp.PublicKey = state.GetServerPublicKeyString()
 
-	resp.LeaderHeight = state.GetLLeaderHeight()
+	resp.LeaderHeight = state.GetTrueLeaderHeight()
+	resp.CurrentHeight = state.GetLLeaderHeight()
 	resp.CurrentMinute = state.GetCurrentMinute()
 	resp.CurrentMinuteDuration = time.Now().UnixNano() - state.GetCurrentMinuteStartTime()
 	resp.PrevMinuteDuration = state.GetCurrentMinuteStartTime() - state.GetPreviousMinuteStartTime()

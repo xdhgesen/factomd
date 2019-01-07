@@ -311,6 +311,7 @@ type DiagnosticsResponse struct {
 	Role      string `json:"role"`
 
 	LeaderHeight          uint32 `json:"leaderheight"`
+	CurrentHeight         uint32 `json:"currentheight"`
 	CurrentMinute         int    `json:"currentminute"`
 	CurrentMinuteDuration int64  `json:"currentminuteduration"`
 	PrevMinuteDuration    int64  `json:"previousminuteduration"`
