@@ -28,12 +28,6 @@ func has(s *State, entry interfaces.IHash) bool {
 		if err != nil {
 			return false
 		}
-
-		entry, err2 := s.DB.FetchEntry(entry)
-		if err2 != nil || entry == nil {
-			panic("Should not happen;  key exists but not entry")
-			return false
-		}
 	}
 	return exists
 }
@@ -84,7 +78,7 @@ func (s *State) MakeMissingEntryRequests() {
 
 		// Keep our map of entries that we are asking for filled up.
 	fillMap:
-		for len(MissingEntryMap) < 3000 {
+		for len(MissingEntryMap) < 6000 {
 			select {
 			case et := <-s.MissingEntries:
 				missing++
@@ -107,7 +101,7 @@ func (s *State) MakeMissingEntryRequests() {
 					continue
 				}
 
-				max := 100
+				max := 3000
 				// If using torrent and the saved height is more than 750 behind, let torrent do it's work, and don't send out
 				// missing message requests
 				if s.UsingTorrent() && s.GetLeaderHeight() > 1000 && s.GetHighestSavedBlk() < s.GetLeaderHeight()-750 {
@@ -155,14 +149,7 @@ func (s *State) MakeMissingEntryRequests() {
 			}
 		}
 		if sent == 0 {
-			if s.GetHighestKnownBlock()-s.GetHighestSavedBlk() > 100 {
-				time.Sleep(10 * time.Second)
-			} else {
-				time.Sleep(100 * time.Millisecond)
-			}
-			if s.EntryDBHeightComplete == s.GetHighestSavedBlk() {
-				time.Sleep(20 * time.Second)
-			}
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
@@ -306,8 +293,7 @@ func (s *State) GoSyncEntries() {
 		if firstMissing < 0 {
 			s.EntryDBHeightComplete = s.GetHighestSavedBlk()
 			s.LogPrintf("EntrySync", "firstMissing EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
-
-			time.Sleep(500 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 
 		time.Sleep(100 * time.Millisecond)

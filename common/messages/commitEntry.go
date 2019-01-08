@@ -27,7 +27,8 @@ type CommitEntryMsg struct {
 	Signature interfaces.IFullSignature
 
 	//Not marshalled
-	hash interfaces.IHash
+	hash    interfaces.IHash
+	sighash interfaces.IHash
 
 	// Not marshalled... Just used by the leader
 	count        int

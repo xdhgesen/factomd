@@ -21,6 +21,9 @@ func (state *State) ValidatorLoop() {
 	var prev time.Time
 	state.validatorLoopThreadID = atomic.Goid()
 	for {
+		if state.DBFinished && state.GetHighestSavedBlk()-state.EntryDBHeightComplete > 100 {
+			time.Sleep(20 * time.Millisecond)
+		}
 		s := state
 		if state.DebugExec() {
 			status := ""
