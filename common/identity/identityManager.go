@@ -5,15 +5,12 @@
 package identity
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 	"math/rand"
+	"sort"
 	"sync"
 
 	"github.com/FactomProject/factomd/common/messages"
-
-	"sort"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -187,23 +184,23 @@ func (im *IdentityManager) AuditServerCount() int {
 	return answer
 }
 
-func (im *IdentityManager) GobDecode(data []byte) error {
-	//Circumventing Gob's "gob: type sync.RWMutex has no exported fields"
-	b := bytes.NewBuffer(data)
-	dec := gob.NewDecoder(b)
-	return dec.Decode(&im.IdentityManagerWithoutMutex)
-}
-
-func (im *IdentityManager) GobEncode() ([]byte, error) {
-	//Circumventing Gob's "gob: type sync.RWMutex has no exported fields"
-	b := bytes.NewBuffer(nil)
-	enc := gob.NewEncoder(b)
-	err := enc.Encode(im.IdentityManagerWithoutMutex)
-	if err != nil {
-		return nil, err
-	}
-	return b.Bytes(), nil
-}
+//func (im *IdentityManager) GobDecode(data []byte) error {
+//	//Circumventing Gob's "gob: type sync.RWMutex has no exported fields"
+//	b := bytes.NewBuffer(data)
+//	dec := gob.NewDecoder(b)
+//	return dec.Decode(&im.IdentityManagerWithoutMutex)
+//}
+//
+//func (im *IdentityManager) GobEncode() ([]byte, error) {
+//	//Circumventing Gob's "gob: type sync.RWMutex has no exported fields"
+//	b := bytes.NewBuffer(nil)
+//	enc := gob.NewEncoder(b)
+//	err := enc.Encode(im.IdentityManagerWithoutMutex)
+//	if err != nil {
+//		return nil, err
+//	}
+//	return b.Bytes(), nil
+//}
 
 func (im *IdentityManager) Init() {
 	// Do nothing, it used to init the maps if they were empty, but we init the Identity control with non-empty maps
@@ -219,7 +216,7 @@ func (im *IdentityManager) SetIdentity(chainID interfaces.IHash, id *Identity) {
 	s := fmt.Sprintf("%x", chainID.Bytes())
 	_ = s
 	defer func() {
-		messages.LogPrintf("identity", "SetIdentity(ChainID %x to ID(%p) %x %s)", chainID, id, id.IdentityChainID.Bytes()[3:6], id.String())
+		messages.LogPrintf("identity.txt", "SetIdentity(ChainID %x to ID(%p) %x %s)", chainID.Bytes()[0:6], id, id.IdentityChainID.Bytes()[3:6], id.String())
 	}()
 	im.Init()
 	im.Mutex.Lock()
@@ -232,7 +229,7 @@ func (im *IdentityManager) RemoveIdentity(chainID interfaces.IHash) (rval bool) 
 	defer func(r *bool) {
 		id, ok := im.Identities[chainID.Fixed()]
 		if ok {
-			messages.LogPrintf("identity", "RemoveIdentity(ChainID %x to ID(%p) %x %s) = %v", chainID, id, id.IdentityChainID.Bytes()[3:6], id.String(), *r)
+			messages.LogPrintf("identity.txt", "RemoveIdentity(ChainID %x to ID(%p) %x %s) = %v", chainID.Bytes()[0:6], id, id.IdentityChainID.Bytes()[3:6], id.String(), *r)
 		}
 	}(&rval)
 
@@ -316,7 +313,7 @@ func (im *IdentityManager) GetIdentities() []*Identity {
 
 func (im *IdentityManager) SetAuthority(chainID interfaces.IHash, auth *Authority) {
 	defer func() {
-		messages.LogPrintf("identity", "SetAuthority(ChainID %x to ID(%p) %x)", chainID, auth, auth.AuthorityChainID.Bytes()[3:6])
+		messages.LogPrintf("identity.txt", "SetAuthority(ChainID %x to ID(%p) %x)", chainID.Bytes()[:6], auth, auth.AuthorityChainID.Bytes()[3:6])
 	}()
 
 	im.Init()
@@ -329,7 +326,7 @@ func (im *IdentityManager) RemoveAuthority(chainID interfaces.IHash) (rval bool)
 	defer func(r *bool) {
 		id, ok := im.Identities[chainID.Fixed()]
 		if ok {
-			messages.LogPrintf("identity", "RemoveAuthority(ChainID %x to ID(%p) %x %s) = %v", chainID, id, id.IdentityChainID.Bytes()[3:6], id.String(), *r)
+			messages.LogPrintf("identity.txt", "RemoveAuthority(ChainID %x to ID(%p) %x %s) = %v", chainID.Bytes()[:6], id, id.IdentityChainID.Bytes()[3:6], id.String(), *r)
 		}
 	}(&rval)
 
@@ -517,6 +514,7 @@ func (im *IdentityManager) UnmarshalBinaryData(p []byte) (newData []byte, err er
 		return
 	}
 
+	messages.LogPrintf(atomic.Goid()+"im.txt", "Unmarshal %d authorities", al)
 	newData = buf.Bytes()
 	for i := 0; i < al; i++ {
 		a := NewAuthority()
@@ -525,6 +523,8 @@ func (im *IdentityManager) UnmarshalBinaryData(p []byte) (newData []byte, err er
 			return
 		}
 		im.Authorities[a.AuthorityChainID.Fixed()] = a
+		messages.LogPrintf(atomic.Goid()+"im.txt", "%x", a.AuthorityChainID.Bytes()[:6])
+
 	}
 	buf = primitives.NewBuffer(newData)
 
@@ -532,6 +532,7 @@ func (im *IdentityManager) UnmarshalBinaryData(p []byte) (newData []byte, err er
 	if err != nil {
 		return
 	}
+	messages.LogPrintf(atomic.Goid()+"im.txt", "Unmarshal %d Identities", il)
 
 	newData = buf.Bytes()
 	for i := 0; i < il; i++ {
@@ -541,6 +542,8 @@ func (im *IdentityManager) UnmarshalBinaryData(p []byte) (newData []byte, err er
 			return
 		}
 		im.Identities[a.IdentityChainID.Fixed()] = a
+		messages.LogPrintf(atomic.Goid()+"im.txt", "%x", a.IdentityChainID.Bytes()[:6])
+
 	}
 	buf = primitives.NewBuffer(newData)
 
@@ -577,11 +580,16 @@ func (im *IdentityManager) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 
-	for _, a := range im.GetSortedAuthorities() {
+	authorities := im.GetSortedAuthorities()
+
+	messages.LogPrintf(atomic.Goid()+"im.txt", "Marshal %d authorities", len(authorities))
+
+	for _, a := range authorities {
 		err = buf.PushBinaryMarshallable(a)
 		if err != nil {
 			return nil, err
 		}
+		messages.LogPrintf(atomic.Goid()+"im.txt", "%x", a.GetAuthorityChainID().Bytes()[:6])
 	}
 
 	err = buf.PushInt(len(im.Identities))
@@ -589,11 +597,14 @@ func (im *IdentityManager) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 
-	for _, i := range im.GetSortedIdentities() {
+	identities := im.GetSortedIdentities()
+	messages.LogPrintf(atomic.Goid()+"im.txt", "Marshal %d identities", len(identities))
+	for _, i := range identities {
 		err = buf.PushBinaryMarshallable(i)
 		if err != nil {
 			return nil, err
 		}
+		messages.LogPrintf(atomic.Goid()+"im.txt", "%x", i.IdentityChainID.Bytes()[:6])
 	}
 
 	err = buf.PushInt(len(im.IdentityRegistrations))

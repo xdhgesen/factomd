@@ -24,7 +24,7 @@ var _ = DecodeIdentityChainStructureFromExtIDs
 
 // identLogger is the general logger for all identity related logs. You can add additional fields,
 // or create more context loggers off of this
-var identLogger = packageLogger.WithFields(log.Fields{"subpack": "identity"})
+var identLogger = packageLogger.WithFields(log.Fields{"subpack": "identity.txt"})
 
 var (
 	// Time window for identity to require registration: 24hours = 144 blocks

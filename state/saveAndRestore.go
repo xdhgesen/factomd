@@ -666,6 +666,12 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.IdentityControl = ss.IdentityControl
 	s.LogPrintf("savestate", "IdentityControl %s", spew.Sdump(s.IdentityControl))
 
+	s.LogPrintf("savestate", "Authorities %s", spew.Sdump(s.IdentityControl.Authorities))
+
+	for k, v := range s.IdentityControl.Authorities {
+		s.LogPrintf("savestate", " auth %x %#v", k, v)
+	}
+
 	if s.IdentityControl == nil {
 		atomic.WhereAmIMsg("Missing IdentityControl")
 	}
