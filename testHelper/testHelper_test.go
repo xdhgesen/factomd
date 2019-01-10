@@ -215,7 +215,7 @@ func TestRevealEntry(t *testing.T) {
 		Content: encode("Hello World!"),
 	}
 
-	reveal, err := ComposeRevealEntryMsg(pkey, e)
+	reveal, err := ComposeRevealEntryMsg(pkey, &e)
 	assert.Nil(t, err)
 	assert.True(t, reveal.IsValid())
 	//println(reveal.String())
