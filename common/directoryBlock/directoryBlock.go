@@ -480,8 +480,11 @@ func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 }
 
 func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {
-	var dbentry interfaces.IDBEntry
-	dbentry = new(DBEntry)
+
+	b.DBHash = nil
+	b.keyMR = nil
+
+	dbentry := new(DBEntry)
 	dbentry.SetChainID(chainID)
 	dbentry.SetKeyMR(keyMR)
 
