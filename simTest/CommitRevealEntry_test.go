@@ -23,6 +23,7 @@ func waitForAnyDeposit(s *state.State, ecPub string) int64 {
 }
 
 func waitForZero(s *state.State, ecPub string) int64 {
+	fmt.Println("Waiting for Zero Balance")
 	return waitForEcBalance(s, ecPub, 0)
 }
 
@@ -34,6 +35,7 @@ func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 		//fmt.Printf("WaitForBalance: %v => %v\n", ecPub, bal)
 
 		if (target == 0 && bal == 0) || (target > 0 && bal >= target) {
+			fmt.Printf("found balance: %v\n", bal)
 			return bal
 		}
 	}
@@ -49,7 +51,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	extids := [][]byte{encode("foo"), encode("bar")}
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
-	numEntries := 7001 //
+	numEntries := 8001 //
 
 	t.Run("generate accounts", func(t *testing.T) {
 		println(b.String())
@@ -57,7 +59,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 20, 1, 1, t)
+		state0 := SetupSim("LAF", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
 
 		stop := func() {
 			ShutDownEverything(t)
@@ -110,7 +112,13 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 		t.Run("End simulation", func(t *testing.T) {
 			waitForZero(state0, a.EcPub())
-			WaitBlocks(state0, 1)
+			ht := state0.GetDBHeightComplete()
+			//WaitBlocks(state0, 10)
+			WaitForBlock(state0, 12)
+			newHt := state0.GetDBHeightComplete()
+			//fmt.Printf("Old: %v New: %v", ht, newHt)
+			assert.True(t, ht < newHt, "block height should progress")
+			assert.True(t, newHt >= uint32(11), "should be past block 10")
 			stop()
 		})
 
