@@ -52,7 +52,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
-	numEntries := 5001 // set the total number of entries to add
+	numEntries := 3001 // set the total number of entries to add
 
 	t.Run("generate accounts", func(t *testing.T) {
 		println(b.String())
