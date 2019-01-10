@@ -18,35 +18,25 @@ func encode(s string) []byte {
 	return b.Bytes()
 }
 
-func waitForEcBalance(s *state.State, ecPub string) int64 {
-	var bal int64 = 0
+func waitForAnyDeposit(s *state.State, ecPub string) int64 {
+	return waitForEcBalance(s, ecPub, 1)
+}
+
+func waitForZero(s *state.State, ecPub string) int64 {
+	return waitForEcBalance(s, ecPub, 0)
+}
+
+func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 
 	for {
-		bal = engine.GetBalanceEC(s, ecPub)
+		bal := engine.GetBalanceEC(s, ecPub)
 		time.Sleep(time.Millisecond * 200)
 		//fmt.Printf("WaitForBalance: %v => %v\n", ecPub, bal)
 
-		if bal > 0 {
+		if (target == 0 && bal == 0) || (target > 0 && bal >= target) {
 			return bal
 		}
 	}
-}
-
-func TestFundingECWallet(t *testing.T) {
-	if RanSimTest {
-		return
-	}
-	RanSimTest = true
-	b := GetBankAccount()
-
-	t.Run("buy entry credits", func(t *testing.T) {
-		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 10, 1, 1, t)
-		engine.FundECWallet(state0, b.FctPrivHash(), b.EcAddr(), 333*state0.GetFactoshisPerEC())
-		bal := waitForEcBalance(state0, b.EcPub())
-		WaitBlocks(state0, 10)
-		ShutDownEverything(t)
-		assert.Equal(t, bal, int64(333))
-	})
 }
 
 func TestSendingCommitAndReveal(t *testing.T) {
@@ -59,7 +49,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	extids := [][]byte{encode("foo"), encode("bar")}
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
-	numEntries := 21 // including head entry
+	numEntries := 7001 //
 
 	t.Run("generate accounts", func(t *testing.T) {
 		println(b.String())
@@ -113,20 +103,22 @@ func TestSendingCommitAndReveal(t *testing.T) {
 		})
 
 		t.Run("Fund EC Address", func(t *testing.T) {
-			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), 444*state0.GetFactoshisPerEC())
-			bal := waitForEcBalance(state0, a.EcPub())
-			assert.Equal(t, bal, int64(444))
+			amt :=  uint64(numEntries+10)
+			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
+			waitForAnyDeposit(state0, a.EcPub())
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
-			WaitBlocks(state0, 2)
+			waitForZero(state0, a.EcPub())
+			WaitBlocks(state0, 1)
 			stop()
 		})
 
 		t.Run("Verify Entries", func(t *testing.T) {
 
 			bal := engine.GetBalanceEC(state0, a.EcPub())
-			assert.Equal(t, int64(444-numEntries-10), bal, "EC spend mismatch")
+			//fmt.Printf("Bal: => %v", bal)
+			assert.Equal(t, bal, int64(0))
 
 			for _, v := range state0.Holding {
 				s, _ := v.JSONString()
