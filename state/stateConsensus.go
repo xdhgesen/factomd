@@ -122,14 +122,14 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 				cur := s.GetDBState(s.LLeaderHeight)
 
 				if prev == nil {
-					s.Log("executeMsg", "ERROR: prev.DirectoryBlock is nil")
+					s.LogPrintf("executeMsg", "ERROR: prev.DirectoryBlock(%d) is nil", s.LLeaderHeight)
 				} else if prev.DirectoryBlock == nil {
-					s.Log("executeMsg", "ERROR: prev.DirectoryBlock is nil")
+					s.LogPrintf("executeMsg", "ERROR: prev.DirectoryBlock(%d) is nil", s.LLeaderHeight)
 				} else if prev.DirectoryBlock.GetTimestamp() == nil {
-					s.Log("executeMsg", "ERROR: prev.DirectoryBlock.GetTimestamp() is nil")
+					s.LogPrintf("executeMsg", "ERROR: prev.DirectoryBlock(%d).GetTimestamp() is nil", s.LLeaderHeight)
+				} else {
+					s.LogPrintf("executeMsg", "prev %v", prev.DirectoryBlock.GetTimestamp().String())
 				}
-
-				s.LogPrintf("executeMsg", "prev %v", prev.DirectoryBlock.GetTimestamp().String())
 				if cur != nil {
 					s.LogPrintf("executeMsg", "curr %v ", cur.DirectoryBlock.GetTimestamp().String())
 				}
