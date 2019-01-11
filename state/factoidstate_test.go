@@ -154,6 +154,7 @@ func TestBalanceHash(t *testing.T) {
 }
 
 func TestGetMapHash(t *testing.T) {
+
 	bmap := map[[32]byte]int64{}
 
 	//using some arbitrary IDs
