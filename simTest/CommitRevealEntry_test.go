@@ -3,13 +3,14 @@ package simtest
 import (
 	"bytes"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func encode(s string) []byte {
@@ -60,14 +61,36 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("LAF", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
+		state0 := SetupSim("LLLA", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
 
 		stop := func() {
 			ShutDownEverything(t)
 			WaitForAllNodes(state0)
 		}
 
-		t.Run("Create Entries Before Chain", func(t *testing.T) {
+		t.Run("Fund EC Address", func(t *testing.T) {
+			amt := uint64(numEntries + 10)
+			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
+			waitForAnyDeposit(state0, a.EcPub())
+		})
+
+		t.Run("Create Chain", func(t *testing.T) {
+			e := factom.Entry{
+				ChainID: id,
+				ExtIDs:  extids,
+				Content: encode("Hello World!"),
+			}
+
+			c := factom.NewChain(&e)
+
+			commit, _ := ComposeChainCommit(a.Priv, c)
+			reveal, _ := ComposeRevealEntryMsg(a.Priv, c.FirstEntry)
+
+			state0.APIQueue().Enqueue(commit)
+			state0.APIQueue().Enqueue(reveal)
+		})
+
+		t.Run("Create Entries After Chain", func(t *testing.T) {
 
 			publish := func(i int) {
 				e := factom.Entry{
@@ -87,28 +110,6 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			for x := 1; x < numEntries; x++ {
 				publish(x)
 			}
-		})
-
-		t.Run("Create Chain", func(t *testing.T) {
-			e := factom.Entry{
-				ChainID: id,
-				ExtIDs:  extids,
-				Content: encode("Hello World!"),
-			}
-
-			c := factom.NewChain(&e)
-
-			commit, _ := ComposeChainCommit(a.Priv, c)
-			reveal, _ := ComposeRevealEntryMsg(a.Priv, c.FirstEntry)
-
-			state0.APIQueue().Enqueue(commit)
-			state0.APIQueue().Enqueue(reveal)
-		})
-
-		t.Run("Fund EC Address", func(t *testing.T) {
-			amt := uint64(numEntries + 10)
-			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
-			waitForAnyDeposit(state0, a.EcPub())
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
