@@ -15,9 +15,10 @@ import (
 
 	"time"
 
-	"github.com/FactomProject/factomd/state"
 	"fmt"
 	"os"
+
+	"github.com/FactomProject/factomd/state"
 
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 )

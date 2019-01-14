@@ -234,7 +234,8 @@ var findHex *regexp.Regexp
 
 // Look up the hex string in the map of names...
 func LookupName(s string) string {
-	n, ok := globals.FnodeNames[s]
+	foo := globals.FnodeNames
+	n, ok := foo[s]
 	if ok {
 		return "<" + n + ">"
 	}

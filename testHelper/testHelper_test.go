@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"testing"
+
 	"github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/common/entryBlock"
@@ -12,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/engine"
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 /*
@@ -173,7 +174,6 @@ func TestTxnCreate(t *testing.T) {
 	assert.Equal(t, outAddress, txn.Outputs[0].GetUserAddress())
 }
 
-
 func TestCommitEntry(t *testing.T) {
 
 	pkey := primitives.RandomPrivateKey()
@@ -231,9 +231,9 @@ func TestAccountHelper(t *testing.T) {
 func TestChainCommit(t *testing.T) {
 	b := GetBankAccount()
 	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
-    extids := [][]byte{encode("foo"), encode("bar")}
+	extids := [][]byte{encode("foo"), encode("bar")}
 
-	e := factom.Entry{ ChainID: id, ExtIDs:  extids, Content: encode("Hello World!"), }
+	e := factom.Entry{ChainID: id, ExtIDs: extids, Content: encode("Hello World!")}
 	c := factom.NewChain(&e)
 	assert.Equal(t, c.ChainID, id)
 
@@ -243,4 +243,3 @@ func TestChainCommit(t *testing.T) {
 	assert.True(t, m.CommitChain.IsValid())
 	assert.True(t, m.IsValid())
 }
-
