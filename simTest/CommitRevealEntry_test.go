@@ -98,21 +98,23 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 			state0.APIQueue().Enqueue(commit)
 			state0.APIQueue().Enqueue(reveal)
+
+			t.Run("Fund ChainCommit Address", func(t *testing.T) {
+				amt := uint64(11)
+				engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
+				waitForAnyDeposit(state0, a.EcPub())
+			})
 		})
 
-		t.Run("Fund ChainCommit Address", func(t *testing.T) {
-			amt := uint64(11)
-			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
-			waitForAnyDeposit(state0, a.EcPub())
-		})
 
 		t.Run("Generate Entries in Batches", func(t *testing.T) {
 			waitForZero(state0, a.EcPub())
-			//GenerateCommitsAndRevealsInBatches(t, state0)
+			GenerateCommitsAndRevealsInBatches(t, state0)
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
-			waitForZero(state0, a.EcPub())
+			// FIXME somehow the EC entry math is wrong - 10 EC end up being stuck here
+			//waitForZero(state0, a.EcPub())
 			ht := state0.GetDBHeightComplete()
 			WaitBlocks(state0, 2)
 			newHt := state0.GetDBHeightComplete()
@@ -125,14 +127,14 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 
-	var numEntries int = 10 // set the total number of entries to add
 
 	// KLUDGE vars duplicated from original test - should refactor
 	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
-
+	// NOTE to send more entries/batches change numbers here
+	var numEntries int = 1000 // set the total number of entries to add
 	for BatchID := 0; BatchID < 10; BatchID++ {
 
 		publish := func(i int) {
@@ -157,7 +159,7 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 
 			waitForEmptyHolding(state0, fmt.Sprintf("START%v", BatchID))
 
-			for x := 1; x < numEntries; x++ {
+			for x := 1; x <= numEntries; x++ {
 				publish(x)
 			}
 
@@ -168,17 +170,18 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 			})
 
 			waitForEmptyHolding(state0, fmt.Sprintf("END%v", BatchID))
+
+			t.Run("Verify Entries", func(t *testing.T) {
+
+				bal := engine.GetBalanceEC(state0, a.EcPub())
+				assert.Equal(t, bal, int64(0))
+
+				// TODO: actually check for confirmed entries
+				assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
+				WaitBlocks(state0, 1)
+			})
 		})
 
-		t.Run("Verify Entries", func(t *testing.T) {
-
-			bal := engine.GetBalanceEC(state0, a.EcPub())
-			assert.Equal(t, bal, int64(0))
-
-			// TODO: actually check for confirmed entries
-			assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
-			WaitBlocks(state0, 1)
-		})
 
 	}
 
