@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// KLUDGE likely already exists elsewhere
 func encode(s string) []byte {
 	b := bytes.Buffer{}
 	b.WriteString(s)
@@ -26,6 +27,15 @@ func waitForAnyDeposit(s *state.State, ecPub string) int64 {
 func waitForZero(s *state.State, ecPub string) int64 {
 	fmt.Println("Waiting for Zero Balance")
 	return waitForEcBalance(s, ecPub, 0)
+}
+
+func waitForEmptyHolding(s *state.State, msg string) {
+	for len(s.Holding) > 0 {
+		time.Sleep(time.Millisecond * 50)
+	}
+	t := time.Now()
+	// TODO refactor to make this work w/ a debuglog file
+	fmt.Printf("%v@0 %v", msg, t)
 }
 
 func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
@@ -42,6 +52,8 @@ func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 	}
 }
 
+var numEntries int = 10 // set the total number of entries to add
+
 func TestSendingCommitAndReveal(t *testing.T) {
 	if RanSimTest {
 		return
@@ -53,7 +65,6 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
-	numEntries := 3001 // set the total number of entries to add
 
 	t.Run("generate accounts", func(t *testing.T) {
 		println(b.String())
@@ -61,18 +72,12 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("LLLA", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
+		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
 
 		stop := func() {
 			ShutDownEverything(t)
 			WaitForAllNodes(state0)
 		}
-
-		t.Run("Fund EC Address", func(t *testing.T) {
-			amt := uint64(numEntries + 10)
-			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
-			waitForAnyDeposit(state0, a.EcPub())
-		})
 
 		t.Run("Create Chain", func(t *testing.T) {
 			e := factom.Entry{
@@ -90,54 +95,78 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			state0.APIQueue().Enqueue(reveal)
 		})
 
-		t.Run("Create Entries After Chain", func(t *testing.T) {
-
-			publish := func(i int) {
-				e := factom.Entry{
-					ChainID: id,
-					ExtIDs:  extids,
-					Content: encode(fmt.Sprintf("hello@%v", i)), // ensure no duplicate msg hashes
-				}
-				i++
-
-				commit, _ := ComposeCommitEntryMsg(a.Priv, e)
-				reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
-
-				state0.APIQueue().Enqueue(commit)
-				state0.APIQueue().Enqueue(reveal)
-			}
-
-			for x := 1; x < numEntries; x++ {
-				publish(x)
-			}
+		t.Run("Generate Entries in Batches", func(t *testing.T) {
+			GenerateCommitsAndRevealsInBatches(t, state0)
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
 			waitForZero(state0, a.EcPub())
 			ht := state0.GetDBHeightComplete()
-			//WaitBlocks(state0, 10)
-			WaitForBlock(state0, 20) // FIXME if holding is backed up this may be past
+			WaitBlocks(state0, 2)
 			newHt := state0.GetDBHeightComplete()
-			//fmt.Printf("Old: %v New: %v", ht, newHt)
 			assert.True(t, ht < newHt, "block height should progress")
-			//assert.True(t, newHt >= uint32(11), "should be past block 10")
 			stop()
+		})
+
+	})
+}
+
+func GenerateCommitsAndRevealsInBatches(t  *testing.T, state0 *state.State) {
+
+	// KLUDGE vars duplicated from original test - should refactor
+	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
+	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
+	b := GetBankAccount()
+
+	for BatchID := 0; BatchID < 10; BatchID++ {
+
+	publish := func(i int) {
+
+		extids := [][]byte{encode(fmt.Sprintf("batch%v", BatchID ))}
+
+		e := factom.Entry{
+			ChainID: id,
+			ExtIDs:  extids,
+			Content: encode(fmt.Sprintf("batch %v, seq: %v", BatchID, i)), // ensure no duplicate msg hashes
+		}
+		i++
+
+		commit, _ := ComposeCommitEntryMsg(a.Priv, e)
+		reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
+
+		state0.APIQueue().Enqueue(commit)
+		state0.APIQueue().Enqueue(reveal)
+	}
+
+
+		t.Run(fmt.Sprintf("Create Entries Batch %v", BatchID), func(t *testing.T) {
+
+			waitForEmptyHolding(state0, fmt.Sprintf("START%v", BatchID))
+
+			for x := 1; x < numEntries; x++ {
+				publish(x)
+			}
+
+			t.Run("Fund EC Address", func(t *testing.T) {
+				amt := uint64(numEntries + 10)
+				engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
+				waitForAnyDeposit(state0, a.EcPub())
+			})
+
+			waitForEmptyHolding(state0, fmt.Sprintf("END%v", BatchID))
 		})
 
 		t.Run("Verify Entries", func(t *testing.T) {
 
-			bal := engine.GetBalanceEC(state0, a.EcPub())
-			//fmt.Printf("Bal: => %v", bal)
-			assert.Equal(t, bal, int64(0))
 
-			for _, v := range state0.Holding {
-				s, _ := v.JSONString()
-				println(s)
-			}
+			bal := engine.GetBalanceEC(state0, a.EcPub())
+			assert.Equal(t, bal, int64(0))
 
 			// TODO: actually check for confirmed entries
 			assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
+			WaitBlocks(state0, 1)
 		})
 
-	})
+	}
+
 }
