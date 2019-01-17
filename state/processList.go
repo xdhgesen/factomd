@@ -1285,15 +1285,18 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.DirectoryBlock = directoryBlock.NewDirectoryBlock(previous.DirectoryBlock)
 		pl.AdminBlock = adminBlock.NewAdminBlock(previous.AdminBlock)
 		pl.EntryCreditBlock, err = entryCreditBlock.NextECBlock(previous.EntryCreditBlock)
+		pl.DirectoryBlock.(*directoryBlock.DirectoryBlock).State = pl.State
 	} else {
 		if pl.DBHeight > 0 {
 			pl.DirectoryBlock, _ = state.GetDB().FetchDBlockByHeight(pl.DBHeight)
 			pl.AdminBlock, _ = state.GetDB().FetchABlockByHeight(pl.DBHeight)
 			pl.EntryCreditBlock, _ = state.GetDB().FetchECBlockByHeight(pl.DBHeight)
+			pl.DirectoryBlock.(*directoryBlock.DirectoryBlock).State = pl.State
 		} else {
 			pl.DirectoryBlock = directoryBlock.NewDirectoryBlock(nil)
 			pl.AdminBlock = adminBlock.NewAdminBlock(nil)
 			pl.EntryCreditBlock, err = entryCreditBlock.NextECBlock(nil)
+			pl.DirectoryBlock.(*directoryBlock.DirectoryBlock).State = pl.State
 		}
 	}
 

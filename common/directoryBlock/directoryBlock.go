@@ -16,6 +16,7 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var _ = fmt.Print
@@ -31,6 +32,7 @@ type DirectoryBlock struct {
 	//Marshalized
 	Header    interfaces.IDirectoryBlockHeader `json:"header"`
 	DBEntries []interfaces.IDBEntry            `json:"dbentries"`
+	State     interfaces.IState
 }
 
 var _ interfaces.Printable = (*DirectoryBlock)(nil)
@@ -179,6 +181,22 @@ func (c *DirectoryBlock) CheckDBEntries() error {
 }
 
 func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
+
+	keymr := c.KeyMR
+	hash := []byte{0, 0, 0, 0}
+	if keymr != nil {
+		hash = keymr.Bytes()[:4]
+	}
+	statename := "-"
+	if c.State != nil {
+		statename = c.State.GetFactomNodeName()
+	}
+
+	fmt.Fprintf(os.Stderr, "%20s GetKeyMR %x\n%v\n", statename, hash, atomic.WhereAmIString(2))
+	defer func() {
+		fmt.Fprintf(os.Stderr, "End: BuildBodyMR %x\n\n", hash)
+	}()
+
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
@@ -323,7 +341,9 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 }
 
 func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
+
 	count := uint32(len(b.GetDBEntries()))
+
 	b.GetHeader().SetBlockCount(count)
 	if count == 0 {
 		panic("Zero block size!")

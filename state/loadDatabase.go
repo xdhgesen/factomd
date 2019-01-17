@@ -117,7 +117,7 @@ func LoadDatabase(s *State) {
 			}
 		}
 		dblk, ablk, fblk, ecblk := GenerateGenesisBlocks(s.GetNetworkID(), customIdentity)
-
+		dblk.(*directoryBlock.DirectoryBlock).State = s
 		messages.LogPrintf("marshalsizes.txt", "FBlock unmarshaled transaction count: %d", len(fblk.GetTransactions()))
 
 		msg := messages.NewDBStateMsg(s.GetTimestamp(), dblk, ablk, fblk, ecblk, nil, nil, nil)

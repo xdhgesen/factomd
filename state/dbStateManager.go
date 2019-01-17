@@ -1362,6 +1362,7 @@ func ReadDBStateFromDebugFile(filename string) (*WholeBlock, error) {
 }
 
 func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
+
 	dbheight := int(d.DirectoryBlock.GetHeader().GetDBHeight())
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.
@@ -1544,13 +1545,13 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	}
 
 	// Not activated.  Set to true if you want extra checking of the data saved to the database.
-	if false {
+	if true {
 		good := true
 		mr, err := list.State.DB.FetchDBKeyMRByHeight(uint32(dbheight))
 		if err != nil {
 			list.State.LogPrintf("dbstateprocess", err.Error())
-			return
 			panic(fmt.Sprintf("%20s At Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			return
 		}
 		if mr == nil {
 			list.State.LogPrintf("dbstateprocess", "There is no mr returned by list.State.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
@@ -1565,13 +1566,14 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			} else {
 				list.State.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
 			}
-			return
 			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			return
 		}
 		if td.GetKeyMR().Fixed() != mr.Fixed() {
 			list.State.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
-			return
+			fmt.Fprintln(os.Stderr, d.DirectoryBlock.String(), "\n==============================================\n Should be:\n", td.String())
 			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			return
 		}
 		if !good {
 			return
