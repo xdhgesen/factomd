@@ -13,6 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var logName string = "simTest"
+
 // KLUDGE likely already exists elsewhere
 func encode(s string) []byte {
 	b := bytes.Buffer{}
@@ -30,15 +32,21 @@ func waitForZero(s *state.State, ecPub string) int64 {
 }
 
 func waitForEmptyHolding(s *state.State, msg string) {
+	t := time.Now()
+	s.LogPrintf(logName, "WaitForEmptyHolding %v %v", t, msg)
+
 	for len(s.Holding) > 0 {
 		time.Sleep(time.Millisecond * 50)
 	}
-	t := time.Now()
-	// TODO refactor to make this work w/ a debuglog file
-	fmt.Printf("%v@0 %v", msg, t)
+
+	t = time.Now()
+	s.LogPrintf(logName, "EmptyHolding %v %v", t, msg)
+
 }
 
 func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
+
+	s.LogPrintf(logName, "WaitForBalance%v:  %v", target, ecPub)
 
 	for {
 		bal := engine.GetBalanceEC(s, ecPub)
@@ -46,13 +54,11 @@ func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 		//fmt.Printf("WaitForBalance: %v => %v\n", ecPub, bal)
 
 		if (target == 0 && bal == 0) || (target > 0 && bal >= target) {
-			fmt.Printf("found balance: %v\n", bal)
+			s.LogPrintf(logName, "FoundBalance%v: %v", target, bal)
 			return bal
 		}
 	}
 }
-
-var numEntries int = 10 // set the total number of entries to add
 
 func TestSendingCommitAndReveal(t *testing.T) {
 	if RanSimTest {
@@ -64,7 +70,6 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	extids := [][]byte{encode("foo"), encode("bar")}
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
-
 
 	t.Run("generate accounts", func(t *testing.T) {
 		println(b.String())
@@ -95,8 +100,15 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			state0.APIQueue().Enqueue(reveal)
 		})
 
+		t.Run("Fund ChainCommit Address", func(t *testing.T) {
+			amt := uint64(11)
+			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
+			waitForAnyDeposit(state0, a.EcPub())
+		})
+
 		t.Run("Generate Entries in Batches", func(t *testing.T) {
-			GenerateCommitsAndRevealsInBatches(t, state0)
+			waitForZero(state0, a.EcPub())
+			//GenerateCommitsAndRevealsInBatches(t, state0)
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
@@ -111,33 +123,35 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 }
 
-func GenerateCommitsAndRevealsInBatches(t  *testing.T, state0 *state.State) {
+func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
+
+	var numEntries int = 10 // set the total number of entries to add
 
 	// KLUDGE vars duplicated from original test - should refactor
 	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
+
 	for BatchID := 0; BatchID < 10; BatchID++ {
 
-	publish := func(i int) {
+		publish := func(i int) {
 
-		extids := [][]byte{encode(fmt.Sprintf("batch%v", BatchID ))}
+			extids := [][]byte{encode(fmt.Sprintf("batch%v", BatchID))}
 
-		e := factom.Entry{
-			ChainID: id,
-			ExtIDs:  extids,
-			Content: encode(fmt.Sprintf("batch %v, seq: %v", BatchID, i)), // ensure no duplicate msg hashes
+			e := factom.Entry{
+				ChainID: id,
+				ExtIDs:  extids,
+				Content: encode(fmt.Sprintf("batch %v, seq: %v", BatchID, i)), // ensure no duplicate msg hashes
+			}
+			i++
+
+			commit, _ := ComposeCommitEntryMsg(a.Priv, e)
+			reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
+
+			state0.APIQueue().Enqueue(commit)
+			state0.APIQueue().Enqueue(reveal)
 		}
-		i++
-
-		commit, _ := ComposeCommitEntryMsg(a.Priv, e)
-		reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
-
-		state0.APIQueue().Enqueue(commit)
-		state0.APIQueue().Enqueue(reveal)
-	}
-
 
 		t.Run(fmt.Sprintf("Create Entries Batch %v", BatchID), func(t *testing.T) {
 
@@ -148,7 +162,7 @@ func GenerateCommitsAndRevealsInBatches(t  *testing.T, state0 *state.State) {
 			}
 
 			t.Run("Fund EC Address", func(t *testing.T) {
-				amt := uint64(numEntries + 10)
+				amt := uint64(numEntries)
 				engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
 				waitForAnyDeposit(state0, a.EcPub())
 			})
@@ -157,7 +171,6 @@ func GenerateCommitsAndRevealsInBatches(t  *testing.T, state0 *state.State) {
 		})
 
 		t.Run("Verify Entries", func(t *testing.T) {
-
 
 			bal := engine.GetBalanceEC(state0, a.EcPub())
 			assert.Equal(t, bal, int64(0))
