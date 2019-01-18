@@ -78,7 +78,14 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
+		givenNodes := os.Getenv("GIVEN_NODES")
+
+		if givenNodes == "" {
+			givenNodes = "L"
+		}
+
+		state0 := SetupSim(givenNodes, map[string]string{"--debuglog": ""}, 200, 1, 1, t)
+		state0.LogPrintf(logName, "GIVEN_NODES:%v", givenNodes)
 
 		stop := func() {
 			ShutDownEverything(t)
