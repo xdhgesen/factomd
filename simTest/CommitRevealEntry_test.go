@@ -33,16 +33,18 @@ func waitForZero(s *state.State, ecPub string) int64 {
 	return waitForEcBalance(s, ecPub, 0)
 }
 
-func waitForEmptyHolding(s *state.State, msg string) {
+func waitForEmptyHolding(s *state.State, msg string) time.Time {
 	t := time.Now()
 	s.LogPrintf(logName, "WaitForEmptyHolding %v %v", t, msg)
 
 	for len(s.Holding) > 0 {
-		time.Sleep(time.Millisecond * 50)
+		time.Sleep(time.Millisecond * 10)
 	}
 
 	t = time.Now()
 	s.LogPrintf(logName, "EmptyHolding %v %v", t, msg)
+
+	return t
 }
 
 func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
@@ -138,7 +140,6 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
-
 	// add a way to set via ENV vars
 	batchCount, _ := strconv.ParseInt(os.Getenv("BATCHES"), 10, 64)
 	entryCount, _ := strconv.ParseInt(os.Getenv("ENTRIES"), 10, 64)
@@ -162,6 +163,8 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 	state0.LogPrintf(logName, "ENTRIES:%v", numEntries)
 	state0.LogPrintf(logName, "DELAY_BLOCKS:%v", setDelay)
 
+	var batchTimes map[int]time.Duration = map[int]time.Duration{}
+
 	for BatchID := 0; BatchID < int(batchCount); BatchID++ {
 
 		publish := func(i int) {
@@ -184,7 +187,7 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 
 		t.Run(fmt.Sprintf("Create Entries Batch %v", BatchID), func(t *testing.T) {
 
-			waitForEmptyHolding(state0, fmt.Sprintf("START%v", BatchID))
+			tstart := waitForEmptyHolding(state0, fmt.Sprintf("START%v", BatchID))
 
 			for x := 1; x <= numEntries; x++ {
 				publish(x)
@@ -193,19 +196,30 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 			t.Run("Fund EC Address", func(t *testing.T) {
 				amt := uint64(numEntries)
 				engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
-				waitForAnyDeposit(state0, a.EcPub())
+				//waitForAnyDeposit(state0, a.EcPub())
 			})
 
-			waitForEmptyHolding(state0, fmt.Sprintf("END%v", BatchID))
+			tend := waitForEmptyHolding(state0, fmt.Sprintf("END%v", BatchID))
+
+			batchTimes[BatchID] = tend.Sub(tstart)
+
+			state0.LogPrintf(logName, "BATCH %v RUNTIME %v", BatchID, batchTimes[BatchID])
 
 			t.Run("Verify Entries", func(t *testing.T) {
 
+				var sum time.Duration = 0
+
+				for _, t := range batchTimes {
+					sum = sum + t
+				}
+
+				state0.LogPrintf(logName, "AVERAGE RUNTIME %v ms", int64(sum*time.Nanosecond)/int64(batchCount*1000000))
+
+				WaitBlocks(state0, int(setDelay)) // wait between batches
+
 				bal := engine.GetBalanceEC(state0, a.EcPub())
 				assert.Equal(t, bal, int64(0))
-
-				// TODO: actually check for confirmed entries
 				assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
-				WaitBlocks(state0, int(setDelay)) // wait between batches
 			})
 		})
 
