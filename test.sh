@@ -6,7 +6,7 @@ PACKAGES=('./simTest/...')
 FAIL=""
 
 for PKG in ${PACKAGES[*]} ; do
-  go test -vet=off $PKG
+  go test -vet=off $PKG &>/dev/null
   if [[ $? != 0 ]] ;  then
     FAIL=1
   fi
