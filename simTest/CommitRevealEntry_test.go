@@ -112,8 +112,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 		})
 
 		t.Run("End simulation", func(t *testing.T) {
-			// FIXME somehow the EC entry math is wrong - 10 EC end up being stuck here
-			//waitForZero(state0, a.EcPub())
+			waitForZero(state0, a.EcPub())
 			ht := state0.GetDBHeightComplete()
 			WaitBlocks(state0, 2)
 			newHt := state0.GetDBHeightComplete()
