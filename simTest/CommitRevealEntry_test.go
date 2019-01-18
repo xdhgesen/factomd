@@ -106,7 +106,6 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			})
 		})
 
-
 		t.Run("Generate Entries in Batches", func(t *testing.T) {
 			waitForZero(state0, a.EcPub())
 			GenerateCommitsAndRevealsInBatches(t, state0)
@@ -127,14 +126,13 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 
-
 	// KLUDGE vars duplicated from original test - should refactor
 	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
 	// NOTE to send more entries/batches change numbers here
-	var numEntries int = 1000 // set the total number of entries to add
+	var numEntries int = 100 // set the total number of entries to add
 	for BatchID := 0; BatchID < 10; BatchID++ {
 
 		publish := func(i int) {
@@ -181,7 +179,6 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 				WaitBlocks(state0, 1)
 			})
 		})
-
 
 	}
 
