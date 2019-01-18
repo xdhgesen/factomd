@@ -3,6 +3,8 @@ package simtest
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
@@ -41,7 +43,6 @@ func waitForEmptyHolding(s *state.State, msg string) {
 
 	t = time.Now()
 	s.LogPrintf(logName, "EmptyHolding %v %v", t, msg)
-
 }
 
 func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
@@ -130,9 +131,31 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 	b := GetBankAccount()
 
-	// NOTE to send more entries/batches change numbers here
+
+	// add a way to set via ENV vars
+	batchCount, _ := strconv.ParseInt(os.Getenv("BATCHES"), 10, 64)
+	entryCount, _ := strconv.ParseInt(os.Getenv("ENTRIES"), 10, 64)
+	setDelay, _ := strconv.ParseInt(os.Getenv("DELAY_BLOCKS"), 10, 64)
+
+	if batchCount == 0 {
+		batchCount = 10
+	}
+
+	if setDelay == 0 {
+		setDelay = 1
+	}
+
 	var numEntries int = 100 // set the total number of entries to add
-	for BatchID := 0; BatchID < 10; BatchID++ {
+
+	if entryCount != 0 {
+		numEntries = int(entryCount)
+	}
+
+	state0.LogPrintf(logName, "BATCHES:%v", batchCount)
+	state0.LogPrintf(logName, "ENTRIES:%v", numEntries)
+	state0.LogPrintf(logName, "DELAY_BLOCKS:%v", setDelay)
+
+	for BatchID := 0; BatchID < int(batchCount); BatchID++ {
 
 		publish := func(i int) {
 
@@ -175,7 +198,7 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 
 				// TODO: actually check for confirmed entries
 				assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
-				WaitBlocks(state0, 1)
+				WaitBlocks(state0, int(setDelay)) // wait between batches
 			})
 		})
 
