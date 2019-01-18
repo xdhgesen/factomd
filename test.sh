@@ -14,6 +14,7 @@ done
 
 if [[ "${FAIL}x" != "x" ]] ; then
   echo "TESTS FAIL"
+  cat ./test.out
   exit 1
 else
   echo "-------------------DETAILED LOG-------------------"
