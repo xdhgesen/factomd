@@ -334,4 +334,7 @@ type IState interface {
 
 	// Activations
 	IsActive(id activations.ActivationType) bool
+
+	// Reogranization
+	ExecuteMsg2(msg IMsg)
 }

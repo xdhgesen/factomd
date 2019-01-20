@@ -86,6 +86,10 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
+}
+
+func (s *State) ExecuteMsg2(msg interfaces.IMsg) (ret bool) {
+
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
 		return false
@@ -126,35 +130,8 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			s.Holding[msg.GetMsgHash().Fixed()] = msg
 		}
 
-		var vml int
-		if vm == nil || vm.List == nil {
-			vml = 0
-		} else {
-			vml = len(vm.List)
-		}
-		local := msg.IsLocal()
-		vmi := msg.GetVMIndex()
-		hkb := s.GetHighestKnownBlock()
-
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving &&
-			vm != nil && int(vm.Height) == vml &&
-			(!s.Syncing || !vm.Synced) &&
-			(local || vmi == s.LeaderVMIndex) &&
-			s.LeaderPL.DBHeight+1 >= hkb {
-			if vml == 0 {
-				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex)
-				TotalXReviewQueueInputs.Inc()
-				s.XReview = append(s.XReview, msg)
-			} else {
-				s.LogMessage("executeMsg", "LeaderExecute", msg)
-				msg.LeaderExecute(s)
-			}
-		} else {
-			s.LogMessage("executeMsg", "FollowerExecute2", msg)
-			msg.FollowerExecute(s)
-		}
+		s.LogMessage("executeMsg", "FollowerExecute2", msg)
+		msg.FollowerExecute(s)
 
 		ret = true
 
