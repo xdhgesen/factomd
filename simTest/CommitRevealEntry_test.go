@@ -86,7 +86,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			givenNodes = "LLLF"
 		}
 
-		state0 := SetupSim(givenNodes, map[string]string{"--debuglog": ""}, 200, 1, 1, t)
+		state0 := SetupSim(givenNodes, 200, 1, 1, t)
 		state0.LogPrintf(logName, "GIVEN_NODES:%v", givenNodes)
 
 		stop := func() {

@@ -3,13 +3,11 @@ package testHelper
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -35,80 +33,29 @@ var startTime, endTime time.Time
 var RanSimTest = false // only run 1 sim test at a time
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
-	fmt.Println("SetupSim(", GivenNodes, ",", UserAddedOptions, ",", height, ",", electionsCnt, ",", RoundsCnt, ")")
+func SetupSim(GivenNodes string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
+	fmt.Println("SetupSim(", GivenNodes, ",", height, ",", electionsCnt, ",", RoundsCnt, ")")
 	ExpectedHeight = height
 	l := len(GivenNodes)
-	CmdLineOptions := map[string]string{
-		"--db":                  "Map",
-		"--network":             "LOCAL",
-		"--net":                 "alot+",
-		"--enablenet":           "false",
-		"--blktime":             "10",
-		"--count":               fmt.Sprintf("%v", l),
-		"--startdelay":          "1",
-		"--stdoutlog":           "out.txt",
-		"--stderrlog":           "out.txt",
-		"--checkheads":          "false",
-		"--controlpanelsetting": "readwrite",
-		"--debuglog":            ".|faulting|bad",
-		"--logPort":             "37000",
-		"--port":                "37001",
-		"--controlpanelport":    "37002",
-		"--networkport":         "37003",
-	}
 
-	// loop thru the test specific options and overwrite or append to the DefaultOptions
-	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
-		for key, value := range UserAddedOptions {
-			if key != "--debuglog" && value != "" {
-				CmdLineOptions[key] = value
-			} else {
-				CmdLineOptions[key] = CmdLineOptions[key] + "|" + value // add debug log flags to the default
-			}
-			// remove options not supported by the current flags set so we can merge this update into older code bases
-		}
-	}
-	// Finds all of the valid commands and stores them
-	optionsArr := make(map[string]bool, 0)
-	flag.VisitAll(func(key *flag.Flag) {
-		optionsArr["--"+key.Name] = true
-	})
+	args := append([]string{},
+		"-db=Map",
+		"-network=LOCAL",
+		"-net=alot+",
+		"-enablenet=true",
+		"-blktime=10",
+		fmt.Sprintf("-count=%v", l),
+		"-logPort=37000",
+		"-port=37001",
+		"-controlpanelport=37002",
+		"-networkport=37003",
+		"-startdelay=1",
+		"-debuglog=.*",
+		"--stdoutlog=out.txt",
+		"--stderrlog=err.txt",
+	)
 
-	// Loops through CmdLineOptions to removed commands that are not valid
-	for i, _ := range CmdLineOptions {
-		_, ok := optionsArr[i]
-		if !ok {
-			fmt.Println("Not Included: " + i + ", Removing from Options")
-			delete(CmdLineOptions, i)
-		}
-	}
-
-	// default the fault time and round time based on the blk time out
-	blktime, err := strconv.Atoi(CmdLineOptions["--blktime"])
-	if err != nil {
-		panic(err)
-	}
-
-	if CmdLineOptions["--faulttimeout"] == "" {
-		CmdLineOptions["--faulttimeout"] = fmt.Sprintf("%d", blktime/5) // use 2 minutes ...
-	}
-
-	if CmdLineOptions["--roundtimeout"] == "" {
-		CmdLineOptions["--roundtimeout"] = fmt.Sprintf("%d", blktime/5)
-	}
-
-	// built the fake command line
-	returningSlice := []string{}
-	for key, value := range CmdLineOptions {
-		returningSlice = append(returningSlice, key+"="+value)
-	}
-
-	fmt.Println("Command Line Arguments:")
-	for _, v := range returningSlice {
-		fmt.Printf("\t%s\n", v)
-	}
-	params := engine.ParseCmdLine(returningSlice)
+	params := engine.ParseCmdLine(args)
 	fmt.Println()
 
 	fmt.Println("Parameter:")
@@ -373,7 +320,7 @@ func CheckAuthoritySet(t *testing.T) {
 
 func RunCmd(cmd string) {
 	os.Stdout.WriteString("Executing: " + cmd + "\n")
-	globals.InputChan <- cmd
+	engine.InputChan <- cmd
 	return
 }
 
