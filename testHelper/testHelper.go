@@ -12,12 +12,10 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	//"github.com/FactomProject/factomd/engine"
-	//"github.com/FactomProject/factomd/log"
+
 	"time"
 
 	"github.com/FactomProject/factomd/state"
-	//"fmt"
 	"fmt"
 	"os"
 
@@ -29,18 +27,21 @@ var DefaultCoinbaseAmount uint64 = 100000000
 
 func CreateEmptyTestState() *state.State {
 	s := new(state.State)
+	s.TimestampAtBoot = new(primitives.Timestamp)
+	s.TimestampAtBoot.SetTime(0)
 	s.EFactory = new(electionMsgs.ElectionsFactory)
 	s.LoadConfig("", "")
 	s.Network = "LOCAL"
 	s.LogPath = "stdout"
 	s.Init()
 	s.Network = "LOCAL"
+	s.CheckChainHeads.CheckChainHeads = false
 	state.LoadDatabase(s)
 	return s
 }
 
-func CreateAndPopulateTestState() *state.State {
-	s := createAndPopulateTestState()
+func CreateAndPopulateTestStateAndStartValidator() *state.State {
+	s := CreateAndPopulateTestState()
 	go s.ValidatorLoop()
 	time.Sleep(30 * time.Millisecond)
 
@@ -48,7 +49,7 @@ func CreateAndPopulateTestState() *state.State {
 }
 
 func CreatePopulateAndExecuteTestState() *state.State {
-	s := createAndPopulateTestState()
+	s := CreateAndPopulateTestState()
 	ExecuteAllBlocksFromDatabases(s)
 	go s.ValidatorLoop()
 	time.Sleep(30 * time.Millisecond)
@@ -56,8 +57,10 @@ func CreatePopulateAndExecuteTestState() *state.State {
 	return s
 }
 
-func createAndPopulateTestState() *state.State {
+func CreateAndPopulateTestState() *state.State {
 	s := new(state.State)
+	s.TimestampAtBoot = new(primitives.Timestamp)
+	s.TimestampAtBoot.SetTime(0)
 	s.EFactory = new(electionMsgs.ElectionsFactory)
 	s.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(0))
 	s.DB = CreateAndPopulateTestDatabaseOverlay()
@@ -363,4 +366,10 @@ func CreateTestBlockSetWithNetworkID(prev *BlockSet, networkID uint32, transacti
 
 func CreateEmptyTestDatabaseOverlay() *databaseOverlay.Overlay {
 	return databaseOverlay.NewOverlay(new(mapdb.MapDB))
+}
+
+func PrintList(title string, list map[string]uint64) {
+	for addr, amt := range list {
+		fmt.Printf("%v - %v:%v\n", title, addr, amt)
+	}
 }
