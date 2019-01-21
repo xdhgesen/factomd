@@ -1,5 +1,5 @@
-hash: fee315cb28853cbabcdc4261c83daf3465a28cf59c2d2f9e10ae9b6f5ddf7166
-updated: 2018-03-16T15:36:47.554093377-05:00
+hash: 7d6983deca5cfab82a4466d4d5a4cc155874ee5a7248c4acca060c25792308b1
+updated: 2019-01-21T15:16:30.19904062-06:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -38,14 +38,14 @@ imports:
   subpackages:
   - edwards25519
 - name: github.com/FactomProject/factom
-  version: cf230df541757ac86cd945a4a388c6c15914b726
+  version: 92b9a9bb5aa25574d8b950bf4e9daec78c8980b2
   subpackages:
   - wallet
   - wallet/wsapi
 - name: github.com/FactomProject/factom-cli
-  version: 4702861b7796d370a888ab3a232c37609304ff94
+  version: ee16c6b6bf44896fd8f8b0fa3143ba01619e48d5
 - name: github.com/FactomProject/factom-walletd
-  version: dfab0806bccd0de9ca065d6fcb05ab56fa77c3e4
+  version: 363fb75e81fcddcc9df1c0578038727b8a48c5b4
 - name: github.com/FactomProject/fctwallet
   version: 97e19f8d1e251975480fa6f76eb2d9084b984a14
 - name: github.com/FactomProject/fsnotify
@@ -84,7 +84,7 @@ imports:
 - name: github.com/FactomProject/netki-go-partner-client
   version: 426acb535e66cc2f9e6226ae254555e3572fd142
 - name: github.com/FactomProject/serveridentity
-  version: 1b8c36bc234e26829156f0cf6b4f64f64057d137
+  version: cf42d2aa8debbe9a690e8c12b7a9fcda127d3f2c
   subpackages:
   - identity
   - utils
@@ -138,6 +138,10 @@ imports:
   version: c6c44e6fdcc30161c7f4480754da7230d01c06e3
 - name: github.com/spf13/pflag
   version: ee5fd03fd6acfd43e44aea0b4135958546ed8e73
+- name: github.com/stretchr/testify
+  version: ffdc059bfe9ce6a4e144ba849dbedead332c6053
+  subpackages:
+  - assert
 - name: golang.org/x/crypto
   version: 9419663f5a44be8b34ca85f08abc5fe1be11f8a3
   subpackages:
@@ -201,4 +205,12 @@ imports:
   - types
 - name: gopkg.in/warnings.v0
   version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
-testImports: []
+testImports:
+- name: github.com/davecgh/go-spew
+  version: d8f796af33cc11cb798c1aaeb27a4ebc5099927d
+  subpackages:
+  - spew
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
