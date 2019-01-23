@@ -75,24 +75,29 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 		}
 	}
 }
-func (s *State) AddToHolding(hash [32]byte, msg interfaces.IMsg) {
-	_, ok := s.Holding[hash]
+func (s *State) AddToHolding(msg interfaces.IMsg) {
+	_, ok := s.Holding[msg.GetMsgHash().Fixed()]
 	if !ok {
-		s.Holding[hash] = msg
+		s.Holding[msg.GetMsgHash().Fixed()] = msg
 		s.LogMessage("holding", "add", msg)
 		TotalHoldingQueueInputs.Inc()
 	}
 }
 
-func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason string) {
-	_, ok := s.Holding[hash]
+func (s *State) DeleteFromHolding(msg interfaces.IMsg, reason string) {
+	_, ok := s.Holding[msg.GetMsgHash().Fixed()]
 	if ok {
-		delete(s.Holding, hash)
+		delete(s.Holding, msg.GetMsgHash().Fixed())
 		s.LogMessage("holding", "delete "+reason, msg)
 		TotalHoldingQueueOutputs.Inc()
 	}
 }
+
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
+	vm = nil
+	if s.Leader && s.RunLeader {
+		vm = s.LeaderPL.VMs[s.LeaderVMIndex]
+	}
 
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
@@ -164,12 +169,12 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
 			if !s.NoEntryYet(msg.GetHash(), nil) {
 				//delete(s.Holding, msg.GetHash().Fixed())
-				s.DeleteFromHolding(msg.GetHash().Fixed(), msg, "AlreadyCommited")
+				s.DeleteFromHolding(msg, "AlreadyCommited")
 				s.Commits.Delete(msg.GetHash().Fixed())
 				s.LogMessage("executeMsg", "drop, already committed", msg)
 				return true
 			}
-			s.AddToHolding(msg.GetMsgHash().Fixed(), msg)
+			s.AddToHolding(msg)
 			//s.Holding[msg.GetMsgHash().Fixed()] = msg
 		}
 
@@ -211,7 +216,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		// this check makes sure we don't put them back in holding after just deleting them
 		if _, valid := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()); valid {
 			//s.Holding[msg.GetMsgHash().Fixed()] = msg
-			s.AddToHolding(msg.GetMsgHash().Fixed(), msg)
+			s.AddToHolding(msg)
 			s.LogMessage("executeMsg", "hold", msg)
 		} else {
 			s.LogMessage("executeMsg", "drop, IReplay", msg)
@@ -363,7 +368,7 @@ ackLoop:
 				// toss the ack into holding and we will try again in a bit...
 				TotalHoldingQueueInputs.Inc()
 				//s.Holding[ack.GetMsgHash().Fixed()] = ack
-				s.AddToHolding(ack.GetMsgHash().Fixed(), ack)
+				s.executeMsg(vm, ack)
 				continue
 			}
 
@@ -486,14 +491,14 @@ func (s *State) ReviewHolding() {
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
-	for k, v := range s.Holding {
+	for _, v := range s.Holding {
 
 		if v.Expire(s) {
 			s.LogMessage("executeMsg", "expire from holding", v)
 			s.ExpireCnt++
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "expired")
+			s.DeleteFromHolding(v, "expired")
 			continue
 		}
 
@@ -502,7 +507,7 @@ func (s *State) ReviewHolding() {
 			s.LogMessage("executeMsg", "invalid from holding", v)
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "invalid from holding")
+			s.DeleteFromHolding(v, "invalid from holding")
 			continue
 		case 0:
 			continue
@@ -513,14 +518,13 @@ func (s *State) ReviewHolding() {
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "HKB-HSB>1000")
+			s.DeleteFromHolding(v, "HKB-HSB>1000")
 		}
 
 		eom, ok := v.(*messages.EOM)
-		if ok && ((eom.DBHeight <= saved && saved > 0) || int(eom.Minute) < s.CurrentMinute) {
+		if ok && ((eom.DBHeight <= saved && saved > 0) || int(eom.Minute) < s.CurrentMinute || v.IsLocal()) {
 			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "old EOM")
+			s.DeleteFromHolding(v, "old EOM")
 			continue
 		}
 
@@ -528,7 +532,7 @@ func (s *State) ReviewHolding() {
 		if ok && (dbsmsg.DirectoryBlock.GetHeader().GetDBHeight() < saved-1 && saved > 0) {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "old DBState")
+			s.DeleteFromHolding(v, "old DBState")
 			continue
 		}
 
@@ -536,7 +540,7 @@ func (s *State) ReviewHolding() {
 		if ok && ((dbsigmsg.DBHeight <= saved && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "Old DBSig")
+			s.DeleteFromHolding(v, "Old DBSig")
 			continue
 		}
 
@@ -544,7 +548,7 @@ func (s *State) ReviewHolding() {
 		if !ok {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "INTERNAL_REPLAY")
+			s.DeleteFromHolding(v, "INTERNAL_REPLAY")
 
 			continue
 		}
@@ -552,7 +556,7 @@ func (s *State) ReviewHolding() {
 		if !ok2 {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "BLOCK_REPLAY")
+			s.DeleteFromHolding(v, "BLOCK_REPLAY")
 			continue
 		}
 
@@ -564,7 +568,7 @@ func (s *State) ReviewHolding() {
 			if !x {
 				TotalHoldingQueueOutputs.Inc()
 				//delete(s.Holding, k) // Drop commits with the same entry hash from holding because they are blocked by a previous entry
-				s.DeleteFromHolding(k, v, "already committed")
+				s.DeleteFromHolding(v, "already committed")
 				continue
 			}
 		}
@@ -577,18 +581,20 @@ func (s *State) ReviewHolding() {
 			if !x {
 				TotalHoldingQueueOutputs.Inc()
 				//delete(s.Holding, k) // Drop commits with the same entry hash from holding because they are blocked by a previous entry
-				s.DeleteFromHolding(k, v, "already committed")
+				s.DeleteFromHolding(v, "already committed")
 				continue
 			}
+			cc.SendOut(s, cc)
 		}
 
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
+			if !s.NoEntryYet(re.GetHash(), nil) {
 				delete(s.Holding, re.GetHash().Fixed())
 				s.Commits.Delete(re.GetHash().Fixed())
 				continue
 			}
+			re.SendOut(s, re)
 			// Only reprocess if at the top of a new minute, and if we are a leader.
 			//if processMinute > 10 {
 			//	continue // No need for followers to review Reveal Entry messages
@@ -783,7 +789,7 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 	TotalHoldingQueueInputs.Inc()
 
 	//s.Holding[m.GetMsgHash().Fixed()] = m
-	s.AddToHolding(m.GetMsgHash().Fixed(), m)
+	s.AddToHolding(m)
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
 	if ack != nil {
@@ -805,7 +811,7 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	if m.IsLocal() {
-		s.AddToHolding(m.GetMsgHash().Fixed(), m)
+		//s.AddToHolding(m.GetMsgHash().Fixed(), m)
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
 
@@ -823,7 +829,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	TotalHoldingQueueInputs.Inc()
 	//s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteEOM
 
-	s.AddToHolding(m.GetMsgHash().Fixed(), m)
+	s.AddToHolding(m)
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
 		pl := s.ProcessLists.Get(ack.DBHeight)
@@ -860,6 +866,11 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	TotalAcksInputs.Inc()
 	s.Acks[ack.GetHash().Fixed()] = ack
 	m, _ := s.Holding[ack.GetHash().Fixed()]
+
+	if m == nil {
+		m = ack.MatchedMsg
+	}
+
 	if m != nil {
 		s.LogMessage("executeMsg", "FollowerExecute3 ", m)
 		m.FollowerExecute(s)
@@ -1277,7 +1288,7 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 	TotalHoldingQueueInputs.Inc()
 
 	//s.Holding[m.GetMsgHash().Fixed()] = m // hold in  FollowerExecuteRevealEntry
-	s.AddToHolding(m.GetMsgHash().Fixed(), m)
+	s.AddToHolding(m)
 
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 
@@ -1323,7 +1334,7 @@ func (s *State) LeaderExecute(m interfaces.IMsg) {
 	if !ok {
 		TotalHoldingQueueOutputs.Inc()
 		//delete(s.Holding, m.GetMsgHash().Fixed())
-		s.DeleteFromHolding(m.GetMsgHash().Fixed(), m, "INTERNAL_REPLAY")
+		s.DeleteFromHolding(m, "INTERNAL_REPLAY")
 		if s.DebugExec() {
 			s.LogMessage("executeMsg", "drop replay", m)
 		}
@@ -1392,10 +1403,10 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 
 	TotalAcksInputs.Inc()
 	s.Acks[eom.GetMsgHash().Fixed()] = ack
-	m.SetLocal(false)
+	eom.SetLocal(false)
 	ack.SendOut(s, ack)
-	m.SendOut(s, m)
-	s.FollowerExecuteEOM(m)
+	eom.SendOut(s, eom)
+	s.FollowerExecuteEOM(eom)
 	s.UpdateState()
 }
 
@@ -1437,7 +1448,7 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 		TotalHoldingQueueOutputs.Inc()
 		HoldingQueueDBSigOutputs.Inc()
 		//delete(s.Holding, m.GetMsgHash().Fixed())
-		s.DeleteFromHolding(m.GetMsgHash().Fixed(), m, "INTERNAL_REPLAY")
+		s.DeleteFromHolding(m, "INTERNAL_REPLAY")
 		s.LogMessage("executeMsg", "drop INTERNAL_REPLAY", m)
 		return
 	}

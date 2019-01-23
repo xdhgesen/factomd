@@ -47,8 +47,7 @@ func CreateMsg(messageType byte) interfaces.IMsg {
 		return new(messages.DataResponse)
 	case constants.REVEAL_ENTRY_MSG:
 		return new(messages.RevealEntryMsg)
-	case constants.REQUEST_BLOCK_MSG:
-		return new(messages.RequestBlock)
+
 	case constants.DBSTATE_MISSING_MSG:
 		return new(messages.DBStateMissing)
 	case constants.DBSTATE_MSG:

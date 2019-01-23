@@ -33,6 +33,10 @@ type RemoveServerMsg struct {
 var _ interfaces.IMsg = (*RemoveServerMsg)(nil)
 var _ interfaces.Signable = (*RemoveServerMsg)(nil)
 
+func (*RemoveServerMsg) Acknowledged() bool {
+	return true
+}
+
 func (m *RemoveServerMsg) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {

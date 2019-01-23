@@ -33,6 +33,10 @@ type AddServerMsg struct {
 var _ interfaces.IMsg = (*AddServerMsg)(nil)
 var _ interfaces.Signable = (*AddServerMsg)(nil)
 
+func (m *AddServerMsg) Acknowledged() bool {
+	return true
+}
+
 func (m *AddServerMsg) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {

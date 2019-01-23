@@ -15,6 +15,75 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func (s *State) Matching() {
+	for {
+		xmsg := <-s.MatchChan
+
+		if !xmsg.Acknowledged() || xmsg.IsLocal() || (s.Leader && xmsg.GetVMIndex() == s.LeaderVMIndex) {
+			s.MsgQueue() <- xmsg
+			continue
+		}
+		var msg, ack interfaces.IMsg
+		ok := false
+
+		if xmsg.Type() == constants.ACK_MSG {
+			ack = xmsg
+			msg, ok = s.matchholding[ack.GetHash().Fixed()]
+		} else {
+			msg := xmsg
+			ack, ok = s.matchacks[msg.GetMsgHash().Fixed()]
+		}
+
+		if ok {
+			s.MsgQueue() <- msg
+			s.AckQueue() <- ack
+			delete(s.matchholding, msg.GetMsgHash().Fixed())
+			delete(s.matchacks, ack.GetHash().Fixed())
+		} else {
+			if msg != nil {
+				s.matchholding[msg.GetMsgHash().Fixed()] = msg
+			}
+			if ack != nil {
+				s.matchacks[ack.GetHash().Fixed()] = ack
+			}
+		}
+	}
+}
+
+func (s *State) executeMsgStart(vm *VM, msg interfaces.IMsg) (ret bool) {
+	// Local messages get executed directly
+	if msg.IsLocal() || true {
+		return s.executeMsg(vm, msg)
+	}
+
+	// Messages that do not get acknowledged get executed directly
+	if !msg.Acknowledged() {
+		return s.executeMsg(vm, msg)
+	}
+
+	// If a leader and responsible for this VMIndex, go ahead and execute it
+	if s.Leader && msg.GetVMIndex() == s.LeaderVMIndex {
+		return s.executeMsg(vm, msg)
+	}
+
+	// Put the message in the MatchChan to be matched.
+	s.MatchChan <- msg
+
+	// Look for messages that have been matched to acknowledgements and execute them.
+	for {
+		select {
+		case nmsg := <-s.MatchedChan:
+			ack := nmsg.(*messages.Ack)
+			b1 := s.executeMsg(vm, ack)
+			b2 := s.executeMsg(vm, ack.MatchedMsg)
+			ret = ret || b1 || b2
+		default:
+			return ret
+		}
+	}
+
+}
+
 func (state *State) ValidatorLoop() {
 	CheckGrants()
 	timeStruct := new(Timer)
@@ -123,10 +192,10 @@ func (state *State) ValidatorLoop() {
 					}
 					if t := msg.Type(); t == constants.ACK_MSG {
 						state.LogMessage("ackQueue", "enqueue", msg)
-						state.ackQueue <- msg //
+						state.MatchChan <- msg //
 					} else {
 						state.LogMessage("msgQueue", "enqueue", msg)
-						state.msgQueue <- msg //
+						state.MatchChan <- msg //
 					}
 				}
 				ackRoom = cap(state.ackQueue) - len(state.ackQueue)

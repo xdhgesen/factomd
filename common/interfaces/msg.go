@@ -18,17 +18,25 @@ type IMsg interface {
 	Printable
 	BinaryMarshallable
 
+	// Type
 	// Returns a byte indicating the type of message.
 	Type() byte
 
+	// Acknowledged
+	// Returns true if this message is matched by an Ack msg (or is an Ack msg) and goes in the process list.
+	Acknowledged() bool
+
+	// IsLocal
 	// A local message is never broadcast to the greater network.
 	IsLocal() bool
 	SetLocal(bool)
 
+	// IsFullBroadcast
 	// FullBroadcast means send to every node
 	IsFullBroadcast() bool
 	SetFullBroadcast(bool)
 
+	// GetOrigin
 	// Returns the origin of this message; used to track
 	// where a message came from. If int == -1, then this
 	// FactomNode generated the message.
@@ -38,24 +46,30 @@ type IMsg interface {
 	GetNetworkOrigin() string
 	SetNetworkOrigin(string)
 
+	//GetTimestamp
 	// Returns the timestamp for a message
 	GetTimestamp() Timestamp
 
+	// GetRepeatHash
 	// This is the hash used to check for repeated messages.  Almost always this
 	// is the MsgHash, however for Chain Commits, Entry Commits, and Factoid Transactions,
 	// this is the GetHash().
 	GetRepeatHash() IHash
 
+	// GetHash
 	// Hash for this message as used by Consensus (i.e. what we match). Does not include
 	// signatures to avoid Signature Maliation attacks.
 	GetHash() IHash
 
+	// GetMsgHash
 	// Hash of this message.  Each message must be unique includes signatures
 	GetMsgHash() IHash
 
+	// GetFullMsgHash
 	// Returns the full message hash of a message (includes signatures)
 	GetFullMsgHash() IHash
 
+	// IsPeer2Peer
 	// If this message should only reply to a peer, this is true.  If to
 	// be broadcast, this should be false.  If the Origin is 0, then the
 	// network can pick a peer to try.  If Origin is > 0, then the message
@@ -63,29 +77,36 @@ type IMsg interface {
 	IsPeer2Peer() bool
 	SetPeer2Peer(bool)
 
+	// Validate
 	// Validate the message, given the state.  Three possible results:
 	//  < 0 -- Message is invalid.  Discard
 	//  0   -- Cannot tell if message is Valid
 	//  1   -- Message is valid
 	Validate(IState) int
 
+	// ComputeVMIndex
 	//Set the VMIndex for a message
 	ComputeVMIndex(IState)
 
+	//LeaderExecute
 	// Call here if the server is a leader
 	LeaderExecute(IState)
 
+	// GetLeaderChainID
 	// Debugging thing to track the leader responsible for a message ack.
 	GetLeaderChainID() IHash
 	SetLeaderChainID(IHash)
 
+	// FollowerExecute
 	// Call here if the server is a follower
 	FollowerExecute(IState)
 
+	// SendOut
 	// Send this message out over the NetworkOutQueue.  This is done with a method
 	// to allow easier debugging and simulation.
 	SendOut(IState, IMsg)
 
+	// GetNoResend
 	// Some messages (DBState messages, missing data messages) must be explicitly sent.
 	// We won't resend them or pass them on.
 	GetNoResend() bool
@@ -97,6 +118,7 @@ type IMsg interface {
 	// Returns true if able to process, false if process is waiting on something.
 	Process(dbheight uint32, state IState) bool
 
+	// GetVMIndex
 	// Some Messages need to be processed on certain VMs.  We set this and querry
 	// the indexes of these machines here.
 	GetVMIndex() int
@@ -106,6 +128,7 @@ type IMsg interface {
 	GetMinute() byte
 	SetMinute(byte)
 
+	// MarkSentInvalid
 	// Stall handling
 	MarkSentInvalid(bool)
 	SentInvalid() bool
@@ -114,6 +137,7 @@ type IMsg interface {
 	SetStall(bool)
 	Expire(IState) bool
 
+	// LogFields
 	// Equivalent to String() for logging
 	LogFields() log.Fields
 }

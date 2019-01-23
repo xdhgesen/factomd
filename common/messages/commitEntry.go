@@ -38,6 +38,10 @@ type CommitEntryMsg struct {
 var _ interfaces.IMsg = (*CommitEntryMsg)(nil)
 var _ interfaces.Signable = (*CommitEntryMsg)(nil)
 
+func (m *CommitEntryMsg) Acknowledged() bool {
+	return true
+}
+
 func (a *CommitEntryMsg) IsSameAs(b *CommitEntryMsg) bool {
 	if a == nil || b == nil {
 		if a == nil && b == nil {

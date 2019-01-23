@@ -1,11 +1,16 @@
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
-package msgbase
+package msgbase_test
 
 import (
 	"testing"
 
+	"fmt"
+
+	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
+	. "github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
 )
@@ -50,4 +55,14 @@ func TestMessageBase(t *testing.T) {
 			t.Errorf("Minutes are not equal")
 		}
 	}
+}
+
+func TestMessageBase2(t *testing.T) {
+	ack := new(messages.Ack)
+	mmr := new(messages.MissingMsgResponse)
+	var msg interfaces.IMsg
+	msg = ack
+	fmt.Printf("Ack %v Msg %v \n", ack.Acknowledged(), msg.Acknowledged())
+	msg = mmr
+	fmt.Printf("mmr %v Msg %v \n", mmr.Acknowledged(), msg.Acknowledged())
 }

@@ -604,6 +604,7 @@ func makeServer(s *state.State) *FactomNode {
 
 func startServers(load bool) {
 	for i, fnode := range fnodes {
+		go fnode.State.Matching()
 		if i > 0 {
 			fnode.State.Init()
 		}

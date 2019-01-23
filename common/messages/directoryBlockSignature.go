@@ -47,6 +47,10 @@ type DirectoryBlockSignature struct {
 var _ interfaces.IMsg = (*DirectoryBlockSignature)(nil)
 var _ interfaces.Signable = (*DirectoryBlockSignature)(nil)
 
+func (m *DirectoryBlockSignature) Acknowledged() bool {
+	return true
+}
+
 func (a *DirectoryBlockSignature) IsSameAs(b *DirectoryBlockSignature) bool {
 	if b == nil {
 		return false

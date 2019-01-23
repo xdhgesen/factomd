@@ -19,11 +19,12 @@ import (
 type MessageBase struct {
 	FullMsgHash interfaces.IHash
 
-	Origin        int    // Set and examined on a server, not marshalled with the message
+	Origin        int    // Set and examined on a server, not marshaled with the message
 	NetworkOrigin string // Hash of the network peer/connection where the message is from
-	Peer2Peer     bool   // The nature of this message type, not marshalled with the message
+	Peer2Peer     bool   // The nature of this message type, not marshaled with the message
 	LocalOnly     bool   // This message is only a local message, is not broadcast and may skip verification
 	FullBroadcast bool   // This is used for messages with no missing message support e.g. election related messages
+	Acked         bool   // Return this flag, should be true if a message must go into the process list to be processed
 
 	NoResend  bool // Don't resend this message if true.
 	ResendCnt int  // Put a limit on resends
@@ -40,6 +41,10 @@ type MessageBase struct {
 	Stalled     bool // This message is currently stalled
 	MarkInvalid bool
 	Sigvalid    bool
+}
+
+func (m *MessageBase) Acknowledged() bool {
+	return false
 }
 
 func (m *MessageBase) StringOfMsgBase() string {

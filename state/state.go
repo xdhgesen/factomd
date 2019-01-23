@@ -411,6 +411,12 @@ type State struct {
 
 	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 	validatorLoopThreadID string
+
+	// speedup
+	MatchChan    chan interfaces.IMsg
+	MatchedChan  chan interfaces.IMsg
+	matchholding map[[32]byte]interfaces.IMsg
+	matchacks    map[[32]byte]interfaces.IMsg
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -1080,6 +1086,12 @@ func (s *State) Init() {
 	s.adds = make(chan plRef, 1)
 	s.dbheights = make(chan int, 1)
 
+	// Allocate Matching maps and channels
+	s.matchholding = make(map[[32]byte]interfaces.IMsg)
+	s.matchacks = make(map[[32]byte]interfaces.IMsg)
+	s.MatchedChan = make(chan interfaces.IMsg, 10000)
+	s.MatchChan = make(chan interfaces.IMsg, 10000)
+
 	if s.StateSaverStruct.FastBoot {
 		d, err := s.DB.FetchDBlockHead()
 		if err != nil {
@@ -1121,6 +1133,7 @@ func (s *State) Init() {
 		path := filepath.Join(s.LdbPath, s.Network, "dbstates")
 		os.MkdirAll(path, 0775)
 	}
+
 }
 
 func (s *State) HookLogstash() error {
@@ -1942,6 +1955,7 @@ entryHashProcessing:
 	return
 }
 
+// NoEntryYet()
 // Returns true if this hash exists nowhere in the Replay structures.  Returns False if we
 // have already seen this hash before.  Replay is NOT updated yet.
 func (s *State) NoEntryYet(entryhash interfaces.IHash, ts interfaces.Timestamp) bool {

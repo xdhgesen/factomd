@@ -43,11 +43,18 @@ type Ack struct {
 	Response     bool // A response to a missing data request
 	BalanceHash  interfaces.IHash
 	marshalCache []byte
+
+	MatchedMsg interfaces.IMsg // If I have matched a message, it could be kept here.
+	Vm         interface{}
 }
 
 var _ interfaces.IMsg = (*Ack)(nil)
 var _ interfaces.Signable = (*Ack)(nil)
 var AckBalanceHash = true
+
+func (m *Ack) Acknowledged() bool {
+	return true
+}
 
 func (m *Ack) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {

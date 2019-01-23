@@ -37,6 +37,10 @@ type RevealEntryMsg struct {
 
 var _ interfaces.IMsg = (*RevealEntryMsg)(nil)
 
+func (*RevealEntryMsg) Acknowledged() bool {
+	return true
+}
+
 func (m *RevealEntryMsg) IsSameAs(msg interfaces.IMsg) bool {
 	m2, ok := msg.(*RevealEntryMsg)
 	if !ok {
