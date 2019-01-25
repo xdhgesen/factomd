@@ -1,6 +1,7 @@
 package messages
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"reflect"
@@ -135,6 +136,8 @@ func LogMessage(name string, note string, msg interfaces.IMsg) {
 
 var logWhere bool = false // log GoID() of the caller.
 
+
+
 // Assumes called managed the locks so we can recurse for multi part messages
 func logMessage(name string, note string, msg interfaces.IMsg) {
 	myfile := getTraceFile(name)
@@ -211,19 +214,28 @@ func logMessage(name string, note string, msg interfaces.IMsg) {
 
 	now := time.Now().Local()
 
+	type Mlog []string
+	l := Mlog{}
+
 	for i, text := range lines {
 		var s string
 		switch i {
 		case 0:
-			s = fmt.Sprintf("%9d %02d:%02d:%02d.%03d %-50s M-%v|R-%v|H-%v|%p %26s[%2v]:%v %s\n", sequence, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000,
+			//var log Mlog = more
+			//data, _ := json.Marshal(log)
+			//_ = log
+			//messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, "%s", data)
+			s = fmt.Sprintf("%9d %02d:%02d:%02d.%03d %-50s M-%v|R-%v|H-%v|%p %26s[%2v]:%v %s", sequence, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000,
 				note, mhash, rhash, hash, msg, messageType, t, text, where)
 		default:
-			s = fmt.Sprintf("%9d %02d:%02d:%02d.%03d %-50s M-%v|R-%v|H-%v|%p %30s:%v\n", sequence, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000,
+			s = fmt.Sprintf("%9d %02d:%02d:%02d.%03d %-50s M-%v|R-%v|H-%v|%p %30s:%v", sequence, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000,
 				note, mhash, rhash, hash, msg, "continue:", text)
 		}
 		s = addNodeNames(s)
-		myfile.WriteString(s)
+		l = append(l, s)
 	}
+	d, _ := json.Marshal(l)
+	myfile.WriteString(fmt.Sprintf("%s\n",d))
 
 	if embeddedMsg != nil {
 		logMessage(name, note+" EmbeddedMsg:", embeddedMsg)
@@ -282,27 +294,22 @@ func LogPrintf(name string, format string, more ...interface{}) {
 		return
 	}
 
+	/*
 	var where string
 
 	if logWhere {
 		where = fmt.Sprintf("<%s>", atomic.Goid())
 	}
+	*/
 
 	sequence++
-	// handle multi-line printf's
-	lines := strings.Split(fmt.Sprintf(format, more...), "\n")
+	var s string
 	now := time.Now().Local()
-	for i, text := range lines {
-		var s string
-		switch i {
-		case 0:
-			s = fmt.Sprintf("%9d %02d:%02d:%02d.%03d %s %s\n", sequence, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000, text, where)
-		default:
-			s = fmt.Sprintf("%9d %02d:%02d:%02d.%03d %s\n", sequence, now.Hour()%24, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000, text)
-		}
-		s = addNodeNames(s)
-		myfile.WriteString(s)
-	}
+	payload := fmt.Sprintf(format, more...)
+
+	s = fmt.Sprintf(`{ "seq": "%d", "ts": "%02d:%02d:%02d.%03d", "log":%s }`+"\n", sequence, now.Hour()%25, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000, payload)
+	myfile.WriteString(s)
+
 }
 
 // stringify it in the caller to avoid having to deal with the import loop
@@ -322,6 +329,7 @@ func LogParcel(name string, note string, msg string) {
 // Log a message with a state timestamp
 func StateLogMessage(FactomNodeName string, DBHeight int, CurrentMinute int, logName string, comment string, msg interfaces.IMsg) {
 	logFileName := FactomNodeName + "_" + logName + ".txt"
+	// fixme
 	t := fmt.Sprintf("%7d-:-%d ", DBHeight, CurrentMinute)
 	LogMessage(logFileName, t+comment, msg)
 }
@@ -329,8 +337,8 @@ func StateLogMessage(FactomNodeName string, DBHeight int, CurrentMinute int, log
 // Log a printf with a state timestamp
 func StateLogPrintf(FactomNodeName string, DBHeight int, CurrentMinute int, logName string, format string, more ...interface{}) {
 	logFileName := FactomNodeName + "_" + logName + ".txt"
-	t := fmt.Sprintf("%7d-:-%d ", DBHeight, CurrentMinute)
-	LogPrintf(logFileName, t+format, more...)
+	t := fmt.Sprintf(` { "height": "%d", "min": "%d", "event": %s }`, DBHeight, CurrentMinute, format)
+	LogPrintf(logFileName, t, more...)
 }
 
 // unused -- of.File is written by direct calls to write and not buffered and the os closes the files on exit.
