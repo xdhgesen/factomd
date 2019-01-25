@@ -1,0 +1,14 @@
+---
+version: '2'
+services:
+  postgres:
+    image: stackdump/postgres-plpython:reportdb
+    build: .
+    hostname: reportdb
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: load
+      POSTGRES_PASSWORD: load
+      POSTGRES_DB: load
+      PYTHONDEBUG: 1
