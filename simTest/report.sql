@@ -18,18 +18,19 @@ $$ LANGUAGE plpgsql;
 */
 
 
---SELECT * FROM fnode0.simtest limit 1;
-
-CREATE OR REPLACE FUNCTION simtest_report() RETURNS SETOF RECORD as $$
-  SELECT
+SELECT * from 
+  (SELECT
     e->'ts' as ts,
     e->'seq' as seq,
     e->'log'->'height' as block, 
     e->'log'->'min' as min, 
-    e->'log'->'event' as event, *
+    e->'log'->'event' as event,
+    e->'log'->'event'->0 as e0,
+    e->'log'->'event'->1 as e1,
+    *
   FROM
-    fnode0.simtest; 
-$$ LANGUAGE sql;
+    fnode0.simtest) as s
+WHERE
+  e0::text like '%HOLD%';
 
-SELECT simtest_report()
 
