@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var _ = fmt.Print
@@ -182,27 +181,6 @@ func (c *DirectoryBlock) CheckDBEntries() error {
 
 func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
 
-	keymr := c.KeyMR
-	hash := []byte{0, 0, 0, 0}
-	if keymr != nil {
-		hash = keymr.Bytes()[:4]
-	}
-	statename := "-"
-	if c.State != nil {
-		statename = c.State.GetFactomNodeName()
-	}
-
-	fmt.Fprintf(os.Stderr, "%20s GetKeyMR %x\n%v\n", statename, hash, atomic.WhereAmIString(2))
-	defer func() {
-		fmt.Fprintf(os.Stderr, "End: BuildBodyMR %x\n\n", hash)
-	}()
-
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("DirectoryBlock.GetKeyMR() saw an interface that was nil")
-		}
-	}()
 	if c.keyMR == nil {
 		keyMR, err := c.BuildKeyMerkleRoot()
 		if err != nil {
