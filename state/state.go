@@ -2742,7 +2742,7 @@ func (s *State) GetTrueLeaderHeight() uint32 {
 		h = 0
 	}
 	if h > 0 && uint32(h-1) > s.HighestKnown {
-		s.HighestKnown = uint32(h - 1)
+		//s.HighestKnown = uint32(h - 1)
 	}
 	return uint32(h)
 }
