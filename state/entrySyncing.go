@@ -119,7 +119,7 @@ func (s *State) MakeMissingEntryRequests() {
 
 			}
 		} else {
-			time.Sleep(20 * time.Second)
+			time.Sleep(5 * time.Second)
 		}
 
 		// Insert the entries we have found into the database.
@@ -129,10 +129,9 @@ func (s *State) MakeMissingEntryRequests() {
 			select {
 
 			case entry := <-s.WriteEntry:
-				if !has(s,entry.GetHash()) {
-					asked := MissingEntryMap[entry.GetHash().Fixed()] != nil
+				if !has(s, entry.GetHash()) {
 
-					if asked {
+					if MissingEntryMap[entry.GetHash().Fixed()] != nil {
 						s.DB.StartMultiBatch()
 						err := s.DB.InsertEntryMultiBatch(entry)
 						if err != nil {
@@ -143,7 +142,11 @@ func (s *State) MakeMissingEntryRequests() {
 							panic(err)
 						}
 					}
+
+				} else {
+					delete(MissingEntryMap, entry.GetHash().Fixed())
 				}
+
 			default:
 				break InsertLoop
 			}

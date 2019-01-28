@@ -451,7 +451,7 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 
 	preReviewHoldingTime := time.Now()
-	if len(s.XReview) > 0 || s.Syncing || s.Saving {
+	if len(s.XReview) > 0 || s.Syncing {
 		return
 	}
 
@@ -499,6 +499,12 @@ func (s *State) ReviewHolding() {
 			s.DeleteFromHolding(k, v, "HKB-HSB>1000")
 		}
 
+		if highest-s.EntryDBHeightComplete > 10 {
+			TotalHoldingQueueOutputs.Inc()
+			//delete(s.Holding, k)
+			s.DeleteFromHolding(k, v, "HSB-EDBC>1000")
+		}
+
 		if v.Expire(s) {
 			s.LogMessage("executeMsg", "expire from holding", v)
 			s.ExpireCnt++
@@ -523,7 +529,7 @@ func (s *State) ReviewHolding() {
 
 		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
 		if ok {
-			if ((dbsigmsg.DBHeight <= saved && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
+			if (dbsigmsg.DBHeight <= saved && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2) {
 				TotalHoldingQueueOutputs.Inc()
 				//delete(s.Holding, k)
 				s.DeleteFromHolding(k, v, "Old DBSig")
@@ -826,7 +832,6 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	if m.IsLocal() {
-		s.AddToHolding(m.GetMsgHash().Fixed(), m)
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	}
 
@@ -1071,7 +1076,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	s.EOMDone = false
 	s.DBSig = false
 	s.DBSigDone = false
-	s.Saving = false
+	s.Saving = true
 	s.Syncing = false
 
 	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.
