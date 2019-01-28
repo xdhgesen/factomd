@@ -13,7 +13,6 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var (
@@ -145,19 +144,21 @@ func logMessage(name string, note string, msg interfaces.IMsg) {
 		return
 	}
 
+	/*
 	var where string
 
 	if logWhere {
 		where = fmt.Sprintf("<%s>", atomic.Goid())
 	}
+	*/
 
 	sequence++
 	embeddedHash := ""
-	to := ""
+	//to := ""
 	hash := "??????"
 	mhash := "??????"
 	rhash := "??????"
-	messageType := ""
+	//messageType := ""
 	t := byte(0)
 	msgString := "-nil-"
 	var embeddedMsg interfaces.IMsg
@@ -185,12 +186,7 @@ func logMessage(name string, note string, msg interfaces.IMsg) {
 		}
 
 		if msg.IsPeer2Peer() {
-			if 0 == msg.GetOrigin() {
-				to = "RandomPeer"
-			} else {
-				// right for sim... what about network ?
-				to = fmt.Sprintf("FNode%02d", msg.GetOrigin()-1)
-			}
+			// pass
 		} else {
 			//to = "broadcast"
 		}
@@ -204,19 +200,20 @@ func logMessage(name string, note string, msg interfaces.IMsg) {
 				embeddedHash += "(unknown)"
 			}
 		}
-		messageType = constants.MessageName(byte(t))
+		//messageType = constants.MessageName(byte(t))
 	}
 
 	// handle multi-line printf's
-	lines := strings.Split(msgString, "\n")
+	//lines := strings.Split(msgString, "\n")
 
-	lines[0] = lines[0] + embeddedHash + " " + to
+	//lines[0] = lines[0] + embeddedHash + " " + to
 
 	now := time.Now().Local()
 
-	type Mlog []string
-	l := Mlog{}
+	type Mlog []interface{}
+	l := Mlog{sequence, now, note, mhash, rhash, hash, msgString}
 
+	/*
 	for i, text := range lines {
 		var s string
 		switch i {
@@ -234,8 +231,10 @@ func logMessage(name string, note string, msg interfaces.IMsg) {
 		s = addNodeNames(s)
 		l = append(l, s)
 	}
+	*/
 	d, _ := json.Marshal(l)
-	myfile.WriteString(fmt.Sprintf("%s\n",d))
+
+	myfile.WriteString(fmt.Sprintf("%s\n", d))
 
 	if embeddedMsg != nil {
 		logMessage(name, note+" EmbeddedMsg:", embeddedMsg)

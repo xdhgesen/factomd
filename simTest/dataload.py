@@ -17,7 +17,7 @@ LOGS = [
 #    'missing_messages',
 #    'inmsgqueue2',
 #    'inmsgqueue',
-#    'holding',
+    'holding',
 #    'faulting',
     #'factoids_trans',
     #'factoids',
