@@ -129,21 +129,21 @@ func (s *State) MakeMissingEntryRequests() {
 			select {
 
 			case entry := <-s.WriteEntry:
+				if !has(s,entry.GetHash()) {
+					asked := MissingEntryMap[entry.GetHash().Fixed()] != nil
 
-				asked := MissingEntryMap[entry.GetHash().Fixed()] != nil
-
-				if asked {
-					s.DB.StartMultiBatch()
-					err := s.DB.InsertEntryMultiBatch(entry)
-					if err != nil {
-						panic(err)
-					}
-					err = s.DB.ExecuteMultiBatch()
-					if err != nil {
-						panic(err)
+					if asked {
+						s.DB.StartMultiBatch()
+						err := s.DB.InsertEntryMultiBatch(entry)
+						if err != nil {
+							panic(err)
+						}
+						err = s.DB.ExecuteMultiBatch()
+						if err != nil {
+							panic(err)
+						}
 					}
 				}
-
 			default:
 				break InsertLoop
 			}

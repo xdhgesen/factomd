@@ -476,6 +476,10 @@ func (s *State) ReviewHolding() {
 
 	highest := s.GetHighestKnownBlock()
 	saved := s.GetHighestSavedBlk()
+	if saved > highest {
+		highest = saved + 1
+	}
+
 	for _, a := range s.Acks {
 		if s.Holding[a.GetHash().Fixed()] != nil {
 			a.FollowerExecute(s)
@@ -489,6 +493,12 @@ func (s *State) ReviewHolding() {
 
 	for k, v := range s.Holding {
 
+		if int(highest)-int(saved) > 1000 {
+			TotalHoldingQueueOutputs.Inc()
+			//delete(s.Holding, k)
+			s.DeleteFromHolding(k, v, "HKB-HSB>1000")
+		}
+
 		if v.Expire(s) {
 			s.LogMessage("executeMsg", "expire from holding", v)
 			s.ExpireCnt++
@@ -496,6 +506,32 @@ func (s *State) ReviewHolding() {
 			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "expired")
 			continue
+		}
+
+		eom, ok := v.(*messages.EOM)
+		if ok {
+			if (eom.DBHeight <= saved && saved > 0) || int(eom.Minute) < s.CurrentMinute {
+				TotalHoldingQueueOutputs.Inc()
+				//delete(s.Holding, k)
+				s.DeleteFromHolding(k, v, "old EOM")
+				continue
+			}
+			if !eom.IsLocal() && eom.DBHeight > saved {
+				s.HighestKnown = eom.DBHeight
+			}
+		}
+
+		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
+		if ok {
+			if ((dbsigmsg.DBHeight <= saved && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
+				TotalHoldingQueueOutputs.Inc()
+				//delete(s.Holding, k)
+				s.DeleteFromHolding(k, v, "Old DBSig")
+				continue
+			}
+			if !dbsigmsg.IsLocal() && dbsigmsg.DBHeight > saved {
+				s.HighestKnown = dbsigmsg.DBHeight
+			}
 		}
 
 		switch v.Validate(s) {
@@ -511,33 +547,12 @@ func (s *State) ReviewHolding() {
 
 		v.SendOut(s, v)
 
-		if int(highest)-int(saved) > 1000 {
-			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "HKB-HSB>1000")
-		}
-
-		eom, ok := v.(*messages.EOM)
-		if ok && ((eom.DBHeight <= saved && saved > 0) || int(eom.Minute) < s.CurrentMinute) {
-			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "old EOM")
-			continue
-		}
-
 		dbsmsg, ok := v.(*messages.DBStateMsg)
-		if ok && (dbsmsg.DirectoryBlock.GetHeader().GetDBHeight() < saved-1 && saved > 0) {
+		if ok && dbsmsg.DirectoryBlock.GetHeader().GetDBHeight() < saved-1 && saved > 0 {
+
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "old DBState")
-			continue
-		}
-
-		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
-		if ok && ((dbsigmsg.DBHeight <= saved && saved > 0) || (dbsigmsg.DBHeight < highest-3 && highest > 2)) {
-			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "Old DBSig")
 			continue
 		}
 
@@ -1056,7 +1071,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	s.EOMDone = false
 	s.DBSig = false
 	s.DBSigDone = false
-	s.Saving = true
+	s.Saving = false
 	s.Syncing = false
 
 	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.

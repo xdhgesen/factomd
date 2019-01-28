@@ -688,7 +688,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.DBSigProcessed = ss.DBSigProcessed
 	s.DBSigDone = ss.DBSigDone
 	s.DBSigSys = ss.DBSigSys
-	s.Saving = true
+	s.Saving = false
 	s.Syncing = false
 	s.HighestAck = ss.DBHeight + 1
 	s.HighestKnown = ss.DBHeight + 2
