@@ -1,7 +1,7 @@
 ---
 version: '2'
 services:
-  postgres:
+  reportdb:
     image: stackdump/postgres-plpython:reportdb
     build: .
     hostname: reportdb
@@ -17,4 +17,3 @@ services:
     hostname: pgadmin
     ports:
       - 8888:80
-

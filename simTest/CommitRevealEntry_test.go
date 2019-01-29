@@ -63,6 +63,36 @@ func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 	}
 }
 
+func watchMessageLists() *time.Ticker{
+
+	ticker := time.NewTicker(1*time.Second)
+
+	go func () {
+		for range ticker.C {
+			for _, n := range engine.GetFnodes() {
+
+				f := n.State
+
+				list := []interface{}{
+					len(f.Holding),
+					len(f.Acks),
+					len(f.MsgQueue()),
+					f.InMsgQueue().Length(),
+					f.APIQueue().Length(),
+					len(f.AckQueue()),
+					len(f.TimerMsgQueue()),
+				}
+
+				f.LogPrintf(logName, "LIST_SIZES Holding: %v, Acks: %v, MsgQueue: %v, InMsgQueue: %v, APIQueue: %v, AckQueue: %v, TimerMsg: %v ", list...)
+			}
+
+		}
+	}()
+
+	return ticker
+}
+
+
 func TestSendingCommitAndReveal(t *testing.T) {
 	if RanSimTest {
 		return
@@ -82,6 +112,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	t.Run("Run sim to create entries", func(t *testing.T) {
 		givenNodes := os.Getenv("GIVEN_NODES")
 	    maxBlocks, _ := strconv.ParseInt(os.Getenv("MAX_BLOCKS"), 10, 64)
+		dropRate, _ := strconv.ParseInt(os.Getenv("DROP_RATE"), 10, 64)
 
 		if maxBlocks == 0 {
 		  maxBlocks=200
@@ -91,13 +122,19 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			givenNodes = "LLLF"
 		}
 
-    	//FIXME add env var for dropping messages
-		state0 := SetupSim(givenNodes, map[string]string{"--debuglog": ""}, int(maxBlocks), 1, 1, t)
+		state0 := SetupSim(givenNodes, map[string]string{"--debuglog": "", "--blktime": "30"}, int(maxBlocks), 1, 1, t)
 		state0.LogPrintf(logName, "GIVEN_NODES:%v", givenNodes)
+		ticker := watchMessageLists()
+
+		if dropRate > 0 {
+			state0.LogPrintf(logName, "DROP_RATE:%v", dropRate)
+			RunCmd(fmt.Sprintf("S%v", dropRate))
+		}
 
 		stop := func() {
 			ShutDownEverything(t)
 			WaitForAllNodes(state0)
+			ticker.Stop()
 		}
 
 		t.Run("Create Chain", func(t *testing.T) {

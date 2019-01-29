@@ -7,6 +7,12 @@ verify_ssl = true
 
 [packages]
 psycopg2-binary = "*"
+jupyter = "*"
+pandas = "*"
+notebook = ">=\"5.3"
+ipywidgets = ">=\"7.2"
+psutil = "*"
+plotly = "*"
 
 [requires]
 python_version = "3.6"

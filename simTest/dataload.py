@@ -3,37 +3,12 @@ import json
 import psycopg2
 from pprint import pprint
 
-NODES = ['fnode0']
+NODES = [ # list of nodes to load
+    'fnode0'
+]
 
-LOGS = [
+LOGS = [ # list of logfiles to load for each node
     'simtest',
-    #'processstatus',
-    #'processlist',
-    #'process',
-    #'pendingchainheads',
-    #'networkoutputs', # 500k+ load by itself
-    #'networkinputs', # 100k+
-#    'msgqueue',
-#    'missing_messages',
-#    'inmsgqueue2',
-#    'inmsgqueue',
-    'holding',
-#    'faulting',
-    #'factoids_trans',
-    #'factoids',
-    #'executemsg',
-    #'entrysync',
-#    'entrycredits_trans',
-    #'entrycredits',
-    #'election',
-    #'duplicatesend',
-    #'dbstateprocess',
-    #'dbsig',
-    #'dbsig-eom',
-#    'commits',
-    #'balancehash',
-#    'apilog',
-#    'ackqueue',
 ]
 
 def main():
@@ -55,13 +30,12 @@ def main():
             print(log, node, data)
 
     def extract(log, node):
-        fo = open("%s_%s.txt" % (node, log), "r")
+        with open("%s_%s.txt" % (node, log), "r") as _file:
+            for d in _file:
+                load(d, l, n)
 
-        for d in fo.readlines():
-            load(d, l, n)
-
-        fo.close()
-
+    # NOTE: you may need to change this connection string to match your database setup
+    #conn = psycopg2.connect("postgres://load:load@localhost:5432")
     conn = psycopg2.connect("postgres://load:load@localdb:5432")
 
     def x(sql, fetch=True):
@@ -69,18 +43,20 @@ def main():
         cursor.execute(sql)
         conn.commit()
 
-    #x('DROP TABLE IF EXISTS logs CASCADE')
-    #x('DROP TABLE IF EXISTS log_runs CASCADE')
+    x('DROP TABLE IF EXISTS logs CASCADE')
+    x('DROP TABLE IF EXISTS log_runs CASCADE')
     x('CREATE TABLE IF NOT EXISTS public.logs (e jsonb, run int)')
     x('CREATE TABLE IF NOT EXISTS public.log_runs (id serial, ts timestamp)')
     x('INSERT INTO public.log_runs(ts) values(now())')
 
+    print("Loading log files into db as json")
     for n in NODES:
         #x('DROP SCHEMA IF EXISTS %s CASCADE' % n)
         x('CREATE SCHEMA IF NOT EXISTS %s' % n)
 
     for l in LOGS:
         for n in NODES:
+            print("%s_%s.txt\n" % (n, l))
             try:
                 x('CREATE TABLE IF NOT EXISTS %s.%s () INHERITS (public.logs)' % (n, l))
                 extract(l, n)
