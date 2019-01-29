@@ -43,7 +43,7 @@ func SetupSim(GivenNodes string, height int, electionsCnt int, RoundsCnt int, t 
 		"-network=LOCAL",
 		"-net=alot+",
 		"-enablenet=true",
-		"-blktime=10",
+		"-blktime=30", //NOTE blocktime is always 30
 		fmt.Sprintf("-count=%v", l),
 		"-logPort=37000",
 		"-port=37001",

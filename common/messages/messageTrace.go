@@ -221,10 +221,10 @@ func LogPrintf(name string, format string, more ...interface{}) {
 	if myfile == nil {
 		return
 	}
-	seq := sequence
 	now := time.Now().Local()
-	s := fmt.Sprintf("%7v %02d:%02d:%02d %s\n", seq, now.Hour()%24, now.Minute()%60, now.Second()%60, fmt.Sprintf(format, more...))
-	s = addNodeNames(s)
+	payload := fmt.Sprintf(format, more...)
+
+	s := fmt.Sprintf(`{ "seq": "%d", "ts": "%02d:%02d:%02d.%03d", "log":%s }`+"\n", sequence, now.Hour()%25, now.Minute()%60, now.Second()%60, (now.Nanosecond()/1e6)%1000, payload)
 	myfile.WriteString(s)
 }
 
@@ -252,8 +252,8 @@ func StateLogMessage(FactomNodeName string, DBHeight int, CurrentMinute int, log
 // Log a printf with a state timestamp
 func StateLogPrintf(FactomNodeName string, DBHeight int, CurrentMinute int, logName string, format string, more ...interface{}) {
 	logFileName := FactomNodeName + "_" + logName + ".txt"
-	t := fmt.Sprintf("%d-:-%d ", DBHeight, CurrentMinute)
-	LogPrintf(logFileName, t+format, more...)
+	t := fmt.Sprintf(` { "height": "%d", "min": "%d", "event": %s }`, DBHeight, CurrentMinute, format)
+	LogPrintf(logFileName, t, more...)
 }
 
 // unused -- of.File is written by direct calls to write and not buffered and the os closes the files on exit.

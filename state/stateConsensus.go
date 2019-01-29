@@ -5,6 +5,7 @@
 package state
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"hash"
@@ -60,13 +61,23 @@ func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) 
 
 func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	if s.DebugExec() {
-		var dbh int
-		if s.LeaderPL != nil {
-			dbh = int(s.LeaderPL.DBHeight)
+		if s == nil {
+			messages.StateLogPrintf("unknown", 0, 0, logName, format, more...)
+		} else {
+			var dbh int
+			if s.LeaderPL != nil {
+				dbh = int(s.LeaderPL.DBHeight)
+			}
+
+			type Mlog []interface{}
+			var log Mlog = append(more, format)
+			data, _ := json.Marshal(log)
+			messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, "%s", data)
 		}
-		messages.StateLogPrintf(s.FactomNodeName, dbh, int(s.CurrentMinute), logName, format, more...)
 	}
 }
+
+
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 	preExecuteMsgTime := time.Now()

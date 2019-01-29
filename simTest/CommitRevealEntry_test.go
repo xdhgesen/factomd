@@ -35,14 +35,14 @@ func waitForZero(s *state.State, ecPub string) int64 {
 
 func waitForEmptyHolding(s *state.State, msg string) time.Time {
 	t := time.Now()
-	s.LogPrintf(logName, "WaitForEmptyHolding %v %v", t, msg)
+	s.LogPrintf(logName, "WaitForEmptyHolding %v", msg)
 
 	for len(s.Holding) > 0 {
 		time.Sleep(time.Millisecond * 10)
 	}
 
 	t = time.Now()
-	s.LogPrintf(logName, "EmptyHolding %v %v", t, msg)
+	s.LogPrintf(logName, "EmptyHolding %v", msg)
 
 	return t
 }
@@ -63,6 +63,35 @@ func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 	}
 }
 
+func watchMessageLists() *time.Ticker {
+
+	ticker := time.NewTicker(1 * time.Second)
+
+	go func() {
+		for range ticker.C {
+			for _, n := range engine.GetFnodes() {
+
+				f := n.State
+
+				list := []interface{}{
+					len(f.Holding),
+					len(f.Acks),
+					len(f.MsgQueue()),
+					f.InMsgQueue().Length(),
+					f.APIQueue().Length(),
+					len(f.AckQueue()),
+					len(f.TimerMsgQueue()),
+				}
+
+				f.LogPrintf(logName, "LIST_SIZES Holding: %v, Acks: %v, MsgQueue: %v, InMsgQueue: %v, APIQueue: %v, AckQueue: %v, TimerMsg: %v ", list...)
+			}
+
+		}
+	}()
+
+	return ticker
+}
+
 func TestSendingCommitAndReveal(t *testing.T) {
 	if RanSimTest {
 		return
@@ -81,17 +110,31 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
 		givenNodes := os.Getenv("GIVEN_NODES")
+		maxBlocks, _ := strconv.ParseInt(os.Getenv("MAX_BLOCKS"), 10, 64)
+		dropRate, _ := strconv.ParseInt(os.Getenv("DROP_RATE"), 10, 64)
+
+		if maxBlocks == 0 {
+			maxBlocks = 200
+		}
 
 		if givenNodes == "" {
 			givenNodes = "LLLF"
 		}
 
+		//FIXME: should also set blocktime = 30
 		state0 := SetupSim(givenNodes, 200, 1, 1, t)
 		state0.LogPrintf(logName, "GIVEN_NODES:%v", givenNodes)
+		ticker := watchMessageLists()
+
+		if dropRate > 0 {
+			state0.LogPrintf(logName, "DROP_RATE:%v", dropRate)
+			RunCmd(fmt.Sprintf("S%v", dropRate))
+		}
 
 		stop := func() {
 			ShutDownEverything(t)
 			WaitForAllNodes(state0)
+			ticker.Stop()
 		}
 
 		t.Run("Create Chain", func(t *testing.T) {
@@ -187,7 +230,7 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 
 		t.Run(fmt.Sprintf("Create Entries Batch %v", BatchID), func(t *testing.T) {
 
-			tstart := waitForEmptyHolding(state0, fmt.Sprintf("START%v", BatchID))
+			tstart := waitForEmptyHolding(state0, fmt.Sprintf("WAIT_HOLDING_START%v", BatchID))
 
 			for x := 1; x <= numEntries; x++ {
 				publish(x)
@@ -199,7 +242,7 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 				//waitForAnyDeposit(state0, a.EcPub())
 			})
 
-			tend := waitForEmptyHolding(state0, fmt.Sprintf("END%v", BatchID))
+			tend := waitForEmptyHolding(state0, fmt.Sprintf("WAIT_HOLDING_END%v", BatchID))
 
 			batchTimes[BatchID] = tend.Sub(tstart)
 

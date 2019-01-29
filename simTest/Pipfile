@@ -1,0 +1,18 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[dev-packages]
+
+[packages]
+psycopg2-binary = "*"
+jupyter = "*"
+pandas = "*"
+notebook = ">=\"5.3"
+ipywidgets = ">=\"7.2"
+psutil = "*"
+plotly = "*"
+
+[requires]
+python_version = "3.6"

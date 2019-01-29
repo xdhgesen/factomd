@@ -1,0 +1,18 @@
+---
+version: '2'
+services:
+  reportdb:
+    image: postgres:11.1
+    hostname: reportdb
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: load
+      POSTGRES_PASSWORD: load
+      POSTGRES_DB: load
+      PYTHONDEBUG: 1
+  pgadmin:
+    image: dpage/pgadmin4
+    hostname: pgadmin
+    ports:
+      - 8888:80
