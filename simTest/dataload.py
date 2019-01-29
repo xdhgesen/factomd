@@ -4,7 +4,9 @@ import psycopg2
 from pprint import pprint
 
 NODES = [ # list of nodes to load
-    'fnode0'
+    'fnode0',
+    'fnode01',
+    'fnode02'
 ]
 
 LOGS = [ # list of logfiles to load for each node
@@ -43,8 +45,8 @@ def main():
         cursor.execute(sql)
         conn.commit()
 
-    x('DROP TABLE IF EXISTS logs CASCADE')
-    x('DROP TABLE IF EXISTS log_runs CASCADE')
+    #x('DROP TABLE IF EXISTS logs CASCADE')
+    #x('DROP TABLE IF EXISTS log_runs CASCADE')
     x('CREATE TABLE IF NOT EXISTS public.logs (e jsonb, run int)')
     x('CREATE TABLE IF NOT EXISTS public.log_runs (id serial, ts timestamp)')
     x('INSERT INTO public.log_runs(ts) values(now())')
