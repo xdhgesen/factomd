@@ -63,11 +63,11 @@ func waitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 	}
 }
 
-func watchMessageLists() *time.Ticker{
+func watchMessageLists() *time.Ticker {
 
-	ticker := time.NewTicker(1*time.Second)
+	ticker := time.NewTicker(1 * time.Second)
 
-	go func () {
+	go func() {
 		for range ticker.C {
 			for _, n := range engine.GetFnodes() {
 
@@ -92,7 +92,6 @@ func watchMessageLists() *time.Ticker{
 	return ticker
 }
 
-
 func TestSendingCommitAndReveal(t *testing.T) {
 	if RanSimTest {
 		return
@@ -111,18 +110,23 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
 		givenNodes := os.Getenv("GIVEN_NODES")
-	    maxBlocks, _ := strconv.ParseInt(os.Getenv("MAX_BLOCKS"), 10, 64)
+		maxBlocks, _ := strconv.ParseInt(os.Getenv("MAX_BLOCKS"), 10, 64)
 		dropRate, _ := strconv.ParseInt(os.Getenv("DROP_RATE"), 10, 64)
+		network_type := os.Getenv("NET")
+
+		if network_type == "" {
+			network_type = "long"
+		}
 
 		if maxBlocks == 0 {
-		  maxBlocks=200
+			maxBlocks = 200
 		}
 
 		if givenNodes == "" {
 			givenNodes = "LLLF"
 		}
 
-		state0 := SetupSim(givenNodes, map[string]string{"--debuglog": "", "--blktime": "30"}, int(maxBlocks), 1, 1, t)
+		state0 := SetupSim(givenNodes, map[string]string{"--debuglog": "", "--blktime": "30", "--net": "long"}, int(maxBlocks), 1, 1, t)
 		state0.LogPrintf(logName, "GIVEN_NODES:%v", givenNodes)
 		ticker := watchMessageLists()
 
