@@ -41,7 +41,8 @@ func SetupSim(GivenNodes string, height int, electionsCnt int, RoundsCnt int, t 
 	args := append([]string{},
 		"-db=Map",
 		"-network=LOCAL",
-		"-net=alot+",
+		//"-net=alot+",
+		"-net=long",
 		"-enablenet=true",
 		"-blktime=30", //NOTE blocktime is always 30
 		fmt.Sprintf("-count=%v", l),
