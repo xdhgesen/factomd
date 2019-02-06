@@ -756,6 +756,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	if !d.IsNew || p == nil {
 		return
 	}
+	d.DirectoryBlock.(*directoryBlock.DirectoryBlock).ClrCaches()
 
 	//	list.State.LogPrintf("dbstateprocess", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
 	currentDBHeight := d.DirectoryBlock.GetHeader().GetDBHeight()

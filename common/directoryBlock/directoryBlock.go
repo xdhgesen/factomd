@@ -477,10 +477,17 @@ func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 	return b.DBHash
 }
 
-func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {
-
+func (b *DirectoryBlock) ClrCaches() {
 	b.DBHash = nil
 	b.keyMR = nil
+	b.KeyMR = nil
+	b.HeaderHash = nil
+	h := b.GetHeader().(*DBlockHeader)
+	h.BodyMR = nil
+}
+
+func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {
+	b.ClrCaches()
 
 	dbentry := new(DBEntry)
 	dbentry.SetChainID(chainID)
