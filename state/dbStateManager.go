@@ -756,13 +756,14 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	if !d.IsNew || p == nil {
 		return
 	}
-	d.DirectoryBlock.(*directoryBlock.DirectoryBlock).ClrCaches()
 
 	//	list.State.LogPrintf("dbstateprocess", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
 	currentDBHeight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	previousDBHeight := p.DirectoryBlock.GetHeader().GetDBHeight()
 
-	d.DirectoryBlock.MarshalBinary()
+	if currentDBHeight > 0 {
+		d.DirectoryBlock.(*directoryBlock.DirectoryBlock).ResetCaches()
+	}
 
 	hash, err := p.EntryCreditBlock.HeaderHash()
 	if err != nil {
@@ -1547,7 +1548,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	}
 
 	// Not activated.  Set to true if you want extra checking of the data saved to the database.
-	if false {
+	if true {
 		good := true
 		mr, err := list.State.DB.FetchDBKeyMRByHeight(uint32(dbheight))
 		if err != nil {

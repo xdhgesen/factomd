@@ -548,7 +548,7 @@ func (s *State) ReviewHolding() {
 		v.SendOut(s, v)
 
 		dbsmsg, ok := v.(*messages.DBStateMsg)
-		if ok && dbsmsg.DirectoryBlock.GetHeader().GetDBHeight() < saved-1 && saved > 0 {
+		if ok && dbsmsg.DirectoryBlock.GetHeader().GetDBHeight() <= saved && saved > 0 {
 
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
@@ -721,6 +721,7 @@ func (s *State) AddDBState(isNew bool,
 
 	directoryBlock.(*directoryBlock2.DirectoryBlock).State = s
 
+	// This is expensive, so only do this once the database is loaded.
 	if s.DBFinished {
 		s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
 			isNew, directoryBlock.GetHeader().GetDBHeight(), directoryBlock.GetHash().Bytes()[:4],
@@ -1071,7 +1072,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	s.EOMDone = false
 	s.DBSig = false
 	s.DBSigDone = false
-	s.Saving = false
+	s.Saving = true
 	s.Syncing = false
 
 	// Hurry up our next ask.  When we get to where we have the data we asked for, then go ahead and ask for the next set.

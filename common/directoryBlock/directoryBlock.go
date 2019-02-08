@@ -26,7 +26,6 @@ type DirectoryBlock struct {
 	KeyMR      interfaces.IHash `json:"keymr"`
 	keyMR      interfaces.IHash
 	HeaderHash interfaces.IHash `json:"headerhash"`
-	keyMRset   bool             `json:"keymrset"`
 
 	//Marshalized
 	Header    interfaces.IDirectoryBlockHeader `json:"header"`
@@ -180,6 +179,12 @@ func (c *DirectoryBlock) CheckDBEntries() error {
 }
 
 func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
+	defer func() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+			primitives.LogNilHashBug("DirectoryBlock.GetKeyMR() saw an interface that was nil")
+		}
+	}()
 
 	if c.keyMR == nil {
 		keyMR, err := c.BuildKeyMerkleRoot()
@@ -191,10 +196,10 @@ func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
 		//	panic("keyMR changed!")
 		//}
 		c.keyMR = keyMR
+		c.KeyMR = keyMR
 	}
-	c.keyMRset = true
 
-	return c.keyMR
+	return c.KeyMR
 }
 
 func (c *DirectoryBlock) GetHeader() interfaces.IDirectoryBlockHeader {
@@ -319,9 +324,7 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 }
 
 func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
-
 	count := uint32(len(b.GetDBEntries()))
-
 	b.GetHeader().SetBlockCount(count)
 	if count == 0 {
 		panic("Zero block size!")
@@ -477,17 +480,20 @@ func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 	return b.DBHash
 }
 
-func (b *DirectoryBlock) ClrCaches() {
+func (b *DirectoryBlock) ResetCaches() {
+	if len(b.DBEntries) == 0 {
+		return
+	}
 	b.DBHash = nil
 	b.keyMR = nil
 	b.KeyMR = nil
-	b.HeaderHash = nil
-	h := b.GetHeader().(*DBlockHeader)
-	h.BodyMR = nil
+	b.BuildBodyMR()
+	b.BuildKeyMerkleRoot()
+	b.GetFullHash()
+	b.GetKeyMR()
 }
 
 func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {
-	b.ClrCaches()
 
 	dbentry := new(DBEntry)
 	dbentry.SetChainID(chainID)

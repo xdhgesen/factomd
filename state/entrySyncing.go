@@ -223,9 +223,9 @@ func (s *State) GoSyncEntries() {
 				db = s.GetDirectoryBlockByHeight(scan)
 			}
 
-      // Run through all the eblocks, and make sure we have updated the Entry Hash for every Entry
-      // Hash in the EBlocks.  This only has to be done one for all the EBlocks of a directory Block,
-      // and we have the entry hashes even if we don't yet have the entries, so this is really simple.
+			// Run through all the eblocks, and make sure we have updated the Entry Hash for every Entry
+			// Hash in the EBlocks.  This only has to be done one for all the EBlocks of a directory Block,
+			// and we have the entry hashes even if we don't yet have the entries, so this is really simple.
 			if scan > firstUpdate {
 				for _, ebKeyMR := range db.GetEntryHashes()[3:] {
 					eBlock, _ := s.DB.FetchEBlock(ebKeyMR)
