@@ -761,9 +761,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	currentDBHeight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	previousDBHeight := p.DirectoryBlock.GetHeader().GetDBHeight()
 
-	if currentDBHeight > 0 {
-		d.DirectoryBlock.(*directoryBlock.DirectoryBlock).ResetCaches()
-	}
+	d.DirectoryBlock.MarshalBinary()
 
 	hash, err := p.EntryCreditBlock.HeaderHash()
 	if err != nil {
@@ -1365,7 +1363,6 @@ func ReadDBStateFromDebugFile(filename string) (*WholeBlock, error) {
 }
 
 func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
-
 	dbheight := int(d.DirectoryBlock.GetHeader().GetDBHeight())
 	// Take the height, and some function of the identity chain, and use that to decide to trim.  That
 	// way, not all nodes in a simulation Trim() at the same time.

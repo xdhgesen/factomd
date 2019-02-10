@@ -24,13 +24,12 @@ type DirectoryBlock struct {
 	//Not Marshalized
 	DBHash     interfaces.IHash `json:"dbhash"`
 	KeyMR      interfaces.IHash `json:"keymr"`
-	keyMR      interfaces.IHash
 	HeaderHash interfaces.IHash `json:"headerhash"`
+	keyMRset   bool             `json:"keymrset"`
 
 	//Marshalized
 	Header    interfaces.IDirectoryBlockHeader `json:"header"`
 	DBEntries []interfaces.IDBEntry            `json:"dbentries"`
-	State     interfaces.IState
 }
 
 var _ interfaces.Printable = (*DirectoryBlock)(nil)
@@ -185,19 +184,17 @@ func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DirectoryBlock.GetKeyMR() saw an interface that was nil")
 		}
 	}()
-
-	if c.keyMR == nil {
-		keyMR, err := c.BuildKeyMerkleRoot()
-		if err != nil {
-			panic("Failed to build the key MR")
-		}
-
-		//if c.keyMRset && c.KeyMR.Fixed() != keyMR.Fixed() {
-		//	panic("keyMR changed!")
-		//}
-		c.keyMR = keyMR
-		c.KeyMR = keyMR
+	keyMR, err := c.BuildKeyMerkleRoot()
+	if err != nil {
+		panic("Failed to build the key MR")
 	}
+
+	//if c.keyMRset && c.KeyMR.Fixed() != keyMR.Fixed() {
+	//	panic("keyMR changed!")
+	//}
+
+	c.KeyMR = keyMR
+	c.keyMRset = true
 
 	return c.KeyMR
 }
@@ -470,32 +467,17 @@ func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DirectoryBlock.GetFullHash() saw an interface that was nil")
 		}
 	}()
-	if b.DBHash == nil {
-		binaryDblock, err := b.MarshalBinary()
-		if err != nil {
-			return nil
-		}
-		b.DBHash = primitives.Sha(binaryDblock)
+	binaryDblock, err := b.MarshalBinary()
+	if err != nil {
+		return nil
 	}
+	b.DBHash = primitives.Sha(binaryDblock)
 	return b.DBHash
 }
 
-func (b *DirectoryBlock) ResetCaches() {
-	if len(b.DBEntries) == 0 {
-		return
-	}
-	b.DBHash = nil
-	b.keyMR = nil
-	b.KeyMR = nil
-	b.BuildBodyMR()
-	b.BuildKeyMerkleRoot()
-	b.GetFullHash()
-	b.GetKeyMR()
-}
-
 func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {
-
-	dbentry := new(DBEntry)
+	var dbentry interfaces.IDBEntry
+	dbentry = new(DBEntry)
 	dbentry.SetChainID(chainID)
 	dbentry.SetKeyMR(keyMR)
 

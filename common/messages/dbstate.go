@@ -142,7 +142,10 @@ func (m *DBStateMsg) GetMsgHash() (rval interfaces.IHash) {
 	}()
 
 	if m.MsgHash == nil {
-		data := m.DirectoryBlock.GetHash().Bytes()
+		data, err := m.MarshalBinary()
+		if err != nil {
+			return nil
+		}
 		m.MsgHash = primitives.Sha(data)
 	}
 	return m.MsgHash
