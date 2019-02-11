@@ -142,10 +142,9 @@ func (s *State) MakeMissingEntryRequests() {
 							panic(err)
 						}
 					}
-				} 
+				}
 
-					delete(MissingEntryMap, entry.GetHash().Fixed())
-				
+				delete(MissingEntryMap, entry.GetHash().Fixed())
 
 			default:
 				break InsertLoop
