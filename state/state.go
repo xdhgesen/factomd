@@ -411,6 +411,7 @@ type State struct {
 
 	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 	validatorLoopThreadID string
+	Hold                  HoldingList
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -907,6 +908,8 @@ func (s *State) Init() {
 		wsapi.InitLogs(s.LogPath+s.FactomNodeName+".log", s.LogLevel)
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	}
+
+	s.Hold.Init(s) // setup the dependant holding map
 
 	s.ControlPanelChannel = make(chan DisplayState, 20)
 	s.tickerQueue = make(chan int, 100)                        //ticks from a clock

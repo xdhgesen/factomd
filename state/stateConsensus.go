@@ -217,6 +217,9 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			s.LogMessage("executeMsg", "drop, IReplay", msg)
 		}
 
+	case -2:
+		s.LogMessage("executeMsg", "new holding", msg)
+
 	default:
 		s.LogMessage("executeMsg", "drop, InvalidMsg", msg)
 		if !msg.SentInvalid() {
@@ -2566,7 +2569,7 @@ func (s *State) GetE(rt bool, adr [32]byte) (v int64) {
 }
 
 // PutE()
-// If rt == true, update the Temp balances.  Otherwise update the Permenent balances.
+// If rt == true, update the Temp balances.  Otherwise update the Permanent balances.
 // concurrency safe to call
 func (s *State) PutE(rt bool, adr [32]byte, v int64) {
 	if rt {
