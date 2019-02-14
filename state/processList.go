@@ -1139,10 +1139,12 @@ func (p *ProcessList) String() string {
 		saved := ""
 		if pdbs == nil {
 			saved = "nil"
-		} else if pdbs.Signed {
-			saved = "signed"
 		} else if pdbs.Saved {
 			saved = "saved"
+		} else if pdbs.Signed {
+			saved = "signed"
+		} else if pdbs.Locked {
+			saved = "processed"
 		} else {
 			saved = "constructing"
 		}

@@ -68,7 +68,9 @@ func (lg *LoadGenerator) Run() {
 			return
 		}
 		var chain interfaces.IHash = nil
-
+		if top == 0 {
+			top = 1
+		}
 		sleep := 500 / top
 
 		for i := 0; i < top; i++ {

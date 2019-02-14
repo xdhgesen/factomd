@@ -121,12 +121,17 @@ func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
 }
 
 func (lists *ProcessLists) String() string {
-	str := "Process Lists"
-	for i, pl := range lists.Lists {
-		if pl == nil {
-			continue
+	b := uint32(0)
+	for _, dbstate := range lists.State.DBStates.DBStates {
+		b = dbstate.DirectoryBlock.GetDatabaseHeight()
+		if dbstate.Saved || dbstate.Locked {
+			break
 		}
-		if len(lists.Lists)-i > 3 {
+	}
+
+	str := "Process Lists"
+	for _, pl := range lists.Lists {
+		if pl.DBHeight < b {
 			continue
 		}
 		str = fmt.Sprintf("%s  DBBase: %d\n", str, lists.DBHeightBase)
