@@ -892,14 +892,12 @@ func modifyLoadIdentities() {
 
 func addFnodeName(i int) {
 	// full name
-	name := fnodes[i].State.FactomNodeName
-	globals.FnodeNames[fnodes[i].State.IdentityChainID.String()] = name
+	globals.FnodeNames[fnodes[i].State.IdentityChainID.String()] = fnodes[i].State.FactomNodeName
 	// common short set
-	id := fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[3:6])
-	globals.FnodeNames[id] = name
-	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:5])] = name
-	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:])] = name
-	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:8])] = name
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[3:6])] = fnodes[i].State.FactomNodeName
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:5])] = fnodes[i].State.FactomNodeName
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:])] = fnodes[i].State.FactomNodeName
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:8])] = fnodes[i].State.FactomNodeName
 }
 
 func shad(data []byte) []byte {

@@ -585,7 +585,9 @@ func (s *State) ReviewHolding() {
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if re, ok := v.(*messages.RevealEntryMsg); ok {
 			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
-				delete(s.Holding, re.GetHash().Fixed())
+				s.DeleteFromHolding(re.GetHash().Fixed(), v, "already committed2")
+
+				//				delete(s.Holding, re.GetHash().Fixed())
 				s.Commits.Delete(re.GetHash().Fixed())
 				continue
 			}

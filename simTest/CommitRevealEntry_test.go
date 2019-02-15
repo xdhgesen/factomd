@@ -58,7 +58,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 40, 1, 1, t)
+		state0 := SetupSim("LLLF", map[string]string{"--debuglog": "", "--blktime": "10"}, 40, 1, 1, t)
 
 		stop := func() {
 			ShutDownEverything(t)

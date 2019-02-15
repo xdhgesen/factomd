@@ -3,24 +3,21 @@ package testHelper
 //A package for functions used multiple times in tests that aren't useful in production code.
 
 import (
+	"fmt"
+	"os"
+	"time"
+
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
+	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-
-	"time"
-
-	"fmt"
-	"os"
-
 	"github.com/FactomProject/factomd/state"
-
-	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 )
 
 var BlockCount int = 10
