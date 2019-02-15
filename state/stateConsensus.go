@@ -1582,15 +1582,13 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
-		entry := s.Holding[h.Fixed()]
-		if entry != nil {
-			entry.FollowerExecute(s)
-			entry.SendOut(s, entry)
-			TotalXReviewQueueInputs.Inc()
-			s.XReview = append(s.XReview, entry)
-			TotalHoldingQueueOutputs.Inc()
-		}
+		//entry := s.Holding[h.Fixed()]
+		//if entry != nil {
+		//	entry.FollowerExecute(s)
+		//	entry.SendOut(s, entry)
+		//}
 		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
+		s.ExecuteFromHolding(h.Fixed()) // execute any messages waiting on this commit
 		return true
 	}
 
@@ -1607,15 +1605,16 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
-		entry := s.Holding[h.Fixed()]
-		if entry != nil && entry.Validate(s) == 1 {
-			entry.FollowerExecute(s)
-			entry.SendOut(s, entry)
-			TotalXReviewQueueInputs.Inc()
-			s.XReview = append(s.XReview, entry)
-			TotalHoldingQueueOutputs.Inc()
-		}
+		// old holding behaviour for commits
+		//entry := s.Holding[h.Fixed()]
+		//if entry != nil && entry.Validate(s) == 1 {
+		//	entry.FollowerExecute(s)
+		//	entry.SendOut(s, entry)
+		//}
 		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitEntry)
+
+		s.ExecuteFromHolding(h.Fixed()) // execute any messages waiting on this commit
+
 		return true
 	}
 	//s.AddStatus("Cannot Process Commit Entry")
@@ -1657,7 +1656,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 	}
 	// Handle the case that this is a Entry Chain create
 	// Must be built with CommitChain (i.e. !msg.IsEntry).  Also
-	// cannot have an existing chaing (eb and eb_db == nil)
+	// cannot have an existing chain (eb and eb_db == nil)
 	if !msg.IsEntry && eb == nil && eb_db == nil {
 		// Create a new Entry Block for a new Entry Block Chain
 		eb = entryBlock.NewEBlock()
@@ -1673,6 +1672,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 
 		s.IncEntryChains()
 		s.IncEntries()
+		s.ExecuteFromHolding(chainID.Fixed())
 		return true
 	}
 
