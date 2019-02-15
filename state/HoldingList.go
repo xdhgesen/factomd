@@ -9,11 +9,13 @@ import (
 type HoldingList struct {
 	holding map[[32]byte][]interfaces.IMsg
 	s       *State // for debug logging
+	size    int
 }
 
 func (l *HoldingList) Init(s *State) {
 	l.holding = make(map[[32]byte][]interfaces.IMsg)
 	l.s = s
+	l.size = 0
 }
 
 // Add a messsage to a dependent holding list
@@ -24,11 +26,13 @@ func (l *HoldingList) Add(h [32]byte, msg interfaces.IMsg) {
 	} else {
 		l.holding[h] = append(l.holding[h], msg)
 	}
+	l.size++
 }
 
 // get and remove the list of dependent message for a hash
 func (l *HoldingList) Get(h [32]byte) []interfaces.IMsg {
 	rval := l.holding[h]
+	l.size -= len(rval)
 	l.holding[h] = nil
 	return rval
 }
