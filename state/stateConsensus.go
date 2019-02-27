@@ -1838,7 +1838,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.SetLLeaderHeight(s.LLeaderHeight + 1)
 			//			s.SetLeaderTimestamp(s.GetTimestamp()) // start the new block now...Needs to be updated when we get the VM 0 DBSig.
 
-			s.GetAckChange()
 			s.CheckForIDChange()
 
 			s.LeaderPL = s.ProcessLists.Get(s.LLeaderHeight)
@@ -1923,8 +1922,15 @@ func (s *State) GetUnSyncedServers(dbheight uint32) string {
 }
 
 func (s *State) CheckForIDChange() {
+	changed, _ := s.GetAckChange()
 	var reloadIdentity bool = false
-	if s.AckChange > 0 {
+
+	if changed {
+		s.LogPrintf("AckChange", "AckChange %v", s.AckChange)
+		// TODO write to stderror also
+	}
+
+	if s.AckChange > 0 { // REVIEW: if set to 0 it seems change never takes effect
 		if s.LLeaderHeight >= s.AckChange {
 			reloadIdentity = true
 		}
@@ -1938,6 +1944,7 @@ func (s *State) CheckForIDChange() {
 		}
 		s.LocalServerPrivKey = config.App.LocalServerPrivKey
 		s.initServerKeys()
+		s.LogPrintf("AckChange", "reloadIdentity local_priv: %v pub: %v, priv: %v", s.LocalServerPrivKey, s.GetServerPublicKey(), s.GetServerPrivateKey())
 	}
 }
 
