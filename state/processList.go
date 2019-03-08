@@ -41,7 +41,7 @@ type ProcessList struct {
 
 	State        *State
 	VMs          []*VM       // Process list for each server (up to 32)
-	ServerMap    [10][64]int // Map of FedServers to all Servers for each minute
+	ServerMap    [10][64]int // Given a minute and a vmIndex get the index of the responsible FedServer
 	System       VM          // System Faults and other system wide messages
 	SysHighest   int
 	diffSigTally int /* Tally of how many VMs have provided different

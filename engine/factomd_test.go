@@ -471,7 +471,7 @@ func TestMultiple3Election(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{"--debuglog": ""}, 9, 3, 3, t)
+	state0 := SetupSim("LLLLLLLAAAAF", map[string]string{"--debuglog": "."}, 9, 3, 3, t)
 
 	RunCmd("1")
 	RunCmd("x")

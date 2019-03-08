@@ -10,6 +10,7 @@ import (
 	"hash"
 	"os"
 	"reflect"
+	"runtime"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -107,6 +108,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		return
 	}
 	s.SetString()
+
 	msg.ComputeVMIndex(s)
 
 	// never ignore DBState messages
@@ -627,7 +629,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 
 	// REVIEW: checking for a change-in-height causes brainswap not to work w/ older v6.1.0
 	// if  newMinute == 0 && s.LLeaderHeight != dbheight {
-	if  newMinute == 0 {
+	if newMinute == 0 {
 		s.CheckForIDChange()
 	}
 
@@ -2034,15 +2036,61 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	return false
 }
 
+// given a time and FedChainID find the VM index for the server
+// return -1 on no match
+func (s *State) GetVmIndexFromFedServer(dbheight uint32, minute int, FedChainId interfaces.IHash) int {
+	p := s.ProcessLists.Get(dbheight)
+	fedIndex := -1
+	vmIndex := -1
+	fedServers := s.GetFedServers(dbheight)
+	for index, fed := range fedServers {
+		if fed.GetChainID().IsSameAs(FedChainId) {
+			fedIndex = index
+		}
+	}
+	if fedIndex != -1 {
+		for vmIndex, x := range p.ServerMap[minute] {
+			if x > len(fedServers) {
+				break
+			}
+			if fedIndex == x {
+				return vmIndex
+			}
+		}
+	}
+	return vmIndex
+}
+
+// given a time and VM index find the FedChainID for the server
+// return zeroHash on no match
+func (s *State) GetFedServerFromVMIndex(dbheight uint32, minute int, vmIndex int) interfaces.IHash {
+
+	servers := s.GetFedServers(dbheight)
+	if vmIndex > len(servers) {
+		return primitives.NewHash(constants.ZERO_HASH[:])
+	}
+
+	p := s.ProcessLists.Get(dbheight)
+	if p == nil {
+		return primitives.NewHash(constants.ZERO_HASH[:])
+	}
+
+	fedIndex := p.ServerMap[s.CurrentMinute][vmIndex]
+
+	return servers[fedIndex].GetChainID()
+}
+
 // GetUnsyncedServers returns an array of the IDs for all unsynced VMs
 func (s *State) GetUnsyncedServers(dbheight uint32) []interfaces.IHash {
 	var ids []interfaces.IHash
 	p := s.ProcessLists.Get(dbheight)
-	for index, l := range s.GetFedServers(dbheight) {
-		vmIndex := p.ServerMap[s.CurrentMinute][index]
-		vm := p.VMs[vmIndex]
+	min := s.CurrentMinute
+	if min == 10 {
+		min = 9
+	}
+	for vmIndex, vm := range p.VMs {
 		if !vm.Synced {
-			ids = append(ids, l.GetChainID())
+			ids = append(ids, s.GetFedServerFromVMIndex(dbheight, min, vmIndex))
 		}
 	}
 	return ids
@@ -2050,14 +2098,63 @@ func (s *State) GetUnsyncedServers(dbheight uint32) []interfaces.IHash {
 
 // GetUnsyncedServersString returns a string with the short IDs for all unsynced VMs
 func (s *State) GetUnsyncedServersString(dbheight uint32) string {
-	var ids string
-	for _, id := range s.GetUnsyncedServers(dbheight) {
-		ids = ids + "," + id.String()[6:12]
+	minute := s.CurrentMinute
+	if minute == 10 {
+		minute = 9
 	}
-	if len(ids) > 0 {
-		ids = ids[1:] // drop the leading comma
+
+	{ //debug
+		p := s.ProcessLists.Get(dbheight)
+		// loop the VMs checking the FedIndex
+		for vmIndex, _ := range s.GetFedServers(dbheight) {
+			fedIndex := p.ServerMap[minute][vmIndex]
+			fed := s.GetFedServers(dbheight)[fedIndex]
+			fedServerVmIndex := s.GetVmIndexFromFedServer(dbheight, minute, fed.GetChainID())
+			if fedServerVmIndex != vmIndex {
+				runtime.Breakpoint()
+			}
+		}
+
+		fedServers := s.GetFedServers(dbheight)
+		for fedIndex := range fedServers {
+			VMIndex := p.ServerMap[minute][fedIndex]
+			if !fedServers[fedIndex].GetChainID().IsSameAs(s.GetFedServerFromVMIndex(dbheight, minute, VMIndex)) {
+				runtime.Breakpoint()
+			}
+		}
+
+		for fedIndex, fed := range fedServers {
+			VMIndex := p.ServerMap[minute][fedIndex]
+			found, vmIndex := p.GetVirtualServers(minute, fed.GetChainID())
+			if !found || VMIndex != vmIndex {
+				runtime.Breakpoint()
+			}
+		}
+
 	}
-	return ids
+
+	var ids2 string
+	p := s.ProcessLists.Get(dbheight)
+	if p.DBHeight != dbheight {
+		runtime.Breakpoint()
+	}
+	fedServers := len(s.GetFedServers(dbheight))
+	// can't just loop thru p.VMs because there are 65 of there reguardless of how many VM there are
+	for vmIndex := 0; vmIndex < fedServers; vmIndex++ {
+		vm := p.VMs[vmIndex]
+		if vm.VmIndex != vmIndex {
+			runtime.Breakpoint()
+		}
+		if !vm.Synced {
+			fed := s.GetFedServerFromVMIndex(dbheight, minute, vmIndex)
+			ids2 = ids2 + "," + fed.String()[6:12] + fmt.Sprintf("<%d/%d/ -- minute %d>", vm.p.DBHeight, vm.VmIndex, vm.LeaderMinute)
+		}
+	}
+
+	if len(ids2) > 0 {
+		ids2 = ids2[1:] // drop the leading comma
+	}
+	return ids2
 }
 
 func (s *State) CheckForIDChange() {
@@ -2351,6 +2448,7 @@ func (s *State) SendHeartBeat() {
 		if auditServer.GetChainID().IsSameAs(s.IdentityChainID) {
 			hb := new(messages.Heartbeat)
 			hb.DBHeight = s.LLeaderHeight
+			hb.Minute = byte(s.CurrentMinute)
 			hb.Timestamp = primitives.NewTimestampNow()
 			hb.SecretNumber = s.GetSalt(hb.Timestamp)
 			hb.DBlockHash = dbstate.DBHash
