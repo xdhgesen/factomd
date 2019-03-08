@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/hack"
 	"os"
 
 	"reflect"
@@ -44,6 +45,15 @@ func main() {
 	sim_Stdin := params.Sim_Stdin
 
 	state := Factomd(params, sim_Stdin)
+
+	go func () {
+		// HACK - including test code
+		var delay time.Duration = 120
+		fmt.Printf("HACK: executing batch in %v sec", delay)
+		time.Sleep(time.Second*delay)
+		hack.TestSendingCommitAndReveal()
+	}()
+
 	for state.Running() {
 		time.Sleep(time.Second)
 	}
