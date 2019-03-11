@@ -2120,6 +2120,8 @@ func (s *State) GetUnsyncedServersString(dbheight uint32) string {
 			VMIndex := p.ServerMap[minute][fedIndex]
 			if !fedServers[fedIndex].GetChainID().IsSameAs(s.GetFedServerFromVMIndex(dbheight, minute, VMIndex)) {
 				runtime.Breakpoint()
+				id := s.GetFedServerFromVMIndex(dbheight, minute, VMIndex)
+				_ = id
 			}
 		}
 
