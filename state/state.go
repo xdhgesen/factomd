@@ -38,6 +38,7 @@ import (
 	"github.com/FactomProject/logrustash"
 
 	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
+	"github.com/FactomProject/factomd/common/directoryBlock"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -1269,6 +1270,8 @@ func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	dblk.(*directoryBlock.DirectoryBlock).State = s
 
 	err = s.ValidatePrevious(dbheight)
 	if err != nil {

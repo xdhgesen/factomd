@@ -22,6 +22,7 @@ var _ = fmt.Print
 
 type DirectoryBlock struct {
 	//Not Marshalized
+	State      interfaces.IState
 	DBHash     interfaces.IHash `json:"dbhash"`
 	KeyMR      interfaces.IHash `json:"keymr"`
 	HeaderHash interfaces.IHash `json:"headerhash"`
@@ -184,7 +185,10 @@ func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DirectoryBlock.GetKeyMR() saw an interface that was nil")
 		}
 	}()
-	keyMR, err := c.BuildKeyMerkleRoot()
+
+	if len(c.GetDBEntries()) > 0 {
+		keyMR, err := c.BuildKeyMerkleRoot()
+	}
 	if err != nil {
 		panic("Failed to build the key MR")
 	}
@@ -298,7 +302,9 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 	}(&err)
 	b.Init()
 	b.Sort()
-	_, err = b.BuildBodyMR()
+	if len(b.GetEBlockDBEntries()) != 0 {
+		_, err = b.BuildBodyMR()
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -324,6 +330,7 @@ func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
 	count := uint32(len(b.GetDBEntries()))
 	b.GetHeader().SetBlockCount(count)
 	if count == 0 {
+		b.State.LogPrintf("DBlock", "BuildBodyMR count == 0")
 		panic("Zero block size!")
 	}
 
@@ -331,6 +338,7 @@ func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
 	for i, entry := range b.GetDBEntries() {
 		data, err := entry.MarshalBinary()
 		if err != nil {
+			b.State.LogPrintf("DBlock", "BuildBodyMR Marshal fail")
 			return nil, err
 		}
 		hashes[i] = primitives.Sha(data)
@@ -345,6 +353,7 @@ func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
 
 	b.GetHeader().SetBodyMR(merkleRoot)
 
+	b.State.LogPrintf("DBlock", "BuildBodyMR Marshal")
 	return merkleRoot, nil
 }
 
@@ -371,6 +380,7 @@ func (b *DirectoryBlock) BuildKeyMerkleRoot() (keyMR interfaces.IHash, err error
 	bodyKeyMR := b.BodyKeyMR() //This needs to be called first to build the header properly!!
 	headerHash, err := b.GetHeaderHash()
 	if err != nil {
+		b.State.LogPrintf("DBlock", "BuildKeyMerkleRoot Marshal fail")
 		return nil, err
 	}
 	hashes = append(hashes, headerHash)
@@ -381,6 +391,7 @@ func (b *DirectoryBlock) BuildKeyMerkleRoot() (keyMR interfaces.IHash, err error
 	b.KeyMR = keyMR
 
 	b.GetFullHash() // Create the Full Hash when we create the keyMR
+	b.State.LogPrintf("DBlock", "BuildKeyMerkleRoot Marshal")
 
 	return primitives.NewHash(keyMR.Bytes()), nil
 }
