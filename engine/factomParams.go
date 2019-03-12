@@ -54,7 +54,7 @@ func init() {
 	flag.BoolVar(&p.Exclusive, "exclusive", false, "If true, we only dial out to special/trusted peers.")
 	flag.BoolVar(&p.ExclusiveIn, "exclusive_in", false, "If true, we only dial out to special/trusted peers and no incoming connections are accepted.")
 	flag.StringVar(&p.Prefix, "prefix", "", "Prefix the Factom Node Names with this value; used to create leaderless networks.")
-	flag.BoolVar(&p.Rotate, "rotate", false, "If true, responsibility is owned by one leader, and Rotated over the leaders.")
+	//	flag.BoolVar(&p.Rotate, "rotate", false, "If true, responsibility is owned by one leader, and Rotated over the leaders.")
 	flag.IntVar(&p.TimeOffset, "timedelta", 0, "Maximum timeDelta in milliseconds to offset each node.  Simulates deltas in system clocks over a network.")
 	flag.BoolVar(&p.KeepMismatch, "keepmismatch", false, "If true, do not discard DBStates even when a majority of DBSignatures have a different hash")
 	flag.Int64Var(&p.StartDelay, "startdelay", 10, "Delay to start processing messages, in seconds")
@@ -157,6 +157,10 @@ func isCompilerVersionOK() bool {
 	}
 
 	if strings.Contains(runtime.Version(), "1.11") {
+		goodenough = true
+	}
+
+	if strings.Contains(runtime.Version(), "1.12") {
 		goodenough = true
 	}
 	return goodenough

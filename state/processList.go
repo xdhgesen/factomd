@@ -172,7 +172,7 @@ func (p *ProcessList) Complete() bool {
 // Returns the Virtual Server index for this hash for the given minute
 func (p *ProcessList) VMIndexFor(hash []byte) int {
 
-	if p == nil || p.State.OneLeader {
+	if p == nil || len(p.FedServers) == 1 {
 		return 0
 	}
 
@@ -325,9 +325,9 @@ func (p *ProcessList) FedServerFor(minute int, hash []byte) interfaces.IServer {
 }
 
 func FedServerVM(serverMap [10][64]int, numberOfFedServers int, minute int, fedIndex int) int {
-	for i := 0; i < numberOfFedServers; i++ {
-		if serverMap[minute][i] == fedIndex {
-			return i
+	for vmIndex := 0; vmIndex < numberOfFedServers; vmIndex++ {
+		if serverMap[minute][vmIndex] == fedIndex {
+			return vmIndex
 		}
 	}
 	return -1

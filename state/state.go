@@ -209,6 +209,10 @@ type State struct {
 	IgnoreDone    bool
 	IgnoreMissing bool
 
+	// Timout and Limit for outstanding missing DBState requests
+	RequestTimeout time.Duration
+	RequestLimit   int
+
 	LLeaderHeight   uint32
 	Leader          bool
 	LeaderVMIndex   int
@@ -217,10 +221,10 @@ type State struct {
 	// Height cutoff where no missing messages below this height
 	DBHeightAtBoot  uint32
 	TimestampAtBoot interfaces.Timestamp
-	OneLeader       bool
-	OutputAllowed   bool
-	LeaderNewMin    int
-	CurrentMinute   int
+	//OneLeader       bool
+	OutputAllowed bool
+	LeaderNewMin  int
+	CurrentMinute int
 
 	// These are the start times for blocks and minutes
 	PreviousMinuteStartTime int64
@@ -292,6 +296,10 @@ type State struct {
 
 	// Directory Block State
 	DBStates *DBStateList // Holds all DBStates not yet processed.
+
+	StatesMissing  *StatesMissing
+	StatesWaiting  *StatesWaiting
+	StatesReceived *StatesReceived
 
 	// Having all the state for a particular directory block stored in one structure
 	// makes creating the next state, updating the various states, and setting up the next
@@ -443,6 +451,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 		os.MkdirAll(simConfigPath, 0775)
 	}
 
+	newState.FactomNodeName = s.Prefix + "FNode" + number
 	config := false
 	if _, err := os.Stat(configfile); !os.IsNotExist(err) {
 		os.Stderr.WriteString(fmt.Sprintf("   Using the %s config file.\n", configfile))
@@ -508,6 +517,8 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 
 	if !config {
 		newState.IdentityChainID = primitives.Sha([]byte(newState.FactomNodeName))
+		s.LogPrintf("AckChange", "Default3 IdentityChainID %v", s.IdentityChainID.String())
+
 		//generate and use a new deterministic PrivateKey for this clone
 		shaHashOfNodeName := primitives.Sha([]byte(newState.FactomNodeName)) //seed the private key with node name
 		clonePrivateKey := primitives.NewPrivateKeyFromHexBytes(shaHashOfNodeName.Bytes())
@@ -523,12 +534,14 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 
 	newState.Port = s.Port
 
-	newState.OneLeader = s.OneLeader
-	newState.OneLeader = s.OneLeader
+	//	newState.OneLeader = s.OneLeader
 
 	newState.RpcUser = s.RpcUser
 	newState.RpcPass = s.RpcPass
 	newState.RpcAuthHash = s.RpcAuthHash
+
+	newState.RequestTimeout = s.RequestTimeout
+	newState.RequestLimit = s.RequestLimit
 
 	newState.FactomdTLSEnable = s.FactomdTLSEnable
 	newState.factomdTLSKeyFile = s.factomdTLSKeyFile
@@ -710,7 +723,7 @@ func (s *State) GetAckChange() (bool, error) {
 }
 
 func (s *State) LoadConfig(filename string, networkFlag string) {
-	s.FactomNodeName = s.Prefix + "FNode0" // Default Factom Node Name for Simulation
+	//	s.FactomNodeName = s.Prefix + "FNode0" // Default Factom Node Name for Simulation
 
 	if len(filename) > 0 {
 		s.ConfigFilePath = filename
@@ -769,6 +782,8 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.ControlPanelPort = cfg.App.ControlPanelPort
 		s.RpcUser = cfg.App.FactomdRpcUser
 		s.RpcPass = cfg.App.FactomdRpcPass
+		s.RequestTimeout = time.Duration(cfg.App.RequestTimeout) * time.Second
+		s.RequestLimit = cfg.App.RequestLimit
 		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
 		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
 		s.FastBoot = cfg.App.FastBoot
@@ -816,8 +831,11 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		identity, err := primitives.HexToHash(cfg.App.IdentityChainID)
 		if err != nil {
 			s.IdentityChainID = primitives.Sha([]byte(s.FactomNodeName))
+			s.LogPrintf("AckChange", "Bad IdentityChainID  in config \"%v\"", cfg.App.IdentityChainID)
+			s.LogPrintf("AckChange", "Default2 IdentityChainID \"%v\"", s.IdentityChainID.String())
 		} else {
 			s.IdentityChainID = identity
+			s.LogPrintf("AckChange", "Load IdentityChainID \"%v\"", s.IdentityChainID.String())
 		}
 	} else {
 		s.LogPath = "database/"
@@ -852,6 +870,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 
 		// TODO:  Actually load the IdentityChainID from the config file
 		s.IdentityChainID = primitives.Sha([]byte(s.FactomNodeName))
+		s.LogPrintf("AckChange", "Default IdentityChainID %v", s.IdentityChainID.String())
 
 	}
 	s.JournalFile = s.LogPath + "/journal0" + ".log"
@@ -967,6 +986,12 @@ func (s *State) Init() {
 	s.DBStates = new(DBStateList)
 	s.DBStates.State = s
 	s.DBStates.DBStates = make([]*DBState, 0)
+
+	s.StatesMissing = NewStatesMissing()
+	s.StatesWaiting = NewStatesWaiting()
+	s.StatesReceived = NewStatesReceived()
+
+	s.DBStates.Catchup()
 
 	switch s.NodeMode {
 	case "FULL":
@@ -2039,6 +2064,9 @@ func (s *State) GetIdentityChainID() (rval interfaces.IHash) {
 }
 
 func (s *State) SetIdentityChainID(chainID interfaces.IHash) {
+	if !s.IdentityChainID.IsSameAs(chainID) {
+		s.LogPrintf("AckChange", "SetIdentityChainID %v", chainID.String())
+	}
 	s.IdentityChainID = chainID
 }
 
@@ -2224,36 +2252,39 @@ func (s *State) GetMessageFilterTimestamp() interfaces.Timestamp {
 // We will not set it to a time that is before boot or more than one hour in the past.
 // this ensure messages from prior boot and messages that predate the current replay filter are
 // are dropped.
-func (s *State) SetMessageFilterTimestamp(requestedTs interfaces.Timestamp) {
+// It marks the start of the replay filter content
+func (s *State) SetMessageFilterTimestamp(leaderTS interfaces.Timestamp) {
 
-	timenow := primitives.NewTimestampNow() // now() - one hour
+	// make a copy of the time stamp so we don't change the source
+	requestedTS := new(primitives.Timestamp)
+	requestedTS.SetTimestamp(leaderTS)
 
-	ts := new(primitives.Timestamp)
-	ts.SetTimestamp(requestedTs)
-	/// this is pointless since boot is always before now.
-	if ts.GetTimeMilli() < s.TimestampAtBoot.GetTimeMilli() {
-		ts.SetTimestamp(s.TimestampAtBoot)
+	onehourago := new(primitives.Timestamp)
+	onehourago.SetTimeMilli(primitives.NewTimestampNow().GetTimeMilli() - 60*60*1000) // now() - one hour
+
+	if requestedTS.GetTimeMilli() < onehourago.GetTimeMilli() {
+		requestedTS.SetTimestamp(onehourago)
 	}
 
-	if ts.GetTimeMilli() < timenow.GetTimeMilli() {
-		ts.SetTimestamp(timenow)
+	if requestedTS.GetTimeMilli() < s.TimestampAtBoot.GetTimeMilli() {
+		requestedTS.SetTimestamp(s.TimestampAtBoot)
 	}
 
-	if s.MessageFilterTimestamp != nil && ts.GetTimeMilli() < s.MessageFilterTimestamp.GetTimeMilli() {
+	if s.MessageFilterTimestamp != nil && requestedTS.GetTimeMilli() < s.MessageFilterTimestamp.GetTimeMilli() {
 		s.LogPrintf("executeMsg", "Set MessageFilterTimestamp attempt to move backward in time from %s", atomic.WhereAmIString(1))
 		return
 	}
 
-	s.LogPrintf("executeMsg", "SetMessageFilterTimestamp(%s) using %s ", requestedTs, ts.String())
+	s.LogPrintf("executeMsg", "SetMessageFilterTimestamp(%s) using %s ", leaderTS, requestedTS.String())
 
-	s.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64())
+	s.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(requestedTS.GetTimeMilliUInt64())
 }
 
 func (s *State) SetLeaderTimestamp(ts interfaces.Timestamp) {
 	s.LogPrintf("executeMsg", "SetLeaderTimestamp(%s)", ts.String())
 
 	s.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64())
-	s.SetMessageFilterTimestamp(ts)
+	s.SetMessageFilterTimestamp(primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64() - 60*60*1000)) // set message filter to one hour before this block started.
 }
 
 func (s *State) SetFaultTimeout(timeout int) {
