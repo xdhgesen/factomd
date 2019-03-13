@@ -75,7 +75,7 @@ func (e *ServerIndexNumber) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("ServerIndexNumber.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("ServerIndexNumber.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

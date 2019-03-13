@@ -60,7 +60,7 @@ func (m *FactoidTransaction) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("FactoidTransaction.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("FactoidTransaction.GetFullHash() saw an interface that was nil")
 		}
 	}()
 
@@ -69,7 +69,7 @@ func (m *FactoidTransaction) GetHash() (rval interfaces.IHash) {
 
 		data, err := m.Transaction.MarshalBinarySig()
 		if err != nil {
-			panic(fmt.Sprintf("Error in CommitChain.GetHash(): %s", err.Error()))
+			panic(fmt.Sprintf("Error in CommitChain.GetFullHash(): %s", err.Error()))
 		}
 		m.hash = primitives.Sha(data)
 	}
@@ -266,7 +266,7 @@ func (m *FactoidTransaction) String() string {
 		outputs += "]"
 	}
 	outputs += "]"
-	rval := fmt.Sprintf("Factoid VM %d Leader %x GetHash %x %s -> %s",
+	rval := fmt.Sprintf("Factoid VM %d Leader %x GetFullHash %x %s -> %s",
 		m.VMIndex,
 		m.GetLeaderChainID().Bytes()[3:6],
 		m.GetHash().Bytes()[:3], inputs, outputs)

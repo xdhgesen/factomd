@@ -43,7 +43,7 @@ type IMsg interface {
 
 	// This is the hash used to check for repeated messages.  Almost always this
 	// is the MsgHash, however for Chain Commits, Entry Commits, and Factoid Transactions,
-	// this is the GetHash().
+	// this is the GetFullHash().
 	GetRepeatHash() IHash
 
 	// Hash for this message as used by Consensus (i.e. what we match). Does not include

@@ -12,7 +12,7 @@ type IFBlock interface {
 	//DatabaseBlockWithEntries
 	GetDatabaseHeight() uint32
 	DatabasePrimaryIndex() IHash   //block.KeyMR()
-	DatabaseSecondaryIndex() IHash //block.GetHash()
+	DatabaseSecondaryIndex() IHash //block.GetFullHash()
 	New() BinaryMarshallableAndCopyable
 	GetEntryHashes() []IHash
 	GetEntrySigHashes() []IHash

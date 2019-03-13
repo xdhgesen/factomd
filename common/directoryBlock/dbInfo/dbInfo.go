@@ -253,7 +253,7 @@ func (dbic *DirBlockInfo) parseDirBlockInfoCopy(dbi *dirBlockInfoCopy) {
 // NewDirBlockInfoFromDirBlock creates a DirDirBlockInfo from DirectoryBlock
 func NewDirBlockInfoFromDirBlock(dirBlock interfaces.IDirectoryBlock) *DirBlockInfo {
 	dbi := new(DirBlockInfo)
-	dbi.DBHash = dirBlock.GetHash()
+	dbi.DBHash = dirBlock.GetFullHash()
 	dbi.DBHeight = dirBlock.GetDatabaseHeight()
 	dbi.DBMerkleRoot = dirBlock.GetKeyMR()
 	dbi.SetTimestamp(dirBlock.GetHeader().GetTimestamp())

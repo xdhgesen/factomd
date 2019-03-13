@@ -50,7 +50,7 @@ func (m *ChangeServerKeyMsg) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("ChangeServerKeyMsg.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("ChangeServerKeyMsg.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

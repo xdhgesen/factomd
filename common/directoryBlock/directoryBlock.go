@@ -22,7 +22,7 @@ var _ = fmt.Print
 
 type DirectoryBlock struct {
 	//Not Marshalized
-	DBHash     interfaces.IHash `json:"dbhash"`
+	FullHash   interfaces.IHash `json:"dbhash"`
 	KeyMR      interfaces.IHash `json:"keymr"`
 	HeaderHash interfaces.IHash `json:"headerhash"`
 	keyMRset   bool             `json:"keymrset"`
@@ -220,7 +220,7 @@ func (c *DirectoryBlock) SetDBEntries(dbEntries []interfaces.IDBEntry) error {
 func (c *DirectoryBlock) New() interfaces.BinaryMarshallableAndCopyable {
 	dBlock := new(DirectoryBlock)
 	dBlock.Header = NewDBlockHeader()
-	dBlock.DBHash = primitives.NewZeroHash()
+	dBlock.FullHash = primitives.NewZeroHash()
 	dBlock.KeyMR = primitives.NewZeroHash()
 	return dBlock
 }
@@ -257,7 +257,7 @@ func (c *DirectoryBlock) DatabaseSecondaryIndex() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DirectoryBlock.DatabaseSecondaryIndex() saw an interface that was nil")
 		}
 	}()
-	return c.GetHash()
+	return c.GetFullHash()
 }
 
 func (e *DirectoryBlock) JSONByte() ([]byte, error) {
@@ -388,7 +388,7 @@ func (b *DirectoryBlock) BuildKeyMerkleRoot() (keyMR interfaces.IHash, err error
 func UnmarshalDBlock(data []byte) (interfaces.IDirectoryBlock, error) {
 	dBlock := new(DirectoryBlock)
 	dBlock.Header = NewDBlockHeader()
-	dBlock.DBHash = primitives.NewZeroHash()
+	dBlock.FullHash = primitives.NewZeroHash()
 	dBlock.KeyMR = primitives.NewZeroHash()
 	err := dBlock.UnmarshalBinary(data)
 	if err != nil {
@@ -450,16 +450,6 @@ func (b *DirectoryBlock) UnmarshalBinary(data []byte) (err error) {
 	return
 }
 
-func (b *DirectoryBlock) GetHash() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("DirectoryBlock.GetHash() saw an interface that was nil")
-		}
-	}()
-	return b.GetFullHash()
-}
-
 func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
@@ -471,8 +461,8 @@ func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 	if err != nil {
 		return nil
 	}
-	b.DBHash = primitives.Sha(binaryDblock)
-	return b.DBHash
+	b.FullHash = primitives.Sha(binaryDblock)
+	return b.FullHash
 }
 
 func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {

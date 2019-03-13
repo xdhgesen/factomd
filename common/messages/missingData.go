@@ -68,7 +68,7 @@ func (m *MissingData) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("MissingData.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("MissingData.GetFullHash() saw an interface that was nil")
 		}
 	}()
 
@@ -191,7 +191,7 @@ func (m *MissingData) FollowerExecute(state interfaces.IState) {
 		switch dataType {
 		case 0: // DataType = entry
 			dataObject = rawObject.(interfaces.IEBEntry)
-			//dataHash = dataObject.(interfaces.IEBEntry).GetHash()
+			//dataHash = dataObject.(interfaces.IEBEntry).GetFullHash()
 		case 1: // DataType = eblock
 			dataObject = rawObject.(interfaces.IEntryBlock)
 			//dataHash, _ = dataObject.(interfaces.IEntryBlock).Hash()

@@ -341,7 +341,7 @@ func (m *FedVoteLevelMsg) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("FedVoteLevelMsg.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("FedVoteLevelMsg.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

@@ -66,7 +66,7 @@ func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	// TODO: State related things about starting an election
 	pl := s.ProcessLists.Get(m.DBHeight)
 	if pl == nil {
-		//s.Holding[m.GetHash().Fixed()] = m
+		//s.Holding[m.GetFullHash().Fixed()] = m
 		s.AddToHolding(m.GetHash().Fixed(), m)
 
 		return
@@ -175,7 +175,7 @@ func (m *StartElectionInternal) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("StartElectionInternal.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("StartElectionInternal.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

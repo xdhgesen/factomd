@@ -34,7 +34,7 @@ func (fc *FaultCore) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("FaultCore.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("FaultCore.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

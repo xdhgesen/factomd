@@ -77,14 +77,14 @@ func (m *MissingMsgResponse) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("MissingMsgResponse.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("MissingMsgResponse.GetFullHash() saw an interface that was nil")
 		}
 	}()
 
 	if m.hash == nil {
 		data, err := m.MarshalBinary()
 		if err != nil {
-			panic(fmt.Sprintf("Error in MissingMsg.GetHash(): %s", err.Error()))
+			panic(fmt.Sprintf("Error in MissingMsg.GetFullHash(): %s", err.Error()))
 		}
 		m.hash = primitives.Sha(data)
 	}
