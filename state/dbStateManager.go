@@ -676,7 +676,7 @@ func (ds *DBState) String() string {
 	} else {
 		str = fmt.Sprintf("%s      State: IsNew %5v ReadyToSave %5v Locked %5v Signed %5v Saved %5v\n", str, ds.IsNew, ds.ReadyToSave, ds.Locked, ds.Signed, ds.Saved)
 		str = fmt.Sprintf("%s      DBlk Height   = %v \n", str, ds.DirectoryBlock.GetHeader().GetDBHeight())
-		str = fmt.Sprintf("%s      DBlock        = %x \n", str, ds.DirectoryBlock.GetHash().Bytes()[:5])
+		str = fmt.Sprintf("%s      DBlock        = %x \n", str, ds.DirectoryBlock.GetFullHash().Bytes()[:5])
 		str = fmt.Sprintf("%s      ABlock        = %x \n", str, ds.AdminBlock.GetHash().Bytes()[:5])
 		str = fmt.Sprintf("%s      FBlock        = %x \n", str, ds.FactoidBlock.GetHash().Bytes()[:5])
 		str = fmt.Sprintf("%s      ECBlock       = %x \n", str, ds.EntryCreditBlock.GetHash().Bytes()[:5])
@@ -754,14 +754,13 @@ func containsServer(haystack []interfaces.IServer, needle interfaces.IServer) bo
 func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	// If this block is new, then make sure all hashes are fully computed.
 	if !d.IsNew || p == nil {
+		d.DirectoryBlock.BuildKeyMerkleRoot()
 		return
 	}
 
 	//	list.State.LogPrintf("dbstateprocess", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
 	currentDBHeight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	previousDBHeight := p.DirectoryBlock.GetHeader().GetDBHeight()
-
-	d.DirectoryBlock.MarshalBinary()
 
 	hash, err := p.EntryCreditBlock.HeaderHash()
 	if err != nil {
@@ -895,7 +894,6 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	}
 
 	d.FactoidBlock = fblock
-
 	d.DirectoryBlock.GetHeader().SetPrevFullHash(p.DirectoryBlock.GetFullHash())
 	d.DirectoryBlock.GetHeader().SetPrevKeyMR(p.DirectoryBlock.GetKeyMR())
 	d.DirectoryBlock.GetHeader().SetTimestamp(list.State.GetLeaderTimestamp())
@@ -904,6 +902,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 	d.DirectoryBlock.SetABlockHash(d.AdminBlock)
 	d.DirectoryBlock.SetECBlockHash(d.EntryCreditBlock)
 	d.DirectoryBlock.SetFBlockHash(d.FactoidBlock)
+	d.DirectoryBlock.BuildKeyMerkleRoot()
 
 	pl := list.State.ProcessLists.Get(currentDBHeight)
 
@@ -920,10 +919,6 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 		}
 		d.DirectoryBlock.AddEntry(eb.GetChainID(), key)
 	}
-
-	// These two lines are crucial. They init/sort the dblock
-	d.DirectoryBlock.BuildBodyMR()
-	d.DirectoryBlock.MarshalBinary()
 
 	progress = true
 	d.IsNew = false
@@ -948,6 +943,14 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : dbstate = %v", dbht, d.Locked, d.IsNew, d.Repeat, d.String())
 		return false
+	}
+
+	DBKeyMR := d.DirectoryBlock.GetKeyMR().String()
+
+	err := CheckDBKeyMR(s, dbht, DBKeyMR)
+	if err != nil {
+		panic(fmt.Errorf("Found block at height %d that didn't match a checkpoint. Got %s, expected %s",
+			dbht, DBKeyMR, constants.CheckPoints[dbht]))
 	}
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
@@ -1006,7 +1009,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// ***** Apply the AdminBlock changes to the next DBState
 	//
 	//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Processing Admin Block at dbht: %d", d.AdminBlock.GetDBHeight()))
-	err := d.AdminBlock.UpdateState(list.State)
+	err = d.AdminBlock.UpdateState(list.State)
 
 	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) after update auth %d/%d ", dbht, len(pl.FedServers), len(pl.AuditServers))
 
@@ -1792,7 +1795,6 @@ func (list *DBStateList) NewDBState(isNew bool,
 	dbState := new(DBState)
 	dbState.Init() // Creat all the sub structor...
 
-	dbState.DBHash = directoryBlock.DatabasePrimaryIndex()
 	dbState.ABHash = adminBlock.DatabasePrimaryIndex()
 	dbState.FBHash = factoidBlock.DatabasePrimaryIndex()
 	dbState.ECHash = entryCreditBlock.DatabasePrimaryIndex()

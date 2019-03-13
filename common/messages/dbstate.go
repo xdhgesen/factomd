@@ -115,14 +115,14 @@ func (m *DBStateMsg) GetRepeatHash() (rval interfaces.IHash) {
 		}
 	}()
 
-	return m.DirectoryBlock.GetHash()
+	return m.DirectoryBlock.GetFullHash()
 }
 
 func (m *DBStateMsg) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("DBStateMsg.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("DBStateMsg.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

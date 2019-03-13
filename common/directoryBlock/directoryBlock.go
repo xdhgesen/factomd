@@ -22,7 +22,8 @@ var _ = fmt.Print
 
 type DirectoryBlock struct {
 	//Not Marshalized
-	DBHash     interfaces.IHash `json:"dbhash"`
+	State      interfaces.IState
+	FullHash   interfaces.IHash `json:"dbhash"`
 	KeyMR      interfaces.IHash `json:"keymr"`
 	HeaderHash interfaces.IHash `json:"headerhash"`
 	keyMRset   bool             `json:"keymrset"`
@@ -177,28 +178,6 @@ func (c *DirectoryBlock) CheckDBEntries() error {
 	return nil
 }
 
-func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("DirectoryBlock.GetKeyMR() saw an interface that was nil")
-		}
-	}()
-	keyMR, err := c.BuildKeyMerkleRoot()
-	if err != nil {
-		panic("Failed to build the key MR")
-	}
-
-	//if c.keyMRset && c.KeyMR.Fixed() != keyMR.Fixed() {
-	//	panic("keyMR changed!")
-	//}
-
-	c.KeyMR = keyMR
-	c.keyMRset = true
-
-	return c.KeyMR
-}
-
 func (c *DirectoryBlock) GetHeader() interfaces.IDirectoryBlockHeader {
 	c.Init()
 	return c.Header
@@ -220,7 +199,7 @@ func (c *DirectoryBlock) SetDBEntries(dbEntries []interfaces.IDBEntry) error {
 func (c *DirectoryBlock) New() interfaces.BinaryMarshallableAndCopyable {
 	dBlock := new(DirectoryBlock)
 	dBlock.Header = NewDBlockHeader()
-	dBlock.DBHash = primitives.NewZeroHash()
+	dBlock.FullHash = primitives.NewZeroHash()
 	dBlock.KeyMR = primitives.NewZeroHash()
 	return dBlock
 }
@@ -257,7 +236,7 @@ func (c *DirectoryBlock) DatabaseSecondaryIndex() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DirectoryBlock.DatabaseSecondaryIndex() saw an interface that was nil")
 		}
 	}()
-	return c.GetHash()
+	return c.GetFullHash()
 }
 
 func (e *DirectoryBlock) JSONByte() ([]byte, error) {
@@ -296,12 +275,6 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 			fmt.Fprintf(os.Stderr, "DirectoryBlock.MarshalBinary err:%v", *pe)
 		}
 	}(&err)
-	b.Init()
-	b.Sort()
-	_, err = b.BuildBodyMR()
-	if err != nil {
-		return nil, err
-	}
 
 	buf := primitives.NewBuffer(nil)
 
@@ -320,12 +293,49 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 	return buf.DeepCopyBytes(), err
 }
 
+func (b *DirectoryBlock) GetHeaderHash() (interfaces.IHash, error) {
+	b.Header.SetBlockCount(uint32(len(b.GetDBEntries())))
+	return b.Header.GetHeaderHash()
+}
+
+func (b *DirectoryBlock) BodyKeyMR() (rval interfaces.IHash) {
+	defer func() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+			primitives.LogNilHashBug("DirectoryBlock.BodyKeyMR() saw an interface that was nil")
+		}
+	}()
+
+	return b.GetHeader().GetBodyMR()
+}
+
+func (c *DirectoryBlock) GetKeyMR() (rval interfaces.IHash) {
+	defer func() {
+		if rval != nil && reflect.ValueOf(rval).IsNil() {
+			rval = nil // convert an interface that is nil to a nil interface
+			primitives.LogNilHashBug("DirectoryBlock.GetKeyMR() saw an interface that was nil")
+		}
+	}()
+	return c.KeyMR
+}
+
+func (b *DirectoryBlock) GetFNode() string {
+	if b.State == nil {
+		return "unknown"
+	}
+	return b.State.GetFactomNodeName()
+}
+
 func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
+
 	count := uint32(len(b.GetDBEntries()))
 	b.GetHeader().SetBlockCount(count)
 	if count == 0 {
 		panic("Zero block size!")
 	}
+
+	b.Init()
+	b.Sort()
 
 	hashes := make([]interfaces.IHash, len(b.GetDBEntries()))
 	for i, entry := range b.GetDBEntries() {
@@ -345,28 +355,25 @@ func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
 
 	b.GetHeader().SetBodyMR(merkleRoot)
 
+	fmt.Printf("DBlock %10s %10d %30s %x\n", b.GetFNode(), b.GetHeader().GetDBHeight(), "BuildBodyMR", merkleRoot.Bytes())
+
+	dbht := b.GetHeader().GetDBHeight()
+	_ = dbht
+	if merkleRoot.Bytes()[0] == 0x64 {
+		_ = dbht
+	} else {
+		_ = dbht
+	}
 	return merkleRoot, nil
 }
 
-func (b *DirectoryBlock) GetHeaderHash() (interfaces.IHash, error) {
-	b.Header.SetBlockCount(uint32(len(b.GetDBEntries())))
-	return b.Header.GetHeaderHash()
-}
-
-func (b *DirectoryBlock) BodyKeyMR() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("DirectoryBlock.BodyKeyMR() saw an interface that was nil")
-		}
-	}()
-	key, _ := b.BuildBodyMR()
-	return key
-}
-
 func (b *DirectoryBlock) BuildKeyMerkleRoot() (keyMR interfaces.IHash, err error) {
-	// Create the Entry Block Key Merkle Root from the hash of Header and the Body Merkle Root
+	if b.keyMRset {
+		return b.KeyMR, nil
+	}
 
+	// Create the Entry Block Key Merkle Root from the hash of Header and the Body Merkle Root
+	b.BuildBodyMR()
 	hashes := make([]interfaces.IHash, 0, 2)
 	bodyKeyMR := b.BodyKeyMR() //This needs to be called first to build the header properly!!
 	headerHash, err := b.GetHeaderHash()
@@ -378,17 +385,17 @@ func (b *DirectoryBlock) BuildKeyMerkleRoot() (keyMR interfaces.IHash, err error
 	merkle := primitives.BuildMerkleTreeStore(hashes)
 	keyMR = merkle[len(merkle)-1] // MerkleRoot is not marshalized in Dir Block
 
+	b.keyMRset = true
 	b.KeyMR = keyMR
-
-	b.GetFullHash() // Create the Full Hash when we create the keyMR
-
-	return primitives.NewHash(keyMR.Bytes()), nil
+	h := primitives.NewHash(keyMR.Bytes())
+	fmt.Printf("DBlock %10s %10d %30s %80s %x\n", b.GetFNode(), b.GetHeader().GetDBHeight(), "BuildKeyMerkleRoot", "", h.Bytes())
+	return h, nil
 }
 
 func UnmarshalDBlock(data []byte) (interfaces.IDirectoryBlock, error) {
 	dBlock := new(DirectoryBlock)
 	dBlock.Header = NewDBlockHeader()
-	dBlock.DBHash = primitives.NewZeroHash()
+	dBlock.FullHash = primitives.NewZeroHash()
 	dBlock.KeyMR = primitives.NewZeroHash()
 	err := dBlock.UnmarshalBinary(data)
 	if err != nil {
@@ -450,16 +457,6 @@ func (b *DirectoryBlock) UnmarshalBinary(data []byte) (err error) {
 	return
 }
 
-func (b *DirectoryBlock) GetHash() (rval interfaces.IHash) {
-	defer func() {
-		if rval != nil && reflect.ValueOf(rval).IsNil() {
-			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("DirectoryBlock.GetHash() saw an interface that was nil")
-		}
-	}()
-	return b.GetFullHash()
-}
-
 func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
@@ -471,8 +468,8 @@ func (b *DirectoryBlock) GetFullHash() (rval interfaces.IHash) {
 	if err != nil {
 		return nil
 	}
-	b.DBHash = primitives.Sha(binaryDblock)
-	return b.DBHash
+	b.FullHash = primitives.Sha(binaryDblock)
+	return b.FullHash
 }
 
 func (b *DirectoryBlock) AddEntry(chainID interfaces.IHash, keyMR interfaces.IHash) error {
@@ -499,14 +496,12 @@ func NewDirectoryBlock(prev interfaces.IDirectoryBlock) interfaces.IDirectoryBlo
 	newdb.GetHeader().SetVersion(constants.VERSION_0)
 
 	if prev != nil {
-		newdb.GetHeader().SetPrevFullHash(prev.GetFullHash())
-		newdb.GetHeader().SetPrevKeyMR(prev.GetKeyMR())
 		newdb.GetHeader().SetDBHeight(prev.GetHeader().GetDBHeight() + 1)
 	} else {
-		newdb.GetHeader().SetPrevFullHash(primitives.NewZeroHash())
-		newdb.GetHeader().SetPrevKeyMR(primitives.NewZeroHash())
 		newdb.GetHeader().SetDBHeight(0)
 	}
+	newdb.GetHeader().SetPrevFullHash(primitives.NewZeroHash())
+	newdb.GetHeader().SetPrevKeyMR(primitives.NewZeroHash())
 
 	newdb.SetDBEntries(make([]interfaces.IDBEntry, 0))
 

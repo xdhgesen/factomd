@@ -169,7 +169,7 @@ func TestEntryBlockMisc(t *testing.T) {
 		t.Errorf("Invalid DatabaseSecondaryIndex - %v", e.DatabaseSecondaryIndex())
 	}
 	if e.GetHash().String() != "1ec4c9a52ede96e57f855efc8cb1475e4a449773bad7a5b9a8b9abf4c683a1da" {
-		t.Errorf("Invalid GetHash - %v", e.GetHash())
+		t.Errorf("Invalid GetFullHash - %v", e.GetHash())
 	}
 	if e.BodyKeyMR().String() != "25f25d9375533b44505964af993212ef7c13314736b2c76a37c73571d89d8b21" {
 		t.Errorf("Invalid BodyKeyMR - %v", e.BodyKeyMR())

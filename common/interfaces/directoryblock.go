@@ -17,7 +17,6 @@ type IDirectoryBlock interface {
 	BuildKeyMerkleRoot() (IHash, error)
 	BuildBodyMR() (IHash, error)
 	GetKeyMR() IHash
-	GetHash() IHash
 	GetFullHash() IHash
 	GetHeaderHash() (IHash, error)
 

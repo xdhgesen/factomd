@@ -723,7 +723,7 @@ func getDblock(hash string) *DblockHolder {
 		}
 	}
 
-	holder.FullHash = dblk.GetHash().String()
+	holder.FullHash = dblk.GetFullHash().String()
 	holder.KeyMR = dblk.GetKeyMR().String()
 
 	ts := dblk.GetTimestamp()

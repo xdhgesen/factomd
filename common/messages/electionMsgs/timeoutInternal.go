@@ -264,7 +264,7 @@ func (m *TimeoutInternal) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("TimeoutInternal.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("TimeoutInternal.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

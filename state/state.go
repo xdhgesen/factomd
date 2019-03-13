@@ -38,6 +38,7 @@ import (
 	"github.com/FactomProject/logrustash"
 
 	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
+	"github.com/FactomProject/factomd/common/directoryBlock"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -1226,6 +1227,7 @@ func (s *State) Needed(eb interfaces.IEntryBlock) bool {
 
 func (s *State) ValidatePrevious(dbheight uint32) error {
 	dblk, err := s.DB.FetchDBlockByHeight(dbheight)
+	dblk.BuildKeyMerkleRoot()
 	errs := ""
 	if dblk != nil && err == nil && dbheight > 0 {
 
@@ -1236,7 +1238,9 @@ func (s *State) ValidatePrevious(dbheight uint32) error {
 		}
 
 		pdblk, _ := s.DB.FetchDBlockByHeight(dbheight - 1)
+		pdblk.BuildKeyMerkleRoot()
 		pdblk2, _ := s.DB.FetchDBlock(dblk.GetHeader().GetPrevKeyMR())
+		pdblk2.BuildKeyMerkleRoot()
 		if pdblk == nil {
 			errs += fmt.Sprintf("Cannot find the previous block by index at %d", dbheight-1)
 		} else {
@@ -1266,9 +1270,11 @@ func (s *State) ValidatePrevious(dbheight uint32) error {
 
 func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 	dblk, err := s.DB.FetchDBlockByHeight(dbheight)
-	if err != nil {
+	if err != nil || dblk == nil {
 		return nil, err
 	}
+	dblk.BuildKeyMerkleRoot()
+	dblk.(*directoryBlock.DirectoryBlock).State = s
 
 	err = s.ValidatePrevious(dbheight)
 	if err != nil {
@@ -2642,6 +2648,9 @@ func (s *State) SetStringQueues() {
 
 	default:
 		d = s.DBStates.Get(int(s.GetHighestSavedBlk())).DirectoryBlock
+		if d.GetKeyMR() == nil {
+			d.BuildKeyMerkleRoot()
+		}
 		keyMR = d.GetKeyMR().Bytes()
 		dHeight = d.GetHeader().GetDBHeight()
 	}

@@ -83,7 +83,7 @@ func (a *WholeBlock) IsSameAs(b *WholeBlock) (resp bool) {
 		}
 	}()
 
-	if !a.DBlock.GetHash().IsSameAs(b.DBlock.GetHash()) {
+	if !a.DBlock.GetFullHash().IsSameAs(b.DBlock.GetFullHash()) {
 		return false
 	}
 

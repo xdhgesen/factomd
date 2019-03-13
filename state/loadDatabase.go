@@ -161,14 +161,14 @@ n:
 			ecblk.GetBody().AddEntry(minute)
 		}
 	}
-
+	dblk.BuildBodyMR()
 	dblk.SetABlockHash(ablk)
 	dblk.SetECBlockHash(ecblk)
 	dblk.SetFBlockHash(fblk)
 	dblk.GetHeader().SetNetworkID(networkID)
 
 	dblk.GetHeader().SetTimestamp(primitives.NewTimestampFromMinutes(24018960))
-	dblk.BuildBodyMR()
+	dblk.BuildKeyMerkleRoot()
 
 	return dblk, ablk, fblk, ecblk
 }

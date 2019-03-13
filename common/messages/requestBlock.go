@@ -59,14 +59,14 @@ func (m *RequestBlock) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("RequestBlock.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("RequestBlock.GetFullHash() saw an interface that was nil")
 		}
 	}()
 
 	if m.hash == nil {
 		data, err := m.MarshalForSignature()
 		if err != nil {
-			panic(fmt.Sprintf("Error in RequestBlock.GetHash(): %s", err.Error()))
+			panic(fmt.Sprintf("Error in RequestBlock.GetFullHash(): %s", err.Error()))
 		}
 		m.hash = primitives.Sha(data)
 	}

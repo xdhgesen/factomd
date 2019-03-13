@@ -538,12 +538,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		fnodes[0].State.SetUseTorrent(false)
 	}
 
-	if p.Journal != "" {
-		go LoadJournal(s, p.Journal)
-		startServers(false)
-	} else {
-		startServers(true)
-	}
+	startServers(true)
 
 	// Start the webserver
 	wsapi.Start(fnodes[0].State)

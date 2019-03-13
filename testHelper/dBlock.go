@@ -47,7 +47,7 @@ func CreateTestDirectoryBlockHeaderWithNetworkID(prevBlock *directoryBlock.Direc
 		header.SetTimestamp(primitives.NewTimestampFromMinutes(1234))
 	} else {
 		header.SetDBHeight(prevBlock.Header.GetDBHeight() + 1)
-		header.SetPrevFullHash(prevBlock.GetHash())
+		header.SetPrevFullHash(prevBlock.GetFullHash())
 		keyMR, err := prevBlock.BuildKeyMerkleRoot()
 		if err != nil {
 			panic(err)

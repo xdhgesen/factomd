@@ -137,7 +137,7 @@ func AnchorRecordToDirBlockInfo(ar *anchor.AnchorRecord) (*dbInfo.DirBlockInfo, 
 	var err error
 
 	//TODO: fetch proper data
-	//dbi.DBHash =
+	//dbi.FullHash =
 	dbi.DBHash, err = primitives.NewShaHashFromStr(ar.KeyMR)
 	if err != nil {
 		return nil, err

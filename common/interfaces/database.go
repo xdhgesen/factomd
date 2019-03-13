@@ -29,7 +29,7 @@ type DatabaseBatchable interface {
 	GetDatabaseHeight() uint32
 
 	DatabasePrimaryIndex() IHash   //block.KeyMR()
-	DatabaseSecondaryIndex() IHash //block.GetHash()
+	DatabaseSecondaryIndex() IHash //block.GetFullHash()
 
 	GetChainID() IHash
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
 
+	directoryBlock2 "github.com/FactomProject/factomd/common/directoryBlock"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -163,7 +164,7 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
 			if !s.NoEntryYet(msg.GetHash(), nil) {
-				//delete(s.Holding, msg.GetHash().Fixed())
+				//delete(s.Holding, msg.GetFullHash().Fixed())
 				s.DeleteFromHolding(msg.GetHash().Fixed(), msg, "AlreadyCommited")
 				s.Commits.Delete(msg.GetHash().Fixed())
 				s.LogMessage("executeMsg", "drop, already committed", msg)
@@ -703,8 +704,10 @@ func (s *State) AddDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 
-	s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
-		isNew, directoryBlock.GetHeader().GetDBHeight(), directoryBlock.GetHash().Bytes()[:4],
+	directoryBlock.(*directoryBlock2.DirectoryBlock).State = s
+
+	s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
+		isNew, directoryBlock.GetHeader().GetDBHeight(),
 		adminBlock.GetHash().Bytes()[:4], factoidBlock.GetHash().Bytes()[:4], entryCreditBlock.GetHash().Bytes()[:4], len(eBlocks), len(entries))
 	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
 
@@ -714,12 +717,6 @@ func (s *State) AddDBState(isNew bool,
 	}
 
 	ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
-	DBKeyMR := dbState.DirectoryBlock.GetKeyMR().String()
-
-	err := CheckDBKeyMR(s, ht, DBKeyMR)
-	if err != nil {
-		panic(fmt.Errorf("Found block at height %d that didn't match a checkpoint. Got %s, expected %s", ht, DBKeyMR, constants.CheckPoints[ht])) //TODO make failing when given bad blocks fail more elegantly
-	}
 
 	if ht == s.LLeaderHeight-1 || (ht == s.LLeaderHeight) {
 	} else {
@@ -887,7 +884,7 @@ func (s *State) ExecuteEntriesInDBState(dbmsg *messages.DBStateMsg) {
 		return // This is a weird case
 	}
 
-	if !dbmsg.DirectoryBlock.GetHash().IsSameAs(dblock.GetHash()) {
+	if !dbmsg.DirectoryBlock.GetFullHash().IsSameAs(dblock.GetFullHash()) {
 		consenLogger.WithFields(log.Fields{"func": "ExecuteEntriesInDBState", "height": height}).Errorf("Bad DBState. DBlock does not match found")
 		return // Bad DBlock
 	}
@@ -918,6 +915,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	// saved := s.GetHighestSavedBlk()
 
 	dbheight := dbstatemsg.DirectoryBlock.GetHeader().GetDBHeight()
+	dbstatemsg.DirectoryBlock.BuildKeyMerkleRoot()
 
 	// ignore if too old. If its under EntryDBHeightComplete
 	//todo: Is this better to be GetEntryDBHeightComplete()
@@ -928,7 +926,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 	//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): Saved %d dbht: %d", saved, dbheight))
 
 	pdbstate := s.DBStates.Get(int(dbheight - 1))
-
+	pdbstate.DirectoryBlock.BuildKeyMerkleRoot()
 	valid := pdbstate.ValidNext(s, dbstatemsg)
 
 	s.LogPrintf("dbstateprocess", "FollowerExecuteDBState dbht %d valid %v", dbheight, valid)
@@ -1624,13 +1622,13 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		if worked {
 			TotalProcessListProcesses.Inc()
 			TotalCommitsOutputs.Inc()
-			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // 	delete(s.Commits, msg.Entry.GetHash().Fixed())
+			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // 	delete(s.Commits, msg.Entry.GetFullHash().Fixed())
 			// This is so the api can determine if a chainhead is about to be updated. It fixes a race condition
 			// on the api. MUST BE BEFORE THE REPLAY FILTER ADD
 			pl.PendingChainHeads.Put(msg.Entry.GetChainID().Fixed(), msg)
 			// Okay the Reveal has been recorded.  Record this as an entry that cannot be duplicated.
 			s.Replay.IsTSValidAndUpdateState(constants.REVEAL_REPLAY, msg.Entry.GetHash().Fixed(), msg.Timestamp, s.GetTimestamp())
-			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // delete(s.Commits, msg.Entry.GetHash().Fixed())
+			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // delete(s.Commits, msg.Entry.GetFullHash().Fixed())
 		}
 	}()
 

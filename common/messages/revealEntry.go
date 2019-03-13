@@ -67,7 +67,7 @@ func (m *RevealEntryMsg) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("RevealEntryMsg.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("RevealEntryMsg.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

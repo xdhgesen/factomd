@@ -192,7 +192,7 @@ func (c *CommitEntry) GetHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
 			rval = nil // convert an interface that is nil to a nil interface
-			primitives.LogNilHashBug("CommitEntry.GetHash() saw an interface that was nil")
+			primitives.LogNilHashBug("CommitEntry.GetFullHash() saw an interface that was nil")
 		}
 	}()
 

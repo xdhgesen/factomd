@@ -34,15 +34,7 @@ var _ interfaces.BinaryMarshallable = (*DBlockHeader)(nil)
 var _ interfaces.IDirectoryBlockHeader = (*DBlockHeader)(nil)
 
 func (h *DBlockHeader) Init() {
-	if h.BodyMR == nil {
-		h.BodyMR = primitives.NewZeroHash()
-	}
-	if h.PrevKeyMR == nil {
-		h.PrevKeyMR = primitives.NewZeroHash()
-	}
-	if h.PrevFullHash == nil {
-		h.PrevFullHash = primitives.NewZeroHash()
-	}
+
 }
 
 func (b *DBlockHeader) GetHeaderHash() (interfaces.IHash, error) {

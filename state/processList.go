@@ -1039,12 +1039,12 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 
 	vm.heartBeat = 0 // We have heard from this VM
 
-	// Both the ack and the message hash to the same GetHash()
+	// Both the ack and the message hash to the same GetFullHash()
 	if ack.GetHash().Fixed() != m.GetMsgHash().Fixed() {
 		s.LogPrintf("executeMsg", "m/ack mismatch m-%x a-%x", m.GetMsgHash().Fixed(), ack.GetHash().Fixed())
 	}
 
-	// Both the ack and the message hash to the same GetHash()
+	// Both the ack and the message hash to the same GetFullHash()
 	m.SetLocal(false)
 	ack.SetLocal(false)
 	ack.SetPeer2Peer(false)
