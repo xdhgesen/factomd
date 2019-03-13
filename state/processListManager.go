@@ -92,6 +92,9 @@ func (lists *ProcessLists) Get(dbheight uint32) *ProcessList {
 
 	s := lists.State
 	_ = s
+	if s == nil {
+		panic("State should not be nil")
+	}
 
 	// Only allocate a pl I have a hope of using. If too high, ignore.
 	highestCompletedBlk := lists.State.GetHighestCompletedBlk()
