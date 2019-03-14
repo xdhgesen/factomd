@@ -1276,7 +1276,7 @@ func (s *State) ValidatePrevious(dbheight uint32) error {
 
 func (s *State) LoadDBState(dbheight uint32) (interfaces.IMsg, error) {
 	dblk, err := s.DB.FetchDBlockByHeight(dbheight)
-	if err != nil {
+	if err != nil || dblk == nil {
 		return nil, err
 	}
 
