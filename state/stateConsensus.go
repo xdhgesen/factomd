@@ -710,8 +710,8 @@ func (s *State) AddDBState(isNew bool,
 
 	// This is expensive, so only do this once the database is loaded.
 	if s.DBFinished {
-		s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
-			isNew, directoryBlock.GetHeader().GetDBHeight(), directoryBlock.GetHash().Bytes()[:4],
+		s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
+			isNew, directoryBlock.GetHeader().GetDBHeight(),
 			adminBlock.GetHash().Bytes()[:4], factoidBlock.GetHash().Bytes()[:4], entryCreditBlock.GetHash().Bytes()[:4], len(eBlocks), len(entries))
 	}
 
