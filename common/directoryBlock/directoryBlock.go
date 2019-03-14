@@ -22,6 +22,7 @@ var _ = fmt.Print
 
 type DirectoryBlock struct {
 	//Not Marshalized
+	State      interfaces.IState
 	FullHash   interfaces.IHash `json:"dbhash"`
 	KeyMR      interfaces.IHash `json:"keymr"`
 	HeaderHash interfaces.IHash `json:"headerhash"`
