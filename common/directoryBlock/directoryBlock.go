@@ -276,6 +276,11 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 		}
 	}(&err)
 
+	// Make sure we have calculated our Merkle trees
+	if b.Header.GetBodyMR() == nil {
+		b.BuildKeyMerkleRoot()
+	}
+
 	buf := primitives.NewBuffer(nil)
 
 	err = buf.PushBinaryMarshallable(b.GetHeader())
