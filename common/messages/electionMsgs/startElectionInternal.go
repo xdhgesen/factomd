@@ -66,9 +66,7 @@ func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	// TODO: State related things about starting an election
 	pl := s.ProcessLists.Get(m.DBHeight)
 	if pl == nil {
-		//s.Holding[m.GetFullHash().Fixed()] = m
-		s.AddToHolding(m.GetHash().Fixed(), m)
-
+		s.AddToHolding(m.GetMsgHash().Fixed(), m) // StartElectionInternal.FollowerExecute
 		return
 	}
 	vm := pl.VMs[m.VMIndex]
