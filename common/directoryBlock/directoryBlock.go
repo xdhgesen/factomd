@@ -27,6 +27,7 @@ type DirectoryBlock struct {
 	KeyMR      interfaces.IHash `json:"keymr"`
 	HeaderHash interfaces.IHash `json:"headerhash"`
 	keyMRset   bool             `json:"keymrset"`
+	Marshal    []byte           // This Directory Block Marshaled
 
 	//Marshalized
 	Header    interfaces.IDirectoryBlockHeader `json:"header"`
@@ -297,11 +298,9 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 			fmt.Fprintf(os.Stderr, "DirectoryBlock.MarshalBinary err:%v", *pe)
 		}
 	}(&err)
-	b.Init()
-	b.Sort()
-	_, err = b.BuildBodyMR()
-	if err != nil {
-		return nil, err
+
+	if b.Marshal != nil {
+		return b.Marshal, nil
 	}
 
 	buf := primitives.NewBuffer(nil)
@@ -322,6 +321,12 @@ func (b *DirectoryBlock) MarshalBinary() (rval []byte, err error) {
 }
 
 func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
+	if b.Marshal != nil {
+		return b.BodyKeyMR(), nil
+	}
+
+	b.Init()
+	b.Sort()
 	count := uint32(len(b.GetDBEntries()))
 	b.GetHeader().SetBlockCount(count)
 	if count == 0 {
@@ -346,6 +351,14 @@ func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
 
 	b.GetHeader().SetBodyMR(merkleRoot)
 
+	if b.State != nil && b.GetHeader().GetDBHeight() > 5 {
+		b.State.LogPrintf("DBlock_MR", "%20s dbht %d minute %d MR %x",
+			"BuildBodyMR",
+			b.GetHeader().GetDBHeight(),
+			b.State.GetCurrentMinute(),
+			merkleRoot.Bytes())
+	}
+
 	return merkleRoot, nil
 }
 
@@ -361,7 +374,7 @@ func (b *DirectoryBlock) BodyKeyMR() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DirectoryBlock.BodyKeyMR() saw an interface that was nil")
 		}
 	}()
-	key, _ := b.BuildBodyMR()
+	key := b.Header.GetBodyMR()
 	return key
 }
 
@@ -379,15 +392,24 @@ func (b *DirectoryBlock) BuildKeyMerkleRoot() (keyMR interfaces.IHash, err error
 	merkle := primitives.BuildMerkleTreeStore(hashes)
 	keyMR = merkle[len(merkle)-1] // MerkleRoot is not marshalized in Dir Block
 
-	b.KeyMR = keyMR
+	b.KeyMR = primitives.NewHash(keyMR.Bytes())
 
 	b.GetFullHash() // Create the Full Hash when we create the keyMR
 
-	return primitives.NewHash(keyMR.Bytes()), nil
+	if b.State != nil && b.GetHeader().GetDBHeight() > 5 {
+		b.State.LogPrintf("DBlock_MR", "%20s dbht %d minute %d MR %x",
+			"BuildKeyMerkleRoot",
+			b.GetHeader().GetDBHeight(),
+			b.State.GetCurrentMinute(),
+			keyMR.Bytes())
+	}
+
+	return primitives.NewHash(b.KeyMR.Bytes()), nil
 }
 
 func UnmarshalDBlock(data []byte) (interfaces.IDirectoryBlock, error) {
 	dBlock := new(DirectoryBlock)
+
 	dBlock.Header = NewDBlockHeader()
 	dBlock.FullHash = primitives.NewZeroHash()
 	dBlock.KeyMR = primitives.NewZeroHash()
@@ -399,6 +421,9 @@ func UnmarshalDBlock(data []byte) (interfaces.IDirectoryBlock, error) {
 }
 
 func (b *DirectoryBlock) UnmarshalBinaryData(data []byte) ([]byte, error) {
+
+	b.Marshal = append([]byte{}, data...)
+
 	newData := data
 	var err error
 	var fbh interfaces.IDirectoryBlockHeader = new(DBlockHeader)

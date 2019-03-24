@@ -1760,7 +1760,7 @@ func (list *DBStateList) Get(height int) *DBState {
 }
 
 func (list *DBStateList) NewDBState(isNew bool,
-	directoryBlock interfaces.IDirectoryBlock,
+	dBlock interfaces.IDirectoryBlock,
 	adminBlock interfaces.IAdminBlock,
 	factoidBlock interfaces.IFBlock,
 	entryCreditBlock interfaces.IEntryCreditBlock,
@@ -1768,14 +1768,14 @@ func (list *DBStateList) NewDBState(isNew bool,
 	entries []interfaces.IEBEntry) *DBState {
 	dbState := new(DBState)
 	dbState.Init() // Creat all the sub structor...
-
-	dbState.DBHash = directoryBlock.DatabasePrimaryIndex()
+	dbState.DBHash = dBlock.DatabasePrimaryIndex()
 	dbState.ABHash = adminBlock.DatabasePrimaryIndex()
 	dbState.FBHash = factoidBlock.DatabasePrimaryIndex()
 	dbState.ECHash = entryCreditBlock.DatabasePrimaryIndex()
 
 	dbState.IsNew = isNew
-	dbState.DirectoryBlock = directoryBlock
+	dbState.DirectoryBlock = dBlock
+	dBlock.(*directoryBlock.DirectoryBlock).State = list.State
 	dbState.AdminBlock = adminBlock
 	dbState.FactoidBlock = factoidBlock
 	dbState.EntryCreditBlock = entryCreditBlock
