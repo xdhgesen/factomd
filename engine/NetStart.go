@@ -284,7 +284,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%t\"\n", "exclusive", p.Exclusive))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%t\"\n", "exclusive_in", p.ExclusiveIn))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "block time", p.BlkTime))
-	//os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "faultTimeout", p.FaultTimeout)) // TODO old fault timeout mechanism to be removed
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "runtimeLog", p.RuntimeLog))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "rotate", p.Rotate))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "timeOffset", p.TimeOffset))
@@ -298,7 +297,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "rpcuser", s.RpcUser))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "corsdomains", s.CorsDomains))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "Start 2nd Sync at ht", s.EntryDBHeightComplete))
-
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "faultTimeout", elections.FaultTimeout))
 
 	if "" == s.RpcPass {
@@ -538,12 +536,12 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		fnodes[0].State.SetUseTorrent(false)
 	}
 
-	if p.Journal != "" {
-		go LoadJournal(s, p.Journal)
-		startServers(false)
-	} else {
-		startServers(true)
-	}
+	StartItAllUp(p.ListenTo, connectionMetricsChannel, p.NodeName, listenToStdin)
+}
+
+func StartItAllUp(ListenTo int, connectionMetricsChannel chan interface{}, NodeName string, listenToStdin bool) {
+
+	go startServers()
 
 	// Start the webserver
 	wsapi.Start(fnodes[0].State)
@@ -559,9 +557,18 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	leveldb.RegisterPrometheus()
 	RegisterPrometheus()
 
-	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build, p.NodeName)
+	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build, NodeName)
 
-	go SimControl(p.ListenTo, listenToStdin)
+	go SimControl(ListenTo, listenToStdin)
+
+	time.Sleep(5 * time.Second)
+
+	for _, fnode := range fnodes {
+		go fnode.State.ValidatorLoop()
+	}
+	for _, fnode := range fnodes {
+		go state.LoadDatabase(fnode.State)
+	}
 
 }
 
@@ -602,20 +609,25 @@ func makeServer(s *state.State) *FactomNode {
 	return fnode
 }
 
-func startServers(load bool) {
+func startServers() {
 	for i, fnode := range fnodes {
 		if i > 0 {
 			fnode.State.Init()
 		}
+	}
+	for _, fnode := range fnodes {
 		go NetworkProcessorNet(fnode)
-		if load {
-			go state.LoadDatabase(fnode.State)
-		}
+	}
+	for _, fnode := range fnodes {
 		go fnode.State.GoSyncEntries()
+	}
+	for _, fnode := range fnodes {
 		go Timer(fnode.State)
-		go fnode.State.ValidatorLoop()
+	}
+	for _, fnode := range fnodes {
 		go elections.Run(fnode.State)
 	}
+
 }
 
 func setupFirstAuthority(s *state.State) {

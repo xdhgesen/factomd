@@ -76,17 +76,14 @@ func (state *State) ValidatorLoop() {
 		var msg interfaces.IMsg
 
 		for i := 0; i < 1; i++ {
-			//for state.Process() {}
-			//for state.UpdateState() {}
-			var progress bool
-			//for i := 0; progress && i < 100; i++ {
+
+			progress := false
 			for state.Process() {
 				progress = true
 			}
 			for state.UpdateState() {
 				progress = true
 			}
-			//}
 
 			select {
 			case min := <-state.tickerQueue:
