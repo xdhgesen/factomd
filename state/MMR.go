@@ -3,6 +3,8 @@ package state
 import (
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/messages"
 )
 
@@ -27,8 +29,9 @@ type MMRInfo struct {
 }
 
 // starts the MMR processing for this state
-func (s *State) startMMR() {
-	go s.makeMMRs(s.asks, s.adds, s.dbheights)
+func (s *State) StartMMR(wg *sync.WaitGroup) {
+	go s.makeMMRs(wg, s.asks, s.adds, s.dbheights)
+	wg.Done()
 }
 
 // Ask VM for an MMR for this height with delay ms before asking the network
@@ -80,7 +83,7 @@ var MMR_enable bool = true
 // Receive all asks and all process list adds and create missing message requests any ask that has expired
 // and still pending. Add 10 seconds to the ask.
 // Doesn't really use (can't use) the process list but I have it for debug
-func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan int) {
+func (s *State) makeMMRs(wg *sync.WaitGroup, asks <-chan askRef, adds <-chan plRef, dbheights <-chan int) {
 	type dbhvm struct {
 		dbh int
 		vm  int
@@ -144,10 +147,6 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 			}
 		} // process all pending add before any ticks
 	}
-
-	// Postpone asking for the first 5 seconds so simulations get a chance to get started. Doesn't break things but
-	// there is a flurry of unhelpful MMR activity on start up of simulations with followers
-	time.Sleep(5 * time.Second)
 
 	// tick ever second to check the  pending MMRs
 	go func() {

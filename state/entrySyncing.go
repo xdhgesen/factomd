@@ -9,6 +9,8 @@ import (
 	"math/rand"
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -36,12 +38,14 @@ var _ = fmt.Print
 
 // This go routine checks every so often to see if we have any missing entries or entry blocks.  It then requests
 // them if it finds entries in the missing lists.
-func (s *State) MakeMissingEntryRequests() {
+func (s *State) MakeMissingEntryRequests(wg *sync.WaitGroup) {
 
 	missing := 0
 	found := 0
 
 	MissingEntryMap := make(map[[32]byte]*MissingEntry)
+
+	wg.Done()
 
 	for {
 		now := time.Now()
@@ -156,8 +160,9 @@ func (s *State) MakeMissingEntryRequests() {
 	}
 }
 
-func (s *State) GoSyncEntries() {
-	go s.MakeMissingEntryRequests()
+func (s *State) GoSyncEntries(wg *sync.WaitGroup) {
+
+	wg.Done()
 
 	// Map to track what I know is missing
 	missingMap := make(map[[32]byte]interfaces.IHash)

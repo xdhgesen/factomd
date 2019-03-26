@@ -11,11 +11,12 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	s "github.com/FactomProject/factomd/state"
+	"sync"
 )
 
 var _ = (*s.State)(nil)
 
-func Timer(state interfaces.IState) {
+func Timer(wg *sync.WaitGroup, state interfaces.IState) {
 	time.Sleep(2 * time.Second)
 
 	billion := int64(1000000000)
@@ -32,7 +33,8 @@ func Timer(state interfaces.IState) {
 		state.Print(fmt.Sprintf("Time: %v\r\n", time.Now()))
 	}
 
-	time.Sleep(time.Duration(wait))
+	wg.Done()
+	wg.Wait()
 
 	for {
 		for i := 0; i < 10; i++ {

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -541,12 +543,46 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 func StartItAllUp(ListenTo int, connectionMetricsChannel chan interface{}, NodeName string, listenToStdin bool) {
 
-	go startServers()
+	var wg = new(sync.WaitGroup)
+	wg.Add(1)
+
+	for i, fnode := range fnodes {
+		if i > 0 {
+			fnode.State.Init()
+			wg.Add(1)
+			fnode.State.StartMMR(wg)
+		}
+	}
+
+	for _, fnode := range fnodes {
+		wg.Add(1)
+		go Peers(wg, fnode)
+	}
+	for _, fnode := range fnodes {
+		wg.Add(1)
+		go NetworkOutputs(wg, fnode)
+	}
+	for _, fnode := range fnodes {
+		wg.Add(1)
+		go InvalidOutputs(wg, fnode)
+	}
+
+	for _, fnode := range fnodes {
+		wg.Add(1)
+		go fnode.State.MakeMissingEntryRequests(wg)
+		wg.Add(1)
+		go fnode.State.GoSyncEntries(wg)
+	}
+	for _, fnode := range fnodes {
+		wg.Add(1)
+		go Timer(wg, fnode.State)
+	}
 
 	// Start the webserver
 	wsapi.Start(fnodes[0].State)
 	if fnodes[0].State.DebugExec() && messages.CheckFileName("graphData.txt") {
-		go printGraphData("graphData.txt", 30)
+		wg.Add(1)
+		go printGraphData(wg, "graphData.txt", 30)
 	}
 
 	// Start prometheus on port
@@ -557,11 +593,13 @@ func StartItAllUp(ListenTo int, connectionMetricsChannel chan interface{}, NodeN
 	leveldb.RegisterPrometheus()
 	RegisterPrometheus()
 
-	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build, NodeName)
+	wg.Add(1)
+	go controlPanel.ServeControlPanel(wg, fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build, NodeName)
 
-	go SimControl(ListenTo, listenToStdin)
+	wg.Add(1)
+	go SimControl(wg, ListenTo, listenToStdin)
 
-	time.Sleep(5 * time.Second)
+	wg.Done()
 
 	for _, fnode := range fnodes {
 		go fnode.State.ValidatorLoop()
@@ -569,12 +607,17 @@ func StartItAllUp(ListenTo int, connectionMetricsChannel chan interface{}, NodeN
 	for _, fnode := range fnodes {
 		go state.LoadDatabase(fnode.State)
 	}
-
+	for _, fnode := range fnodes {
+		go elections.Run(fnode.State)
+	}
 }
 
-func printGraphData(filename string, period int) {
+func printGraphData(wg *sync.WaitGroup, filename string, period int) {
 	downscale := int64(1)
 	messages.LogPrintf(filename, "\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s", "Dbh-:-min", "Node", "ProcessCnt", "ListPCnt", "UpdateState", "SleepCnt")
+
+	wg.Done()
+
 	for {
 		for _, f := range fnodes {
 			s := f.State
@@ -607,27 +650,6 @@ func makeServer(s *state.State) *FactomNode {
 	fnode.MLog = mLog
 
 	return fnode
-}
-
-func startServers() {
-	for i, fnode := range fnodes {
-		if i > 0 {
-			fnode.State.Init()
-		}
-	}
-	for _, fnode := range fnodes {
-		go NetworkProcessorNet(fnode)
-	}
-	for _, fnode := range fnodes {
-		go fnode.State.GoSyncEntries()
-	}
-	for _, fnode := range fnodes {
-		go Timer(fnode.State)
-	}
-	for _, fnode := range fnodes {
-		go elections.Run(fnode.State)
-	}
-
 }
 
 func setupFirstAuthority(s *state.State) {

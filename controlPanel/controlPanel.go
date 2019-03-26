@@ -97,7 +97,7 @@ func InitTemplates() {
 }
 
 // Main function. This intiates appropriate variables and starts the control panel serving
-func ServeControlPanel(displayStateChannel chan state.DisplayState, statePointer *state.State, connections chan interface{}, controller *p2p.Controller, gitBuild string, nodeName string) {
+func ServeControlPanel(wg *sync.WaitGroup, displayStateChannel chan state.DisplayState, statePointer *state.State, connections chan interface{}, controller *p2p.Controller, gitBuild string, nodeName string) {
 	defer func() {
 		if r := recover(); r != nil {
 			// The following recover string indicates an overwrite of existing http.ListenAndServe goroutine
@@ -122,6 +122,10 @@ func ServeControlPanel(displayStateChannel chan state.DisplayState, statePointer
 	if controlPanelSetting == 0 { // 0 = Disabled
 		fmt.Println("Control Panel has been disabled within the config file and will not be served. This is recommended for any public server, if you wish to renable it, check your config file.")
 		return
+	}
+
+	if wg != nil {
+		wg.Done()
 	}
 
 	go DisplayStateDrain(displayStateChannel)
@@ -170,6 +174,7 @@ func ServeControlPanel(displayStateChannel chan state.DisplayState, statePointer
 		fmt.Println("Starting Control Panel on http://localhost" + portStr + "/")
 		http.ListenAndServe(portStr, nil)
 	}
+
 }
 
 func noStaticFilesFoundHandler(w http.ResponseWriter, r *http.Request) {

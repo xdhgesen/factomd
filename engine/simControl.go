@@ -17,6 +17,8 @@ import (
 	"time"
 	"unicode"
 
+	"sync"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/globals"
@@ -89,7 +91,7 @@ func GetFocus() *FactomNode {
 	return nil
 }
 
-func SimControl(listenTo int, listenStdin bool) {
+func SimControl(wg *sync.WaitGroup, listenTo int, listenStdin bool) {
 	var _ = time.Sleep
 	var summary int
 	var elections int
@@ -106,6 +108,8 @@ func SimControl(listenTo int, listenStdin bool) {
 	if loadGenerator == nil {
 		loadGenerator = NewLoadGenerator(fnodes[0].State)
 	}
+
+	wg.Done()
 
 	for {
 		// This splits up the command at anycodepoint that is not a letter, number or punctuation, so usually by spaces.
@@ -135,7 +139,7 @@ func SimControl(listenTo int, listenStdin bool) {
 			os.Stderr.WriteString(fmt.Sprintf("Switching to Node %d\n", ListenTo))
 			// Update which node will be displayed on the controlPanel page
 			connectionMetricsChannel := make(chan interface{}, p2p.StandardChannelSize)
-			go controlPanel.ServeControlPanel(fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build, "")
+			go controlPanel.ServeControlPanel(nil, fnodes[ListenTo].State.ControlPanelChannel, fnodes[ListenTo].State, connectionMetricsChannel, p2pNetwork, Build, "")
 		} else {
 			switch {
 			case '!' == b[0]:
