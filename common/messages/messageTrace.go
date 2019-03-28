@@ -230,48 +230,70 @@ func logMessage(name string, note string, msg interfaces.IMsg) {
 	}
 }
 
-var findHex *regexp.Regexp
+var calls int = 0
+var hits int = 0
 
 // Look up the hex string in the map of names...
 func LookupName(s string) string {
+	if (calls % 1000) == 0 {
+		fmt.Printf("CAllS %8d:%8d\n", hits, calls)
+	}
+	calls++
+	ffo := globals.FnodeNames
+	_ = ffo
 	n, ok := globals.FnodeNames[s]
 	if ok {
+		hits++
 		return "<" + n + ">"
 	}
 	return ""
 }
 
+var findHex *regexp.Regexp
+
 // Look thru a string and annotate the string with names based on any hex strings
-func addNodeNames(s string) (rval string) {
+func addNodeNames(iString string) (rval string) {
 	var err error
 	if findHex == nil {
-		findHex, err = regexp.Compile("[A-Fa-f0-9]{6,}")
+		//findHex, err = regexp.Compile("(?:[^a-fA-F0-9])(?:[A-Fa-f0-9]{6})?[A-Fa-f0-9]{6}")
+		findHex, err = regexp.Compile("[^a-fA-F0-9]([A-Fa-f0-9]{6})?[A-Fa-f0-9]{6}")
+
+		//findHex, err = regexp.Compile("[A-Fa-f0-9]{6,}")
 		if err != nil {
 			panic(err)
 		}
 	}
-	hexStr := findHex.FindAllStringIndex(s, -1)
+	hexStr := findHex.FindAllStringIndex(iString, -1)
 	if hexStr == nil {
-		return s
+		return iString
 	}
+
+	var ms []string = make([]string, len(hexStr))
+
+	for i := len(hexStr); i > 0; {
+		i--
+		ms[i] = iString[hexStr[i][1]-6 : hexStr[i][1]]
+		_ = ms[i]
+	}
+
 	// loop thru the matches last to first and add the name. Start with the last so the positions don't change
 	// as we add text
 	for i := len(hexStr); i > 0; {
 		i--
-		// if it's a short hex string
+		// if it'iString a short hex string
 		if hexStr[i][1]-hexStr[i][0] != 64 {
-			l := s[hexStr[i][0]:hexStr[i][1]]
-			s = s[:hexStr[i][1]] + LookupName(l) + s[hexStr[i][1]:]
-		} else {
-			// Shorten 32 byte IDs to [3:6]
-			l := s[hexStr[i][0]:hexStr[i][1]]
-			name := LookupName(l)
-			if name != "" {
-				s = s[:hexStr[i][0]] + s[hexStr[i][0]+6:hexStr[i][0]+12] + name + s[hexStr[i][1]:]
-			}
-		}
+			l := iString[hexStr[i][1]-6 : hexStr[i][1]]
+			iString = iString[:hexStr[i][1]] + LookupName(l) + iString[hexStr[i][1]:]
+		} // else {
+		//	// Shorten 32 byte IDs to [3:6]
+		//	l := iString[hexStr[i][0]:hexStr[i][1]]
+		//	name := LookupName(l)
+		//	if name != "" {
+		//		iString = iString[:hexStr[i][0]] + iString[hexStr[i][0]+6:hexStr[i][0]+12] + name + iString[hexStr[i][1]:]
+		//	}
+		//}
 	}
-	return s
+	return iString
 }
 
 func LogPrintf(name string, format string, more ...interface{}) {
