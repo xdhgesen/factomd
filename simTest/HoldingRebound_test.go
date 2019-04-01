@@ -36,7 +36,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 		// FIXME: test times out w/ failure when providing "LAF"
 		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 200, 1, 1, t)
-		ticker := WatchMessageLists()
+		//ticker := WatchMessageLists()
 
 		if dropRate > 0 {
 			state0.LogPrintf(logName, "DROP_RATE:%v", dropRate)
@@ -45,8 +45,8 @@ func TestSendingCommitAndReveal(t *testing.T) {
 
 		stop := func() {
 			ShutDownEverything(t)
-			WaitForAllNodes(state0)
-			ticker.Stop()
+			//WaitForAllNodes(state0)
+			//ticker.Stop()
 		}
 
 		t.Run("Create Chain", func(t *testing.T) {
@@ -67,17 +67,17 @@ func TestSendingCommitAndReveal(t *testing.T) {
 			t.Run("Fund ChainCommit Address", func(t *testing.T) {
 				amt := uint64(11)
 				engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
-				WaitForAnyDeposit(state0, a.EcPub())
+				//WaitForAnyDeposit(state0, a.EcPub())
 			})
 		})
 
-		t.Run("Generate Entries in Batches", func(t *testing.T) {
-			WaitForZero(state0, a.EcPub())
-			GenerateCommitsAndRevealsInBatches(t, state0)
-		})
+		//t.Run("Generate Entries in Batches", func(t *testing.T) {
+			//WaitForZero(state0, a.EcPub())
+			//GenerateCommitsAndRevealsInBatches(t, state0)
+		//})
 
 		t.Run("End simulation", func(t *testing.T) {
-			WaitForZero(state0, a.EcPub())
+			//WaitForZero(state0, a.EcPub())
 			ht := state0.GetDBHeightComplete()
 			WaitBlocks(state0, 2)
 			newHt := state0.GetDBHeightComplete()
