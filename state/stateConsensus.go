@@ -817,7 +817,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	TotalHoldingQueueInputs.Inc()
 	//s.Holding[m.GetMsgHash().Fixed()] = m // FollowerExecuteEOM
 
-	s.AddToHolding(m.GetMsgHash().Fixed(), m) // follower execute nonlocal EOM
+	s.AddToHolding(m.GetMsgHash().Fixed(), m) // follower execute non local EOM
 	ack, _ := s.Acks[m.GetMsgHash().Fixed()].(*messages.Ack)
 	if ack != nil {
 		pl := s.ProcessLists.Get(ack.DBHeight)

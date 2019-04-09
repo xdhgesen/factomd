@@ -3,11 +3,12 @@ package simTest
 import (
 	"testing"
 
-	. "github.com/FactomProject/factomd/engine"
-	. "github.com/FactomProject/factomd/testHelper"
-	"github.com/FactomProject/factomd/state"
 	"math/rand"
 	"strconv"
+
+	. "github.com/FactomProject/factomd/engine"
+	"github.com/FactomProject/factomd/state"
+	. "github.com/FactomProject/factomd/testHelper"
 )
 
 func TestSequentialMinuteElections(t *testing.T) {
@@ -46,7 +47,7 @@ func TestSequentialMinuteElections(t *testing.T) {
 	RunCmd("7")
 	RunCmd("x") // bring 7 back
 
-	WaitBlocks(state0, 2)         // wait till the victims are back as the audit server
+	WaitBlocks(state0, 2)    // wait till the victims are back as the audit server
 	WaitForMinute(state0, 1) // Wait till ablock is loaded
 	WaitForAllNodes(state0)
 
@@ -89,12 +90,12 @@ func TestSequentialMinuteElections_long(t *testing.T) {
 		fedIndex1 := rand.Intn(len(currentFeds))
 		fault1 := currentFeds[fedIndex1]
 		fault1str := strconv.Itoa(fault1)
-		currentFeds = append(currentFeds[:fedIndex1], currentFeds[fedIndex1 + 1:]...)
+		currentFeds = append(currentFeds[:fedIndex1], currentFeds[fedIndex1+1:]...)
 
 		fedIndex2 := rand.Intn(len(currentFeds))
 		fault2 := currentFeds[fedIndex2]
 		fault2str := strconv.Itoa(fault2)
-		currentFeds = append(currentFeds[:fedIndex2], currentFeds[fedIndex2 + 1:]...)
+		currentFeds = append(currentFeds[:fedIndex2], currentFeds[fedIndex2+1:]...)
 
 		// Pick the leader we will use as a reference for tracking height and minutes
 		reference := states[currentFeds[0]]
@@ -132,7 +133,6 @@ func TestSequentialMinuteElections_long(t *testing.T) {
 		currentFeds = append(currentFeds, currentAuds...)
 		currentAuds = []int{fault1, fault2}
 	}
-
 
 	WaitForAllNodes(state0)
 	ShutDownEverything(t)
