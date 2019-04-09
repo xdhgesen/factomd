@@ -25,7 +25,6 @@ type StateSaverStruct struct {
 	Stop     bool
 }
 
-
 func (sss *StateSaverStruct) StopSaving() {
 	sss.Mutex.Lock()
 	defer sss.Mutex.Unlock()
