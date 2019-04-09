@@ -7,8 +7,9 @@ package state
 import (
 	"fmt"
 	"math"
-	"os"
 	"time"
+
+	"os"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -46,10 +47,12 @@ func LoadDatabase(s *State) {
 	first := time.Now()
 	last := first
 	time.Sleep(time.Second)
+
 	//msg, err := s.LoadDBState(blkCnt)
 	start := s.GetDBHeightComplete()
-	if start > 10 {
-		start = start - 10
+
+	if start > 0 {
+		start++
 	}
 
 	for i := int(start); i <= int(blkCnt); i++ {
@@ -63,13 +66,11 @@ func LoadDatabase(s *State) {
 			blocksRemaining := float64(blkCnt) - float64(i)
 			timeRemaining := time.Duration(blocksRemaining/abps) * time.Second
 
-			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f average bps %8.2f Progress %v remaining %v\n", s.FactomNodeName, i, blkCnt, bps, abps,
-				humanizeDuration(timeUsed), humanizeDuration(timeRemaining))
+			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f average bps %8.2f Progress %v remaining %v Estimated Total Time: %v \n", s.FactomNodeName, i, blkCnt, bps, abps,
+				humanizeDuration(timeUsed), humanizeDuration(timeRemaining), humanizeDuration(timeUsed+timeRemaining))
 			last = time.Now()
-
-			height := s.GetLLeaderHeight()
-			fmt.Fprintf(os.Stderr, "%20s Federated: DBH: %8d, Feds %d, audits: %d \n", s.FactomNodeName, height, len(s.GetFedServers(height)), len(s.GetAuditServers(height)))
-
+			// height := s.GetLLeaderHeight()
+			// fmt.Fprintf(os.Stderr, "%20s Federated: DBH: %8d, Feds %d, audits: %d \n", s.FactomNodeName, height, len(s.GetFedServers(height)), len(s.GetAuditServers(height)))
 		}
 
 		msg, err := s.LoadDBState(uint32(i))
@@ -77,26 +78,27 @@ func LoadDatabase(s *State) {
 			s.Println(err.Error())
 			os.Stderr.WriteString(fmt.Sprintf("%20s Error reading database at block %d: %s\n", s.FactomNodeName, i, err.Error()))
 			break
-		} else {
-			if msg != nil {
-				// We hold off EOM and other processing (s.Runleader) till the last DBStateMsg is executed.
-				if i == int(blkCnt) {
-					// last block, flag it.
-					dbstate, _ := msg.(*messages.DBStateMsg)
-					dbstate.IsLast = true // this is the last DBState in this load
-					// this will cause s.DBFinished to go true
-				}
-				s.InMsgQueue().Enqueue(msg)
-				msg.SetLocal(true)
-				if s.InMsgQueue().Length() > constants.INMSGQUEUE_MED {
-					for s.InMsgQueue().Length() > constants.INMSGQUEUE_LOW {
-						time.Sleep(10 * time.Millisecond)
-					}
-				}
-			} else {
-				// os.Stderr.WriteString(fmt.Sprintf("%20s Last Block in database: %d\n", s.FactomNodeName, i))
-				break
+		}
+		if msg != nil {
+			// We hold off EOM and other processing (s.Runleader) till the last DBStateMsg is executed.
+			if i == int(blkCnt) {
+				// last block, flag it.
+				dbstate, _ := msg.(*messages.DBStateMsg)
+				dbstate.IsLast = true // this is the last DBState in this load
+				// this will cause s.DBFinished to go true
 			}
+
+			s.LogMessage("InMsgQueue", "enqueue", msg)
+			msg.SetLocal(true)
+			s.InMsgQueue().Enqueue(msg)
+			if s.InMsgQueue().Length() > 200 || len(s.DBStatesReceived) > 50 {
+				for s.InMsgQueue().Length() > 50 || len(s.DBStatesReceived) > 50 {
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+		} else {
+			// os.Stderr.WriteString(fmt.Sprintf("%20s Last Block in database: %d\n", s.FactomNodeName, i))
+			break
 		}
 
 		s.Print("\r", "\\|/-"[i%4:i%4+1])
@@ -115,6 +117,9 @@ func LoadDatabase(s *State) {
 			}
 		}
 		dblk, ablk, fblk, ecblk := GenerateGenesisBlocks(s.GetNetworkID(), customIdentity)
+
+		messages.LogPrintf("marshalsizes.txt", "FBlock unmarshaled transaction count: %d", len(fblk.GetTransactions()))
+
 		msg := messages.NewDBStateMsg(s.GetTimestamp(), dblk, ablk, fblk, ecblk, nil, nil, nil)
 		// last block, flag it.
 		dbstate, _ := msg.(*messages.DBStateMsg)
@@ -123,6 +128,7 @@ func LoadDatabase(s *State) {
 		s.InMsgQueue().Enqueue(msg)
 	}
 	s.Println(fmt.Sprintf("Loaded %d directory blocks on %s", blkCnt, s.FactomNodeName))
+	fmt.Fprintf(os.Stderr, "%20s Loading complete %v.\n", s.FactomNodeName, blkCnt)
 }
 
 func GenerateGenesisBlocks(networkID uint32, bootstrapIdentity interfaces.IHash) (interfaces.IDirectoryBlock, interfaces.IAdminBlock, interfaces.IFBlock, interfaces.IEntryCreditBlock) {
