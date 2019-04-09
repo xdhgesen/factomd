@@ -18,18 +18,17 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
+	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/controlPanel"
 	"github.com/FactomProject/factomd/database/leveldb"
+	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
-
-	"github.com/FactomProject/factomd/common/messages"
-	"github.com/FactomProject/factomd/common/messages/msgsupport"
-	"github.com/FactomProject/factomd/elections"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -250,12 +249,15 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	if p.Sync2 >= 0 {
 		s.EntryDBHeightComplete = uint32(p.Sync2)
+		s.LogPrintf("EntrySync", "NetStart EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
+
 	} else {
 		height, err := s.DB.FetchDatabaseEntryHeight()
 		if err != nil {
 			os.Stderr.WriteString(fmt.Sprintf("ERROR: %v", err))
 		} else {
 			s.EntryDBHeightComplete = height
+			s.LogPrintf("EntrySync", "NetStart EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
 		}
 	}
 
@@ -264,6 +266,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	setupFirstAuthority(s)
 
 	os.Stderr.WriteString(fmt.Sprintf("%20s %s\n", "Build", Build))
+	os.Stderr.WriteString(fmt.Sprintf("%20s %s\n", "Node name", p.NodeName))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "balancehash", messages.AckBalanceHash))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %s\n", "FNode 0 Salt", s.Salt.String()[:16]))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %v\n", "enablenet", p.EnableNet))
@@ -556,7 +559,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	leveldb.RegisterPrometheus()
 	RegisterPrometheus()
 
-	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build)
+	go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build, p.NodeName)
 
 	go SimControl(p.ListenTo, listenToStdin)
 
@@ -601,18 +604,22 @@ func makeServer(s *state.State) *FactomNode {
 
 func startServers(load bool) {
 	for i, fnode := range fnodes {
-		if i > 0 {
-			fnode.State.Init()
-		}
-		go NetworkProcessorNet(fnode)
-		if load {
-			go state.LoadDatabase(fnode.State)
-		}
-		go fnode.State.GoSyncEntries()
-		go Timer(fnode.State)
-		go elections.Run(fnode.State)
-		go fnode.State.ValidatorLoop()
+		startServer(i, fnode, load)
 	}
+}
+
+func startServer(i int, fnode *FactomNode, load bool) {
+	if i > 0 {
+		fnode.State.Init()
+	}
+	go NetworkProcessorNet(fnode)
+	if load {
+		go state.LoadDatabase(fnode.State)
+	}
+	go fnode.State.GoSyncEntries()
+	go Timer(fnode.State)
+	go elections.Run(fnode.State)
+	go fnode.State.ValidatorLoop()
 }
 
 func setupFirstAuthority(s *state.State) {
@@ -630,4 +637,20 @@ func networkHousekeeping() {
 		time.Sleep(1 * time.Second)
 		p2pProxy.SetWeight(p2pNetwork.GetNumberOfConnections())
 	}
+}
+
+func AddNode() {
+
+	fnodes := GetFnodes()
+	s := fnodes[0].State
+	i := len(fnodes)
+
+	makeServer(s)
+	modifyLoadIdentities()
+
+	fnodes = GetFnodes()
+	fnodes[i].State.IntiateNetworkSkeletonIdentity()
+	fnodes[i].State.InitiateNetworkIdentityRegistration()
+	AddSimPeer(fnodes, i, i-1) // KLUDGE peer w/ only last node
+	startServer(i, fnodes[i], true)
 }

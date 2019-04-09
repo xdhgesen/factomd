@@ -37,6 +37,8 @@ import (
 	"github.com/FactomProject/factomd/wsapi"
 	"github.com/FactomProject/logrustash"
 
+	"regexp"
+
 	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
 	log "github.com/sirupsen/logrus"
 )
@@ -181,8 +183,8 @@ type State struct {
 	JournalFile  string
 	Journaling   bool
 
-	serverPrivKey         *primitives.PrivateKey
-	serverPubKey          *primitives.PublicKey
+	ServerPrivKey         *primitives.PrivateKey
+	ServerPubKey          *primitives.PublicKey
 	serverPendingPrivKeys []*primitives.PrivateKey
 	serverPendingPubKeys  []*primitives.PublicKey
 
@@ -209,6 +211,10 @@ type State struct {
 	IgnoreDone    bool
 	IgnoreMissing bool
 
+	// Timout and Limit for outstanding missing DBState requests
+	RequestTimeout time.Duration
+	RequestLimit   int
+
 	LLeaderHeight   uint32
 	Leader          bool
 	LeaderVMIndex   int
@@ -223,8 +229,9 @@ type State struct {
 	CurrentMinute   int
 
 	// These are the start times for blocks and minutes
-	CurrentMinuteStartTime int64
-	CurrentBlockStartTime  int64
+	PreviousMinuteStartTime int64
+	CurrentMinuteStartTime  int64
+	CurrentBlockStartTime   int64
 
 	EOMsyncing bool
 
@@ -240,6 +247,8 @@ type State struct {
 	DBSigProcessed int // Number of DBSignatures received and processed.
 	DBSigDone      bool
 	DBSigSys       bool // At least one DBSig has covered the System List
+
+	CreatedLastBlockFromDBState bool
 
 	// By default, this is false, which means DBstates are discarded
 	// when a majority of leaders disagree with the hash we have via DBSigs
@@ -290,6 +299,10 @@ type State struct {
 	// Directory Block State
 	DBStates *DBStateList // Holds all DBStates not yet processed.
 
+	StatesMissing  *StatesMissing
+	StatesWaiting  *StatesWaiting
+	StatesReceived *StatesReceived
+
 	// Having all the state for a particular directory block stored in one structure
 	// makes creating the next state, updating the various states, and setting up the next
 	// state much more simple.
@@ -311,6 +324,8 @@ type State struct {
 	NumTransactions int
 
 	// Permanent balances from processing blocks.
+	RestoreFCT            map[[32]byte]int64
+	RestoreEC             map[[32]byte]int64
 	FactoidBalancesPapi   map[[32]byte]int64
 	FactoidBalancesP      map[[32]byte]int64
 	FactoidBalancesPMutex sync.Mutex
@@ -406,6 +421,11 @@ type State struct {
 
 	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 	validatorLoopThreadID string
+
+	OutputRegEx       *regexp.Regexp
+	OutputRegExString string
+	InputRegEx        *regexp.Regexp
+	InputRegExString  string
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -435,9 +455,10 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	}
 	if _, err := os.Stat(simConfigPath); os.IsNotExist(err) {
 		os.Stderr.WriteString("Creating simConfig directory\n")
-		os.MkdirAll(simConfigPath, 0777)
+		os.MkdirAll(simConfigPath, 0775)
 	}
 
+	newState.FactomNodeName = s.Prefix + "FNode" + number
 	config := false
 	if _, err := os.Stat(configfile); !os.IsNotExist(err) {
 		os.Stderr.WriteString(fmt.Sprintf("   Using the %s config file.\n", configfile))
@@ -482,6 +503,8 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.CustomSpecialPeers = s.CustomSpecialPeers
 	newState.StartDelayLimit = s.StartDelayLimit
 	newState.CustomNetworkID = s.CustomNetworkID
+	newState.CustomBootstrapIdentity = s.CustomBootstrapIdentity
+	newState.CustomBootstrapKey = s.CustomBootstrapKey
 
 	newState.DirectoryBlockInSeconds = s.DirectoryBlockInSeconds
 	newState.PortNumber = s.PortNumber
@@ -501,18 +524,18 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 
 	if !config {
 		newState.IdentityChainID = primitives.Sha([]byte(newState.FactomNodeName))
+		s.LogPrintf("AckChange", "Default IdentityChainID %v", s.IdentityChainID.String())
+
 		//generate and use a new deterministic PrivateKey for this clone
 		shaHashOfNodeName := primitives.Sha([]byte(newState.FactomNodeName)) //seed the private key with node name
 		clonePrivateKey := primitives.NewPrivateKeyFromHexBytes(shaHashOfNodeName.Bytes())
 		newState.LocalServerPrivKey = clonePrivateKey.PrivateKeyString()
+		s.initServerKeys()
 	}
 
-	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
-	newState.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
 	newState.TimestampAtBoot = primitives.NewTimestampFromMilliseconds(s.TimestampAtBoot.GetTimeMilliUInt64())
-
-	//serverPrivKey primitives.PrivateKey
-	//serverPubKey  primitives.PublicKey
+	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
+	newState.SetMessageFilterTimestamp(s.MessageFilterTimestamp)
 
 	newState.FactoshisPerEC = s.FactoshisPerEC
 
@@ -524,6 +547,9 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.RpcUser = s.RpcUser
 	newState.RpcPass = s.RpcPass
 	newState.RpcAuthHash = s.RpcAuthHash
+
+	newState.RequestTimeout = s.RequestTimeout
+	newState.RequestLimit = s.RequestLimit
 
 	newState.FactomdTLSEnable = s.FactomdTLSEnable
 	newState.factomdTLSKeyFile = s.factomdTLSKeyFile
@@ -653,8 +679,28 @@ func (s *State) GetCurrentMinuteStartTime() int64 {
 	return s.CurrentMinuteStartTime
 }
 
+func (s *State) GetPreviousMinuteStartTime() int64 {
+	return s.PreviousMinuteStartTime
+}
+
 func (s *State) GetCurrentTime() int64 {
 	return time.Now().UnixNano()
+}
+
+func (s *State) IsSyncing() bool {
+	return s.Syncing
+}
+
+func (s *State) IsSyncingEOMs() bool {
+	return s.Syncing && s.EOM && !s.EOMDone
+}
+
+func (s *State) IsSyncingDBSigs() bool {
+	return s.Syncing && s.DBSig && !s.DBSigDone
+}
+
+func (s *State) DidCreateLastBlockFromDBState() bool {
+	return s.CreatedLastBlockFromDBState
 }
 
 func (s *State) IncDBStateAnswerCnt() {
@@ -673,17 +719,19 @@ func (s *State) IncECommits() {
 	s.ECommits++
 }
 
-func (s *State) GetAckChange() error {
+func (s *State) GetAckChange() (bool, error) {
+	var flag bool
 	change, err := util.GetChangeAcksHeight(s.ConfigFilePath)
 	if err != nil {
-		return err
+		return flag, err
 	}
+	flag = s.AckChange != change
 	s.AckChange = change
-	return nil
+	return flag, nil
 }
 
 func (s *State) LoadConfig(filename string, networkFlag string) {
-	s.FactomNodeName = s.Prefix + "FNode0" // Default Factom Node Name for Simulation
+	//	s.FactomNodeName = s.Prefix + "FNode0" // Default Factom Node Name for Simulation
 
 	if len(filename) > 0 {
 		s.ConfigFilePath = filename
@@ -742,6 +790,8 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.ControlPanelPort = cfg.App.ControlPanelPort
 		s.RpcUser = cfg.App.FactomdRpcUser
 		s.RpcPass = cfg.App.FactomdRpcPass
+		s.RequestTimeout = time.Duration(cfg.App.RequestTimeout) * time.Second
+		s.RequestLimit = cfg.App.RequestLimit
 		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
 		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
 		s.FastBoot = cfg.App.FastBoot
@@ -789,8 +839,11 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		identity, err := primitives.HexToHash(cfg.App.IdentityChainID)
 		if err != nil {
 			s.IdentityChainID = primitives.Sha([]byte(s.FactomNodeName))
+			s.LogPrintf("AckChange", "Bad IdentityChainID  in config \"%v\"", cfg.App.IdentityChainID)
+			s.LogPrintf("AckChange", "Default2 IdentityChainID \"%v\"", s.IdentityChainID.String())
 		} else {
 			s.IdentityChainID = identity
+			s.LogPrintf("AckChange", "Load IdentityChainID \"%v\"", s.IdentityChainID.String())
 		}
 	} else {
 		s.LogPath = "database/"
@@ -825,6 +878,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 
 		// TODO:  Actually load the IdentityChainID from the config file
 		s.IdentityChainID = primitives.Sha([]byte(s.FactomNodeName))
+		s.LogPrintf("AckChange", "Default IdentityChainID %v", s.IdentityChainID.String())
 
 	}
 	s.JournalFile = s.LogPath + "/journal0" + ".log"
@@ -875,7 +929,7 @@ func (s *State) Init() {
 		wsapi.InitLogs(s.LogPath, s.LogLevel)
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	} else {
-		er := os.MkdirAll(s.LogPath, 0777)
+		er := os.MkdirAll(s.LogPath, 0775)
 		if er != nil {
 			// fmt.Println("Could not create " + s.LogPath + "\n error: " + er.Error())
 		}
@@ -897,9 +951,9 @@ func (s *State) Init() {
 	s.ackQueue = make(chan interfaces.IMsg, 100)                   //queue of Leadership messages
 	s.msgQueue = make(chan interfaces.IMsg, 400)                   //queue of Follower messages
 	s.ShutdownChan = make(chan int, 1)                             //Channel to gracefully shut down.
-	s.MissingEntries = make(chan *MissingEntry, 1000)              //Entries I discover are missing from the database
+	s.MissingEntries = make(chan *MissingEntry, 10000)             //Entries I discover are missing from the database
 	s.UpdateEntryHash = make(chan *EntryUpdate, 10000)             //Handles entry hashes and updating Commit maps.
-	s.WriteEntry = make(chan interfaces.IEBEntry, 3000)            //Entries to be written to the database
+	s.WriteEntry = make(chan interfaces.IEBEntry, 20000)           //Entries to be written to the database
 
 	if s.Journaling {
 		f, err := os.Create(s.JournalFile)
@@ -940,6 +994,12 @@ func (s *State) Init() {
 	s.DBStates = new(DBStateList)
 	s.DBStates.State = s
 	s.DBStates.DBStates = make([]*DBState, 0)
+
+	s.StatesMissing = NewStatesMissing()
+	s.StatesWaiting = NewStatesWaiting()
+	s.StatesReceived = NewStatesReceived()
+
+	s.DBStates.Catchup()
 
 	switch s.NodeMode {
 	case "FULL":
@@ -1066,7 +1126,7 @@ func (s *State) Init() {
 			//This is to ensure we don't accidentally keep SaveState while deleting a database
 			s.StateSaverStruct.DeleteSaveState(s.Network)
 		} else {
-			err = s.StateSaverStruct.LoadDBStateList(s.DBStates, s.Network)
+			err = s.StateSaverStruct.LoadDBStateList(s, s.DBStates, s.Network)
 			if err != nil {
 				s.StateSaverStruct.DeleteSaveState(s.Network)
 				s.LogPrintf("faulting", "Database load failed %v", err)
@@ -1884,6 +1944,7 @@ func (s *State) UpdateState() (progress bool) {
 	}
 
 	p2 := s.DBStates.UpdateState()
+	s.LogPrintf("updateIssues", "ProcessList progress %v DBStates progress %v", progress, p2)
 	progress = progress || p2
 
 	s.SetString()
@@ -1896,10 +1957,11 @@ func (s *State) UpdateState() (progress bool) {
 		s.CalculateTransactionRate()
 	}
 
-	// check to see ig a holding queue list request has been made
+	// check to see if a holding queue list request has been made
 	s.fillHoldingMap()
 	s.fillAcksMap()
 
+	eupdates := false
 entryHashProcessing:
 	for {
 		select {
@@ -1909,11 +1971,14 @@ entryHashProcessing:
 			// If the SetHashNow worked, then we should prohibit any commit that might be pending.
 			// Remove any commit that might be around.
 			s.Commits.Delete(e.Hash.Fixed())
+			eupdates = true
 		default:
 			break entryHashProcessing
 		}
 	}
-
+	if eupdates {
+		s.LogPrintf("updateIssues", "entryProcessing")
+	}
 	return
 }
 
@@ -2012,6 +2077,9 @@ func (s *State) GetIdentityChainID() (rval interfaces.IHash) {
 }
 
 func (s *State) SetIdentityChainID(chainID interfaces.IHash) {
+	if !s.IdentityChainID.IsSameAs(chainID) {
+		s.LogPrintf("AckChange", "SetIdentityChainID %v", chainID.String())
+	}
 	s.IdentityChainID = chainID
 }
 
@@ -2024,11 +2092,15 @@ func (s *State) SetDirectoryBlockInSeconds(t int) {
 }
 
 func (s *State) GetServerPrivateKey() *primitives.PrivateKey {
-	return s.serverPrivKey
+	return s.ServerPrivKey
 }
 
 func (s *State) GetServerPublicKey() *primitives.PublicKey {
-	return s.serverPubKey
+	return s.ServerPubKey
+}
+
+func (s *State) GetServerPublicKeyString() string {
+	return s.ServerPubKey.String()
 }
 
 func (s *State) GetAnchor() interfaces.IAnchor {
@@ -2057,11 +2129,11 @@ func (s *State) GetFactomdVersion() string {
 
 func (s *State) initServerKeys() {
 	var err error
-	s.serverPrivKey, err = primitives.NewPrivateKeyFromHex(s.LocalServerPrivKey)
+	s.ServerPrivKey, err = primitives.NewPrivateKeyFromHex(s.LocalServerPrivKey)
 	if err != nil {
 		//panic("Cannot parse Server Private Key from configuration file: " + err.Error())
 	}
-	s.serverPubKey = s.serverPrivKey.Pub
+	s.ServerPubKey = s.ServerPrivKey.Pub
 }
 
 func (s *State) Log(level string, message string) {
@@ -2117,7 +2189,7 @@ func (s *State) GetTimeOffset() interfaces.Timestamp {
 }
 
 func (s *State) Sign(b []byte) interfaces.IFullSignature {
-	return s.serverPrivKey.Sign(b)
+	return s.ServerPrivKey.Sign(b)
 }
 
 func (s *State) GetFactoidState() interfaces.IFactoidState {
@@ -2176,14 +2248,15 @@ func (s *State) MsgQueue() chan interfaces.IMsg {
 
 func (s *State) GetLeaderTimestamp() interfaces.Timestamp {
 	if s.LeaderTimestamp == nil {
-		s.SetLeaderTimestamp(new(primitives.Timestamp))
+		// To leader timestamp?  Then use the boottime less a minute
+		s.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(s.TimestampAtBoot.GetTimeMilliUInt64() - 60*1000))
 	}
-	return s.LeaderTimestamp
+	return primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
 }
 
 func (s *State) GetMessageFilterTimestamp() interfaces.Timestamp {
 	if s.MessageFilterTimestamp == nil {
-		s.MessageFilterTimestamp.SetTimestamp(new(primitives.Timestamp))
+		s.MessageFilterTimestamp = primitives.NewTimestampNow()
 	}
 	return s.MessageFilterTimestamp
 }
@@ -2192,42 +2265,39 @@ func (s *State) GetMessageFilterTimestamp() interfaces.Timestamp {
 // We will not set it to a time that is before boot or more than one hour in the past.
 // this ensure messages from prior boot and messages that predate the current replay filter are
 // are dropped.
-func (s *State) SetMessageFilterTimestamp(requestedTs interfaces.Timestamp) {
+// It marks the start of the replay filter content
+func (s *State) SetMessageFilterTimestamp(leaderTS interfaces.Timestamp) {
 
-	oneHourAgo := primitives.NewTimestampNow() // now() - one hour
-	oneHourAgo.SetTimeMilli(oneHourAgo.GetTimeMilli() - 60*60*1000)
+	// make a copy of the time stamp so we don't change the source
+	requestedTS := new(primitives.Timestamp)
+	requestedTS.SetTimestamp(leaderTS)
 
-	ts := requestedTs
-	if ts.GetTimeMilli() < s.TimestampAtBoot.GetTimeMilli() {
-		ts.SetTimestamp(s.TimestampAtBoot)
+	onehourago := new(primitives.Timestamp)
+	onehourago.SetTimeMilli(primitives.NewTimestampNow().GetTimeMilli() - 60*60*1000) // now() - one hour
+
+	if requestedTS.GetTimeMilli() < onehourago.GetTimeMilli() {
+		requestedTS.SetTimestamp(onehourago)
 	}
 
-	if ts.GetTimeMilli() < oneHourAgo.GetTimeMilli() {
-		ts.SetTimestamp(oneHourAgo)
+	if requestedTS.GetTimeMilli() < s.TimestampAtBoot.GetTimeMilli() {
+		requestedTS.SetTimestamp(s.TimestampAtBoot)
 	}
 
-	if ts.GetTimeMilli() < s.LeaderTimestamp.GetTimeMilli() {
+	if s.MessageFilterTimestamp != nil && requestedTS.GetTimeMilli() < s.MessageFilterTimestamp.GetTimeMilli() {
 		s.LogPrintf("executeMsg", "Set MessageFilterTimestamp attempt to move backward in time from %s", atomic.WhereAmIString(1))
-		ts.SetTimestamp(s.LeaderTimestamp)
+		return
 	}
 
-	s.LeaderTimestamp.SetTimestamp(ts) //SetLeaderTimestamp()
-	s.LogPrintf("executeMsg", "Set MessageFilterTimestamp(%s) @ dbht %d using %s for %s", requestedTs, s.LLeaderHeight, ts.String(), atomic.WhereAmIString(1))
+	s.LogPrintf("executeMsg", "SetMessageFilterTimestamp(%s) using %s ", leaderTS, requestedTS.String())
 
-	if s.MessageFilterTimestamp == nil {
-		s.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(uint64(ts.GetTimeMilli()))
-	} else {
-		s.MessageFilterTimestamp.SetTimestamp(ts)
-	}
+	s.MessageFilterTimestamp = primitives.NewTimestampFromMilliseconds(requestedTS.GetTimeMilliUInt64())
 }
+
 func (s *State) SetLeaderTimestamp(ts interfaces.Timestamp) {
-	//	s.LogPrintf("executeMsg", "Set SetLeaderTimestamp(%s) @ dbht %d for %s", ts.String(), s.LLeaderHeight, atomic.WhereAmIString(1))
-	if s.LeaderTimestamp == nil {
-		s.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(uint64(ts.GetTimeMilli()))
-	} else {
-		s.LeaderTimestamp.SetTimestamp(ts)
-	}
-	s.SetMessageFilterTimestamp(ts)
+	s.LogPrintf("executeMsg", "SetLeaderTimestamp(%s)", ts.String())
+
+	s.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64())
+	s.SetMessageFilterTimestamp(primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64() - 60*60*1000)) // set message filter to one hour before this block started.
 }
 
 func (s *State) SetFaultTimeout(timeout int) {
@@ -2238,7 +2308,9 @@ func (s *State) SetFaultWait(wait int) {
 	s.FaultWait = wait
 }
 
-//var _ IState = (*State)(nil)
+func (s *State) GetElections() interfaces.IElections {
+	return s.Elections
+}
 
 // GetAuthorities will return a list of the network authorities
 func (s *State) GetAuthorities() []interfaces.IAuthority {
@@ -2715,9 +2787,6 @@ func (s *State) GetTrueLeaderHeight() uint32 {
 	if h < 0 {
 		h = 0
 	}
-	if h > 0 && uint32(h-1) > s.HighestKnown {
-		s.HighestKnown = uint32(h - 1)
-	}
 	return uint32(h)
 }
 
@@ -2904,4 +2973,22 @@ func (s *State) IsActive(id activations.ActivationType) bool {
 	}
 
 	return rval
+}
+
+func (s *State) PassOutputRegEx(RegEx *regexp.Regexp, RegExString string) {
+	s.OutputRegEx = RegEx
+	s.OutputRegExString = RegExString
+}
+
+func (s *State) GetOutputRegEx() (*regexp.Regexp, string) {
+	return s.OutputRegEx, s.OutputRegExString
+}
+
+func (s *State) PassInputRegEx(RegEx *regexp.Regexp, RegExString string) {
+	s.InputRegEx = RegEx
+	s.InputRegExString = RegExString
+}
+
+func (s *State) GetInputRegEx() (*regexp.Regexp, string) {
+	return s.InputRegEx, s.InputRegExString
 }

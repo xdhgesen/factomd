@@ -22,7 +22,6 @@ func (state *State) ValidatorLoop() {
 	state.validatorLoopThreadID = atomic.Goid()
 	for {
 		s := state
-
 		if state.DebugExec() {
 			status := ""
 			now := time.Now()
@@ -79,15 +78,19 @@ func (state *State) ValidatorLoop() {
 		for i := 0; i < 1; i++ {
 			//for state.Process() {}
 			//for state.UpdateState() {}
-			var progress bool
-			//for i := 0; progress && i < 100; i++ {
-			for state.Process() {
-				progress = true
+			p1 := true
+			p2 := true
+			i1 := 0
+			i2 := 0
+
+			for i1 = 0; p1 && i1 < 200; i1++ {
+				p1 = state.Process()
 			}
-			for state.UpdateState() {
-				progress = true
+			for i2 = 0; p2 && i2 < 200; i2++ {
+				p2 = state.UpdateState()
 			}
-			//}
+
+			s.LogPrintf("updateIssues", "Validation messages %3d processlist %3d", i1, i2)
 
 			select {
 			case min := <-state.tickerQueue:
@@ -103,12 +106,7 @@ func (state *State) ValidatorLoop() {
 				// This doesn't block so it intentionally returns nil, don't log nils
 				msg = state.InMsgQueue().Dequeue()
 				if msg != nil {
-					if msg.Type() != constants.HEARTBEAT_MSG {
-						state.LogMessage("InMsgQueue", "dequeue", msg)
-					} else {
-						state.LogMessage("InMsgQueue", "heartbeat", msg)
-					}
-
+					state.LogMessage("InMsgQueue", "dequeue", msg)
 				}
 				if msg == nil {
 					// This doesn't block so it intentionally returns nil, don't log nils
@@ -138,9 +136,9 @@ func (state *State) ValidatorLoop() {
 				ackRoom = cap(state.ackQueue) - len(state.ackQueue)
 				msgRoom = cap(state.msgQueue) - len(state.msgQueue)
 			}
-			if !progress && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
+			if !(p1 || p2) && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
 				// No messages? Sleep for a bit
-				for i := 0; i < 10 && state.InMsgQueue().Length() == 0; i++ {
+				for i := 0; i < 10 && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0; i++ {
 					time.Sleep(10 * time.Millisecond)
 					state.ValidatorLoopSleepCnt++
 				}
@@ -175,7 +173,6 @@ func (t *Timer) timer(s *State, min int) {
 		eom.Sign(s)
 		eom.SetLocal(true)
 		consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
-
 		s.LogMessage("MsgQueue", "enqueue", eom)
 
 		s.MsgQueue() <- eom

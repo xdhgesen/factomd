@@ -14,6 +14,8 @@ import (
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/globals"
+	"github.com/FactomProject/factomd/util/atomic"
+
 	// "github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
@@ -35,8 +37,7 @@ var _ = log.Print
 type DBState struct {
 	IsNew bool
 
-	TmpSaveStruct *SaveState
-	SaveStruct    *SaveState
+	SaveStruct *SaveState
 
 	DBHash interfaces.IHash
 	ABHash interfaces.IHash
@@ -66,11 +67,13 @@ type DBState struct {
 var _ interfaces.BinaryMarshallable = (*DBState)(nil)
 
 func (dbs *DBState) Init() {
-	/*
-		if dbs.SaveStruct == nil {
-			dbs.SaveStruct = new(SaveState)
-		}
-	*/
+	if dbs.SaveStruct == nil {
+		dbs.SaveStruct = new(SaveState)
+		dbs.SaveStruct.Init()
+	}
+	if dbs.SaveStruct.IdentityControl == nil {
+		atomic.WhereAmIMsg("no identity manager")
+	}
 
 	if dbs.DBHash == nil {
 		dbs.DBHash = primitives.NewZeroHash()
@@ -213,7 +216,6 @@ func (dbs *DBState) MarshalBinary() (rval []byte, err error) {
 	defer func(pe *error) {
 		if *pe != nil {
 			fmt.Fprintf(os.Stderr, "DBState.MarshalBinary err:%v", *pe)
-
 		}
 	}(&err)
 
@@ -277,8 +279,13 @@ func (dbs *DBState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 
 	dbs.IsNew = false
 
-	dbs.SaveStruct = new(SaveState)
-	err = b.PopBinaryMarshallable(dbs.SaveStruct)
+	SaveStruct := new(SaveState)
+	SaveStruct.Init()
+	if SaveStruct.IdentityControl == nil {
+		atomic.WhereAmIMsg("no identity manager")
+	}
+
+	err = b.PopBinaryMarshallable(SaveStruct)
 	if err != nil {
 		return
 	}
@@ -328,6 +335,12 @@ func (dbs *DBState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 		return
 	}
 
+	dbs.SaveStruct = SaveStruct // OK, this worked so keep the save struct
+
+	if dbs.SaveStruct.IdentityControl == nil {
+		atomic.WhereAmIMsg("no identity manager")
+	}
+
 	newData = b.DeepCopyBytes()
 	return
 }
@@ -338,6 +351,7 @@ func (dbs *DBState) UnmarshalBinary(p []byte) error {
 }
 
 type DBStateList struct {
+	// TODO: mjb: get rid of LastBegin LastEnd and TimeToAsk
 	LastEnd       int
 	LastBegin     int
 	TimeToAsk     interfaces.Timestamp
@@ -449,7 +463,10 @@ func (dbsl *DBStateList) MarshalBinary() (rval []byte, err error) {
 		return nil, err
 	}
 	for _, v := range dbsl.DBStates {
-		if v.Saved {
+		if v.Saved && v.Locked {
+			if !v.Locked {
+				panic("unlocked save state")
+			}
 			err = buf.PushBinaryMarshallable(v)
 			if err != nil {
 				return nil, err
@@ -471,42 +488,53 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 
 	x, err := buf.PopUInt32()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData LastEnd err: %v", err)
 		return
 	}
 	dbsl.LastEnd = int(x)
 	x, err = buf.PopUInt32()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData LastBegin err: %v", err)
 		return
 	}
 	dbsl.LastBegin = int(x)
 
 	dbsl.ProcessHeight, err = buf.PopUInt32()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData ProcessHeight err: %v", err)
 		return
 	}
 	dbsl.SavedHeight, err = buf.PopUInt32()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData SavedHeight err: %v", err)
 		return
 	}
 
 	//TODO: handle State
 	dbsl.Base, err = buf.PopUInt32()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData Base err: %v", err)
 		return
 	}
 	dbsl.Complete, err = buf.PopUInt32()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData Complete err: %v", err)
 		return
 	}
 
-	listLen, err := buf.PopVarInt()
+	l, err := buf.PopVarInt()
 	if err != nil {
+		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData listLen err: %v", err)
 		return
 	}
-	for i := 0; i < int(listLen); i++ {
+	for i := 0; i < int(l); i++ {
 		dbs := new(DBState)
 		err = buf.PopBinaryMarshallable(dbs)
+		if dbs.SaveStruct.IdentityControl == nil {
+			atomic.WhereAmIMsg("no identity control")
+		}
 		if err != nil {
+			dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData (%d) err: %v", int(dbsl.Base)+i, err)
 			return
 		}
 		dbsl.DBStates = append(dbsl.DBStates, dbs)
@@ -534,6 +562,7 @@ func (d *DBState) ValidNext(state *State, next *messages.DBStateMsg) int {
 	_ = s
 	dirblk := next.DirectoryBlock
 	dbheight := dirblk.GetHeader().GetDBHeight()
+
 	// If we don't have the previous blocks processed yet, then let's wait on this one.
 	highestSavedBlk := state.GetHighestSavedBlk()
 
@@ -607,7 +636,8 @@ func (list *DBStateList) String() string {
 			if ds.DirectoryBlock != nil {
 				rec = "x"
 
-				dblk, _ := list.State.GetDB().FetchDBlock(ds.DirectoryBlock.GetKeyMR())
+				dblk := ds.DirectoryBlock
+				//				dblk, _ := list.State.GetDB().FetchDBlock(ds.DirectoryBlock.GetKeyMR())
 
 				if dblk != nil {
 					rec = "s"
@@ -978,6 +1008,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	//
 	//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Processing Admin Block at dbht: %d", d.AdminBlock.GetDBHeight()))
 	err := d.AdminBlock.UpdateState(list.State)
+
+	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) after update auth %d/%d ", dbht, len(pl.FedServers), len(pl.AuditServers))
+
 	if err != nil {
 		panic(err)
 	}
@@ -1006,7 +1039,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// Factoid Block Processing
 	// *******************
 	fs := list.State.GetFactoidState()
-	fs.(*FactoidState).DBHeight = dbht
 
 	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Process Factoids dbht %d factoid",
 		dbht, fs.(*FactoidState).DBHeight)
@@ -1015,10 +1047,28 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// in this block.  If you want the balance of the highest saved block, look to
 	// list.State.FactoidBalancesPapi if it is not null.  If you have no entry there,
 	// then look to list.State.FactoidBalancesP
+
+	if s.RestoreFCT != nil {
+		for k, v := range s.RestoreFCT {
+			s.FactoidBalancesP[k] = v
+		}
+	}
+	if s.RestoreEC != nil {
+		for k, v := range s.RestoreEC {
+			s.ECBalancesP[k] = v
+		}
+	}
+
 	list.State.FactoidBalancesPMutex.Lock()
 	list.State.FactoidBalancesPapi = make(map[[32]byte]int64, len(pl.FactoidBalancesT))
+	list.State.RestoreFCT = make(map[[32]byte]int64, len(pl.FactoidBalancesT))
+	list.State.RestoreEC = make(map[[32]byte]int64, len(pl.FactoidBalancesT))
 	for k := range pl.FactoidBalancesT {
-		list.State.FactoidBalancesPapi[k] = list.State.FactoidBalancesP[k]
+		list.State.FactoidBalancesPapi[k] = list.State.FactoidBalancesP[k] // Capture the previous block balances for the APIs
+		list.State.RestoreFCT[k] = list.State.FactoidBalancesP[k]          // Capture the previous block balances to restore if we have to apply a dbstate over this block.
+	}
+	for k := range pl.ECBalancesT {
+		list.State.RestoreEC[k] = list.State.ECBalancesP[k]
 	}
 	list.State.FactoidBalancesPMutex.Unlock()
 
@@ -1044,11 +1094,12 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	}
 
 	if list.State.DBFinished {
+		fs.(*FactoidState).DBHeight = dbht
 		list.State.Balancehash = fs.GetBalanceHash(false)
 	}
 
 	// Make the current exchange rate whatever we had in the previous block.
-	// UNLESS there was a FER entry processed during this block  changeheight will be left at 1 on a change block
+	// UNLESS there was a FER entry processed during this block  change height will be left at 1 on a change block
 	if list.State.FERChangeHeight == 1 {
 		list.State.FERChangeHeight = 0
 	} else {
@@ -1131,18 +1182,31 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		list.WriteDBStateToDebugFile(d)
 	}
 
+	fs.(*FactoidState).DBHeight = list.State.GetDirectoryBlock().GetHeader().GetDBHeight()
+
 	tbh := list.State.FactoidState.GetBalanceHash(true) // recompute temp balance hash here
 	list.State.Balancehash = fs.GetBalanceHash(false)
-
 	list.State.LogPrintf("dbstateprocess", "ProcessBlock(%d) BalanceHash P %x T %x", dbht, list.State.Balancehash.Bytes()[0:4], tbh.Bytes()[0:4])
 
-	d.TmpSaveStruct = SaveFactomdState(list.State, d)
+	// We will only save blocks marked to be saved.  As such, this must follow
+	// the "d.saved = true" above
+	if list.State.StateSaverStruct.FastBoot && d.DirectoryBlock.GetHeader().GetDBHeight() != 0 {
+
+		d.SaveStruct = SaveFactomdState(list.State, d)
+		err := list.State.StateSaverStruct.SaveDBStateList(list.State, list.State.DBStates, list.State.Network)
+		if err != nil {
+			list.State.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
+		}
+	}
 
 	// All done with this block move to the next height if we are loading by blocks
 	if s.LLeaderHeight == dbht {
 		// if we are following by blocks then this move us forward but if we are following by minutes the
 		// code in ProcessEOM for minute 10 will have moved us forward
+		s.SetLeaderTimestamp(d.DirectoryBlock.GetTimestamp())
 		s.MoveStateToHeight(dbht+1, 0)
+		// todo: is there a reason not to do this in MoveStateToHeight?
+		fs.(*FactoidState).DBHeight = dbht + 1
 	}
 
 	// Note about dbsigs.... If we processed the previous minute, then we generate the DBSig for the next block.
@@ -1153,32 +1217,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	pldbs := s.ProcessLists.Get(s.LLeaderHeight)
 	if s.Leader && !pldbs.DBSigAlreadySent {
 		s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ProcessBlocks()
-		//// dbstate is already set.
-		//dbs := new(messages.DirectoryBlockSignature)
-		//dbs.DirectoryBlockHeader = d.DirectoryBlock.GetHeader()
-		//dbs.ServerIdentityChainID = s.GetIdentityChainID()
-		//dbs.DBHeight = s.LLeaderHeight
-		//dbs.Timestamp = s.GetTimestamp()
-		//dbs.SetVMHash(nil)
-		//dbs.SetVMIndex(s.LeaderVMIndex)
-		//dbs.SetLocal(true)
-		//dbs.Sign(s)
-		//err := dbs.Sign(s)
-		//if err != nil {
-		//	panic(err)
-		//}
-		////{ // debug
-		////	s.LogMessage("dbstateprocess", "currentminute=10", dbs)
-		////	dbs2, _ := s.CreateDBSig(s.LLeaderHeight, s.LeaderVMIndex)
-		////	dbs3 := dbs2.(*messages.DirectoryBlockSignature)
-		////	s.LogPrintf("dbstateprocess", "issameas()=%v", dbs.IsSameAs(dbs3))
-		////}
-		//s.LogMessage("dbstateprocess", "currentminute=10", dbs)
-		//s.LogPrintf("dbstateprocess", d.String())
-		//pldbs.DBSigAlreadySent = true
-		//
-		//s.LogMessage("executeMsg", "LeaderExec2", dbs)
-		//dbs.LeaderExecute(s)
 	}
 
 	return
@@ -1283,7 +1321,7 @@ func (list *DBStateList) WriteDBStateToDebugFile(d *DBState) {
 }
 
 func ReadDBStateFromDebugFile(filename string) (*WholeBlock, error) {
-	file, err := os.OpenFile(filename, os.O_RDONLY, 0777)
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0775)
 	if err != nil {
 		return nil, err
 	}
@@ -1306,7 +1344,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
 		return
 	}
-	list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Balance hash %x", d.DirectoryBlock.GetHeader().GetDBHeight())
+	list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Balance hash %x", d.DirectoryBlock.GetHeader().GetDBHeight(), list.State.Balancehash.Bytes()[:4])
 
 	// If this is a repeated block, and I have already saved at this height, then we can safely ignore
 	// this dbstate.
@@ -1327,6 +1365,9 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		}
 	}
 
+	list.State.RestoreFCT = nil
+	list.State.RestoreEC = nil
+
 	if d.Saved {
 		Havedblk, err := list.State.DB.DoesKeyExist(databaseOverlay.DIRECTORYBLOCK, d.DirectoryBlock.GetKeyMR().Bytes())
 		if err != nil || !Havedblk {
@@ -1345,7 +1386,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				fct.GetTimestamp(),
 				d.DirectoryBlock.GetHeader().GetTimestamp())
 		}
-
+		list.State.Saving = false
 		return
 	}
 
@@ -1483,8 +1524,8 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 		mr, err := list.State.DB.FetchDBKeyMRByHeight(uint32(dbheight))
 		if err != nil {
 			list.State.LogPrintf("dbstateprocess", err.Error())
-			return
 			panic(fmt.Sprintf("%20s At Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			return
 		}
 		if mr == nil {
 			list.State.LogPrintf("dbstateprocess", "There is no mr returned by list.State.DB.FetchDBKeyMRByHeight() at %d\n", dbheight)
@@ -1499,13 +1540,14 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			} else {
 				list.State.LogPrintf("dbstateprocess", "Could not get directory block by primary key at Block Height %d\n", dbheight)
 			}
-			return
 			panic(fmt.Sprintf("%20s Error reading db by mr at Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			return
 		}
 		if td.GetKeyMR().Fixed() != mr.Fixed() {
 			list.State.LogPrintf("dbstateprocess", "Key MR is wrong at Directory Block Height %d\n", dbheight)
-			return
+			fmt.Fprintln(os.Stderr, d.DirectoryBlock.String(), "\n==============================================\n Should be:\n", td.String())
 			panic(fmt.Sprintf("%20s KeyMR is wrong at Directory Block Height %d", list.State.FactomNodeName, dbheight))
+			return
 		}
 		if !good {
 			return
@@ -1524,17 +1566,11 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	list.State.NumFCTTrans += len(d.FactoidBlock.GetTransactions()) - 1
 
 	list.SavedHeight = uint32(dbheight)
+	list.State.Saving = false
 	progress = true
 	d.ReadyToSave = false
 	d.Saved = true
 
-	// We will only save blocks marked to be saved.  As such, this must follow
-	// the "d.saved = true" above
-	if list.State.StateSaverStruct.FastBoot {
-		d.SaveStruct = d.TmpSaveStruct
-		err := list.State.StateSaverStruct.SaveDBStateList(list.State.DBStates, list.State.Network)
-		list.State.LogPrintf("dbstateprocess", "Error while saving Fastboot %v", err)
-	}
 	// Now that we have saved the perm balances, we can clear the api hashmaps that held the differences
 	// between the actual saved block prior, and this saved block.  If you are looking for balances of
 	// the highest saved block, you first look to see that one of the "<fct or ec>Papi" maps exist, then
@@ -1552,8 +1588,6 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 }
 
 func (list *DBStateList) UpdateState() (progress bool) {
-	list.Catchup(false)
-
 	s := list.State
 	_ = s
 	if len(list.DBStates) != 0 {
@@ -1562,7 +1596,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 			if d == nil {
 				l += "nil "
 			} else {
-				status := []byte("_____")
+				status := []byte("______")
 				if d.Locked {
 					status[0] = 'L'
 				}
@@ -1577,6 +1611,9 @@ func (list *DBStateList) UpdateState() (progress bool) {
 				}
 				if d.Repeat {
 					status[4] = 'D'
+				}
+				if d.SaveStruct != nil && d.SaveStruct.IdentityControl != nil {
+					status[5] = '!'
 				}
 				l += fmt.Sprintf("%d%s, ", d.DirectoryBlock.GetHeader().GetDBHeight(), string(status))
 			}
@@ -1701,6 +1738,11 @@ searchLoop:
 		list.DBStates = append(list.DBStates, nil)
 	}
 	list.DBStates[index] = dbState
+	if dbState.SaveStruct.IdentityControl == nil {
+		atomic.WhereAmIMsg("no identity control")
+	} else {
+
+	}
 
 	return true
 }
@@ -1724,6 +1766,7 @@ func (list *DBStateList) NewDBState(isNew bool,
 	eBlocks []interfaces.IEntryBlock,
 	entries []interfaces.IEBEntry) *DBState {
 	dbState := new(DBState)
+	dbState.Init() // Creat all the sub structor...
 
 	dbState.DBHash = directoryBlock.DatabasePrimaryIndex()
 	dbState.ABHash = adminBlock.DatabasePrimaryIndex()
@@ -1742,6 +1785,10 @@ func (list *DBStateList) NewDBState(isNew bool,
 
 	// If we actually add this to the list, return the dbstate.
 	if list.Put(dbState) {
+		if dbState.SaveStruct.IdentityControl == nil {
+			atomic.WhereAmIMsg("no identity control")
+		}
+
 		return dbState
 	} else {
 		ht := dbState.DirectoryBlock.GetHeader().GetDBHeight()
@@ -1749,6 +1796,9 @@ func (list *DBStateList) NewDBState(isNew bool,
 			index := int(ht) - int(list.State.DBStates.Base)
 			if index > 0 {
 				list.State.DBStates.DBStates[index] = dbState
+				if dbState.SaveStruct.IdentityControl == nil {
+					atomic.WhereAmIMsg("no identity control")
+				}
 				pdbs := list.State.DBStates.Get(int(ht - 1))
 				if pdbs != nil {
 					pdbs.SaveStruct.TrimBack(list.State, dbState)

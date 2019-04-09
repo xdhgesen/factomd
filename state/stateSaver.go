@@ -5,12 +5,11 @@
 package state
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"sync"
-
-	"errors"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -32,10 +31,10 @@ func (sss *StateSaverStruct) StopSaving() {
 	sss.Stop = true
 }
 
-func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string) error {
+func (sss *StateSaverStruct) SaveDBStateList(s *State, ss *DBStateList, networkName string) error {
 	//For now, to file. Later - to DB
 	if sss.Stop == true {
-		return nil
+		return nil // if we have closed the database then don't save
 	}
 
 	hsb := int(ss.GetHighestSavedBlk())
@@ -48,8 +47,9 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	sss.Mutex.Lock()
 	defer sss.Mutex.Unlock()
 	//Actually save data from previous cached state to prevent dealing with rollbacks
+	// Save the N block old state and then make a new savestate for the next save
 	if len(sss.TmpState) > 0 {
-		err := SaveToFile(sss.TmpDBHt, sss.TmpState, NetworkIDToFilename(networkName, sss.FastBootLocation))
+		err := SaveToFile(s, sss.TmpDBHt, sss.TmpState, NetworkIDToFilename(networkName, sss.FastBootLocation))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "SaveState SaveToFile Failed", err)
 			return err
@@ -68,24 +68,6 @@ func (sss *StateSaverStruct) SaveDBStateList(ss *DBStateList, networkName string
 	sss.TmpState = b
 	sss.TmpDBHt = ss.State.LLeaderHeight
 
-	//{ /// Debug code, check if I can unmarshal the object myself.
-	//	test := new(DBStateList)
-	//	test.UnmarshalBinary(b)
-	//	if err != nil {
-	//		fmt.Fprintln(os.Stderr, "SaveState UnmarshalBinary Failed", err)
-	//	}
-	//
-	//	h := primitives.NewZeroHash()
-	//	b, err = h.UnmarshalBinaryData(b)
-	//	if err != nil {
-	//		return nil
-	//	}
-	//	h2 := primitives.Sha(b)
-	//	if h.IsSameAs(h2) == false {
-	//		fmt.Fprintln(os.Stderr, "LoadDBStateList - Integrity hashes do not match!")
-	//		return nil
-	//	}
-	//}
 	return nil
 }
 
@@ -93,10 +75,10 @@ func (sss *StateSaverStruct) DeleteSaveState(networkName string) error {
 	return DeleteFile(NetworkIDToFilename(networkName, sss.FastBootLocation))
 }
 
-func (sss *StateSaverStruct) LoadDBStateList(statelist *DBStateList, networkName string) error {
+func (sss *StateSaverStruct) LoadDBStateList(s *State, statelist *DBStateList, networkName string) error {
 	filename := NetworkIDToFilename(networkName, sss.FastBootLocation)
 	fmt.Println(statelist.State.FactomNodeName, "Loading from", filename)
-	b, err := LoadFromFile(filename)
+	b, err := LoadFromFile(s, filename)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "LoadDBStateList error:", err)
 		return err
@@ -125,7 +107,6 @@ func (sss *StateSaverStruct) LoadDBStateList(statelist *DBStateList, networkName
 		}
 	}
 	statelist.DBStates[i].SaveStruct.RestoreFactomdState(statelist.State)
-	statelist.DBStates[i].Locked = false // Need to process this state.
 
 	return nil
 }
@@ -143,21 +124,21 @@ func NetworkIDToFilename(networkName string, fileLocation string) string {
 	return file
 }
 
-func SaveToFile(dbht uint32, b []byte, filename string) error {
-	fmt.Fprintf(os.Stderr, "Saving %s for dbht %d\n", filename, dbht)
+func SaveToFile(s *State, dbht uint32, b []byte, filename string) error {
+	fmt.Fprintf(os.Stderr, "%20s Saving %s for dbht %d\n", s.FactomNodeName, filename, dbht)
 	err := ioutil.WriteFile(filename, b, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%20s Saving FailrueError: %v\n", s.FactomNodeName, err)
 		return err
 	}
 	return nil
 }
 
-func LoadFromFile(filename string) ([]byte, error) {
-	fmt.Fprintf(os.Stderr, "Load state from %s\n", filename)
+func LoadFromFile(s *State, filename string) ([]byte, error) {
+	fmt.Fprintf(os.Stderr, "%20s Load state from %s\n", s.FactomNodeName, filename)
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "LoadFromFile error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "%20s LoadFromFile error: %v\n", s.FactomNodeName, err)
 		return nil, err
 	}
 	return b, nil

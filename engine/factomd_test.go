@@ -29,96 +29,6 @@ import (
 	"github.com/FactomProject/factomd/wsapi"
 )
 
-func TestSetupANetwork(t *testing.T) {
-	if RanSimTest {
-		return
-	}
-
-	RanSimTest = true
-
-	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--debuglog": "", "--blktime": "15"}, 14, 0, 0, t)
-
-	RunCmd("9")  // Puts the focus on node 9
-	RunCmd("x")  // Takes Node 9 Offline
-	RunCmd("w")  // Point the WSAPI to send API calls to the current node.
-	RunCmd("10") // Puts the focus on node 9
-	RunCmd("8")  // Puts the focus on node 8
-	RunCmd("w")  // Point the WSAPI to send API calls to the current node.
-	RunCmd("7")
-	WaitBlocks(state0, 1) // Wait for 1 block
-
-	WaitForMinute(state0, 2) // Waits for minute 2
-	RunCmd("F100")           //  Set the Delay on messages from all nodes to 100 milliseconds
-	RunCmd("S10")            // Set Drop Rate to 1.0 on everyone
-	RunCmd("g10")            // Adds 10 identities to your identity pool.
-
-	fn1 := GetFocus()
-	PrintOneStatus(0, 0)
-	if fn1.State.FactomNodeName != "FNode07" {
-		t.Fatalf("Expected FNode07, but got %s", fn1.State.FactomNodeName)
-	}
-	RunCmd("g1")             // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 3) // Waits for 3 "Minutes"
-	RunCmd("g1")             // // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 4) // Waits for 4 "Minutes"
-	RunCmd("g1")             // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 5) // Waits for 5 "Minutes"
-	RunCmd("g1")             // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 6) // Waits for 6 "Minutes"
-	WaitBlocks(state0, 1)    // Waits for 1 block
-	WaitForMinute(state0, 1) // Waits for 1 "Minutes"
-	RunCmd("g1")             // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 2) // Waits for 2 "Minutes"
-	RunCmd("g1")             // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 3) // Waits for 3 "Minutes"
-	RunCmd("g20")            // Adds 20 identities to your identity pool.
-	WaitBlocks(state0, 1)
-	RunCmd("9") // Focuses on Node 9
-	RunCmd("x") // Brings Node 9 back Online
-	RunCmd("8") // Focuses on Node 8
-
-	time.Sleep(100 * time.Millisecond)
-
-	fn2 := GetFocus()
-	PrintOneStatus(0, 0)
-	if fn2.State.FactomNodeName != "FNode08" {
-		t.Fatalf("Expected FNode08, but got %s", fn1.State.FactomNodeName)
-	}
-
-	RunCmd("i") // Shows the identities being monitored for change.
-	// Test block recording lengths and error checking for pprof
-	RunCmd("b100") // Recording delays due to blocked go routines longer than 100 ns (0 ms)
-
-	RunCmd("b") // specifically how long a block will be recorded (in nanoseconds).  1 records all blocks.
-
-	RunCmd("babc") // Not sure that this does anything besides return a message to use "bnnn"
-
-	RunCmd("b1000000") // Recording delays due to blocked go routines longer than 1000000 ns (1 ms)
-
-	RunCmd("/") // Sort Status by Chain IDs
-
-	RunCmd("/") // Sort Status by Node Name
-
-	RunCmd("a1")             // Shows Admin block for Node 1
-	RunCmd("e1")             // Shows Entry credit block for Node 1
-	RunCmd("d1")             // Shows Directory block
-	RunCmd("f1")             // Shows Factoid block for Node 1
-	RunCmd("a100")           // Shows Admin block for Node 100
-	RunCmd("e100")           // Shows Entry credit block for Node 100
-	RunCmd("d100")           // Shows Directory block
-	RunCmd("f100")           // Shows Factoid block for Node 1
-	RunCmd("yh")             // Nothing
-	RunCmd("yc")             // Nothing
-	RunCmd("r")              // Rotate the WSAPI around the nodes
-	WaitForMinute(state0, 1) // Waits 1 "Minute"
-
-	RunCmd("g1")             // Adds 1 identities to your identity pool.
-	WaitForMinute(state0, 3) // Waits 3 "Minutes"
-	WaitBlocks(fn1.State, 3) // Waits for 3 blocks
-
-	ShutDownEverything(t)
-}
-
 func TestLoad(t *testing.T) {
 	if RanSimTest {
 		return
@@ -160,7 +70,6 @@ func TestTXTimestampsAndBlocks(t *testing.T) {
 	RunCmd("x")
 	RunCmd("R0") // turn off the load
 }
-
 func TestLoad2(t *testing.T) {
 	if RanSimTest {
 		return
@@ -196,7 +105,6 @@ func TestLoad2(t *testing.T) {
 	}
 	ShutDownEverything(t)
 } // testLoad2(){...}
-
 // The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
 // the bug happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
 // Using a message delay, drop and tree network makes this likely
@@ -335,7 +243,6 @@ func TestActivationHeightElection(t *testing.T) {
 
 	ShutDownEverything(t)
 }
-
 func TestAnElection(t *testing.T) {
 	if RanSimTest {
 		return
@@ -344,6 +251,7 @@ func TestAnElection(t *testing.T) {
 	RanSimTest = true
 
 	state0 := SetupSim("LLLAAF", map[string]string{}, 9, 1, 1, t)
+
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
 
@@ -357,6 +265,7 @@ func TestAnElection(t *testing.T) {
 	WaitMinutes(state0, 2)
 	//bring him back
 	RunCmd("x")
+
 	// wait for him to update via dbstate and become an audit
 	WaitBlocks(state0, 2)
 	WaitMinutes(state0, 1)
@@ -435,7 +344,6 @@ func TestDBsigEOMElection(t *testing.T) {
 	WaitMinutes(state0, 1)
 	WaitForAllNodes(state0)
 	ShutDownEverything(t)
-
 }
 
 func TestMultiple2Election(t *testing.T) {
@@ -458,11 +366,6 @@ func TestMultiple2Election(t *testing.T) {
 	RunCmd("x")
 	RunCmd("2")
 	RunCmd("x")
-
-	RunCmd("E")
-	RunCmd("F")
-	RunCmd("0")
-	RunCmd("p")
 
 	WaitBlocks(state0, 2)
 	WaitForMinute(state0, 1)
@@ -502,6 +405,72 @@ func TestMultiple3Election(t *testing.T) {
 
 }
 
+func TestSimCtrl(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	RanSimTest = true
+
+	type walletcallHelper struct {
+		Status string `json:"status"`
+	}
+	type walletcall struct {
+		Jsonrpc string           `json:"jsonrps"`
+		Id      int              `json:"id"`
+		Result  walletcallHelper `json:"result"`
+	}
+
+	apiCall := func(state0 *state.State, cmd string) {
+		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/debug"
+		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "sim-ctrl", "params":{"commands": ["` + cmd + `"]}}`)
+		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+		req.Header.Set("content-type", "text/plain;")
+		if err != nil {
+			t.Error(err)
+		}
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Error(err)
+		}
+
+		defer resp.Body.Close()
+		body, _ := ioutil.ReadAll(resp.Body)
+
+		resp2 := new(walletcall)
+		err1 := json.Unmarshal([]byte(body), &resp2)
+		if err1 != nil {
+			t.Error(err1)
+		}
+
+		fmt.Println("resp2: ", resp2)
+	}
+
+	state0 := SetupSim("LLLLLAAF", map[string]string{"--debuglog": "."}, 8, 2, 2, t)
+
+	WaitForMinute(state0, 2)
+	apiCall(state0, "1")
+	apiCall(state0, "x")
+	apiCall(state0, "2")
+	apiCall(state0, "x")
+	WaitForMinute(state0, 1)
+	apiCall(state0, "1")
+	apiCall(state0, "x")
+	apiCall(state0, "2")
+	apiCall(state0, "x")
+
+	apiCall(state0, "E")
+	apiCall(state0, "F")
+	apiCall(state0, "0")
+	apiCall(state0, "p")
+
+	WaitBlocks(state0, 2)
+	WaitForMinute(state0, 1)
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+}
+
 func TestMultiple7Election(t *testing.T) {
 	if RanSimTest {
 		return
@@ -539,8 +508,9 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		return
 	}
 	RanSimTest = true
-
-	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--blktime": "15"}, 6, 0, 0, t)
+	// only have one leader because if you are not the leader responcible for the FCT transaction then
+	// you will return transACK before teh balance is updated which will make thsi test fail.
+	state0 := SetupSim("LAF", map[string]string{"--blktime": "15"}, 6, 0, 0, t)
 	WaitForMinute(state0, 1)
 
 	type walletcallHelper struct {
@@ -560,7 +530,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		Result  wsapi.GeneralTransactionData `json:"result"`
 	}
 
-	apiCall := func(arrayOfFactoidAccounts []string) *walletcall {
+	apiCall := func(state0 *state.State, arrayOfFactoidAccounts []string) *walletcall {
 		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
 		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-fct-balances", "params":{"addresses":["` + strings.Join(arrayOfFactoidAccounts, `", "`) + `"]}}  `)
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
@@ -585,7 +555,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 	}
 
 	arrayOfFactoidAccounts := []string{"FA1zT4aFpEvcnPqPCigB3fvGu4Q4mTXY22iiuV69DqE1pNhdF2MC", "FA3Y1tBWnFpyoZUPr9ZH51R1gSC8r5x5kqvkXL3wy4uRvzFnuWLB", "FA3Fsy2WPkR5z7qjpL8H1G51RvZLCiLDWASS6mByeQmHSwAws8K7"}
-	resp2 := apiCall(arrayOfFactoidAccounts)
+	resp2 := apiCall(state0, arrayOfFactoidAccounts)
 
 	// To check if the balances returned from the API are right
 	for i, a := range arrayOfFactoidAccounts {
@@ -651,7 +621,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 	}
 	TimeNow(state0)
 	ToTestPermAndTempBetweenBlocks := []string{"FA3EPZYqodgyEGXNMbiZKE5TS2x2J9wF8J9MvPZb52iGR78xMgCb", "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"}
-	resp3 := apiCall(ToTestPermAndTempBetweenBlocks)
+	resp3 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok := resp3.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
@@ -696,7 +666,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 	}
 
 	// This call should show a different acknowledged balance than the Saved Balance
-	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
+	resp_5 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
@@ -713,7 +683,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
 
-	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
+	resp_6 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
@@ -730,7 +700,9 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	}
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLAAAFFF", map[string]string{"--blktime": "15"}, 6, 0, 0, t)
+	// only have one leader because if you are not the leader responcible for the FCT transaction then
+	// you will return transACK before teh balance is updated which will make thsi test fail.
+	state0 := SetupSim("LAF", map[string]string{"--blktime": "15"}, 6, 0, 0, t)
 	WaitForMinute(state0, 1)
 
 	type walletcallHelper struct {
@@ -767,7 +739,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 		Result  wsapi.EntryStatus `json:"result"`
 	}
 
-	apiCall := func(arrayOfECAccounts []string) *walletcall {
+	apiCall := func(state0 *state.State, arrayOfECAccounts []string) *walletcall {
 		url := "http://localhost:" + fmt.Sprint(state0.GetPort()) + "/v2"
 		var jsonStr = []byte(`{"jsonrpc": "2.0", "id": 0, "method": "multiple-ec-balances", "params":{"addresses":["` + strings.Join(arrayOfECAccounts, `", "`) + `"]}}  `)
 		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
@@ -792,7 +764,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	}
 
 	arrayOfECAccounts := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy"}
-	resp2 := apiCall(arrayOfECAccounts)
+	resp2 := apiCall(state0, arrayOfECAccounts)
 
 	// To check if the balances returned from the API are right
 	for i, a := range arrayOfECAccounts {
@@ -861,7 +833,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	}
 	TimeNow(state0)
 	ToTestPermAndTempBetweenBlocks := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
-	resp3 := apiCall(ToTestPermAndTempBetweenBlocks)
+	resp3 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok := resp3.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
@@ -903,12 +875,12 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	}
 
 	// This call should show a different acknowledged balance than the Saved Balance
-	resp_5 := apiCall(ToTestPermAndTempBetweenBlocks)
+	resp_5 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok = resp_5.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
 	}
-
+	// looking at EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab
 	if int64(x["ack"].(float64)) == int64(x["saved"].(float64)) {
 		t.Fatalf("Expected  temp[%d] to not match perm[%d]", int64(x["ack"].(float64)), int64(x["saved"].(float64)))
 	}
@@ -916,7 +888,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	WaitBlocks(state0, 1)
 	WaitMinutes(state0, 1)
 
-	resp_6 := apiCall(ToTestPermAndTempBetweenBlocks)
+	resp_6 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok = resp_6.Result.Balances[1].(map[string]interface{})
 	if ok != true {
 		fmt.Println(x)
@@ -936,7 +908,7 @@ func TestDBsigElectionEvery2Block_long(t *testing.T) {
 	RanSimTest = true
 
 	iterations := 1
-	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "", "--faulttimeout": "10"}, 32, 6, 6, t)
+	state := SetupSim("LLLLLLAF", map[string]string{"--debuglog": "", "--faulttimeout": "10"}, 35, 6, 6, t)
 
 	RunCmd("S10") // Set Drop Rate to 1.0 on everyone
 
@@ -1120,7 +1092,6 @@ func TestCoinbaseCancel(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
 	RanSimTest = true
 
 	state0 := SetupSim("LFFFFF", map[string]string{"-blktime": "5"}, 30, 0, 0, t)
@@ -1130,7 +1101,7 @@ func TestCoinbaseCancel(t *testing.T) {
 
 	WaitMinutes(state0, 2)
 	RunCmd("g10") // Adds 10 identities to your identity pool.
-	WaitBlocks(state0, 1)
+	WaitBlocks(state0, 2)
 	// Assign identities
 	RunCmd("1")
 	RunCmd("t")
@@ -1156,7 +1127,6 @@ func TestCoinbaseCancel(t *testing.T) {
 	RunCmd("5")
 	RunCmd("o")
 
-	WaitBlocks(state0, 3)
 	WaitForBlock(state0, 15)
 	WaitMinutes(state0, 1)
 	// Cancel coinbase of 18 (14+ delay of 4) with a majority of the authority set, should succeed
@@ -1280,7 +1250,8 @@ func TestTestNetCoinBaseActivation_long(t *testing.T) {
 	}
 
 	fmt.Println("Wait till activation height")
-	WaitForBlock(state0, 25)
+	blk := activations.ActivationMap[activations.TESTNET_COINBASE_PERIOD].ActivationHeight["LOCAL"]
+	WaitForBlock(state0, blk)
 	if constants.COINBASE_DECLARATION != 140 {
 		t.Fatalf("constants.COINBASE_DECLARATION = %d expect 140\n", constants.COINBASE_DECLARATION)
 	}
@@ -1321,18 +1292,15 @@ func TestElection9(t *testing.T) {
 	WaitBlocks(state0, 2)    // wait till the victim is back as the audit server
 	WaitForMinute(state0, 1) // Wait till ablock is loaded
 	WaitForAllNodes(state0)
-
 	WaitForMinute(state3, 1) // Wait till node 3 is following by minutes
 
 	WaitForAllNodes(state0)
 	ShutDownEverything(t)
 }
-
 func TestRandom(t *testing.T) {
 	if RanSimTest {
 		return
 	}
-
 	RanSimTest = true
 
 	if random.RandUInt8() > 200 {
@@ -1373,7 +1341,6 @@ func TestBadDBStateUnderflow(t *testing.T) {
 	WaitForAllNodes(state0)
 	ShutDownEverything(t)
 }
-
 func TestFactoidDBState(t *testing.T) {
 	if RanSimTest {
 		return
@@ -1441,6 +1408,36 @@ func TestDBStateCatchup(t *testing.T) {
 	WaitMinutes(state0, 2)
 	RunCmd("x") // bring the follower online
 	WaitBlocks(state0, 7)
+
+	WaitForAllNodes(state0) // if the follower isn't catching up this will timeout
+	PrintOneStatus(0, 0)
+	ShutDownEverything(t)
+}
+
+func TestDBState(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	RanSimTest = true
+
+	state0 := SetupSim("LLLFFFF", map[string]string{"--net": "line", "--debuglog": ".", "--blktime": "10"}, 100, 0, 0, t)
+	state1 := GetFnodes()[1].State
+	state6 := GetFnodes()[6].State // Get node 6
+	StatusEveryMinute(state1)
+
+	WaitForMinute(state0, 8)
+	RunCmd("Re")
+	RunCmd("R4")
+	RunCmd("F100")
+	RunCmd("6")
+	WaitForMinute(state6, 0)
+	RunCmd("x")
+	RunCmd("F0")
+	WaitBlocks(state0, 5)
+	RunCmd("x")
+	WaitBlocks(state0, 5)
+	RunCmd("R0")
+	WaitBlocks(state0, 1)
 
 	WaitForAllNodes(state0) // if the follower isn't catching up this will timeout
 	PrintOneStatus(0, 0)

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"regexp"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
@@ -177,6 +179,10 @@ func HandleV2Request(state interfaces.IState, j *primitives.JSON2Request) (*prim
 		resp, jsonError = HandleV2MultipleFCTBalances(state, params)
 	case "multiple-ec-balances":
 		resp, jsonError = HandleV2MultipleECBalances(state, params)
+	case "diagnostics":
+		resp, jsonError = HandleV2Diagnostics(state, params)
+	case "message-filter":
+		resp, jsonError = HandleV2MessageFilter(state, params)
 		//case "factoid-accounts":
 		// resp, jsonError = HandleV2Accounts(state, params)
 	default:
@@ -192,7 +198,7 @@ func HandleV2Request(state interfaces.IState, j *primitives.JSON2Request) (*prim
 	jsonResp.ID = j.ID
 	jsonResp.Result = resp
 
-	state.LogPrintf("apilog", "responce %v", jsonResp.String())
+	state.LogPrintf("apilog", "response %v", jsonResp.String())
 	return jsonResp, nil
 }
 
@@ -1382,6 +1388,115 @@ func HandleV2MultipleFCTBalances(state interfaces.IState, params interface{}) (i
 	h.CurrentHeight = currentHeight
 	h.LastSavedHeight = savedHeight
 	h.Balances = totalBalances
+
+	return h, nil
+}
+
+func HandleV2Diagnostics(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	// General state information
+	resp := new(DiagnosticsResponse)
+	resp.Name = state.GetFactomNodeName()
+	resp.ID = state.GetIdentityChainID().String()
+	resp.PublicKey = state.GetServerPublicKeyString()
+
+	resp.LeaderHeight = state.GetLLeaderHeight()
+	resp.CurrentMinute = state.GetCurrentMinute()
+	resp.CurrentMinuteDuration = time.Now().UnixNano() - state.GetCurrentMinuteStartTime()
+	resp.PrevMinuteDuration = state.GetCurrentMinuteStartTime() - state.GetPreviousMinuteStartTime()
+	resp.BalanceHash = state.GetFactoidState().GetBalanceHash(false).String()
+	resp.TempBalanceHash = state.GetFactoidState().GetBalanceHash(true).String()
+	resp.LastBlockFromDBState = state.DidCreateLastBlockFromDBState()
+
+	feds := state.GetFedServers(resp.LeaderHeight)
+	fedCount := len(feds)
+	audits := state.GetAuditServers(resp.LeaderHeight)
+
+	resp.AuthSet = new(AuthSet)
+	resp.Role = "Follower"
+	foundRole := false // tells us when to stop looking for the node's role
+	for i, fed := range feds {
+		vmIndex, listHeight, listLength, nextNil := state.GetLeaderPL().GetVMStatsForFedServer(i)
+		status := LeaderStatus{fed.GetChainID().String(), vmIndex, listHeight, listLength, nextNil}
+		resp.AuthSet.Leaders = append(resp.AuthSet.Leaders, status)
+		if !foundRole && state.GetIdentityChainID().IsSameAs(fed.GetChainID()) {
+			resp.Role = "Leader"
+			foundRole = true
+		}
+	}
+	for _, aud := range audits {
+		status := AuditStatus{aud.GetChainID().String(), aud.IsOnline()}
+		resp.AuthSet.Audits = append(resp.AuthSet.Audits, status)
+		if !foundRole && state.GetIdentityChainID().IsSameAs(aud.GetChainID()) {
+			resp.Role = "Audit"
+		}
+	}
+
+	// Syncing information
+	syncInfo := new(SyncInfo)
+	if state.IsSyncingEOMs() || state.IsSyncingDBSigs() {
+		syncInfo.Status = "Syncing EOMs"
+		if state.IsSyncingDBSigs() {
+			syncInfo.Status = "Syncing DBSigs"
+		}
+		missing := state.GetUnsyncedServers(resp.LeaderHeight)
+		numberReceived := fedCount - len(missing)
+		syncInfo.Received = &numberReceived
+		syncInfo.Expected = &fedCount
+		for _, v := range missing {
+			syncInfo.Missing = append(syncInfo.Missing, v.String())
+		}
+	} else {
+		syncInfo.Status = "Processing"
+	}
+	resp.SyncInfo = syncInfo
+
+	// Elections information
+	eInfo := new(ElectionInfo)
+	e := state.GetElections()
+	electing := e.GetElecting()
+	if electing != -1 {
+		eInfo.InProgress = true
+		vm := e.GetVMIndex()
+		eInfo.VmIndex = &vm
+		eInfo.FedIndex = &electing
+		eInfo.FedID = e.GetFedID().String()
+		eInfo.Round = &e.GetRound()[electing]
+	}
+	resp.ElectionInfo = eInfo
+
+	return resp, nil
+}
+
+func HandleV2MessageFilter(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
+	x, ok := params.(map[string]interface{})
+	if !ok {
+		return nil, NewCustomInvalidParamsError("ERROR! Invalid params passed in")
+	}
+
+	fmt.Println(`x["output-regex"]`, x["output-regex"])
+	fmt.Println(`x["input-regex"]`, x["input-regex"])
+
+	OutputString := fmt.Sprintf("%s", x["output-regex"])
+	if OutputString != "" {
+
+		OutputRegEx := regexp.MustCompile(OutputString)
+		state.PassOutputRegEx(OutputRegEx, OutputString)
+
+	} else if OutputString == "off" {
+		state.PassOutputRegEx(nil, "")
+	}
+
+	InputString := fmt.Sprintf("%s", x["input-regex"])
+	if InputString != "" {
+		InputRegEx := regexp.MustCompile(InputString)
+
+		state.PassInputRegEx(InputRegEx, InputString)
+	} else if InputString == "off" {
+		state.PassInputRegEx(nil, "")
+	}
+
+	h := new(MessageFilter)
+	h.Params = "Success"
 
 	return h, nil
 }

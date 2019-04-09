@@ -51,6 +51,10 @@ func LoadDatabase(s *State) {
 	//msg, err := s.LoadDBState(blkCnt)
 	start := s.GetDBHeightComplete()
 
+	if start > 0 {
+		start++
+	}
+
 	for i := int(start); i <= int(blkCnt); i++ {
 		if i > int(start)+500 && i%1000 == 0 {
 			seconds := time.Since(last).Seconds()
@@ -62,8 +66,8 @@ func LoadDatabase(s *State) {
 			blocksRemaining := float64(blkCnt) - float64(i)
 			timeRemaining := time.Duration(blocksRemaining/abps) * time.Second
 
-			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f average bps %8.2f Progress %v remaining %v\n", s.FactomNodeName, i, blkCnt, bps, abps,
-				humanizeDuration(timeUsed), humanizeDuration(timeRemaining))
+			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f average bps %8.2f Progress %v remaining %v Estimated Total Time: %v \n", s.FactomNodeName, i, blkCnt, bps, abps,
+				humanizeDuration(timeUsed), humanizeDuration(timeRemaining), humanizeDuration(timeUsed+timeRemaining))
 			last = time.Now()
 			// height := s.GetLLeaderHeight()
 			// fmt.Fprintf(os.Stderr, "%20s Federated: DBH: %8d, Feds %d, audits: %d \n", s.FactomNodeName, height, len(s.GetFedServers(height)), len(s.GetAuditServers(height)))
@@ -74,29 +78,27 @@ func LoadDatabase(s *State) {
 			s.Println(err.Error())
 			os.Stderr.WriteString(fmt.Sprintf("%20s Error reading database at block %d: %s\n", s.FactomNodeName, i, err.Error()))
 			break
-		} else {
-			if msg != nil {
-				// We hold off EOM and other processing (s.Runleader) till the last DBStateMsg is executed.
-				if i == int(blkCnt) {
-					// last block, flag it.
-					dbstate, _ := msg.(*messages.DBStateMsg)
-					dbstate.IsLast = true // this is the last DBState in this load
-					// this will cause s.DBFinished to go true
-				}
-
-				s.LogMessage("InMsgQueue", "enqueue", msg)
-				msg.SetLocal(true)
-				s.InMsgQueue().Enqueue(msg)
-				if s.InMsgQueue().Length() > 100 || len(s.DBStatesReceived) > 10 {
-					for s.InMsgQueue().Length() > 5 || len(s.DBStatesReceived) > 10 {
-						time.Sleep(100 * time.Millisecond)
-					}
-				}
-				time.Sleep(2 * time.Millisecond)
-			} else {
-				// os.Stderr.WriteString(fmt.Sprintf("%20s Last Block in database: %d\n", s.FactomNodeName, i))
-				break
+		}
+		if msg != nil {
+			// We hold off EOM and other processing (s.Runleader) till the last DBStateMsg is executed.
+			if i == int(blkCnt) {
+				// last block, flag it.
+				dbstate, _ := msg.(*messages.DBStateMsg)
+				dbstate.IsLast = true // this is the last DBState in this load
+				// this will cause s.DBFinished to go true
 			}
+
+			s.LogMessage("InMsgQueue", "enqueue", msg)
+			msg.SetLocal(true)
+			s.InMsgQueue().Enqueue(msg)
+			if s.InMsgQueue().Length() > 200 || len(s.DBStatesReceived) > 50 {
+				for s.InMsgQueue().Length() > 50 || len(s.DBStatesReceived) > 50 {
+					time.Sleep(100 * time.Millisecond)
+				}
+			}
+		} else {
+			// os.Stderr.WriteString(fmt.Sprintf("%20s Last Block in database: %d\n", s.FactomNodeName, i))
+			break
 		}
 
 		s.Print("\r", "\\|/-"[i%4:i%4+1])

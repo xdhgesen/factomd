@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
@@ -32,10 +34,12 @@ var quit = make(chan struct{})
 
 var ExpectedHeight, Leaders, Audits, Followers int
 var startTime, endTime time.Time
-var RanSimTest = false // only run 1 sim test at a time
+var RanSimTest = false // KLUDGE disables all sim tests during a group unit test run
+// NOTE: going forward breaking out a test into a file under ./simTest allows it to run on CI.
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
 func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
+	fmt.Println("SetupSim(", GivenNodes, ",", UserAddedOptions, ",", height, ",", electionsCnt, ",", RoundsCnt, ")")
 	ExpectedHeight = height
 	l := len(GivenNodes)
 	CmdLineOptions := map[string]string{
@@ -161,12 +165,17 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 		t.Fatalf("Should have allocated %d nodes", l)
 		t.Fail()
 	}
-	CheckAuthoritySet(t)
+	if Audits == 0 && Leaders == 0 {
+		// if no requested promotions then assume we loaded from a database and the test will check
+	} else {
+		CheckAuthoritySet(t)
+	}
 	return state0
 }
 
 func creatingNodes(creatingNodes string, state0 *state.State, t *testing.T) {
 	RunCmd(fmt.Sprintf("g%d", len(creatingNodes)))
+	WaitBlocks(state0, 3) // Wait for 2 blocks because ID scans is for block N-1
 	WaitMinutes(state0, 1)
 	// Wait till all the entries from the g command are processed
 	simFnodes := engine.GetFnodes()
@@ -174,43 +183,15 @@ func creatingNodes(creatingNodes string, state0 *state.State, t *testing.T) {
 	if len(creatingNodes) > nodes {
 		t.Fatalf("Should have allocated %d nodes", len(creatingNodes))
 	}
-	for {
-		iq := 0
-		for _, s := range simFnodes {
-			iq += s.State.InMsgQueue().Length()
-		}
-		iq2 := 0
-		for _, s := range simFnodes {
-			iq2 += s.State.InMsgQueue2().Length()
-		}
-
-		holding := 0
-		for _, s := range simFnodes {
-			holding += len(s.State.Holding)
-		}
-
-		pendingCommits := 0
-		for _, s := range simFnodes {
-			pendingCommits += s.State.Commits.Len()
-		}
-		if iq == 0 && iq2 == 0 && pendingCommits == 0 && holding == 0 {
-			break
-		}
-		fmt.Printf("Waiting for g to complete iq == %d && iq2 == %d && pendingCommits == %d && holding == %d\n", iq, iq2, pendingCommits, holding)
-		WaitMinutes(state0, 1)
-
-	}
-	WaitBlocks(state0, 2) // Wait for 2 blocks because ID scans is for block N-1
 	WaitForMinute(state0, 1)
 	for i, c := range []byte(creatingNodes) {
-		if i == 0 {
-			Leaders++
-			continue
-		}
+		fmt.Println("it:", i, c)
 		switch c {
 		case 'L', 'l':
-			RunCmd(fmt.Sprintf("%d", i))
-			RunCmd("l")
+			if i != 0 {
+				RunCmd(fmt.Sprintf("%d", i))
+				RunCmd("l")
+			}
 			Leaders++
 		case 'A', 'a':
 			RunCmd(fmt.Sprintf("%d", i))
@@ -233,19 +214,18 @@ func WaitForAllNodes(state *state.State) {
 	simFnodes := engine.GetFnodes()
 	engine.PrintOneStatus(0, 0) // Print a status
 	fmt.Printf("Wait for all nodes done\n%s", height)
-	prevblk := state.LLeaderHeight
+	block := state.LLeaderHeight
+	minute := state.CurrentMinute
+	target := int(block*10) + minute
+
 	for i := 0; i < len(simFnodes); i++ {
-		blk := state.LLeaderHeight
-		if prevblk != blk {
-			engine.PrintOneStatus(0, 0)
-			prevblk = blk
-		}
 		s := simFnodes[i].State
-		height = ""
-		if s.LLeaderHeight != blk { // if not caught up, start over
+		h := int(s.LLeaderHeight*10) + s.CurrentMinute
+
+		if !s.GetNetStateOff() && h < target { // if not caught up, start over
+			fmt.Printf("WaitForAllNodes: Waiting on FNode%2d\n", i)
 			time.Sleep(100 * time.Millisecond)
-			i = 0 // start over
-			continue
+			i--
 		}
 		height = fmt.Sprintf("%s%s:%d-%d\n", height, s.FactomNodeName, s.LLeaderHeight, s.CurrentMinute)
 	}
@@ -354,7 +334,7 @@ func WaitForMinute(s *state.State, newMinute int) {
 	TimeNow(s)
 }
 
-func CheckAuthoritySet(t *testing.T) {
+func CountAuthoritySet() (int, int, int) {
 	leadercnt := 0
 	auditcnt := 0
 	followercnt := 0
@@ -378,6 +358,63 @@ func CheckAuthoritySet(t *testing.T) {
 		}
 	}
 
+	return leadercnt, auditcnt, followercnt
+}
+
+func AdjustAuthoritySet(adjustingNodes string) {
+	lead := Leaders
+	audit := Audits
+	follow := Followers
+
+	for _, c := range []byte(adjustingNodes) {
+		switch c {
+		case 'L':
+			lead--
+		case 'A':
+			audit--
+		case 'F':
+			follow--
+			break
+		default:
+			panic("NOT L, A or F")
+		}
+	}
+
+	fmt.Printf("AdjustAuthoritySet DIFF: L: %v, F: %v, A: %v\n", lead, audit, follow)
+	Leaders = Leaders - lead
+	Audits = Audits - audit
+	Followers = Followers - follow
+}
+
+func isAuditor(fnode int) bool {
+	nodes := engine.GetFnodes()
+	list := nodes[0].State.ProcessLists.Get(nodes[0].State.LLeaderHeight)
+	foundAudit, _ := list.GetAuditServerIndexHash(nodes[fnode].State.GetIdentityChainID())
+	return foundAudit
+}
+
+func isFollower(fnode int) bool {
+	return !(isAuditor(fnode) || engine.GetFnodes()[fnode].State.Leader)
+}
+
+func AssertAuthoritySet(t *testing.T, givenNodes string) {
+	nodes := engine.GetFnodes()
+	for i, c := range []byte(givenNodes) {
+		switch c {
+		case 'L':
+			assert.True(t, nodes[i].State.Leader, "Expected node %v to be a leader", i)
+		case 'A':
+			assert.True(t, isAuditor(i), "Expected node %v to be an auditor", i)
+		default:
+			assert.True(t, isFollower(i), "Expected node %v to be a follower", i)
+		}
+	}
+}
+
+func CheckAuthoritySet(t *testing.T) {
+
+	leadercnt, auditcnt, followercnt := CountAuthoritySet()
+
 	if leadercnt != Leaders {
 		engine.PrintOneStatus(0, 0)
 		t.Fatalf("found %d leaders, expected %d", leadercnt, Leaders)
@@ -396,12 +433,11 @@ func CheckAuthoritySet(t *testing.T) {
 
 func RunCmd(cmd string) {
 	os.Stdout.WriteString("Executing: " + cmd + "\n")
-	engine.InputChan <- cmd
+	globals.InputChan <- cmd
 	return
 }
 
-func ShutDownEverything(t *testing.T) {
-	CheckAuthoritySet(t)
+func Halt(t *testing.T) {
 	quit <- struct{}{}
 	close(quit)
 	t.Log("Shutting down the network")
@@ -410,6 +446,11 @@ func ShutDownEverything(t *testing.T) {
 	}
 	// sleep long enough for everyone to see the shutdown.
 	time.Sleep(time.Duration(globals.Params.BlkTime) * time.Second)
+}
+
+func ShutDownEverything(t *testing.T) {
+	CheckAuthoritySet(t)
+	Halt(t)
 	fnodes := engine.GetFnodes()
 	currentHeight := fnodes[0].State.LLeaderHeight
 	// Sleep one block
@@ -421,8 +462,8 @@ func ShutDownEverything(t *testing.T) {
 
 	engine.PrintOneStatus(0, 0) // Print a final status
 	fmt.Printf("Test took %d blocks and %s time\n", engine.GetFnodes()[0].State.LLeaderHeight, time.Now().Sub(startTime))
-
 }
+
 func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
 	j, err := json.Marshal(req)
 	if err != nil {
@@ -448,4 +489,25 @@ func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Respons
 		return nil, err
 	}
 	return nil, nil
+}
+
+// TODO: this doesn't seem to work - fix along w/ AddFNodeTest
+func ResetFactomHome(t *testing.T, subDir string) {
+	dir, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	globals.Params.FactomHome = dir + "/.sim/" + subDir
+	os.Setenv("FACTOM_HOME", globals.Params.FactomHome)
+
+	t.Logf("Removing old run in %s", globals.Params.FactomHome)
+	if err := os.RemoveAll(globals.Params.FactomHome); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func AddFNode() {
+	engine.AddNode()
+	Followers++
 }
