@@ -164,6 +164,9 @@ func TestActivationHeightElection(t *testing.T) {
 
 	RanSimTest = true
 
+	// set the activation height to 10 for the sake of this test
+	activations.ActivationMap[activations.ELECTION_NO_SORT].ActivationHeight["LOCAL"] = 10
+
 	state0 := SetupSim("LLLLLAAF", map[string]string{}, 16, 2, 2, t)
 
 	// Kill the last two leader to cause a double election

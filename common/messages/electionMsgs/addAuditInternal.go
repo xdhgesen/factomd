@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
@@ -76,10 +77,13 @@ func (m *AddAuditInternal) ElectionProcess(is interfaces.IState, elect interface
 	}
 	if e.AuditIndex(m.ServerID) < 0 {
 		e.Audit = append(e.Audit, &state.Server{ChainID: m.ServerID, Online: true})
-		changed := e.Sort(e.Audit)
-		if changed {
-			e.LogPrintf("election", "Sort changed e.Audit leaders in AddAuditInternal.ElectionProcess")
-			e.LogPrintLeaders("election")
+		// We stop sorting here on DATE at TIME ... TODO: change this activation description
+		if !is.IsActive(activations.ELECTION_NO_SORT) {
+			changed := e.Sort(e.Audit)
+			if changed {
+				e.LogPrintf("election", "Sort changed e.Audit leaders in AddAuditInternal.ElectionProcess")
+				e.LogPrintLeaders("election")
+			}
 		}
 	}
 }

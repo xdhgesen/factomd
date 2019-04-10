@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
@@ -79,12 +80,14 @@ func (m *AddLeaderInternal) ElectionProcess(s interfaces.IState, elect interface
 		e.Federated = append(e.Federated, &state.Server{ChainID: m.ServerID, Online: true})
 		e.Round = append(e.Round, 0)
 		// TODO: If we reorder Federated[] do we need to reorder Round[]?
-		changed := e.Sort(e.Federated)
-		if changed {
-			e.LogPrintf("election", "Sort changed e.Federated in AddLeaderInternal.ElectionProcess()")
-			e.LogPrintLeaders("election")
+		// We stop sorting here on DATE at TIME ... TODO: change this activation description
+		if !s.IsActive(activations.ELECTION_NO_SORT) {
+			changed := e.Sort(e.Federated)
+			if changed {
+				e.LogPrintf("election", "Sort changed e.Federated in AddLeaderInternal.ElectionProcess()")
+				e.LogPrintLeaders("election")
+			}
 		}
-
 	}
 }
 

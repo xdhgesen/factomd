@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -103,10 +104,13 @@ func (e *Elections) AddFederatedServer(server interfaces.IServer) int {
 	e.RemoveAuditServer(server)
 
 	e.Federated = append(e.Federated, server)
-	changed := e.Sort(e.Federated)
-	if changed {
-		e.LogPrintf("election", "Sort changed e.Federated in Elections.AddFederatedServer")
-		e.LogPrintLeaders("election")
+	// We stop sorting here on DATE at TIME TODO: change this activation description
+	if !e.State.IsActive(activations.ELECTION_NO_SORT) {
+		changed := e.Sort(e.Federated)
+		if changed {
+			e.LogPrintf("election", "Sort changed e.Federated in Elections.AddFederatedServer")
+			e.LogPrintLeaders("election")
+		}
 	}
 
 	return e.GetFedServerIndex(server)
@@ -122,10 +126,13 @@ func (e *Elections) AddAuditServer(server interfaces.IServer) int {
 	e.RemoveFederatedServer(server)
 
 	e.Audit = append(e.Audit, server)
-	changed := e.Sort(e.Audit)
-	if changed {
-		e.LogPrintf("election", "Sort changed e.Audit in Elections.AddAuditServer")
-		e.LogPrintLeaders("election")
+	// We stop sorting here on DATE at TIME ... TODO: change this activation description
+	if !e.State.IsActive(activations.ELECTION_NO_SORT) {
+		changed := e.Sort(e.Audit)
+		if changed {
+			e.LogPrintf("election", "Sort changed e.Audit in Elections.AddAuditServer")
+			e.LogPrintLeaders("election")
+		}
 	}
 
 	return e.GetAudServerIndex(server)
