@@ -7,23 +7,37 @@ import (
 	. "github.com/FactomProject/factomd/testHelper"
 )
 
+var givenNodes string = "LLLLLLLLAAAAFF"
+
+
+// Run this first to configure network and initialize databases
+func TestSetupBootWithoutDB(t *testing.T) {
+	// FIXME: later versions of factomd test suite will create a home directory based on test name
+	// this step should be relocated into TestBootWithDB function
+	params := map[string]string {
+		"--db":           "LDB",
+		"--net":          "alot+",
+	}
+	state0 := SetupSim(givenNodes, params, 10, 0, 0, t)
+	WaitBlocks(state0, 1)
+}
+
 /*
-Replicate behavior of
+Subsequent runs after network is setup, can be re-run to check behavior when booting w/ existing DB's
 
+Replicates behavior of
 factomd  --network=LOCAL --fastsaverate=100 --checkheads=false --count=15 --net=alot+ --blktime=600 --faulttimeout=12 --enablenet=false --startdelay=2 $@ > out.txt 2> err.txt
-
 */
 func TestBootWithDB(t *testing.T) {
-	state0 := StartSim(
-		"LLLLLLLLAAAAFF",
-		map[string]string{
-			"--db":           "LDB",
-			"--fastsaverate": "100",
-			"--net":          "alot+",
-			"--blktime":      "600",
-			"--faulttimeout": "12",
-			"--startdelay":   "2",
-		})
+	params := map[string]string {
+		"--db":           "LDB",
+		"--fastsaverate": "100",
+		"--net":          "alot+",
+		"--blktime":      "600",
+		"--faulttimeout": "12",
+		"--startdelay":   "2",
+	}
+	state0 := StartSim(givenNodes, params)
 
 	// adjust simulation parameters
 	RunCmd("s")
