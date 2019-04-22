@@ -158,11 +158,6 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 		return
 	}
 
-	m1, m2 := fmt.Sprintf("%p", m), fmt.Sprintf("%p", msg)
-
-	if m1 != m2 {
-		panic("mismatch")
-	}
 	now := s.GetTimestamp()
 	m.ResendCnt++
 	m.resend = now.GetTimeMilli()

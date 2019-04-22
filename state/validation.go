@@ -69,9 +69,6 @@ func (state *State) ValidatorLoop() {
 		default:
 		}
 
-		ackRoom := cap(state.ackQueue) - len(state.ackQueue)
-		msgRoom := cap(state.msgQueue) - len(state.msgQueue)
-
 		// Look for pending messages, and get one if there is one.
 		var msg interfaces.IMsg
 
@@ -99,6 +96,8 @@ func (state *State) ValidatorLoop() {
 			}
 
 			for i := 0; i < 50; i++ {
+				ackRoom := cap(state.ackQueue) - len(state.ackQueue)
+				msgRoom := cap(state.msgQueue) - len(state.msgQueue)
 				if ackRoom == 1 || msgRoom == 1 {
 					break // no room
 				}
@@ -157,7 +156,7 @@ type Timer struct {
 func (t *Timer) timer(s *State, min int) {
 	t.lastMin = min
 
-	if s.RunLeader { // don't generate EOM if we are not a leader or are loading the DBState messages
+	if s.RunLeader && s.Leader { // don't generate EOM if we are not a leader or are loading the DBState messages
 		eom := new(messages.EOM)
 		eom.Timestamp = s.GetTimestamp()
 		eom.ChainID = s.GetIdentityChainID()
