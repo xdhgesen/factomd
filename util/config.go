@@ -7,9 +7,10 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/log"
-	gcfg "gopkg.in/gcfg.v1"
+	"gopkg.in/gcfg.v1"
 )
 
 var _ = fmt.Print
@@ -316,6 +317,19 @@ func CheckConfigFileName(filename string) string {
 // Track a filename-error pair so we don't report the same error repeatedly
 var reportedError map[string]string = make(map[string]string)
 
+func WriteConfig(filename string, config *FactomdConfig) {
+	if !globals.Params.WriteConfigs {
+		return
+	}
+	var DefaultConfig FactomdConfig
+
+	err := gcfg.ReadStringInto(DefaultConfig, defaultConfig)
+	if err != nil {
+		panic(err)
+	}
+
+}
+
 func ReadConfig(filename string) *FactomdConfig {
 	if filename == "" {
 		filename = ConfigFilename()
@@ -330,17 +344,18 @@ func ReadConfig(filename string) *FactomdConfig {
 	}
 
 	err = gcfg.FatalOnly(gcfg.ReadFileInto(cfg, filename))
+
 	if err != nil {
 		if reportedError[filename] != err.Error() {
 			log.Printfln("Reading from '%s'", filename)
-			log.Printfln("Cannot open custom config file,\nStarting with default settings.\n%v\n", err)
+			log.Printfln("Cannot open custom config file %s [%v],\nStarting with default settings.\n", filename, err)
 			// Remember the error reported for this filename
 			reportedError[filename] = err.Error()
 		}
-
-		err = gcfg.ReadStringInto(cfg, defaultConfig)
-		if err != nil {
-			panic(err)
+		if os.IsNotExist(err) {
+			if globals.Params.WriteConfigs {
+				WriteConfig(filename, cfg)
+			}
 		}
 	} else {
 		// Remember that there was no error reported for this filename
