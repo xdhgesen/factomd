@@ -34,18 +34,17 @@ var ExpectedHeight, Leaders, Audits, Followers int
 var startTime, endTime time.Time
 var RanSimTest = false // only run 1 sim test at a time
 
-//EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
-	fmt.Println("SetupSim(", GivenNodes, ",", UserAddedOptions, ",", height, ",", electionsCnt, ",", RoundsCnt, ")")
-	ExpectedHeight = height
-	l := len(GivenNodes)
+// start simulation without promoting nodes to the authority set
+// this is useful for creating scripts that will start/stop a simulation outside of the context of a unit test
+// this allows for consistent tweaking of a simulation to induce load add message loss or adjust timing
+func StartSim(GivenNodes string, UserAddedOptions map[string]string) *state.State {
 	CmdLineOptions := map[string]string{
 		"--db":                  "Map",
 		"--network":             "LOCAL",
 		"--net":                 "alot+",
 		"--enablenet":           "false",
 		"--blktime":             "10",
-		"--count":               fmt.Sprintf("%v", l),
+		"--count":               fmt.Sprintf("%v", len(GivenNodes)),
 		"--startdelay":          "1",
 		"--stdoutlog":           "out.txt",
 		"--stderrlog":           "out.txt",
@@ -121,12 +120,19 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 			typeOfT.Field(i).Name, f.Type(), f.Interface())
 	}
 	fmt.Println()
+	return engine.Factomd(params, false).(*state.State)
 
+}
+
+//EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
+func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
+	fmt.Println("SetupSim(", GivenNodes, ",", UserAddedOptions, ",", height, ",", electionsCnt, ",", RoundsCnt, ")")
+	state0 := StartSim(GivenNodes, UserAddedOptions)
+	ExpectedHeight = height
 	blkt := globals.Params.BlkTime
 	roundt := elections.RoundTimeout
 	et := elections.FaultTimeout
 	startTime = time.Now()
-	state0 := engine.Factomd(params, false).(*state.State)
 	//	statusState = state0
 	calctime := time.Duration(float64(((height+3)*blkt)+(electionsCnt*et)+(RoundsCnt*roundt))*1.1) * time.Second
 	endTime = time.Now().Add(calctime)
@@ -157,6 +163,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	WaitMinutes(state0, 1) // wait till initial DBState message for the genesis block is processed
 	creatingNodes(GivenNodes, state0, t)
 
+	l := len(GivenNodes)
 	t.Logf("Allocated %d nodes", l)
 	if len(engine.GetFnodes()) != l {
 		t.Fatalf("Should have allocated %d nodes", l)
