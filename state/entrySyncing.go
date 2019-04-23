@@ -115,7 +115,7 @@ func (s *State) RecheckMissingEntryRequests() {
 		if !has(s, rc.EntryHash) {
 			entryRequest := messages.NewMissingData(s, rc.EntryHash)
 			entryRequest.SendOut(s, entryRequest)
-			rc.TimeToCheck = time.Now().Unix() + 5 // Don't check again for 5 seconds
+			rc.TimeToCheck = time.Now().Unix() + int64(s.DirectoryBlockInSeconds/100) // Don't check again for seconds
 			s.EntrySyncState.Processing <- rc
 		}
 	}
@@ -133,6 +133,10 @@ func (s *State) GoSyncEntries() {
 
 	highestChecked := s.EntryDBHeightComplete
 	for {
+
+		if !s.DBFinished {
+			time.Sleep(time.Second / 30)
+		}
 
 		highestSaved := s.GetHighestSavedBlk()
 		if highestSaved <= highestChecked {

@@ -1376,7 +1376,10 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	eom.SysHeight = uint32(pl.System.Height)
 
 	if s.Syncing && vm.Synced {
-		s.AddToHolding(m.GetMsgHash().Fixed(), m)
+		go func() { // This is a trigger to issue the EOM, but we are still syncing.  Wait to retry.
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.EomQueue() <- m                                                        // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
+		}()
 		return
 	} else if !s.Syncing {
 		s.Syncing = true

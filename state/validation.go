@@ -18,53 +18,76 @@ import (
 func (state *State) ValidatorLoop() {
 	CheckGrants()
 	timeStruct := new(Timer)
-	var prev time.Time
 	state.validatorLoopThreadID = atomic.Goid()
-	for {
-		s := state
-		if state.DebugExec() {
-			status := ""
-			now := time.Now()
-			if now.Sub(prev).Minutes() > 1 {
-				state.LogPrintf("executeMsg", "Timestamp DBh/VMh/h %d/%d/%d", state.LLeaderHeight, state.LeaderVMIndex, state.CurrentMinute)
-				pendingEBs := 0
-				pendingEntries := 0
-				pl := state.ProcessLists.Get(state.LLeaderHeight)
-				if pl != nil {
-					pendingEBs = len(pl.NewEBlocks)
-					pendingEntries = len(pl.NewEntries)
-				}
-				status += fmt.Sprintf("Review %d ", len(state.XReview))
-				status += fmt.Sprintf("Holding %d ", len(state.Holding))
-				status += fmt.Sprintf("Commits %d ", state.Commits.Len())
-				status += fmt.Sprintf("Pending EBs %d ", pendingEBs)         // cope with nil
-				status += fmt.Sprintf("Pending Entries %d ", pendingEntries) // cope with nil
-				status += fmt.Sprintf("Acks %d ", len(state.AcksMap))
-				status += fmt.Sprintf("MsgQueue %d ", len(state.msgQueue))
-				status += fmt.Sprintf("InMsgQueue %d ", state.inMsgQueue.Length())
-				status += fmt.Sprintf("InMsgQueue2 %d ", state.inMsgQueue2.Length())
-				status += fmt.Sprintf("APIQueue   %d ", state.apiQueue.Length())
-				status += fmt.Sprintf("AckQueue %d ", len(state.ackQueue))
-				status += fmt.Sprintf("TimerMsgQueue %d ", len(state.timerMsgQueue))
-				status += fmt.Sprintf("NetworkOutMsgQueue %d ", state.networkOutMsgQueue.Length())
-				status += fmt.Sprintf("NetworkInvalidMsgQueue %d ", len(state.networkInvalidMsgQueue))
-				status += fmt.Sprintf("UpdateEntryHash %d ", len(state.UpdateEntryHash))
-				status += fmt.Sprintf("MissingEntries %d ", state.GetMissingEntryCount())
-				status += fmt.Sprintf("WriteEntry %d ", len(state.WriteEntry))
+	s := state
+	// This is the tread with access to state. It does process and update state
+	DoProcessing := func() {
+		var prev time.Time
+		for s.IsRunning {
+			if s.DebugExec() {
+				status := ""
+				now := time.Now()
+				if now.Sub(prev).Minutes() > 1 {
+					s.LogPrintf("executeMsg", "Timestamp DBh/VMh/h %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
+					pendingEBs := 0
+					pendingEntries := 0
+					pl := s.ProcessLists.Get(s.LLeaderHeight)
+					if pl != nil {
+						pendingEBs = len(pl.NewEBlocks)
+						pendingEntries = len(pl.NewEntries)
+					}
+					status += fmt.Sprintf("Review %d ", len(s.XReview))
+					status += fmt.Sprintf("Holding %d ", len(s.Holding))
+					status += fmt.Sprintf("Commits %d ", s.Commits.Len())
+					status += fmt.Sprintf("Pending EBs %d ", pendingEBs)         // cope with nil
+					status += fmt.Sprintf("Pending Entries %d ", pendingEntries) // cope with nil
+					status += fmt.Sprintf("Acks %d ", len(s.AcksMap))
+					status += fmt.Sprintf("MsgQueue %d ", len(s.msgQueue))
+					status += fmt.Sprintf("InMsgQueue %d ", s.inMsgQueue.Length())
+					status += fmt.Sprintf("InMsgQueue2 %d ", s.inMsgQueue2.Length())
+					status += fmt.Sprintf("APIQueue   %d ", s.apiQueue.Length())
+					status += fmt.Sprintf("AckQueue %d ", len(s.ackQueue))
+					status += fmt.Sprintf("TimerMsgQueue %d ", len(s.timerMsgQueue))
+					status += fmt.Sprintf("NetworkOutMsgQueue %d ", s.networkOutMsgQueue.Length())
+					status += fmt.Sprintf("NetworkInvalidMsgQueue %d ", len(s.networkInvalidMsgQueue))
+					status += fmt.Sprintf("UpdateEntryHash %d ", len(s.UpdateEntryHash))
+					status += fmt.Sprintf("MissingEntries %d ", s.GetMissingEntryCount())
+					status += fmt.Sprintf("WriteEntry %d ", len(s.WriteEntry))
 
-				status += fmt.Sprintf("PL %8d, P %8d, U %8d, S%8d", s.ProcessListProcessCnt, s.StateProcessCnt, s.StateUpdateState, s.ValidatorLoopSleepCnt)
-				state.LogPrintf("executeMsg", "Status %s", status)
-				prev = now
+					s.LogPrintf("executeMsg", "Status %s", status)
+					prev = now
+				}
+			}
+
+			var progress bool // set progress false
+			//for i := 0; progress && i < 100; i++ {
+			for s.Process() {
+				progress = true
+			}
+			for s.UpdateState() {
+				progress = true
+			}
+			if !progress {
+				// No work? Sleep for a bit
+				time.Sleep(10 * time.Millisecond)
+				s.ValidatorLoopSleepCnt++
 			}
 		}
+	}
+
+	s.IsRunning = true
+	go DoProcessing()
+
+	for {
+
 		// Check if we should shut down.
 		select {
-		case <-state.ShutdownChan:
-			fmt.Println("Closing the Database on", state.GetFactomNodeName())
-			state.DB.Close()
-			state.StateSaverStruct.StopSaving()
-			fmt.Println(state.GetFactomNodeName(), "closed")
-			state.IsRunning = false
+		case <-s.ShutdownChan:
+			fmt.Println("Closing the Database on", s.GetFactomNodeName())
+			s.DB.Close()
+			s.StateSaverStruct.StopSaving()
+			fmt.Println(s.GetFactomNodeName(), "closed")
+			s.IsRunning = false
 			return
 		default:
 		}
@@ -73,21 +96,6 @@ func (state *State) ValidatorLoop() {
 		var msg interfaces.IMsg
 
 		for i := 0; i < 1; i++ {
-			//for state.Process() {}
-			//for state.UpdateState() {}
-			p1 := true
-			p2 := true
-			i1 := 0
-			i2 := 0
-
-			for i1 = 0; p1 && i1 < 200; i1++ {
-				p1 = state.Process()
-			}
-			for i2 = 0; p2 && i2 < 200; i2++ {
-				p2 = state.UpdateState()
-			}
-
-			s.LogPrintf("updateIssues", "Validation messages %3d processlist %3d", i1, i2)
 
 			select {
 			case min := <-state.tickerQueue:
@@ -137,7 +145,7 @@ func (state *State) ValidatorLoop() {
 				ackRoom = cap(state.ackQueue) - len(state.ackQueue)
 				msgRoom = cap(state.msgQueue) - len(state.msgQueue)
 			}
-			if !(p1 || p2) && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
+			if state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
 				// No messages? Sleep for a bit
 				for i := 0; i < 10 && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0; i++ {
 					time.Sleep(10 * time.Millisecond)
