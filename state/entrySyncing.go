@@ -93,11 +93,13 @@ func (s *State) RecheckMissingEntryRequests() {
 	for {
 
 		// First, look for new requests, and move them into processing
+	loadProcessing:
 		for cap(s.EntrySyncState.Processing) > len(s.EntrySyncState.Processing)+1 {
 			select {
 			case er := <-s.EntrySyncState.EntryReCheck:
 				s.EntrySyncState.Processing <- er
 			default:
+				break loadProcessing
 			}
 		}
 

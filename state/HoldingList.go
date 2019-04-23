@@ -2,6 +2,7 @@ package state
 
 import (
 	"fmt"
+
 	"github.com/FactomProject/factomd/common/interfaces"
 )
 
@@ -64,7 +65,7 @@ func (s *State) ExecuteFromHolding(h [32]byte) {
 	l := s.Get(h)
 	if l != nil {
 		// add the messages to the msgQueue so they get executed as space is available
-		func() {
+		go func() {
 			for _, m := range l {
 				s.LogMessage("msgQueue", "enqueue_from_holding", m)
 				s.msgQueue <- m

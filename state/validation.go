@@ -118,7 +118,6 @@ func (state *State) ValidatorLoop() {
 				// This doesn't block so it intentionally returns nil, don't log nils
 
 				if msg != nil {
-					state.JournalMessage(msg)
 
 					// Sort the messages.
 					if state.IsReplaying == true {
@@ -127,6 +126,9 @@ func (state *State) ValidatorLoop() {
 					if t := msg.Type(); t == constants.ACK_MSG {
 						state.LogMessage("ackQueue", "enqueue", msg)
 						state.ackQueue <- msg //
+					} else if t := msg.Type(); t == constants.EOM_MSG {
+						state.LogMessage("eomQueue", "enqueue", msg)
+						state.eomQueue <- msg
 					} else {
 						state.LogMessage("msgQueue", "enqueue", msg)
 						state.msgQueue <- msg //
@@ -174,6 +176,6 @@ func (t *Timer) timer(s *State, min int) {
 		consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
 		s.LogMessage("MsgQueue", "enqueue", eom)
 
-		s.MsgQueue() <- eom
+		s.eomQueue <- eom
 	}
 }

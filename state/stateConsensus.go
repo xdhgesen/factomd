@@ -329,6 +329,17 @@ func (s *State) Process() (progress bool) {
 	}
 	// Process inbound messages
 	preEmptyLoopTime := time.Now()
+eomLoop:
+	for {
+		select {
+		case msg := <-s.eomQueue:
+			s.LogMessage("eomQueue", "Execute", msg)
+			progress = s.executeMsg(vm, msg) || progress
+		default:
+			break eomLoop
+		}
+	}
+
 emptyLoop:
 	for {
 		select {
@@ -1365,6 +1376,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	eom.SysHeight = uint32(pl.System.Height)
 
 	if s.Syncing && vm.Synced {
+		s.AddToHolding(m.GetMsgHash().Fixed(), m)
 		return
 	} else if !s.Syncing {
 		s.Syncing = true
