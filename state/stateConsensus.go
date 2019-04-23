@@ -86,9 +86,17 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 }
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
+	// Execute EOM in preference to anything.
+	if len(s.eomQueue) > 0 {
+		m := <-s.eomQueue
+		s.executeMsg(vm, m)
+		// Return true because we processed the EOM
+		ret = true
+	}
+
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
 		s.LogMessage("badMsgs", "Nil hash in executeMsg", msg)
-		return false
+		return
 	}
 
 	preExecuteMsgTime := time.Now()
@@ -329,17 +337,6 @@ func (s *State) Process() (progress bool) {
 	}
 	// Process inbound messages
 	preEmptyLoopTime := time.Now()
-eomLoop:
-	for {
-		select {
-		case msg := <-s.eomQueue:
-			s.LogMessage("eomQueue", "Execute", msg)
-			progress = s.executeMsg(vm, msg) || progress
-		default:
-			break eomLoop
-		}
-	}
-
 emptyLoop:
 	for {
 		select {
