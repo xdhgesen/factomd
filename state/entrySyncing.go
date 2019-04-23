@@ -59,7 +59,7 @@ func (s *State) MakeMissingEntryRequests() {
 		if !has(s, entryHash) {
 			rc := new(ReCheck)
 			rc.EntryHash = entryHash
-			rc.TimeToCheck = time.Now().Unix() + 5 // Recheck in 15 seconds
+			rc.TimeToCheck = time.Now().Unix() + 5 // Recheck in so many seconds
 			s.EntrySyncState.EntryReCheck <- rc
 		}
 	}
@@ -94,7 +94,11 @@ func (s *State) RecheckMissingEntryRequests() {
 
 		// First, look for new requests, and move them into processing
 		for cap(s.EntrySyncState.Processing) > len(s.EntrySyncState.Processing)+1 {
-			s.EntrySyncState.Processing <- <-s.EntrySyncState.EntryReCheck
+			select {
+			case er := <-s.EntrySyncState.EntryReCheck:
+				s.EntrySyncState.Processing <- er
+			default:
+			}
 		}
 
 		// Now process one of the requests.  If we can't process it, then it goes back into Processing,
@@ -130,7 +134,9 @@ func (s *State) GoSyncEntries() {
 
 		highestSaved := s.GetHighestSavedBlk()
 		if highestSaved <= highestChecked {
-			if len(s.EntrySyncState.CheckThese) == 0 && len(s.EntrySyncState.EntryReCheck) == 0 {
+			if len(s.EntrySyncState.CheckThese) == 0 &&
+				len(s.EntrySyncState.EntryReCheck) == 0 &&
+				len(s.EntrySyncState.Processing) == 0 {
 				s.EntryDBHeightComplete = highestSaved
 				s.EntryBlockDBHeightComplete = highestSaved
 				s.EntryDBHeightProcessing = 0
