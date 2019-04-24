@@ -936,7 +936,7 @@ func (s *State) Init() {
 	s.inMsgQueue2 = NewInMsgQueue(constants.INMSGQUEUE_HIGH)                        //incoming message queue for Factom application messages
 	s.electionsQueue = NewElectionQueue(constants.INMSGQUEUE_HIGH)                  //incoming message queue for Factom application messages
 	s.apiQueue = NewAPIQueue(constants.INMSGQUEUE_HIGH)                             //incoming message queue from the API
-	s.ackQueue = make(chan interfaces.IMsg, constants.INMSGQUEUE_LOW)               //queue of Leadership messages
+	s.ackQueue = make(chan interfaces.IMsg, constants.INMSGQUEUE_HIGH)              //queue of Leadership messages
 	s.msgQueue = make(chan interfaces.IMsg, constants.INMSGQUEUE_HIGH)              //queue of Follower messages
 	s.eomQueue = make(chan interfaces.IMsg, constants.INMSGQUEUE_LOW)               //queue of EOM (because we sync on these)
 	s.ShutdownChan = make(chan int, 1)                                              //Channel to gracefully shut down.

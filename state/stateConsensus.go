@@ -87,11 +87,12 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 	// Execute EOM in preference to anything.
-	if len(s.eomQueue) > 0 {
-		m := <-s.eomQueue
-		s.executeMsg(vm, m)
+	select {
+	case eom := <-s.eomQueue:
+		s.executeMsg(vm, eom)
 		// Return true because we processed the EOM
 		ret = true
+	default:
 	}
 
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
@@ -343,18 +344,6 @@ emptyLoop:
 		case msg := <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
 			progress = s.executeMsg(vm, msg) || progress
-		default:
-			break emptyLoop
-		}
-	}
-	emptyLoopTime := time.Since(preEmptyLoopTime)
-	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
-
-	preAckLoopTime := time.Now()
-	// Process acknowledgements if we have some.
-ackLoop:
-	for {
-		select {
 		case ack := <-s.ackQueue:
 			switch ack.Validate(s) {
 			case -1:
@@ -381,14 +370,12 @@ ackLoop:
 
 			s.LogMessage("ackQueue", "Execute2", ack)
 			progress = s.executeMsg(vm, ack) || progress
-
 		default:
-			break ackLoop
+			break emptyLoop
 		}
 	}
-
-	ackLoopTime := time.Since(preAckLoopTime)
-	TotalAckLoopTime.Add(float64(ackLoopTime.Nanoseconds()))
+	emptyLoopTime := time.Since(preEmptyLoopTime)
+	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
 
 	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
@@ -452,7 +439,7 @@ func CheckDBKeyMR(s *State, ht uint32, hash string) error {
 func (s *State) ReviewHolding() {
 
 	preReviewHoldingTime := time.Now()
-	if len(s.XReview) > 0 || s.Syncing {
+	if len(s.XReview) > 0 {
 		return
 	}
 
@@ -822,8 +809,11 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 // Returns true if it finds a match, puts the message in holding, or invalidates the message
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
-	if m.IsLocal() {
+	if m.IsLocal() && !s.Leader {
 		return // This is an internal EOM message.  We are not a leader so ignore.
+	} else if m.IsLocal() {
+		s.LeaderExecuteEOM(m)
+		return
 	}
 
 	eom, ok := m.(*messages.EOM)
@@ -1392,7 +1382,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	}
 
 	if vm.EomMinuteIssued >= s.CurrentMinute+1 {
-		//os.Stderr.WriteString(fmt.Sprintf("Bump detected %s minute %2d\n", s.FactomNodeName, s.CurrentMinute))
+		os.Stderr.WriteString(fmt.Sprintf("Bump detected %s minute %2d\n", s.FactomNodeName, s.CurrentMinute))
 		return
 	}
 
