@@ -134,9 +134,6 @@ func (state *State) ValidatorLoop() {
 					if t := msg.Type(); t == constants.ACK_MSG {
 						state.LogMessage("ackQueue", "enqueue", msg)
 						state.ackQueue <- msg //
-					} else if t := msg.Type(); t == constants.EOM_MSG {
-						state.LogMessage("eomQueue", "enqueue", msg)
-						state.eomQueue <- msg
 					} else {
 						state.LogMessage("msgQueue", "enqueue", msg)
 						state.msgQueue <- msg //
