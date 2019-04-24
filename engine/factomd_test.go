@@ -163,6 +163,7 @@ func TestTXTimestampsAndBlocks(t *testing.T) {
 	RunCmd("x")
 	RunCmd("R0") // turn off the load
 }
+
 func TestLoad2(t *testing.T) {
 	if RanSimTest {
 		return
@@ -198,6 +199,27 @@ func TestLoad2(t *testing.T) {
 	}
 	ShutDownEverything(t)
 } // testLoad2(){...}
+
+// Make logs so we can do MMR checks... should be extended to report MMR efficiency
+func TestMMR(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	RanSimTest = true
+
+	go RunCmd("Re") // Turn on tight allocation of EC as soon as the simulator is up and running
+	state0 := SetupSim("LLLAF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 24, 0, 0, t)
+	StatusEveryMinute(state0)
+
+	RunCmd("R20") // Feed load
+	RunCmd("S10") // Drop 1%
+	WaitBlocks(state0, 5)
+	RunCmd("R0")
+
+	WaitBlocks(state0, 1)
+	ShutDownEverything(t)
+} // TestMMR(){...}
+
 // The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
 // the bug happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
 // Using a message delay, drop and tree network makes this likely
