@@ -313,6 +313,7 @@ type State struct {
 	// Factom State
 	FactoidState    interfaces.IFactoidState
 	NumTransactions int
+	missedEOM       int // Count the triggers I have missed.
 
 	// Permanent balances from processing blocks.
 	RestoreFCT            map[[32]byte]int64

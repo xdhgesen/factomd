@@ -139,8 +139,6 @@ func (state *State) ValidatorLoop() {
 						state.msgQueue <- msg //
 					}
 				}
-				ackRoom = cap(state.ackQueue) - len(state.ackQueue)
-				msgRoom = cap(state.msgQueue) - len(state.msgQueue)
 			}
 			if state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
 				// No messages? Sleep for a bit

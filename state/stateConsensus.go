@@ -173,6 +173,10 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 		}
 		msg.SendOut(s, msg)
 
+		if s.Leader && s.RunLeader {
+			vm = s.LeaderPL.VMs[s.LeaderVMIndex]
+		}
+
 		var vml int
 		if vm == nil || vm.List == nil {
 			vml = 0
@@ -341,6 +345,9 @@ func (s *State) Process() (progress bool) {
 emptyLoop:
 	for {
 		select {
+		case msg := <-s.eomQueue:
+			s.LogMessage("msgQueue", "Execute", msg)
+			progress = s.executeMsg(vm, msg) || progress
 		case msg := <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
 			progress = s.executeMsg(vm, msg) || progress
@@ -812,7 +819,10 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	if m.IsLocal() && !s.Leader {
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	} else if m.IsLocal() {
-		s.LeaderExecuteEOM(m)
+		go func() { // This is a trigger to issue the EOM, but we are still syncing.  Wait to retry.
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.EomQueue() <- m                                                        // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
+		}()
 		return
 	}
 
@@ -1204,9 +1214,9 @@ func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
 		if !ok {
 			return
 		}
-		if len(s.WriteEntry) < cap(s.WriteEntry) {
+		go func() {
 			s.WriteEntry <- entry
-		}
+		}()
 	}
 }
 
@@ -1325,6 +1335,14 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 }
 
 func (s *State) LeaderExecute(m interfaces.IMsg) {
+	vm := s.LeaderPL.VMs[s.LeaderVMIndex]
+	if len(vm.List) != vm.Height {
+		go func() { // We have some processing to do before we can schedule this.
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.InMsgQueue().Enqueue(m)
+		}()
+	}
+
 	LeaderExecutions.Inc()
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, m.GetRepeatHash().Fixed(), m.GetTimestamp(), s.GetTimestamp())
 	if !ok {
@@ -1362,10 +1380,10 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	// Put the System Height and Serial Hash into the EOM
 	eom.SysHeight = uint32(pl.System.Height)
 
-	if s.Syncing && vm.Synced {
-		go func() { // This is a trigger to issue the EOM, but we are still syncing.  Wait to retry.
+	if (s.Syncing && vm.Synced) || vm.Height == 0 {
+		go func() { // This is a trigger to issue the EOM, but we still need it
 			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
-			s.EomQueue() <- m                                                        // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
+			s.InMsgQueue().Enqueue(m)                                                // Goes in the "resort" queue
 		}()
 		return
 	} else if !s.Syncing {
@@ -1382,6 +1400,11 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	}
 
 	if vm.EomMinuteIssued >= s.CurrentMinute+1 {
+		go func() { // This is a trigger to issue the EOM, but we still need it.
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.InMsgQueue().Enqueue(m)
+			// Goes in the "resort" queue
+		}()
 		os.Stderr.WriteString(fmt.Sprintf("Bump detected %s minute %2d\n", s.FactomNodeName, s.CurrentMinute))
 		return
 	}
@@ -1462,6 +1485,17 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 }
 
 func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
+
+	vm := s.LeaderPL.VMs[s.LeaderVMIndex]
+	if len(vm.List) != vm.Height {
+		go func() { // We can't process yet.  Wait and resort
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.InMsgQueue().Enqueue(m)
+			// Goes in the "resort" queue
+		}()
+
+	}
+
 	cc := m.(*messages.CommitChainMsg)
 	// Check if this commit has more entry credits than any previous that we have.
 	if !s.IsHighestCommit(cc.GetHash(), m) {
@@ -1477,6 +1511,14 @@ func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
 }
 
 func (s *State) LeaderExecuteCommitEntry(m interfaces.IMsg) {
+	vm := s.LeaderPL.VMs[s.LeaderVMIndex]
+	if len(vm.List) != vm.Height {
+		go func() { // We can't process yet.  Wait and resort
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.InMsgQueue().Enqueue(m)                                                // Goes in the "resort" queue
+		}()
+	}
+
 	ce := m.(*messages.CommitEntryMsg)
 
 	// Check if this commit has more entry credits than any previous that we have.
@@ -1496,6 +1538,14 @@ func (s *State) LeaderExecuteRevealEntry(m interfaces.IMsg) {
 	LeaderExecutions.Inc()
 	re := m.(*messages.RevealEntryMsg)
 	eh := re.Entry.GetHash()
+
+	vm := s.LeaderPL.VMs[s.LeaderVMIndex]
+	if len(vm.List) != vm.Height {
+		go func() { // We can't process yet.  Wait and resort
+			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
+			s.InMsgQueue().Enqueue(m)                                                // Goes in the "resort" queue
+		}()
+	}
 
 	ack := s.NewAck(m, nil).(*messages.Ack)
 
