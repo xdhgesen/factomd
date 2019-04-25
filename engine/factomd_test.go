@@ -208,11 +208,11 @@ func TestMMR(t *testing.T) {
 	RanSimTest = true
 
 	go RunCmd("Re") // Turn on tight allocation of EC as soon as the simulator is up and running
-	state0 := SetupSim("LLLAF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 24, 0, 0, t)
+	state0 := SetupSim("LLLAF", map[string]string{"--debuglog": ".", "--blktime": "30", "--faulttimeout": "30"}, 2400, 0, 0, t)
 	StatusEveryMinute(state0)
 
 	RunCmd("R20") // Feed load
-	RunCmd("S10") // Drop 1%
+	RunCmd("S50") // Drop 1%
 	WaitBlocks(state0, 5)
 	RunCmd("R0")
 
