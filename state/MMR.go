@@ -98,7 +98,9 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 		if !ok {
 			when := ask.When
 			pending[ask.plRef] = &when // add the requests to the map
-			s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
+			now := s.GetTimestamp().GetTimeMilli()
+
+			s.LogPrintf(logname, "Ask %d/%d/%d %d %d", ask.DBH, ask.VM, ask.H, when-now, len(pending))
 		} // don't update the when if it already existed...
 	}
 
