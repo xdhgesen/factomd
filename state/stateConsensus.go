@@ -1380,7 +1380,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	// Put the System Height and Serial Hash into the EOM
 	eom.SysHeight = uint32(pl.System.Height)
 
-	if (s.Syncing && vm.Synced) || vm.Height == 0 {
+	if (s.Syncing && vm.Synced) || vm.Height == 0 || len(vm.List) != vm.Height {
 		go func() { // This is a trigger to issue the EOM, but we still need it
 			time.Sleep(time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600) // Once a second for 10 min block
 			s.InMsgQueue().Enqueue(m)                                                // Goes in the "resort" queue
