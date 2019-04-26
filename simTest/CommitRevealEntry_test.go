@@ -3,13 +3,14 @@ package simtest
 import (
 	"bytes"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/stretchr/testify/assert"
-	"testing"
-	"time"
 )
 
 func encode(s string) []byte {
@@ -57,7 +58,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 	})
 
 	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 20, 1, 1, t)
+		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 40, 1, 1, t)
 
 		stop := func() {
 			ShutDownEverything(t)
@@ -81,7 +82,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 				state0.APIQueue().Enqueue(reveal)
 			}
 
-			for x:= 1; x < numEntries; x++ {
+			for x := 1; x < numEntries; x++ {
 				publish(x)
 			}
 		})
@@ -103,7 +104,7 @@ func TestSendingCommitAndReveal(t *testing.T) {
 		})
 
 		t.Run("Fund EC Address", func(t *testing.T) {
-			amt :=  uint64(numEntries+10)
+			amt := uint64(numEntries + 10)
 			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
 			waitForAnyDeposit(state0, a.EcPub())
 		})

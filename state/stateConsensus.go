@@ -517,7 +517,7 @@ func (s *State) ReviewHolding() {
 		}
 
 		eom, ok := v.(*messages.EOM)
-		if ok && ((eom.DBHeight <= saved && saved > 0) || int(eom.Minute) < s.CurrentMinute) {
+		if ok && (int(eom.DBHeight)*10+int(eom.Minute)) < (int(s.LLeaderHeight)*10+int(s.CurrentMinute)) {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
 			s.DeleteFromHolding(k, v, "old EOM")
