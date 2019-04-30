@@ -10,8 +10,6 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/FactomProject/factomd/util/atomic"
-
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
@@ -181,8 +179,8 @@ func (m *Ack) Validate(s interfaces.IState) int {
 	}
 
 	m.authvalid = true
-	s.LogMessage("executeMsg", "Valid-", m)
-	s.LogPrintf("executeMsg", "from %s %s %s", atomic.WhereAmIString(1), atomic.WhereAmIString(2), atomic.WhereAmIString(3))
+	s.LogMessage("executeMsg", "Valid", m)
+	//	s.LogPrintf("executeMsg", "from %s %s %s", atomic.WhereAmIString(1), atomic.WhereAmIString(2), atomic.WhereAmIString(3))
 	return 1
 }
 
