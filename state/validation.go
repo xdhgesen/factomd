@@ -136,7 +136,7 @@ func (state *State) ValidatorLoop() {
 				ackRoom = cap(state.ackQueue) - len(state.ackQueue)
 				msgRoom = cap(state.msgQueue) - len(state.msgQueue)
 			}
-			if !(p1 || p2) && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
+			if !(p1 || p2) && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 && len(state.eomQueue) == 0 {
 				// No messages? Sleep for a bit
 				for i := 0; i < 10 && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0; i++ {
 					time.Sleep(10 * time.Millisecond)
@@ -175,6 +175,6 @@ func (t *Timer) timer(s *State, min int) {
 		consenLogger.WithFields(log.Fields{"func": "GenerateEOM", "lheight": s.GetLeaderHeight()}).WithFields(eom.LogFields()).Debug("Generate EOM")
 		s.LogMessage("MsgQueue", "enqueue", eom)
 
-		s.MsgQueue() <- eom
+		s.eomQueue <- eom
 	}
 }
