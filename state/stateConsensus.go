@@ -145,6 +145,7 @@ func (s *State) Validate(msg interfaces.IMsg) (rval int) {
 	if !ok {
 		consenLogger.WithFields(msg.LogFields()).Debug("executeMsg (Replay Invalid)")
 		s.LogMessage("executeMsg", "drop, INTERNAL_REPLAY", msg)
+		s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp()) // debug
 		return -1
 	}
 
@@ -431,12 +432,19 @@ ackLoop:
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
 	preProcessProcChanTime := time.Now()
+	if len(process) > 0 {
+		s.LogPrintf("executeMsg", "process has %d", len(process))
+	}
+
 	for _, msg := range process {
 		newProgress := s.executeMsg(vm, msg)
 		progress = newProgress || progress //
 		s.LogMessage("executeMsg", "From process", msg)
 		s.UpdateState()
 	} // processLoop for{...}
+	if len(process) > 0 {
+		s.LogPrintf("executeMsg", "done with process")
+	}
 
 	processProcChanTime := time.Since(preProcessProcChanTime)
 	TotalProcessProcChanTime.Add(float64(processProcChanTime.Nanoseconds()))
