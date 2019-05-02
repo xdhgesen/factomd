@@ -702,17 +702,16 @@ func (s *State) AddDBState(isNew bool,
 	adminBlock interfaces.IAdminBlock,
 	factoidBlock interfaces.IFBlock,
 	entryCreditBlock interfaces.IEntryCreditBlock,
-	eBlocks []interfaces.IEntryBlock,
-	entries []interfaces.IEBEntry) *DBState {
+	eBlocks []interfaces.IEntryBlock) *DBState {
 
 	// This is expensive, so only do this once the database is loaded.
 	if s.DBFinished {
-		s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d, entries %d)",
+		s.LogPrintf("dbstateprocess", "AddDBState(isNew %v, directoryBlock %d %x, adminBlock %x, factoidBlock %x, entryCreditBlock %X, eBlocks %d)",
 			isNew, directoryBlock.GetHeader().GetDBHeight(), directoryBlock.GetHash().Bytes()[:4],
-			adminBlock.GetHash().Bytes()[:4], factoidBlock.GetHash().Bytes()[:4], entryCreditBlock.GetHash().Bytes()[:4], len(eBlocks), len(entries))
+			adminBlock.GetHash().Bytes()[:4], factoidBlock.GetHash().Bytes()[:4], entryCreditBlock.GetHash().Bytes()[:4], len(eBlocks))
 	}
 
-	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks, entries)
+	dbState := s.DBStates.NewDBState(isNew, directoryBlock, adminBlock, factoidBlock, entryCreditBlock, eBlocks)
 
 	if dbState == nil {
 		//s.AddStatus(fmt.Sprintf("AddDBState(): Fail dbstate is nil at dbht: %d", directoryBlock.GetHeader().GetDBHeight()))
@@ -972,8 +971,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		dbstatemsg.AdminBlock,
 		dbstatemsg.FactoidBlock,
 		dbstatemsg.EntryCreditBlock,
-		dbstatemsg.EBlocks,
-		dbstatemsg.Entries)
+		dbstatemsg.EBlocks)
 	if dbstate == nil {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate fail at ht %d", dbheight))
 		cntFail()
@@ -1645,8 +1643,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		}
 	}()
 
-	myhash := msg.Entry.GetHash()
-
 	chainID := msg.Entry.GetChainID()
 
 	TotalCommitsOutputs.Inc()
@@ -1670,7 +1666,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		eb.AddEBEntry(msg.Entry)
 		// Put it in our list of new Entry Blocks for this Directory Block
 		s.PutNewEBlocks(dbheight, chainID, eb)
-		s.PutNewEntries(dbheight, myhash, msg.Entry)
 
 		s.IncEntryChains()
 		s.IncEntries()
@@ -1697,9 +1692,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 	}
 	// Add our new entry
 	eb.AddEBEntry(msg.Entry)
+	s.WriteEntry <- msg.Entry
+
 	// Put it in our list of new Entry Blocks for this Directory Block
 	s.PutNewEBlocks(dbheight, chainID, eb)
-	s.PutNewEntries(dbheight, myhash, msg.Entry)
 
 	s.IncEntries()
 	return true
@@ -1903,15 +1899,11 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			case s.CurrentMinute == 10:
 				s.LogPrintf("dbsig-eom", "Start new block")
 				eBlocks := []interfaces.IEntryBlock{}
-				entries := []interfaces.IEBEntry{}
 				for _, v := range pl.NewEBlocks {
 					eBlocks = append(eBlocks, v)
 				}
-				for _, v := range pl.NewEntries {
-					entries = append(entries, v)
-				}
 
-				dbstate := s.AddDBState(true, s.LeaderPL.DirectoryBlock, s.LeaderPL.AdminBlock, s.GetFactoidState().GetCurrentBlock(), s.LeaderPL.EntryCreditBlock, eBlocks, entries)
+				dbstate := s.AddDBState(true, s.LeaderPL.DirectoryBlock, s.LeaderPL.AdminBlock, s.GetFactoidState().GetCurrentBlock(), s.LeaderPL.EntryCreditBlock, eBlocks)
 				if dbstate == nil {
 					dbstate = s.DBStates.Get(int(s.LeaderPL.DirectoryBlock.GetHeader().GetDBHeight()))
 				}
@@ -2404,11 +2396,6 @@ func (s *State) PutNewEBlocks(dbheight uint32, hash interfaces.IHash, eb interfa
 	pl.AddNewEBlocks(hash, eb)
 	// We no longer need them in this map, as they are in the other
 	pl.PendingChainHeads.Delete(hash.Fixed())
-}
-
-func (s *State) PutNewEntries(dbheight uint32, hash interfaces.IHash, e interfaces.IEntry) {
-	pl := s.ProcessLists.Get(dbheight)
-	pl.AddNewEntry(hash, e)
 }
 
 // Returns the oldest, not processed, Commit received

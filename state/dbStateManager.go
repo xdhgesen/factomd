@@ -1482,16 +1482,11 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				if err := list.State.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
 					panic(err.Error())
 				}
-
-				for _, e := range eb.GetBody().GetEBEntries() {
-					pl.State.WriteEntry <- pl.GetNewEntry(e.Fixed())
-				}
 			} else {
 				list.State.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
 			}
 		}
 		pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-		pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 	}
 
 	d.EntryBlocks = make([]interfaces.IEntryBlock, 0)
@@ -1752,8 +1747,7 @@ func (list *DBStateList) NewDBState(isNew bool,
 	adminBlock interfaces.IAdminBlock,
 	factoidBlock interfaces.IFBlock,
 	entryCreditBlock interfaces.IEntryCreditBlock,
-	eBlocks []interfaces.IEntryBlock,
-	entries []interfaces.IEBEntry) *DBState {
+	eBlocks []interfaces.IEntryBlock) *DBState {
 	dbState := new(DBState)
 	dbState.Init() // Creat all the sub structor...
 
@@ -1768,7 +1762,7 @@ func (list *DBStateList) NewDBState(isNew bool,
 	dbState.FactoidBlock = factoidBlock
 	dbState.EntryCreditBlock = entryCreditBlock
 	dbState.EntryBlocks = eBlocks
-	dbState.Entries = entries
+	dbState.Entries = []interfaces.IEBEntry{}
 
 	dbState.Added = list.State.GetTimestamp()
 

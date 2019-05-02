@@ -313,13 +313,6 @@ func (s *State) getACKStatus(hash interfaces.IHash, useOldMsgs bool) (int, inter
 
 			ts := pl.DirectoryBlock.GetHeader().GetTimestamp()
 
-			keys := pl.GetKeysNewEntries()
-			for _, k := range keys {
-				tx := pl.GetNewEntry(k)
-				if hash.IsSameAs(tx.GetHash()) {
-					return constants.AckStatusACK, hash, nil, ts, nil
-				}
-			}
 			ecBlock := pl.EntryCreditBlock
 			if ecBlock != nil {
 				tx := ecBlock.GetEntryByHash(hash)
@@ -610,18 +603,6 @@ func (s *State) FetchEntryByHash(hash interfaces.IHash) (interfaces.IEBEntry, er
 	//TODO: expand to search data from outside database
 	if hash == nil {
 		return nil, nil
-	}
-
-	//pl := s.ProcessLists.LastList()
-	for _, pl := range s.ProcessLists.Lists {
-		keys := pl.GetKeysNewEntries()
-
-		for _, key := range keys {
-			tx := pl.GetNewEntry(key)
-			if hash.IsSameAs(tx.GetHash()) {
-				return tx, nil
-			}
-		}
 	}
 
 	// not in process lists.  try holding queue

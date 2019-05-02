@@ -63,9 +63,6 @@ type ProcessList struct {
 	NewEBlocks     map[[32]byte]interfaces.IEntryBlock
 	neweblockslock sync.Mutex
 
-	NewEntriesMutex sync.RWMutex
-	NewEntries      map[[32]byte]interfaces.IEntry
-
 	// State information about the directory block while it is under construction.  We may
 	// have to start building the next block while still building the previous block.
 	AdminBlock       interfaces.IAdminBlock
@@ -92,8 +89,6 @@ type ProcessList struct {
 	stringCnt int
 }
 
-var _ interfaces.IProcessList = (*ProcessList)(nil)
-
 // Data needed to add to admin block
 type DBSig struct {
 	ChainID   interfaces.IHash
@@ -117,37 +112,6 @@ type VM struct {
 	HighestAsk      int                  // highest ask sent to MMR for this VM
 	HighestNil      int                  // Debug highest nil reported
 	p               *ProcessList         // processList this VM part of
-}
-
-func (p *ProcessList) GetKeysNewEntries() (keys [][32]byte) {
-	keys = make([][32]byte, p.LenNewEntries())
-
-	if p == nil {
-		return
-	}
-	p.NewEntriesMutex.RLock()
-	defer p.NewEntriesMutex.RUnlock()
-	i := 0
-	for k := range p.NewEntries {
-		keys[i] = k
-		i++
-	}
-	return
-}
-
-func (p *ProcessList) GetNewEntry(key [32]byte) interfaces.IEntry {
-	p.NewEntriesMutex.RLock()
-	defer p.NewEntriesMutex.RUnlock()
-	return p.NewEntries[key]
-}
-
-func (p *ProcessList) LenNewEntries() int {
-	if p == nil {
-		return 0
-	}
-	p.NewEntriesMutex.RLock()
-	defer p.NewEntriesMutex.RUnlock()
-	return len(p.NewEntries)
 }
 
 func (p *ProcessList) Complete() bool {
@@ -617,12 +581,6 @@ func (p *ProcessList) GetNewEBlocks(key interfaces.IHash) interfaces.IEntryBlock
 	p.neweblockslock.Lock()
 	defer p.neweblockslock.Unlock()
 	return p.NewEBlocks[key.Fixed()]
-}
-
-func (p *ProcessList) AddNewEntry(key interfaces.IHash, value interfaces.IEntry) {
-	p.NewEntriesMutex.Lock()
-	defer p.NewEntriesMutex.Unlock()
-	p.NewEntries[key.Fixed()] = value
 }
 
 func (p *ProcessList) ResetDiffSigTally() {
@@ -1284,7 +1242,6 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 	pl.OldAcks = make(map[[32]byte]interfaces.IMsg)
 
 	pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 
 	pl.DBSignatures = make([]DBSig, 0)
 

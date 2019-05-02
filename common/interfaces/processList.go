@@ -2,9 +2,6 @@ package interfaces
 
 type IProcessList interface {
 	//Clear()
-	GetKeysNewEntries() (keys [][32]byte)
-	GetNewEntry(key [32]byte) IEntry
-	LenNewEntries() int
 	Complete() bool
 	VMIndexFor(hash []byte) int
 	GetVMStatsForFedServer(index int) (vmIndex int, listHeight int, listLength int, nextNil int)

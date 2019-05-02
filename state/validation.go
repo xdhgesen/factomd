@@ -32,7 +32,6 @@ func (state *State) ValidatorLoop() {
 				pl := state.ProcessLists.Get(state.LLeaderHeight)
 				if pl != nil {
 					pendingEBs = len(pl.NewEBlocks)
-					pendingEntries = len(pl.NewEntries)
 				}
 				status += fmt.Sprintf("Review %d ", len(state.XReview))
 				status += fmt.Sprintf("Holding %d ", len(state.Holding))
