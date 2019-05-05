@@ -110,6 +110,18 @@ func TestLoadHoldingMap(t *testing.T) {
 	}
 }
 
+func TestDependantHoldingReview(t *testing.T) {
+	// FIXME: add better mock
+	state := testHelper.CreateAndPopulateTestHoldingState()
+
+	hque := state.LoadHoldingMap()
+	if len(hque) != len(state.HoldingMap) {
+		t.Errorf("Error with Holding Map Length")
+	}
+
+	state.Hold.Review()
+}
+
 func TestLoadAcksMap(t *testing.T) {
 	state := testHelper.CreateAndPopulateTestStateAndStartValidator()
 

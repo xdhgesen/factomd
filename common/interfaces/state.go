@@ -353,6 +353,5 @@ type IState interface {
 	// get and remove the list of dependent message for a hash
 	Get(h [32]byte) []IMsg
 	// expire any dependent messages that are in holding but are older than limit
-	Review(limit Timestamp)
 	ExecuteFromHolding(h [32]byte)
 }

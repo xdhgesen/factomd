@@ -1,8 +1,6 @@
 package state
 
 import (
-	"fmt"
-
 	"github.com/FactomProject/factomd/common/interfaces"
 )
 
@@ -38,11 +36,19 @@ func (l *HoldingList) Get(h [32]byte) []interfaces.IMsg {
 	return rval
 }
 
-// expire any dependent messages that are in holding but are older than limit
-func (l *HoldingList) Review(limit interfaces.Timestamp) {
-	for h := range l.holding {
-		for m := range l.holding[h] {
-			fmt.Print(m)
+// try to execute dependent messages that are in holding
+func (hl *HoldingList) Review() {
+	for h := range hl.holding {
+		l := hl.Get(h)
+		if l != nil {
+			// add the messages to the msgQueue so they get executed as space is available
+			func() {
+				for _, m := range l {
+					vm := hl.s.LeaderPL.VMs[hl.s.LeaderVMIndex]
+					hl.s.executeMsg(vm, m)
+					hl.s.LogMessage("holdingList", "Review Msg Holding", m)
+				}
+			}()
 		}
 	}
 }
@@ -55,11 +61,6 @@ func (s *State) Add(h [32]byte, msg interfaces.IMsg) {
 // get and remove the list of dependent message for a hash
 func (s *State) Get(h [32]byte) []interfaces.IMsg {
 	return s.Hold.Get(h)
-}
-
-// expire any dependent messages that are in holding but are older than limit
-func (s *State) Review(limit interfaces.Timestamp) {
-	s.Hold.Review(limit)
 }
 
 // Execute a list of messages from holding that are dependant on a hash

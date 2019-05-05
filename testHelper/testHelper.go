@@ -61,6 +61,30 @@ func CreatePopulateAndExecuteTestState() *state.State {
 	return s
 }
 
+func CreateAndPopulateTestHoldingState() *state.State {
+	s := new(state.State)
+	s.TimestampAtBoot = new(primitives.Timestamp)
+	s.TimestampAtBoot.SetTime(0)
+	s.EFactory = new(electionMsgs.ElectionsFactory)
+	s.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(0))
+	s.DB = CreateAndPopulateTestDatabaseOverlay()
+	s.LoadConfig("", "")
+
+	s.DirectoryBlockInSeconds = 20
+
+	s.Network = "LOCAL"
+	s.LogPath = "stdout"
+
+	s.Init()
+	s.Network = "LOCAL"
+	s.SetFactoshisPerEC(1)
+	state.LoadDatabase(s)
+	s.UpdateState()
+	// FIXME: push some messages into holding
+
+	return s
+}
+
 func CreateAndPopulateTestState() *state.State {
 	s := new(state.State)
 	s.TimestampAtBoot = new(primitives.Timestamp)

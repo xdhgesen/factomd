@@ -696,6 +696,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		s.LeaderPL.SortFedServers()
 	}
 
+	s.Hold.Review()
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", dbheight, newMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
 
 }
