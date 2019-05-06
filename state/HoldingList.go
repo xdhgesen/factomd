@@ -39,16 +39,18 @@ func (l *HoldingList) Get(h [32]byte) []interfaces.IMsg {
 // try to execute dependent messages that are in holding
 func (hl *HoldingList) Review() {
 	for h := range hl.holding {
-		l := hl.Get(h)
-		if l != nil {
-			// add the messages to the msgQueue so they get executed as space is available
-			func() {
-				for _, m := range l {
-					vm := hl.s.LeaderPL.VMs[hl.s.LeaderVMIndex]
-					hl.s.executeMsg(vm, m)
-					hl.s.LogMessage("holdingList", "Review Msg Holding", m)
-				}
-			}()
+		l := hl.holding[h]
+		if l == nil {
+			continue
+		}
+
+		for _, m := range l {
+			if hl.s.IsMsgValid(m) < 0 {
+				// FIXME actually remove invalid messages from holding
+				//hl.Get(h)
+				hl.s.LogMessage("holdingList", "Remove Msg From Holding", m)
+			}
+			hl.s.LogMessage("holdingList", "Review Msg Holding", m)
 		}
 	}
 }
