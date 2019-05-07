@@ -36,14 +36,24 @@ func (l *HoldingList) Get(h [32]byte) []interfaces.IMsg {
 	return rval
 }
 
-// requeue messages in holding
+// clean stale messages from holding
 func (hl *HoldingList) Review() {
 	for h := range hl.holding {
-		hl.s.ExecuteFromHolding(h)
+		l := hl.holding[h]
+		if nil == l {
+			continue
+		}
+		for _, msg := range l {
+			if hl.s.IsMsgStale(msg) < 0 {
+				hl.Get(h) // remove from holding
+				hl.s.LogMessage("holdinglist", "remove_from_holding", msg)
+				continue
+			}
+		}
 	}
 }
 
-// Add a messsage to a dependent holding list
+// Add a message to a dependent holding list
 func (s *State) Add(h [32]byte, msg interfaces.IMsg) {
 	s.Hold.Add(h, msg)
 }

@@ -12,9 +12,6 @@ import (
 
 func TestCreatEntriesBeforeChain(t *testing.T) {
 
-    //FIXME test disabled
-    return
-
 	encode := func(s string) []byte {
 		b := bytes.Buffer{}
 		b.WriteString(s)
@@ -28,89 +25,58 @@ func TestCreatEntriesBeforeChain(t *testing.T) {
 
 	numEntries := 250 // set the total number of entries to add
 
-	t.Run("generate accounts", func(t *testing.T) {
-		println(b.String())
-		println(a.String())
-	})
+	println(b.String())
+	println(a.String())
 
-	// KLUDGE: using "LAF" causes timeout on CI
-	t.Run("Run sim to create entries", func(t *testing.T) {
-		state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 200, 0, 0, t)
+	state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 200, 0, 0, t)
 
-		stop := func() {
-			ShutDownEverything(t)
-			WaitForAllNodes(state0)
+	publish := func(i int) {
+		e := factom.Entry{
+			ChainID: id,
+			ExtIDs:  extids,
+			Content: encode(fmt.Sprintf("hello@%v", i)), // ensure no duplicate msg hashes
 		}
+		i++
 
-		t.Run("Create Entries Before Chain", func(t *testing.T) {
+		commit, _ := ComposeCommitEntryMsg(a.Priv, e)
+		reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
 
-			publish := func(i int) {
-				e := factom.Entry{
-					ChainID: id,
-					ExtIDs:  extids,
-					Content: encode(fmt.Sprintf("hello@%v", i)), // ensure no duplicate msg hashes
-				}
-				i++
+		state0.APIQueue().Enqueue(commit)
+		state0.APIQueue().Enqueue(reveal)
+	}
 
-				commit, _ := ComposeCommitEntryMsg(a.Priv, e)
-				reveal, _ := ComposeRevealEntryMsg(a.Priv, &e)
+	for x := 0; x < numEntries; x++ {
+		publish(x)
+	}
 
-				state0.APIQueue().Enqueue(commit)
-				state0.APIQueue().Enqueue(reveal)
-			}
+	e := factom.Entry{
+		ChainID: id,
+		ExtIDs:  extids,
+		Content: encode("Hello World!"),
+	}
 
-			for x := 0; x < numEntries; x++ {
-				publish(x)
-			}
-		})
+	c := factom.NewChain(&e)
 
-		t.Run("Create Chain", func(t *testing.T) {
-			e := factom.Entry{
-				ChainID: id,
-				ExtIDs:  extids,
-				Content: encode("Hello World!"),
-			}
+	commit, _ := ComposeChainCommit(a.Priv, c)
+	reveal, _ := ComposeRevealEntryMsg(a.Priv, c.FirstEntry)
 
-			c := factom.NewChain(&e)
+	state0.APIQueue().Enqueue(commit)
+	state0.APIQueue().Enqueue(reveal)
 
-			commit, _ := ComposeChainCommit(a.Priv, c)
-			reveal, _ := ComposeRevealEntryMsg(a.Priv, c.FirstEntry)
+	WaitBlocks(state0, 2) // ensure messages are reviewed in holding at least once
 
-			state0.APIQueue().Enqueue(commit)
-			state0.APIQueue().Enqueue(reveal)
-		})
+	amt := uint64(numEntries + 11) // include cost of chain head
+	engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
+	WaitForAnyDeposit(state0, a.EcPub())
 
-		t.Run("Fund EC Address", func(t *testing.T) {
-			amt := uint64(numEntries + 10)
-			engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
-			WaitForAnyDeposit(state0, a.EcPub())
-		})
+	WaitForZero(state0, a.EcPub())
+	ShutDownEverything(t)
+	WaitForAllNodes(state0)
 
-		t.Run("End simulation", func(t *testing.T) {
-			WaitForZero(state0, a.EcPub())
-			ht := state0.GetDBHeightComplete()
-			WaitBlocks(state0, 1)
-			newHt := state0.GetDBHeightComplete()
-			//fmt.Printf("Old: %v New: %v", ht, newHt)
-			assert.True(t, ht < newHt, "block height should progress")
-			//assert.True(t, newHt >= uint32(11), "should be past block 10")
-			stop()
-		})
+	bal := engine.GetBalanceEC(state0, a.EcPub())
+	//fmt.Printf("Bal: => %v", bal)
+	assert.Equal(t, int64(0), bal)
 
-		t.Run("Verify Entries", func(t *testing.T) {
-
-			bal := engine.GetBalanceEC(state0, a.EcPub())
-			//fmt.Printf("Bal: => %v", bal)
-			assert.Equal(t, bal, int64(0))
-
-			for _, v := range state0.Holding {
-				s, _ := v.JSONString()
-				println(s)
-			}
-
-			// TODO: actually check for confirmed entries
-			assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
-		})
-
-	})
+	// TODO: actually check for confirmed entries
+	assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
 }

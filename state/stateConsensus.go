@@ -84,6 +84,38 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 		TotalHoldingQueueOutputs.Inc()
 	}
 }
+func (s *State) IsMsgStale(msg interfaces.IMsg) int {
+	// Make sure we don't put in an old ack'd message (outside our repeat filter range)
+	tlim := int64(Range * 60 * 2 * 1000000000)                       // Filter hold two hours of messages, one in the past one in the future
+	filterTime := s.GetMessageFilterTimestamp().GetTime().UnixNano() // this is the start of the filter
+
+	if filterTime == 0 {
+		panic("got 0 time")
+	}
+
+	msgtime := msg.GetTimestamp().GetTime().UnixNano()
+
+	// Make sure we don't put in an old msg (outside our repeat range)
+	{ // debug
+		if msgtime < filterTime || msgtime > (filterTime+tlim) {
+			s.LogPrintf("executeMsg", "MsgFilter %s", s.GetMessageFilterTimestamp().GetTime().String())
+
+			s.LogPrintf("executeMsg", "Leader    %s", s.GetLeaderTimestamp().GetTime().String())
+			s.LogPrintf("executeMsg", "Message   %s", msg.GetTimestamp().GetTime().String())
+		}
+	}
+	// messages before message filter timestamp it's an old message
+	if msgtime < filterTime {
+		s.LogMessage("executeMsg", "drop message, more than an hour in the past", msg)
+		return -1 // Old messages are bad.
+	} else if msgtime > (filterTime + tlim) {
+		s.LogMessage("executeMsg", "hold message from the future", msg)
+		return 0 // Future stuff I can hold for now.  It might be good later?
+	}
+
+	return 1
+}
+
 func (s *State) IsMsgValid(msg interfaces.IMsg) int {
 	valid := msg.Validate(s)
 	if valid != 1 {
@@ -96,37 +128,10 @@ func (s *State) IsMsgValid(msg interfaces.IMsg) int {
 		// Allow these thru as they do not have Ack's (they don't change processlists)
 		return valid
 	default:
-		// Make sure we don't put in an old ack'd message (outside our repeat filter range)
-		tlim := int64(Range * 60 * 2 * 1000000000)                       // Filter hold two hours of messages, one in the past one in the future
-		filterTime := s.GetMessageFilterTimestamp().GetTime().UnixNano() // this is the start of the filter
-
-		if filterTime == 0 {
-			panic("got 0 time")
-		}
-
-		msgtime := msg.GetTimestamp().GetTime().UnixNano()
-
-		// Make sure we don't put in an old msg (outside our repeat range)
-		{ // debug
-			if msgtime < filterTime || msgtime > (filterTime+tlim) {
-				s.LogPrintf("executeMsg", "MsgFilter %s", s.GetMessageFilterTimestamp().GetTime().String())
-
-				s.LogPrintf("executeMsg", "Leader    %s", s.GetLeaderTimestamp().GetTime().String())
-				s.LogPrintf("executeMsg", "Message   %s", msg.GetTimestamp().GetTime().String())
-			}
-		}
-		// messages before message filter timestamp it's an old message
-		if msgtime < filterTime {
-			s.LogMessage("executeMsg", "drop message, more than an hour in the past", msg)
-			valid = -1 // Old messages are bad.
-		} else if msgtime > (filterTime + tlim) {
-			s.LogMessage("executeMsg", "hold message from the future", msg)
-			valid = 0 // Future stuff I can hold for now.  It might be good later?
-		}
+		return s.IsMsgStale(msg)
 	}
-
-	return valid
 }
+
 func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 
 	if msg.GetHash() == nil || reflect.ValueOf(msg.GetHash()).IsNil() {
@@ -154,7 +159,6 @@ func (s *State) executeMsg(vm *VM, msg interfaces.IMsg) (ret bool) {
 			return
 		}
 	}
-
 
 	switch valid {
 	case 1:
