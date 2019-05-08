@@ -3,6 +3,9 @@ package testHelper
 //A package for functions used multiple times in tests that aren't useful in production code.
 
 import (
+	"bytes"
+	"encoding/binary"
+	"github.com/FactomProject/factom"
 	"os/exec"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -61,7 +64,7 @@ func CreatePopulateAndExecuteTestState() *state.State {
 	return s
 }
 
-func CreateAndPopulateTestHoldingState() *state.State {
+func CreateAndPopulateStaleHolding() *state.State {
 	s := new(state.State)
 	s.TimestampAtBoot = new(primitives.Timestamp)
 	s.TimestampAtBoot.SetTime(0)
@@ -80,7 +83,41 @@ func CreateAndPopulateTestHoldingState() *state.State {
 	s.SetFactoshisPerEC(1)
 	state.LoadDatabase(s)
 	s.UpdateState()
-	// FIXME: push some messages into holding
+
+	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
+
+	encode := func(s string) []byte {
+		b := bytes.Buffer{}
+		b.WriteString(s)
+		return b.Bytes()
+	}
+
+	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
+	extids := [][]byte{encode(fmt.Sprintf("makeStaleMessages"))}
+
+	e := factom.Entry{
+		ChainID: id,
+		ExtIDs:  extids,
+		Content: encode(fmt.Sprintf("this is a stale message")),
+	}
+
+	// create stale MilliTime
+	mockTime := func() (r []byte) {
+		buf := new(bytes.Buffer)
+		t := time.Now().UnixNano()
+		m := t / 1e6 - state.FilterTimeLimit // make msg too old
+		binary.Write(buf, binary.BigEndian, m)
+		return buf.Bytes()[2:]
+	}
+
+
+	// adding a commit w/ no REVEAL
+	m, _ := ComposeCommitEntryMsg(a.Priv, e)
+	copy(m.CommitEntry.MilliTime[:], mockTime())
+
+
+	// add commit to holding
+	s.Hold.Add(m.GetMsgHash().Fixed(), m)
 
 	return s
 }

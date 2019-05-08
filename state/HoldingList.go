@@ -17,6 +17,10 @@ func (l *HoldingList) Init(s *State) {
 	l.size = 0
 }
 
+func (l *HoldingList) GetSize() int {
+	return l.size
+}
+
 // Add a messsage to a dependent holding list
 func (l *HoldingList) Add(h [32]byte, msg interfaces.IMsg) {
 

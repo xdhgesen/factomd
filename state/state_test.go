@@ -112,14 +112,17 @@ func TestLoadHoldingMap(t *testing.T) {
 
 func TestDependantHoldingReview(t *testing.T) {
 	// FIXME: add better mock
-	state := testHelper.CreateAndPopulateTestHoldingState()
+	state := testHelper.CreateAndPopulateStaleHolding()
 
-	hque := state.LoadHoldingMap()
-	if len(hque) != len(state.HoldingMap) {
+	if  state.Hold.GetSize() == 0 {
 		t.Errorf("Error with Holding Map Length")
 	}
 
 	state.Hold.Review()
+
+	if  state.Hold.GetSize() != 0 {
+		t.Errorf("Stale message should be dropped")
+	}
 }
 
 func TestLoadAcksMap(t *testing.T) {
@@ -129,7 +132,6 @@ func TestLoadAcksMap(t *testing.T) {
 	if len(hque) != len(state.HoldingMap) {
 		t.Errorf("Error with Acks Map Length")
 	}
-
 }
 
 func TestCalculateTransactionRate(t *testing.T) {
