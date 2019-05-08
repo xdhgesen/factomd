@@ -130,7 +130,7 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLF", map[string]string{"--debuglog": ""}, 15, 0, 0, t)
+	state0 := SetupSim("LLF", map[string]string{"--debuglog": ""}, 35, 0, 0, t)
 
 	RunCmd("2")   // select 2
 	RunCmd("R30") // Feed load
@@ -1544,25 +1544,4 @@ func SystemCall(cmd string) {
 		panic(err)
 	}
 	fmt.Print(string(out))
-}
-
-func TestMMR(t *testing.T) {
-	if RanSimTest {
-		return
-	}
-	RanSimTest = true
-
-	state0 := SetupSim("LL", map[string]string{"--net": "line", "--debuglog": ".", "--blktime": "360"}, 100, 0, 0, t)
-
-	WaitForMinute(state0, 2)
-
-	RunCmd("1")
-	RunCmd("x")
-	WaitBlocks(state0, 5)
-	RunCmd("x")
-	WaitBlocks(state0, 5)
-
-	WaitForAllNodes(state0) // if the follower isn't catching up this will timeout
-	PrintOneStatus(0, 0)
-	ShutDownEverything(t)
 }
