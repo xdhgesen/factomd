@@ -6,9 +6,9 @@ package state
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/common/constants"
 	"time"
 
-	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -73,83 +73,32 @@ func (state *State) ValidatorLoop() {
 	s := state
 	go s.DoProcessing()
 
-	// this is the message sort
-	for {
-		// Check if we should shut down.
+	msgSorter := func (msg interfaces.IMsg) {
+		if t := msg.Type(); t == constants.ACK_MSG {
+			state.LogMessage("ackQueue", "enqueue", msg)
+			state.ackQueue <- msg
+		} else {
+			state.LogMessage("msgQueue", fmt.Sprintf("enqueue(%d)", len(state.msgQueue)), msg)
+			state.msgQueue <- msg
+		}
+	}
+
+	for { // this is the message sort
+		var msg interfaces.IMsg
 		select {
-		case <-state.ShutdownChan:
+		case <-state.ShutdownChan: // Check if we should shut down.
 			state.IsRunning = false
 			time.Sleep(10 * time.Second) // wait till database close is complete
 			return
-		default:
-		}
-
-		// Look for pending messages, and get one if there is one.
-		var msg interfaces.IMsg
-		select {
-		case min := <-state.tickerQueue:
+		case min := <-state.tickerQueue: // Look for pending messages, and get one if there is one.
 			timeStruct.timer(state, min)
-		default:
+		case msg = <- state.inMsgQueue:
+			state.LogMessage("InMsgQueue", "dequeue", msg)
+			go msgSorter(msg)
+		case msg = <- state.inMsgQueue2:
+			state.LogMessage("InMsgQueue2", "dequeue", msg)
+			go msgSorter(msg)
 		}
-
-		msgcnt := 0
-		for i := 0; i < 50; i++ {
-			msg = nil
-			ackRoom := cap(state.ackQueue) - len(state.ackQueue)
-			msgRoom := cap(state.msgQueue) - len(state.msgQueue)
-
-			if ackRoom < 1 || msgRoom < 1 {
-				break // no room
-			}
-			msg = nil // in the i%5==0 we don't want to repeat the prev message
-			if i%5 != 0 {
-				// This doesn't block so it intentionally returns nil, don't log nils
-				msg = state.InMsgQueue().Dequeue()
-				if msg != nil {
-					state.LogMessage("InMsgQueue", "dequeue", msg)
-				}
-			}
-			if msg == nil {
-				// This doesn't block so it intentionally returns nil, don't log nils
-				msg = state.InMsgQueue2().Dequeue()
-				if msg != nil {
-					state.LogMessage("InMsgQueue2", "dequeue", msg)
-				}
-			}
-
-			// This doesn't block so it intentionally returns nil, don't log nils
-
-			if msg != nil {
-				msgcnt++
-				// Sort the messages.
-				if t := msg.Type(); t == constants.ACK_MSG {
-					state.LogMessage("ackQueue", "enqueue", msg)
-					state.ackQueue <- msg //
-				} else {
-					state.LogMessage("msgQueue", fmt.Sprintf("enqueue(%d)", len(state.msgQueue)), msg)
-					state.msgQueue <- msg //
-				}
-			}
-		}
-		if ValidationDebug {
-			s.LogPrintf("executeMsg", "stop validate.messagesort sorted %d messages", msgcnt)
-		}
-
-		// if we are not making progress and there are no messages to sort  sleep a bit
-		if state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0 {
-			// No messages? Sleep for a bit
-			i := 0
-			for ; i < 10 && state.InMsgQueue().Length() == 0 && state.InMsgQueue2().Length() == 0; i++ {
-				time.Sleep(10 * time.Millisecond)
-				state.ValidatorLoopSleepCnt++
-			}
-
-			if ValidationDebug {
-				s.LogPrintf("executeMsg", "slept %d times", i)
-			}
-
-		}
-
 	}
 }
 
