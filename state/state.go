@@ -1444,7 +1444,7 @@ func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
 }
 
 // this is executed in the state maintenance processes where the holding queue is in scope and can be queried
-//  This is what fills the HoldingMap while locking it againstt a read while building
+//  This is what fills the HoldingMap while locking it against a read while building
 func (s *State) fillHoldingMap() {
 	// once a second is often enough to rebuild the Ack list exposed to api
 
@@ -2468,7 +2468,7 @@ func (s *State) InitLevelDB() error {
 		}
 	}
 
-	s.DB = databaseOverlay.NewOverlay(dbase)
+	s.DB = databaseOverlay.NewOverlay(dbase, s)
 	return nil
 }
 
@@ -2484,7 +2484,7 @@ func (s *State) InitBoltDB() error {
 
 	dbase := new(boltdb.BoltDB)
 	dbase.Init(nil, path+"FactomBolt.db")
-	s.DB = databaseOverlay.NewOverlay(dbase)
+	s.DB = databaseOverlay.NewOverlay(dbase, s)
 	return nil
 }
 
@@ -2495,7 +2495,7 @@ func (s *State) InitMapDB() error {
 
 	dbase := new(mapdb.MapDB)
 	dbase.Init(nil)
-	s.DB = databaseOverlay.NewOverlay(dbase)
+	s.DB = databaseOverlay.NewOverlay(dbase, s)
 	return nil
 }
 

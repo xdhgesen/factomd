@@ -138,7 +138,7 @@ func TestLoad(t *testing.T) {
 	RunCmd("R0") // Stop load
 	WaitBlocks(state0, 1)
 	ShutDownEverything(t)
-} // testLoad(){...}
+} //TestLoad(){...}
 
 // Test that we don't put invalid TX into a block.  This is done by creating transactions that are just outside
 // the time for the block, and we let the block catch up.  The code should validate against the block time of the
@@ -197,7 +197,7 @@ func TestLoad2(t *testing.T) {
 		t.Fatalf("Node 7 was at dbheight %d which didn't match Node 6 at dbheight %d", ht7, ht6)
 	}
 	ShutDownEverything(t)
-} // testLoad2(){...}
+} //TestLoad2(){...}
 // The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
 // the bug happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
 // Using a message delay, drop and tree network makes this likely
@@ -228,7 +228,7 @@ func TestLoadScrambled(t *testing.T) {
 	WaitBlocks(state0, 1)
 
 	ShutDownEverything(t)
-} // testLoad(){...}
+} //TestLoadScrambled(){...}
 
 func TestMakeALeader(t *testing.T) {
 	if RanSimTest {
