@@ -83,8 +83,9 @@ func (state *State) ValidatorLoop() {
 		}
 	}
 
+	var msg interfaces.IMsg
+
 	for { // this is the message sort
-		var msg interfaces.IMsg
 		select {
 		case <-state.ShutdownChan: // Check if we should shut down.
 			state.IsRunning = false
