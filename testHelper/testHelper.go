@@ -3,6 +3,10 @@ package testHelper
 //A package for functions used multiple times in tests that aren't useful in production code.
 
 import (
+	"os/exec"
+	"regexp"
+	"runtime"
+
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
@@ -12,14 +16,13 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	//"github.com/FactomProject/factomd/engine"
-	//"github.com/FactomProject/factomd/log"
+
 	"time"
 
-	"github.com/FactomProject/factomd/state"
-	//"fmt"
 	"fmt"
 	"os"
+
+	"github.com/FactomProject/factomd/state"
 
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 )
@@ -29,6 +32,8 @@ var DefaultCoinbaseAmount uint64 = 100000000
 
 func CreateEmptyTestState() *state.State {
 	s := new(state.State)
+	s.TimestampAtBoot = new(primitives.Timestamp)
+	s.TimestampAtBoot.SetTime(0)
 	s.EFactory = new(electionMsgs.ElectionsFactory)
 	s.LoadConfig("", "")
 	s.Network = "LOCAL"
@@ -37,6 +42,7 @@ func CreateEmptyTestState() *state.State {
 	s.Network = "LOCAL"
 	s.CheckChainHeads.CheckChainHeads = false
 	state.LoadDatabase(s)
+	s.DBFinished = true
 	return s
 }
 
@@ -59,6 +65,8 @@ func CreatePopulateAndExecuteTestState() *state.State {
 
 func CreateAndPopulateTestState() *state.State {
 	s := new(state.State)
+	s.TimestampAtBoot = new(primitives.Timestamp)
+	s.TimestampAtBoot.SetTime(0)
 	s.EFactory = new(electionMsgs.ElectionsFactory)
 	s.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(0))
 	s.DB = CreateAndPopulateTestDatabaseOverlay()
@@ -364,4 +372,46 @@ func CreateTestBlockSetWithNetworkID(prev *BlockSet, networkID uint32, transacti
 
 func CreateEmptyTestDatabaseOverlay() *databaseOverlay.Overlay {
 	return databaseOverlay.NewOverlay(new(mapdb.MapDB))
+}
+
+func PrintList(title string, list map[string]uint64) {
+	for addr, amt := range list {
+		fmt.Printf("%v - %v:%v\n", title, addr, amt)
+	}
+}
+
+func SystemCall(cmd string) []byte {
+	fmt.Println("SystemCall(\"", cmd, "\")")
+	out, err := exec.Command("sh", "-c", cmd).Output()
+	if err != nil {
+		foo := err.Error()
+		fmt.Println(foo)
+		os.Exit(1)
+		panic(err)
+	}
+	fmt.Print(string(out))
+	return out
+}
+
+var testNameRe = regexp.MustCompile(`\.Test\w+$`)
+
+// find Test Function name in stack
+func GetTestName() (name string) {
+	targetFrameIndex := 4 // limit caller frame depth to check for a test name
+
+	programCounters := make([]uintptr, targetFrameIndex+2)
+	n := runtime.Callers(0, programCounters)
+
+	if n > 0 {
+		frames := runtime.CallersFrames(programCounters[:n])
+		var frameCandidate runtime.Frame
+		for more, frameIndex := true, 0; more && frameIndex <= targetFrameIndex; frameIndex++ {
+			frameCandidate, more = frames.Next()
+			if testNameRe.MatchString(frameCandidate.Function) {
+				return testNameRe.FindString(frameCandidate.Function)[1:]
+			}
+		}
+	}
+
+	return name
 }
