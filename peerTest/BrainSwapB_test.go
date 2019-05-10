@@ -15,6 +15,7 @@ If you boot this simulator by itself - the simulation will not progress and will
 func TestBrainSwapB(t *testing.T) {
 
 	maxBlocks := 30
+	_ = maxBlocks
 	peers := "127.0.0.1:38003"
 	// this sim starts with identities 8 & 9
 	givenNodes := "FF"
@@ -37,7 +38,7 @@ func TestBrainSwapB(t *testing.T) {
 		"--peers":            peers,
 	}
 
-	state0 := SetupSim(givenNodes, params, int(maxBlocks), 0, 0, t)
+	state0 := SetupSim(givenNodes, params, t)
 
 	WaitForAllNodes(state0)
 	WriteConfigFile(1, 0, "ChangeAcksHeight = 10\n", t) // Setup A brain swap between L2 and F4

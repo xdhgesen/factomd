@@ -37,8 +37,76 @@ var startTime, endTime time.Time
 var RanSimTest = false // KLUDGE disables all sim tests during a group unit test run
 // NOTE: going forward breaking out a test into a file under ./simTest allows it to run on CI.
 
+
+// SetupSim()
+// SetupSim takes care of your options, and setting up nodes
+// pass in a string for nodes: 4 Leaders, 3 Audit, 4 Followers: "LLLLAAAFFFF" as the first argument
+// Pass in the Network type ex. "LOCAL" as the second argument
+// It has default but if you want just add it like "map[string]string{"--Other" : "Option"}" as the third argument
+// Pass in t for the testing as the 4th argument
+//
+//EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA", "LOCAL", map[string]string {"--controlpanelsetting" : "readwrite"}, t)
+func SetupSim(GivenNodes string, UserAddedOptions map[string]string, t *testing.T) *state.State {
+	NetworkType := "alot+"
+	return SetupSim2(GivenNodes, false, NetworkType, UserAddedOptions, t)
+}
+
+// SetupSim2()
+// new entrypoint into SetupSim to allow specifying "tight" transactions, where EC are bought as needed rather than in
+// large blocks.
+func SetupSim2(GivenNodes string, tight bool, NetworkType string, UserAddedOptions map[string]string, t *testing.T) *state.State {
+	l := len(GivenNodes)
+	DefaultOptions := map[string]string{
+		"--db":           "Map",
+		"--network":      fmt.Sprintf("%v", NetworkType),
+		"--net":          "alot+",
+		"--enablenet":    "false",
+		"--blktime":      "8",
+		"--faulttimeout": "2",
+		"--roundtimeout": "2",
+		"--count":        fmt.Sprintf("%v", l),
+		//"--debuglog=.*",
+		//"--debuglog=F.*",
+		"--startdelay": "1",
+		"--stdoutlog":  "out.txt",
+		"--stderrlog":  "err.txt",
+		"--checkheads": "false",
+	}
+
+	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
+		for key, value := range UserAddedOptions {
+			DefaultOptions[key] = value
+		}
+	}
+
+	returningSlice := []string{}
+	for key, value := range DefaultOptions {
+		returningSlice = append(returningSlice, key+"="+value)
+	}
+
+	params := engine.ParseCmdLine(returningSlice)
+	state0 := engine.Factomd(params, false).(*state.State)
+	state0.MessageTally = true
+	time.Sleep(3 * time.Second)
+	StatusEveryMinute(state0)
+	if tight {
+		RunCmd("Re")
+	}
+
+	creatingNodes(GivenNodes, state0)
+
+	t.Logf("Allocated %d nodes", l)
+	lenFnodes := len(engine.GetFnodes())
+	if lenFnodes != l {
+		t.Fatalf("Should have allocated %d nodes", l)
+		t.Fail()
+	}
+	return state0
+}
+
+
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
-func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
+func SetupSimNew(GivenNodes string, UserAddedOptions map[string]string, height int, electionsCnt int, RoundsCnt int, t *testing.T) *state.State {
 	fmt.Println("SetupSim(", GivenNodes, ",", UserAddedOptions, ",", height, ",", electionsCnt, ",", RoundsCnt, ")")
 	ExpectedHeight = height
 	l := len(GivenNodes)
@@ -166,7 +234,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	fmt.Printf("Starting timeout timer:  Expected test to take %s or %d blocks\n", calctime.String(), height)
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 1) // wait till initial DBState message for the genesis block is processed
-	creatingNodes(GivenNodes, state0, t)
+	creatingNodes(GivenNodes, state0)
 
 	t.Logf("Allocated %d nodes", l)
 	if len(engine.GetFnodes()) != l {
@@ -181,6 +249,53 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	return state0
 }
 
+func creatingNodes(creatingNodes string, state0 *state.State) {
+	RunCmd(fmt.Sprintf("g%d", len(creatingNodes)))
+	// Wait till all the entries from the g command are processed
+	simFnodes := engine.GetFnodes()
+	for {
+		iq2 := 0
+		for _, s := range simFnodes {
+			iq2 += s.State.InMsgQueue2().Length()
+		}
+
+		holding := 0
+		for _, s := range simFnodes {
+			iq2 += s.State.InMsgQueue2().Length()
+		}
+
+		pendingCommits := 0
+		for _, s := range simFnodes {
+			pendingCommits += s.State.Commits.Len()
+		}
+		if iq2 == 0 && pendingCommits == 0 && holding == 0 {
+			break
+		}
+		fmt.Printf("Waiting for g to complete\n")
+		WaitMinutes(state0, 1)
+
+	}
+	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitForMinute(state0, 1)
+	RunCmd("0")
+	for i, c := range []byte(creatingNodes) {
+		fmt.Println(i)
+		switch c {
+		case 'L', 'l':
+			fmt.Println("L")
+			RunCmd("l")
+		case 'A', 'a':
+			RunCmd("o")
+		case 'F', 'f':
+			break
+		default:
+			panic("NOT L, A or F")
+		}
+	}
+	WaitBlocks(state0, 1) // Wait for 1 block
+	WaitForMinute(state0, 1)
+}
+/*
 func creatingNodes(creatingNodes string, state0 *state.State, t *testing.T) {
 	RunCmd(fmt.Sprintf("g%d", len(creatingNodes)))
 	WaitBlocks(state0, 3) // Wait for 2 blocks because ID scans is for block N-1
@@ -216,6 +331,8 @@ func creatingNodes(creatingNodes string, state0 *state.State, t *testing.T) {
 	WaitForMinute(state0, 1)
 	WaitForAllNodes(state0) // make sure everyone is caught up
 }
+
+ */
 
 func WaitForAllNodes(state *state.State) {
 	height := ""
@@ -441,7 +558,7 @@ func CheckAuthoritySet(t *testing.T) {
 
 func RunCmd(cmd string) {
 	os.Stdout.WriteString("Executing: " + cmd + "\n")
-	globals.InputChan <- cmd
+	engine.InputChan <- cmd
 	return
 }
 
@@ -516,7 +633,3 @@ func ResetFactomHome(t *testing.T) (string, error) {
 	return string(homeDir), nil
 }
 
-func AddFNode() {
-	engine.AddNode()
-	Followers++
-}

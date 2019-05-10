@@ -15,6 +15,7 @@ If you boot this simulator by itself - the tests will fail
 func TestBrainSwapA(t *testing.T) {
 
 	maxBlocks := 30
+	_ = maxBlocks
 	peers := "127.0.0.1:37003"
 	// nodes usage 0123456 nodes 8 and 9 are in a separate sim of TestBrainSwapB
 	givenNodes := "LLLLAAA"
@@ -40,7 +41,7 @@ func TestBrainSwapA(t *testing.T) {
 		"--peers":            peers,
 	}
 
-	state0 := SetupSim(givenNodes, params, int(maxBlocks), 0, 0, t)
+	state0 := SetupSim(givenNodes, params, t)
 
 	WaitForAllNodes(state0)
 	WriteConfigFile(9, 1, "ChangeAcksHeight = 10\n", t)
