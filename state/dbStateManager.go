@@ -1473,10 +1473,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			list.State.LogPrintf("dbstateprocess", "Error saving eblock from dbstate, eblock not allowed")
 		}
 	}
-	for _, e := range d.Entries {
-		// If it's in the DBlock
-		list.State.WriteEntry <- e
-	}
+
 	list.State.NumEntries += len(d.Entries)
 	list.State.NumEntryBlocks += len(d.EntryBlocks)
 
@@ -1491,16 +1488,11 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				if err := list.State.DB.ProcessEBlockMultiBatch(eb, true); err != nil {
 					panic(err.Error())
 				}
-
-				for _, e := range eb.GetBody().GetEBEntries() {
-					pl.State.WriteEntry <- pl.GetNewEntry(e.Fixed())
-				}
 			} else {
 				list.State.LogPrintf("dbstateprocess", "Error saving eblock from process list, eblock not allowed")
 			}
 		}
 		pl.NewEBlocks = make(map[[32]byte]interfaces.IEntryBlock)
-		pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 	}
 
 	d.EntryBlocks = make([]interfaces.IEntryBlock, 0)
@@ -1513,6 +1505,19 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if err := list.State.DB.ExecuteMultiBatch(); err != nil {
 		panic(err.Error())
 	}
+
+	for _, e := range d.Entries {
+		// If it's in the DBlock
+		go func() { list.State.WriteEntry <- e }()
+	}
+
+	// Info from ProcessList
+	if pl != nil {
+		for _, e := range pl.NewEntries {
+			go func() { pl.State.WriteEntry <- e }()
+		}
+	}
+	pl.NewEntries = make(map[[32]byte]interfaces.IEntry)
 
 	// Not activated.  Set to true if you want extra checking of the data saved to the database.
 	if false {

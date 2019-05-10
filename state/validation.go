@@ -118,7 +118,7 @@ func (state *State) ValidatorLoop() {
 					break // no room
 				}
 
-				if i%5 != 0 {
+				if state.inMsgQueue.Length() > state.inMsgQueue2.Length() {
 					// This doesn't block so it intentionally returns nil, don't log nils
 					msg = state.InMsgQueue().Dequeue()
 					if msg != nil {

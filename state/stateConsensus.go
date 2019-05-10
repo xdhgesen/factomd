@@ -1021,17 +1021,10 @@ func (s *State) ExecuteEntriesInDBState(dbmsg *messages.DBStateMsg) {
 		consenLogger.WithFields(log.Fields{"func": "ExecuteEntriesInDBState", "height": height}).Errorf("Bad DBState. DBlock does not match found")
 		return // Bad DBlock
 	}
-	//todo: consider using func (s *State) WriteEntries()
-	s.DB.StartMultiBatch()
+
 	for _, e := range dbmsg.Entries {
-		s.WriteEntry <- e
+		go func() { s.WriteEntry <- e }()
 	}
-	err = s.DB.ExecuteMultiBatch()
-	if err != nil {
-		consenLogger.WithFields(log.Fields{"func": "ExecuteEntriesInDBState", "height": height}).Errorf("Was unable to execute multibatch")
-		return
-	}
-	// todo: Should we move the EntryDBHeightComplete here?
 }
 
 func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
@@ -1926,7 +1919,14 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 }
 
 // TODO: Should fault the server if we don't have the proper sequence of EOM messages.
-func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
+func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) (processed bool) {
+
+	defer func() {
+		if processed {
+			for s.DBStates.UpdateState() {
+			}
+		}
+	}()
 	TotalProcessEOMs.Inc()
 	e := msg.(*messages.EOM)
 	// plog := consenLogger.WithFields(log.Fields{"func": "ProcessEOM", "msgheight": e.DBHeight, "lheight": s.GetLeaderHeight(), "min", e.Minute})

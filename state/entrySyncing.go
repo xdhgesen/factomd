@@ -112,7 +112,6 @@ func (s *State) SendManager() {
 				EntriesRequested[missingData.RequestHash.Fixed()] = now
 				missingData.SendOut(s, missingData)
 				s.EntrySyncState.EntryRequests++
-				continue
 			}
 		}
 	} // forever ...
