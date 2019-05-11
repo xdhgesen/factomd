@@ -123,9 +123,6 @@ func (lg *LoadGenerator) NewRevealEntry(entry *entryBlock.Entry) *messages.Revea
 	return msg
 }
 
-var cnt int
-var goingUp bool
-
 func (lg *LoadGenerator) KeepUsFunded() {
 	time.Sleep(10 * time.Second)
 
@@ -135,6 +132,13 @@ func (lg *LoadGenerator) KeepUsFunded() {
 	totalBought := 0
 	for i := 0; ; i++ {
 
+		// If no load is asked for, then just sleep
+		if lg.PerSecond.Load() == 0 {
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		// Set the load level
 		if lg.tight.Load() {
 			level = 10
 		} else {
@@ -151,7 +155,10 @@ func (lg *LoadGenerator) KeepUsFunded() {
 			buys++
 			need := level - ecBal + level*2
 			totalBought += int(need)
-			FundWalletTOFF(s, lg.txoffset, uint64(need)*ecPrice)
+			err, _ := FundWalletTOFF(s, lg.txoffset, uint64(need)*ecPrice)
+			if err != nil {
+				//time.Sleep(600 * time.Second)
+			}
 		}
 		if i%5 == 0 {
 			ts := "false"

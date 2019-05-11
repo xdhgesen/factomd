@@ -21,7 +21,7 @@ func FundWallet(st *state.State, amt uint64) (error, string) {
 // FundWalletTOFF()
 // Entry Point where test code allows the transaction to have a time offset from the current time.
 func FundWalletTOFF(st *state.State, timeOffsetInMilliseconds int64, amt uint64) (error, string) {
-	inSec, _ := primitives.HexToHash("FB3B471B1DCDADFEB856BD0B02D8BF49ACE0EDD372A3D9F2A95B78EC12A324D6") // private key or FCT Source
+	inSec, _ := primitives.HexToHash("FB3B471B1DCDADFEB856BD0B02D8BF49ACE0EDD372A3D9F2A95B78EC12A324D7") // private key or FCT Source
 	outEC, _ := primitives.HexToHash("c23ae8eec2beb181a0da926bd2344e988149fbe839fbc7489f2096e7d6110243") // EC address
 
 	var sec [64]byte

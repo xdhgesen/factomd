@@ -153,26 +153,24 @@ func (m *EOM) Validate(state interfaces.IState) int {
 
 	// Ignore old EOM
 	if m.DBHeight <= state.GetHighestSavedBlk() {
+		state.LogPrintf("executemsg", "EOM Height %d Highest Saved %d", m.DBHeight, state.GetHighestSavedBlk())
 		return -1
 	}
 
 	found, _ := state.GetVirtualServers(m.DBHeight, int(m.Minute), m.ChainID)
 	if !found { // Only EOM from federated servers are valid.
+		state.LogPrintf("executemsg", "Not from an authority %s", m.String())
 		return -1
 	}
 
 	// Check signature
 	eomSigned, err := m.VerifySignature()
 	if err != nil || !eomSigned {
-		vlog := func(format string, args ...interface{}) {
-			eLogger.WithFields(log.Fields{"func": "Validate", "lheight": state.GetLeaderHeight()}).WithFields(m.LogFields()).Errorf(format, args...)
-		}
-
 		if err != nil {
-			vlog("[1] Failed to verify signature. Err: %s -- Msg: %s", err.Error(), m.String())
+			state.LogPrintf("executemsg", "[1] Failed to verify signature. Err: %s -- Msg: %s", err.Error(), m.String())
 		}
 		if !eomSigned {
-			vlog("[1] Failed to verify, not signed. Msg: %s", m.String())
+			state.LogPrintf("executemsg", "[1] Failed to verify, not signed. Msg: %s", m.String())
 		}
 		return -1
 	}
