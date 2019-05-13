@@ -416,6 +416,7 @@ type State struct {
 	validatorLoopThreadID string
 
 	executeRecursionDetection map[[32]byte]interfaces.IMsg
+	Hold                      HoldingList
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -922,8 +923,13 @@ func (s *State) Init() {
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	}
 
-	s.TimeOffset = new(primitives.Timestamp) //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
+	s.Hold.Init(s) // setup the dependant holding map
 
+	s.ControlPanelChannel = make(chan DisplayState, 20)
+	s.tickerQueue = make(chan int, 100)                        //ticks from a clock
+	s.timerMsgQueue = make(chan interfaces.IMsg, 100)          //incoming eom notifications, used by leaders
+	s.TimeOffset = new(primitives.Timestamp)                   //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
+	s.networkInvalidMsgQueue = make(chan interfaces.IMsg, 100) //incoming message queue from the network messages
 	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
 
 	s.ShutdownChan = make(chan int, 1)                //Channel to gracefully shut down.

@@ -39,11 +39,6 @@ func TestHoldingRebound(t *testing.T) {
 	ticker := WatchMessageLists()
 	defer ticker.Stop()
 
-	if dropRate > 0 {
-		state0.LogPrintf(logName, "DROP_RATE:%v", dropRate)
-		RunCmd(fmt.Sprintf("S%v", dropRate))
-	}
-
 	e := factom.Entry{
 		ChainID: id,
 		ExtIDs:  extids,
