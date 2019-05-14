@@ -364,6 +364,7 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 
 	case -2:
 		s.LogMessage("executeMsg", "new holding", msg)
+		return false
 
 	default:
 		s.DeleteFromHolding(msg.GetMsgHash().Fixed(), msg, "InvalidMsg") // delete commit
@@ -371,9 +372,8 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			msg.MarkSentInvalid(true)
 			s.networkInvalidMsgQueue <- msg
 		}
+		return true
 	}
-
-	return true
 }
 
 func (s *State) Process() (progress bool) {
