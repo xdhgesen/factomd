@@ -20,7 +20,6 @@ func TestHoldingRebound(t *testing.T) {
 		return b.Bytes()
 	}
 
-	logName := "simTest"
 	id := "92475004e70f41b94750f4a77bf7b430551113b25d3d57169eadca5692bb043d"
 	extids := [][]byte{encode("foo"), encode("bar")}
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
@@ -28,8 +27,6 @@ func TestHoldingRebound(t *testing.T) {
 
 	println(b.String())
 	println(a.String())
-
-	dropRate := 0
 
 	params := map[string]string{"--debuglog": ""}
 

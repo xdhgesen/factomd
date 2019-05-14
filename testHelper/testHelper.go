@@ -67,25 +67,9 @@ func CreatePopulateAndExecuteTestState() *state.State {
 }
 
 func CreateAndPopulateStaleHolding() *state.State {
-	s := new(state.State)
-	s.TimestampAtBoot = new(primitives.Timestamp)
-	s.TimestampAtBoot.SetTime(0)
-	s.EFactory = new(electionMsgs.ElectionsFactory)
-	s.SetLeaderTimestamp(primitives.NewTimestampFromMilliseconds(0))
-	s.DB = CreateAndPopulateTestDatabaseOverlay()
-	s.LoadConfig("", "")
+	s := CreateAndPopulateTestState()
 
-	s.DirectoryBlockInSeconds = 20
-
-	s.Network = "LOCAL"
-	s.LogPath = "stdout"
-
-	s.Init()
-	s.Network = "LOCAL"
-	s.SetFactoshisPerEC(1)
-	state.LoadDatabase(s)
-	s.UpdateState()
-
+	// TODO: refactor into test helpers
 	a := AccountFromFctSecret("Fs2zQ3egq2j99j37aYzaCddPq9AF3mgh64uG9gRaDAnrkjRx3eHs")
 
 	encode := func(s string) []byte {

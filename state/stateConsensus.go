@@ -87,6 +87,7 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 // TODO: refactor these new functions used as part of dependent holding
 var FilterTimeLimit = int64(Range * 60 * 2 * 1000000000) // Filter hold two hours of messages, one in the past one in the future
 
+// TODO: refactor these new functions used as part of dependent holding
 func (s *State) GetFilterTimeNano() int64 {
 	t := s.GetMessageFilterTimestamp().GetTime().UnixNano() // this is the start of the filter
 	if t == 0 {
@@ -95,6 +96,7 @@ func (s *State) GetFilterTimeNano() int64 {
 	return t
 }
 
+// TODO: refactor these new functions used as part of dependent holding
 func (s *State) IsMsgStale(msg interfaces.IMsg) int {
 	// Make sure we don't put in an old ack'd message (outside our repeat filter range)
 	filterTime := s.GetFilterTimeNano()
@@ -122,6 +124,7 @@ func (s *State) IsMsgStale(msg interfaces.IMsg) int {
 	return 1
 }
 
+// TODO: refactor these new functions used as part of dependent holding
 func (s *State) IsMsgValid(msg interfaces.IMsg) int {
 	valid := msg.Validate(s)
 	if valid != 1 {

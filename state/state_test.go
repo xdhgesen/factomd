@@ -111,7 +111,6 @@ func TestLoadHoldingMap(t *testing.T) {
 }
 
 func TestDependantHoldingReview(t *testing.T) {
-	// FIXME: add better mock
 	state := testHelper.CreateAndPopulateStaleHolding()
 
 	if  state.Hold.GetSize() == 0 {
