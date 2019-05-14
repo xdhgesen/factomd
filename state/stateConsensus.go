@@ -208,6 +208,14 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	if validToSend == -1 { // if the msg says drop then we drop...
 		return -1, -1
 	}
+	if validToSend == -2 { // if the msg says New hold then we don't execute...
+		return 0, -2
+	}
+
+	if validToSend != 1 { // if the msg says anything other than valid
+		s.LogMessage("badmsgs", fmt.Sprintf("Invalid validity code %d", validToSend), msg)
+		panic("unexpected validity code")
+	}
 
 	// if it is valid to send then we check other stuff ...
 
