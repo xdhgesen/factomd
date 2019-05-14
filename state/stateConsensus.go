@@ -140,18 +140,15 @@ func (s *State) IsMsgValid(msg interfaces.IMsg) int {
 		return s.IsMsgStale(msg)
 	}
 }
-
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
 // for the replay filter.
 func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int) {
 	// check the time frame of messages with ACKs and reject any that are before the message filter time (before boot
 	// or outside the replay filter time frame)
 
-	//defer func() {
-	//	s.LogMessage("msgvalidation", fmt.Sprintf("send=%d execute=%d local=%v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
-	//}()
-
-	// FIXME support IsMsgValid or ValidToExecute
+	defer func() {
+		s.LogMessage("msgvalidation", fmt.Sprintf("send=%d execute=%d local=%v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
+	}()
 
 	// During boot ignore messages that are more than 15 minutes old...
 	if s.IgnoreMissing && msg.Type() != constants.DBSTATE_MSG {
@@ -249,7 +246,6 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 		}
 	}
 
-	s.LogMessage("executeMsg", fmt.Sprintf("validation s.vm=%d,m.vm=%d", s.LeaderVMIndex, vmIndex), msg)
 	return 1, 1
 }
 
@@ -678,7 +674,7 @@ func (s *State) ReviewHolding() {
 
 		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
 		if ok {
-			if (dbsigmsg.DBHeight < s.LLeaderHeight+1 && saved > 0) || s.CurrentMinute > 0 {
+			if dbsigmsg.DBHeight < s.LLeaderHeight || (s.CurrentMinute > 0 && dbsigmsg.DBHeight == s.LLeaderHeight) {
 				TotalHoldingQueueOutputs.Inc()
 				//delete(s.Holding, k)
 				s.DeleteFromHolding(k, v, "Old DBSig")
@@ -687,22 +683,6 @@ func (s *State) ReviewHolding() {
 			if !dbsigmsg.IsLocal() && dbsigmsg.DBHeight > saved {
 				s.HighestKnown = dbsigmsg.DBHeight
 			}
-		}
-		validToSend, validToExecute := s.Validate(v)
-
-		if validToSend >= 0 {
-			v.SendOut(s, v)
-		}
-
-		switch validToExecute {
-		case -1:
-			s.LogMessage("executeMsg", "invalid from holding", v)
-			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "invalid from holding")
-			continue
-		case 0:
-			continue
 		}
 
 		dbsmsg, ok := v.(*messages.DBStateMsg)
@@ -714,16 +694,6 @@ func (s *State) ReviewHolding() {
 			continue
 		}
 
-		// if it is a Factoid or entry credit transaction then check BLOCK_REPLAY
-		switch v.Type() {
-		case constants.FACTOID_TRANSACTION_MSG, constants.COMMIT_CHAIN_MSG, constants.COMMIT_ENTRY_MSG:
-			ok2 := s.FReplay.IsHashUnique(constants.BLOCK_REPLAY, v.GetRepeatHash().Fixed())
-			if !ok2 {
-				s.DeleteFromHolding(k, v, "BLOCK_REPLAY")
-				continue
-			}
-		default:
-		}
 
 		// If it is an entryCommit/ChainCommit/RevealEntry and it has a duplicate hash to an existing entry throw it away here
 		ce, ok := v.(*messages.CommitEntryMsg)
@@ -750,6 +720,33 @@ func (s *State) ReviewHolding() {
 			}
 		}
 
+		validToSend, validToExecute := s.Validate(v)
+
+		if validToSend > 0 {
+			v.SendOut(s, v)
+		}
+
+		switch validToExecute {
+		case -1:
+			s.LogMessage("executeMsg", "invalid from holding", v)
+			TotalHoldingQueueOutputs.Inc()
+			//delete(s.Holding, k)
+			s.DeleteFromHolding(k, v, "invalid from holding")
+			continue
+		case 0:
+			continue
+		}
+
+		// if it is a Factoid or entry credit transaction then check BLOCK_REPLAY
+		switch v.Type() {
+		case constants.FACTOID_TRANSACTION_MSG, constants.COMMIT_CHAIN_MSG, constants.COMMIT_ENTRY_MSG:
+			ok2 := s.FReplay.IsHashUnique(constants.BLOCK_REPLAY, v.GetRepeatHash().Fixed())
+			if !ok2 {
+				s.DeleteFromHolding(k, v, "BLOCK_REPLAY")
+				continue
+			}
+		default:
+		}
 		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
 		if re, ok := v.(*messages.RevealEntryMsg); ok {
 			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
@@ -767,6 +764,9 @@ func (s *State) ReviewHolding() {
 		TotalXReviewQueueInputs.Inc()
 		s.XReview = append(s.XReview, v)
 		TotalHoldingQueueOutputs.Inc()
+		if len(s.XReview) > 200 {
+			break
+		}
 	}
 	reviewHoldingTime := time.Since(preReviewHoldingTime)
 	TotalReviewHoldingTime.Add(float64(reviewHoldingTime.Nanoseconds()))
@@ -871,7 +871,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		s.CurrentMinute = newMinute                                                            // Update just the minute
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute
 
-		s.LogPrintf("executeMsg", "MoveStateToHeight set leader=%v, vmIndex = %v", s.LeaderExecute, s.LeaderVMIndex)
+		s.LogPrintf("executeMsg", "MoveStateToHeight new minute set leader=%v, vmIndex = %v", s.Leader, s.LeaderVMIndex)
 		// We are between blocks make sure we are setup to sync
 		// should already be true but if a DBSTATE got processed mid block
 		// there might be a circumstance where we get here in a weird state
@@ -917,7 +917,6 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 	s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
 	s.DBSigLimit = s.EOMLimit               // We add or remove server only on block boundaries
 
-	s.Hold.Review()
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", dbheight, newMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
 
 }
@@ -1825,16 +1824,13 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
-		//entry := s.Holding[h.Fixed()]
-		//if entry != nil {
-		//	entry.FollowerExecute(s)
-		//	entry.SendOut(s, entry)
-		//	TotalXReviewQueueInputs.Inc()
-		//	s.XReview = append(s.XReview, entry)
-		//	TotalHoldingQueueOutputs.Inc()
-		//}
 		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
-		s.ExecuteFromHolding(h.Fixed()) // execute any messages waiting on this commit
+
+		entry := s.Holding[h.Fixed()]
+		if entry != nil {
+			entry.FollowerExecute(s)
+		}
+		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 		return true
 	}
 
@@ -1851,19 +1847,13 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		// save the Commit to match against the Reveal later
 		h := c.GetHash()
 		s.PutCommit(h, c)
-		// old holding behaviour for commits
-		// entry := s.Holding[h.Fixed()]
-		// if entry != nil && entry.Validate(s) == 1 {
-		// 	entry.FollowerExecute(s)
-		// 	entry.SendOut(s, entry)
-		// 	TotalXReviewQueueInputs.Inc()
-		// 	s.XReview = append(s.XReview, entry)
-		// 	TotalHoldingQueueOutputs.Inc()
-		// }
 		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitEntry)
 
-		s.ExecuteFromHolding(h.Fixed()) // execute any messages waiting on this commit
-
+		entry := s.Holding[h.Fixed()]
+		if entry != nil && entry.Validate(s) == 1 {
+			entry.FollowerExecute(s)
+		}
+		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitEntry)
 		return true
 	}
 	//s.AddStatus("Cannot Process Commit Entry")
@@ -1882,7 +1872,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		if worked {
 			TotalProcessListProcesses.Inc()
 			TotalCommitsOutputs.Inc()
-			s.Commits.Delete(msg.Entry.GetHash().Fixed()) // 	delete(s.Commits, msg.Entry.GetHash().Fixed())
 			// This is so the api can determine if a chainhead is about to be updated. It fixes a race condition
 			// on the api. MUST BE BEFORE THE REPLAY FILTER ADD
 			pl.PendingChainHeads.Put(msg.Entry.GetChainID().Fixed(), msg)
@@ -1921,7 +1910,6 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 
 		s.IncEntryChains()
 		s.IncEntries()
-		s.ExecuteFromHolding(chainID.Fixed())
 		return true
 	}
 

@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -28,6 +30,7 @@ import (
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/FactomProject/factomd/wsapi"
 )
+
 
 func TestLoad(t *testing.T) {
 	if RanSimTest {
@@ -168,6 +171,28 @@ func TestLoadScrambled(t *testing.T) {
 
 	ShutDownEverything(t)
 } //TestLoadScrambled(){...}
+
+func TestMinute9Election(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	RanSimTest = true
+
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLAL", map[string]string{"--debuglog": ".", "--net": "line"}, 10, 1, 1, t)
+	state3 := GetFnodes()[3].State
+
+	WaitForMinute(state3, 9)
+	RunCmd("3")
+	RunCmd("x")
+	WaitMinutes(state0, 1)
+	RunCmd("x")
+	WaitBlocks(state0, 2)
+	WaitMinutes(state0, 1)
+
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+} //TestMinute9Election(){...}
 
 func TestMakeALeader(t *testing.T) {
 	if RanSimTest {
