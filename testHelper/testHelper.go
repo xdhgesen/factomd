@@ -5,10 +5,11 @@ package testHelper
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/FactomProject/factom"
 	"os/exec"
 	"regexp"
 	"runtime"
+
+	"github.com/FactomProject/factom"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -91,16 +92,14 @@ func CreateAndPopulateStaleHolding() *state.State {
 	mockTime := func() (r []byte) {
 		buf := new(bytes.Buffer)
 		t := time.Now().UnixNano()
-		m := t / 1e6 - state.FilterTimeLimit // make msg too old
+		m := t/1e6 - state.FilterTimeLimit // make msg too old
 		binary.Write(buf, binary.BigEndian, m)
 		return buf.Bytes()[2:]
 	}
 
-
 	// adding a commit w/ no REVEAL
 	m, _ := ComposeCommitEntryMsg(a.Priv, e)
 	copy(m.CommitEntry.MilliTime[:], mockTime())
-
 
 	// add commit to holding
 	s.Hold.Add(m.GetMsgHash().Fixed(), m)

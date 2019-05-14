@@ -140,6 +140,7 @@ func (s *State) IsMsgValid(msg interfaces.IMsg) int {
 		return s.IsMsgStale(msg)
 	}
 }
+
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
 // for the replay filter.
 func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int) {
@@ -693,7 +694,6 @@ func (s *State) ReviewHolding() {
 			s.DeleteFromHolding(k, v, "old DBState")
 			continue
 		}
-
 
 		// If it is an entryCommit/ChainCommit/RevealEntry and it has a duplicate hash to an existing entry throw it away here
 		ce, ok := v.(*messages.CommitEntryMsg)
@@ -1830,7 +1830,6 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		if entry != nil {
 			entry.FollowerExecute(s)
 		}
-		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitChain)
 		return true
 	}
 
@@ -1853,7 +1852,6 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		if entry != nil && entry.Validate(s) == 1 {
 			entry.FollowerExecute(s)
 		}
-		pl.EntryCreditBlock.GetBody().AddEntry(c.CommitEntry)
 		return true
 	}
 	//s.AddStatus("Cannot Process Commit Entry")

@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -30,7 +28,6 @@ import (
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/FactomProject/factomd/wsapi"
 )
-
 
 func TestLoad(t *testing.T) {
 	if RanSimTest {
