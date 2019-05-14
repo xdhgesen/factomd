@@ -239,7 +239,7 @@ mainloop:
 // Start up all of our supporting go routines, and run through the directory blocks and make sure we have
 // all the entries they reference.
 func (s *State) GoSyncEntries() {
-	time.Sleep(5 * time.Second)
+	time.Sleep(20 * time.Second)
 	s.EntrySyncState = new(EntrySync)
 	s.EntrySyncState.Init() // Initialize our processes
 
@@ -248,6 +248,11 @@ func (s *State) GoSyncEntries() {
 	go s.RequestAndCollectMissingEntries()
 
 	highestChecked := s.EntryDBHeightComplete
+	if highestChecked > 12 {
+		highestChecked -= 12
+	} else {
+		highestChecked = 1
+	}
 
 	lookingfor := 0
 
@@ -257,14 +262,15 @@ func (s *State) GoSyncEntries() {
 		// we get ahead of what has been processed while loading from disk.  So don't go past what has been
 		// processed, even if a directory block has been saved.
 		entryScanLimit := s.GetHighestSavedBlk()
-		p := s.DBStates.ProcessHeight
-		if entryScanLimit > p {
-			entryScanLimit = p
-		}
 
 		// Sleep often if we are caught up (to the best of our knowledge)
 		if entryScanLimit == highestChecked {
 			time.Sleep(time.Second)
+		}
+
+		p := s.DBStates.ProcessHeight
+		if entryScanLimit > p {
+			entryScanLimit = p
 		}
 
 		for scan := highestChecked + 1; scan <= entryScanLimit; scan++ {

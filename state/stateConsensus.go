@@ -1533,7 +1533,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	// If we have already issued an EOM for the minute being sync'd
 	// then this should be the next EOM but we can't do that just yet.
 	if vm.EomMinuteIssued == s.CurrentMinute+1 {
-		s.repost(m)
+		//s.repost(m)
 		return
 	}
 

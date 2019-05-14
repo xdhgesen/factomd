@@ -499,7 +499,7 @@ func (dbsl *DBStateList) UnmarshalBinaryData(p []byte) (newData []byte, err erro
 	}
 	dbsl.LastBegin = int(x)
 
-	dbsl.ProcessHeight, err = buf.PopUInt32()
+	_, err = buf.PopUInt32()
 	if err != nil {
 		dbsl.State.LogPrintf("dbstateprocess", "DBStateList.UnmarshalBinaryData ProcessHeight err: %v", err)
 		return
