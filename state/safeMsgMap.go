@@ -12,6 +12,9 @@ import (
 
 var _ = fmt.Println
 
+var SafeMapLog bool = false
+var SafeMapDetailLog bool = false
+
 // SafeMsgMap is a threadsafe map[[32]byte]interfaces.IMsg
 type SafeMsgMap struct {
 	msgmap map[[32]byte]interfaces.IMsg
@@ -38,7 +41,11 @@ func (m *SafeMsgMap) Put(key [32]byte, msg interfaces.IMsg) {
 	m.Lock()
 	_, ok := m.msgmap[key]
 	if !ok {
-		defer m.s.LogMessage(m.name, "put", msg)
+		if SafeMapLog {
+			defer m.s.LogMessage(m.name, "put", msg)
+		}
+	} else if SafeMapDetailLog {
+		defer m.s.LogMessage(m.name, "re-put", msg)
 	}
 	m.msgmap[key] = msg
 	m.Unlock()
@@ -48,10 +55,14 @@ func (m *SafeMsgMap) Delete(key [32]byte) (msg interfaces.IMsg, found bool) {
 	m.Lock()
 	msg, ok := m.msgmap[key] // return the message being deleted
 	if ok {
-		defer m.s.LogMessage(m.name, fmt.Sprintf("delete from %s", atomic.WhereAmIString(1)), msg)
+		if SafeMapLog {
+			defer m.s.LogMessage(m.name, fmt.Sprintf("delete from %s", atomic.WhereAmIString(1)), msg)
+		}
 		delete(m.msgmap, key)
 	} else {
-		defer m.s.LogPrintf(m.name, "nodelete from %s M-%x", atomic.WhereAmIString(1), key[:3])
+		if SafeMapDetailLog {
+			defer m.s.LogPrintf(m.name, "nodelete from %s M-%x", atomic.WhereAmIString(1), key[:3])
+		}
 	}
 	m.Unlock()
 	return
@@ -82,7 +93,9 @@ func (m *SafeMsgMap) Reset() {
 		m.msgmap = make(map[[32]byte]interfaces.IMsg)
 	}
 	m.Unlock()
-	m.s.LogPrintf(m.name, "reset")
+	if SafeMapLog {
+		m.s.LogPrintf(m.name, "reset")
+	}
 }
 
 //
@@ -100,7 +113,9 @@ func (m *SafeMsgMap) Cleanup(s *State) {
 		if ok && !s.NoEntryYet(cc.CommitChain.EntryHash, now) {
 			msg, ok := m.msgmap[k]
 			if ok {
-				defer m.s.LogMessage(m.name, "cleanup_chain", msg)
+				if SafeMapLog {
+					defer m.s.LogMessage(m.name, "cleanup_chain", msg)
+				}
 			}
 			delete(m.msgmap, k)
 			continue
@@ -110,7 +125,9 @@ func (m *SafeMsgMap) Cleanup(s *State) {
 		if ok && !s.NoEntryYet(c.CommitEntry.EntryHash, now) {
 			msg, ok := m.msgmap[k]
 			if ok {
-				defer m.s.LogMessage(m.name, "cleanup_entry", msg)
+				if SafeMapLog {
+					defer m.s.LogMessage(m.name, "cleanup_entry", msg)
+				}
 			}
 			delete(m.msgmap, k)
 			continue
@@ -120,7 +137,9 @@ func (m *SafeMsgMap) Cleanup(s *State) {
 		if !ok {
 			msg, ok := m.msgmap[k]
 			if ok {
-				defer m.s.LogMessage(m.name, "cleanup_timeout", msg)
+				if SafeMapLog {
+					defer m.s.LogMessage(m.name, "cleanup_timeout", msg)
+				}
 			}
 			delete(m.msgmap, k)
 		}
@@ -128,7 +147,9 @@ func (m *SafeMsgMap) Cleanup(s *State) {
 		if !ok {
 			msg, ok := m.msgmap[k]
 			if ok {
-				defer m.s.LogMessage(m.name, "cleanup_replay", msg)
+				if SafeMapLog {
+					defer m.s.LogMessage(m.name, "cleanup_replay", msg)
+				}
 			}
 			delete(m.msgmap, k)
 		}

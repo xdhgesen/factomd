@@ -845,7 +845,16 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 
 					s.LogPrintf("process", "expected %x", expectedSerialHash.Bytes())
 					s.LogPrintf("process", "thisAck  %x", thisAck.SerialHash.Bytes())
-					s.Reset() // This currently does nothing.. see comments in reset
+
+					vm.List[j] = nil
+					if vm.HighestNil > j {
+						vm.HighestNil = j // Drag report limit back
+					}
+					if vm.HighestAsk > j {
+						vm.HighestAsk = j // Drag Ask limit back
+					}
+					//s.AddStatus(fmt.Sprintf("ProcessList.go Process: Error computing serial hash at dbht: %d vm %d  vm-height %d ", p.DBHeight, i, j))
+					vm.ReportMissing(j, 0)
 					//todo: report this... it's probably bad
 					return
 				}
