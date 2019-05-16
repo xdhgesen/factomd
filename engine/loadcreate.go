@@ -160,7 +160,7 @@ func (lg *LoadGenerator) KeepUsFunded() {
 		} else if lg.tight.Load() {
 			level = 10
 		} else {
-			level = 10000
+			level = 20000
 		}
 
 		outEC, _ := primitives.HexToHash("c23ae8eec2beb181a0da926bd2344e988149fbe839fbc7489f2096e7d6110243")

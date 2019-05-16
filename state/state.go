@@ -176,6 +176,7 @@ type State struct {
 	apiQueue               APIMSGQueue
 	ackQueue               chan interfaces.IMsg
 	msgQueue               chan interfaces.IMsg
+	eomQueue               chan interfaces.IMsg
 
 	ShutdownChan chan int // For gracefully halting Factom
 	JournalFile  string
@@ -938,6 +939,7 @@ func (s *State) Init() {
 	s.apiQueue = NewAPIQueue(constants.INMSGQUEUE_HIGH)                      //incoming message queue from the API
 	s.ackQueue = make(chan interfaces.IMsg, 50)                              //queue of Leadership messages
 	s.msgQueue = make(chan interfaces.IMsg, 50)                              //queue of Follower messages
+	s.eomQueue = make(chan interfaces.IMsg, 50)                              //queue of EOM (because we sync on these)
 	s.MissingEntries = make(chan *MissingEntry, constants.INMSGQUEUE_HIGH)   //Entries I discover are missing from the database
 	s.UpdateEntryHash = make(chan *EntryUpdate, constants.INMSGQUEUE_HIGH)   //Handles entry hashes and updating Commit maps.
 	s.WriteEntry = make(chan interfaces.IEBEntry, constants.INMSGQUEUE_HIGH) //Entries to be written to the database
@@ -2214,6 +2216,10 @@ func (s *State) APIQueue() interfaces.IQueue {
 
 func (s *State) AckQueue() chan interfaces.IMsg {
 	return s.ackQueue
+}
+
+func (s *State) EomQueue() chan interfaces.IMsg {
+	return s.eomQueue
 }
 
 func (s *State) MsgQueue() chan interfaces.IMsg {

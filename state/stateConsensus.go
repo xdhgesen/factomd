@@ -542,7 +542,7 @@ func (s *State) ReviewHolding() {
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
 	}
-	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 300 {
+	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 100 {
 		return
 	}
 
@@ -1541,7 +1541,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	// If we have already issued an EOM for the minute being sync'd
 	// then this should be the next EOM but we can't do that just yet.
 	if vm.EomMinuteIssued == s.CurrentMinute+1 {
-		//s.repost(m)
+		s.repost(m, 1)
 		return
 	}
 
@@ -1828,7 +1828,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		}
 	}()
 
-	myhash := msg.Entry.GetHash()
+	//myhash := msg.Entry.GetHash()
 
 	chainID := msg.Entry.GetChainID()
 
@@ -1853,7 +1853,9 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		eb.AddEBEntry(msg.Entry)
 		// Put it in our list of new Entry Blocks for this Directory Block
 		s.PutNewEBlocks(dbheight, chainID, eb)
-		s.PutNewEntries(dbheight, myhash, msg.Entry)
+
+		//s.PutNewEntries(dbheight, myhash, msg.Entry)
+		s.WriteEntry <- msg.Entry
 
 		s.IncEntryChains()
 		s.IncEntries()
@@ -1882,7 +1884,9 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 	eb.AddEBEntry(msg.Entry)
 	// Put it in our list of new Entry Blocks for this Directory Block
 	s.PutNewEBlocks(dbheight, chainID, eb)
-	s.PutNewEntries(dbheight, myhash, msg.Entry)
+
+	//s.PutNewEntries(dbheight, myhash, msg.Entry)
+	s.WriteEntry <- msg.Entry
 
 	s.IncEntries()
 	return true

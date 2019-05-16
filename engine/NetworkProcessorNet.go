@@ -186,6 +186,9 @@ func Peers(fnode *FactomNode) {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
 				fnode.State.LogMessage("InMsgQueue2", "enqueue2", msg)
 				fnode.State.InMsgQueue2().Enqueue(msg)
+			} else if t := msg.Type(); t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
+				fnode.State.LogMessage("eomQueue", "enqueue", msg)
+				fnode.State.EomQueue() <- msg
 			} else {
 				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
 				fnode.State.LogMessage("InMsgQueue", "enqueue", msg)
@@ -312,6 +315,9 @@ func Peers(fnode *FactomNode) {
 						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue2", msg)
 						fnode.State.LogMessage("InMsgQueue2", fromPeer+", enqueue2", msg)
 						fnode.State.InMsgQueue2().Enqueue(msg)
+					} else if t := msg.Type(); t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
+						fnode.State.LogMessage("eomQueue", "enqueue", msg)
+						fnode.State.EomQueue() <- msg
 					} else {
 						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
 						fnode.State.LogMessage("InMsgQueue", fromPeer+", enqueue", msg)
