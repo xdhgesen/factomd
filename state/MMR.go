@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+	"github.com/FactomProject/factomd/common/constants"
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages"
@@ -59,11 +61,6 @@ func (vm *VM) ReportMissing(height int, delay int64) {
 }
 
 func (s *State) Ask(DBHeight int, vmIndex int, height int, when int64) {
-	doWeHaveAckandMsg := s.MissingMessageResponse.GetAckANDMsg(DBHeight, vmIndex, height)
-
-	if doWeHaveAckandMsg {
-		return
-	}
 	if s.asks == nil { // If it is nil, there is no makemmrs
 		return
 	}
@@ -98,6 +95,13 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 	logname := "missing_messages"
 
 	addAsk := func(ask askRef) {
+		// checking if we already have message in our maps
+		doWeHaveAckandMsg := s.MissingMessageResponse.GetAckANDMsg(ask.DBH, ask.VM, ask.H)
+
+		if doWeHaveAckandMsg {
+			fmt.Println("We HAVE dont call addAdd(add)!!")
+			return
+		}
 		_, ok := pending[ask.plRef]
 		if !ok {
 			when := ask.When
@@ -186,6 +190,15 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 		}
 
 		select {
+		case msg := <- s.MissingMessageResponse.NewMsgs:
+			if msg.Type() == constants.ACK_MSG {
+				// adds Acks to a Ack map for MMR
+				s.MissingMessageResponse.AcksMap.Add(msg)
+			} else {
+				// adds messages to a message map for MMR
+				s.MsgsMap.Add(msg)
+			}
+
 		case dbheight = <-dbheights:
 			// toss any old pending requests when the height moves up
 			// todo: Keep asks in a  list so cleanup is more efficient
