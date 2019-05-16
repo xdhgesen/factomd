@@ -356,11 +356,10 @@ func (m *EOM) String() string {
 	if m.FactoidVM {
 		f = "F"
 	}
-	return fmt.Sprintf("%6s-%30s FF %2d %1s-Leader[%x] hash[%x] %s",
+	return fmt.Sprintf("%6s-%30s Signer[%x] ChainID[%x] hash[%x] %s",
 		"EOM",
 		fmt.Sprintf("DBh/VMh/h %d/%d/-- minute %d", m.DBHeight, m.VMIndex, m.Minute),
-		m.SysHeight,
-		f,
+		m.Signature.GetKey()[3:6],
 		m.ChainID.Bytes()[3:6],
 		m.GetMsgHash().Bytes()[:3],
 		local)
