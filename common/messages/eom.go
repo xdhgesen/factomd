@@ -352,10 +352,6 @@ func (m *EOM) String() string {
 	if m.IsLocal() {
 		local = "local"
 	}
-	f := "-"
-	if m.FactoidVM {
-		f = "F"
-	}
 	return fmt.Sprintf("%6s-%30s Signer[%x] ChainID[%x] hash[%x] %s",
 		"EOM",
 		fmt.Sprintf("DBh/VMh/h %d/%d/-- minute %d", m.DBHeight, m.VMIndex, m.Minute),
