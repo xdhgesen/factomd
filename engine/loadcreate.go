@@ -29,6 +29,11 @@ type LoadGenerator struct {
 	tight     atomic.AtomicBool      // Only allocate ECs as needed (more EC purchases)
 	txoffset  int64                  // Offset to be added to the timestamp of created tx to test time limits.
 	state     *state.State           // Access to logging
+	EntryMax  int                    // Maximum Entry Size
+	EntryMin  int                    // Minimum Entry Size
+	ExIDMax   int                    // Maximum External IDs to generate
+	ExIDMin   int                    // Minimum External IDs to generate
+	ExIDSize  int                    // Size of each External ID
 }
 
 // NewLoadGenerator makes a new load generator. The state is used for funding the transaction
@@ -37,6 +42,12 @@ func NewLoadGenerator(s *state.State) *LoadGenerator {
 	lg.ECKey, _ = primitives.NewPrivateKeyFromHex(ecSec)
 	lg.stop = make(chan bool, 5)
 	lg.state = s
+
+	lg.EntryMax = 1000
+	lg.EntryMin = 32
+	lg.ExIDMax = 5
+	lg.ExIDMin = 0
+	lg.ExIDSize = 128
 
 	return lg
 }
@@ -71,7 +82,7 @@ func (lg *LoadGenerator) Run() {
 
 		for i := 0; i < top; i++ {
 			var c interfaces.IMsg
-			e := RandomEntry()
+			e := lg.RandomEntry()
 			if chain == nil {
 				c = lg.NewCommitChain(e)
 				chain = e.ChainID
@@ -92,14 +103,18 @@ func (lg *LoadGenerator) Stop() {
 	lg.stop <- true
 }
 
-func RandomEntry() *entryBlock.Entry {
+func (lg *LoadGenerator) RandomEntry() *entryBlock.Entry {
 	entry := entryBlock.NewEntry()
-	entry.Content = primitives.ByteSlice{random.RandByteSliceOfLen(rand.Intn(4000) + 128)}
-	entry.ExtIDs = make([]primitives.ByteSlice, rand.Intn(4)+1)
-	raw := make([][]byte, len(entry.ExtIDs))
+	esize := lg.EntryMin
+	esize += rand.Intn(lg.EntryMax - lg.EntryMin)
+	entry.Content = primitives.ByteSlice{random.RandByteSliceOfLen(esize)}
+
+	exidnum := lg.ExIDMin
+	exidnum += rand.Intn(lg.ExIDMax - lg.ExIDMin)
+
+	entry.ExtIDs = make([]primitives.ByteSlice, exidnum)
 	for i := range entry.ExtIDs {
-		entry.ExtIDs[i] = primitives.ByteSlice{random.RandByteSliceOfLen(rand.Intn(300))}
-		raw[i] = entry.ExtIDs[i].Bytes
+		entry.ExtIDs[i] = primitives.ByteSlice{random.RandByteSliceOfLen(lg.ExIDSize)}
 	}
 
 	sum := sha256.New()
