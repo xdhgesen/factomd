@@ -404,6 +404,7 @@ func NetworkOutputs(fnode *FactomNode) {
 				if p >= 0 {
 					wt = fnode.Peers[p].Weight()
 				}
+				fnode.State.LogPrintf("NetworkOutputs", "Send M-%X to %s i%d/p%d/wt%d", msg.GetMsgHash().Bytes()[:3], peer.GetNameTo(), i, p, wt)
 				// Don't resend to the node that sent it to you.
 				if i != p || wt > 1 {
 					bco := fmt.Sprintf("%s/%d/%d", "BCast", p, i)
