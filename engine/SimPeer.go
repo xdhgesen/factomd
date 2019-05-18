@@ -126,7 +126,7 @@ func (f *SimPeer) Send(msg interfaces.IMsg) error {
 	go func() {
 		if f.Delay > 0 {
 			// Sleep some random number of milliseconds, then send the packet
-			time.Sleep(time.Duration(rand.Intn(int(f.Delay))) * time.Millisecond)
+			time.Sleep(time.Duration(int(f.Delay)*9+rand.Intn(int(f.Delay))/10) * time.Millisecond)
 		}
 		packet := SimPacket{data: data, sent: time.Now().UnixNano() / 1000000}
 		f.BroadcastOut <- &packet
