@@ -143,6 +143,18 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 		}
 	}
 
+	defer func() {
+		if validToExec == 1 && s.LLeaderHeight > 1 && s.Acks[msg.GetHash().Fixed()] == nil {
+			switch msg.Type() {
+			case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG, constants.FACTOID_TRANSACTION_MSG:
+				pl := s.ProcessLists.Get(s.LLeaderHeight)
+				if pl.VMs[msg.GetVMIndex()].Synced {
+					validToExec = 0
+				}
+			}
+		}
+	}()
+
 	// Valid to send is a bit different from valid to execute.  Check for valid to send here.
 	validToSend = msg.Validate(s)
 	if validToSend == 0 { // if the msg says hold then we hold...
@@ -173,7 +185,8 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	// If we are not the leader, or this isn't the VM we are responsible for ...
 	if !s.Leader || (s.LeaderVMIndex != vmIndex) {
 		switch msg.Type() {
-		case constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG, constants.REVEAL_ENTRY_MSG, constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG, constants.FACTOID_TRANSACTION_MSG:
+		case constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG, constants.REVEAL_ENTRY_MSG,
+			constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG, constants.FACTOID_TRANSACTION_MSG:
 			// don't need to check for a matching ack for ACKs or local messages
 			// for messages that get ACK make sure we can expect to process them
 			ack, _ := s.Acks[msg.GetMsgHash().Fixed()].(*messages.Ack)
@@ -272,7 +285,7 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			s.Leader &&
 			!s.Saving && // if not between blocks
 			vm != nil && vmh == vml && // if we have processed to the end of the process list
-			(!s.Syncing || !vms) && // if not syncing or this VM is not yet synced
+			!vms && //  This VM is not yet synced
 			(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
 			s.LeaderPL.DBHeight+1 >= hkb {
 			if vml == 0 { // if we have not generated a DBSig ...
@@ -414,6 +427,11 @@ func (s *State) Process() (progress bool) {
 	}
 	// Process inbound messages
 	preEmptyLoopTime := time.Now()
+
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "start messageSort")
+	}
+
 emptyLoop:
 	for {
 		select {
@@ -460,7 +478,9 @@ ackLoop:
 	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
 	// Process last first
-
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "start reviewHolding")
+	}
 	if s.RunLeader {
 		s.ReviewHolding()
 		for {
@@ -584,6 +604,10 @@ func (s *State) ReviewHolding() {
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
 	for k, v := range s.Holding {
+
+		if (time.Now().Add(-2 * time.Second)).After(preReviewHoldingTime) {
+			break
+		}
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
@@ -978,7 +1002,7 @@ func (s *State) repost(m interfaces.IMsg, delay int) {
 		}
 		//s.LogMessage("MsgQueue", fmt.Sprintf("enqueue_%s(%d)", whereAmI, len(s.msgQueue)), m)
 		s.LogMessage("MsgQueue", fmt.Sprintf("enqueue (%d)", len(s.msgQueue)), m)
-		s.msgQueue <- m // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
+		s.eomQueue <- m // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
 	}()
 }
 
@@ -1432,24 +1456,12 @@ func (s *State) FollowerExecuteMissingMsg(msg interfaces.IMsg) {
 func (s *State) FollowerExecuteCommitChain(m interfaces.IMsg) {
 	FollowerExecutions.Inc()
 	s.FollowerExecuteMsg(m)
-	cc := m.(*messages.CommitChainMsg)
-	re := s.Holding[cc.CommitChain.EntryHash.Fixed()]
-	if re != nil {
-		re.FollowerExecute(s)
-		re.SendOut(s, re)
-	}
 	m.SendOut(s, m)
 }
 
 func (s *State) FollowerExecuteCommitEntry(m interfaces.IMsg) {
-	ce := m.(*messages.CommitEntryMsg)
 	FollowerExecutions.Inc()
 	s.FollowerExecuteMsg(m)
-	re := s.Holding[ce.CommitEntry.EntryHash.Fixed()]
-	if re != nil {
-		re.FollowerExecute(s)
-		re.SendOut(s, re)
-	}
 	m.SendOut(s, m)
 }
 
@@ -2146,7 +2158,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		s.EOMMinute = int(e.Minute)
 		s.EOMsyncing = true
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm  %2d First SigType processed: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
-		return false
 	}
 
 	// What I do for each EOM

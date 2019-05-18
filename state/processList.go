@@ -747,6 +747,11 @@ var extraDebug bool = false
 
 // Process messages and update our state.
 func (p *ProcessList) Process(s *State) (progress bool) {
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "start processlist.Process")
+		defer s.LogPrintf("executeMsg", "end processlist.Process")
+	}
+
 	dbht := s.GetHighestSavedBlk()
 	if dbht >= p.DBHeight {
 		//s.AddStatus(fmt.Sprintf("ProcessList.Process: VM Height is %d and Saved height is %d", dbht, s.GetHighestSavedBlk()))
@@ -756,7 +761,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 	s.PLProcessHeight = p.DBHeight
 
 	now := s.GetTimestamp()
-
+VMLoop:
 	for i := 0; i < len(p.FedServers); i++ {
 		vm := p.VMs[i]
 
@@ -802,6 +807,11 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 
 				//				s.LogPrintf("process","nil  at  %v/%v/%v", p.DBHeight, i, j)
 				break VMListLoop
+			}
+
+			if t := vm.List[j].Type(); vm.Synced == true && t != constants.EOM_MSG && t != constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
+				s.LogPrintf("process", "VM Synced %d/%d/%d", s.LLeaderHeight, i, j)
+				continue VMLoop
 			}
 
 			if extraDebug {
@@ -1094,9 +1104,9 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 	}
 
 	s.LogMessage("processList", fmt.Sprintf("Added at %d/%d/%d by %s", ack.DBHeight, ack.VMIndex, ack.Height, atomic.WhereAmIString(1)), m)
-	if ack.IsLocal() {
-		for p.Process(s) {
-		}
+	if ack.IsLocal() { // If I am a leader, I know that this message can be processed, so calling p.Process stops thrashing
+		for p.Process(s) { // If I am a follower, I really don't know I can process this, so we will thrash if we call process
+		} // That's why we check for IsLocal (did this node create the ack).
 	}
 
 }

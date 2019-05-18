@@ -127,6 +127,7 @@ func Peers(fnode *FactomNode) {
 
 		for i := 0; i < 100 && fnode.State.APIQueue().Length() > 0; i++ {
 			msg := fnode.State.APIQueue().Dequeue()
+			fnode.State.LogMessage("NetworkInputs", "from API, Dequeue", msg)
 
 			if globals.Params.FullHashesLog {
 				primitives.Loghash(msg.GetMsgHash())
@@ -182,16 +183,20 @@ func Peers(fnode *FactomNode) {
 			}
 
 			//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, msg)
-			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
-				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue2", msg)
-				fnode.State.LogMessage("InMsgQueue2", "enqueue2", msg)
+			switch msg.Type() {
+			case constants.REVEAL_ENTRY_MSG, constants.COMMIT_CHAIN_MSG, constants.COMMIT_ENTRY_MSG:
+				fnode.State.LogMessage("InMsgQueue2", "APIenqueue2", msg)
 				fnode.State.InMsgQueue2().Enqueue(msg)
-			} else if t := msg.Type(); t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
-				fnode.State.LogMessage("eomQueue", "enqueue", msg)
+			case constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG,
+				constants.MISSING_MSG_RESPONSE, constants.MISSING_MSG,
+				constants.DBSTATE_MSG, constants.DBSTATE_MISSING_MSG:
+				fnode.State.LogMessage("eomQueue", "APIenqueue", msg)
 				fnode.State.EomQueue() <- msg
-			} else {
-				fnode.State.LogMessage("NetworkInputs", "from API, Enqueue", msg)
-				fnode.State.LogMessage("InMsgQueue", "enqueue", msg)
+			case constants.ACK_MSG:
+				fnode.State.LogMessage("ackQueue", "APIenqueue", msg)
+				fnode.State.AckQueue() <- msg
+			default:
+				fnode.State.LogMessage("InMsgQueue", "APIenqueue", msg)
 				fnode.State.InMsgQueue().Enqueue(msg)
 			}
 		} // for the api queue read up to 100 messages {...}
@@ -215,6 +220,8 @@ func Peers(fnode *FactomNode) {
 					// TODO: Maybe we should check the error type and/or count errors and change status to offline?
 					break // move to next peer
 				}
+
+				fnode.State.LogMessage("NetworkInputs", fromPeer+",denqueue", msg)
 
 				if globals.Params.FullHashesLog {
 					primitives.Loghash(msg.GetMsgHash())
@@ -311,16 +318,20 @@ func Peers(fnode *FactomNode) {
 				msg.SetNetwork(true)
 
 				if !crossBootIgnore(msg) {
-					if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
-						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue2", msg)
-						fnode.State.LogMessage("InMsgQueue2", fromPeer+", enqueue2", msg)
+					switch msg.Type() {
+					case constants.REVEAL_ENTRY_MSG, constants.COMMIT_CHAIN_MSG, constants.COMMIT_ENTRY_MSG:
+						fnode.State.LogMessage("InMsgQueue2", fromPeer+",enqueue", msg)
 						fnode.State.InMsgQueue2().Enqueue(msg)
-					} else if t := msg.Type(); t == constants.EOM_MSG || t == constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
-						fnode.State.LogMessage("eomQueue", "enqueue", msg)
+					case constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG,
+						constants.MISSING_MSG_RESPONSE, constants.MISSING_MSG,
+						constants.DBSTATE_MSG, constants.DBSTATE_MISSING_MSG:
+						fnode.State.LogMessage("eomQueue", fromPeer+",enqueue", msg)
 						fnode.State.EomQueue() <- msg
-					} else {
-						fnode.State.LogMessage("NetworkInputs", fromPeer+", enqueue", msg)
-						fnode.State.LogMessage("InMsgQueue", fromPeer+", enqueue", msg)
+					case constants.ACK_MSG:
+						fnode.State.LogMessage("ackQueue", fromPeer+",enqueue", msg)
+						fnode.State.AckQueue() <- msg
+					default:
+						fnode.State.LogMessage("InMsgQueue", fromPeer+",enqueue", msg)
 						fnode.State.InMsgQueue().Enqueue(msg)
 					}
 				}
