@@ -109,6 +109,7 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 		} else {
 			// todo: Send messages to execute
 		}
+
 	}
 
 	addAdd := func(add plRef) {
