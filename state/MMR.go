@@ -97,15 +97,21 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 		// checking if we already have message in our maps
 		doWeHaveAckandMsg := s.MissingMessageResponse.GetAckANDMsg(ask.DBH, ask.VM, ask.H, s)
 
-		if doWeHaveAckandMsg {
-			return
-		}
 		_, ok := pending[ask.plRef]
-		if !ok {
+		if doWeHaveAckandMsg {
+			//fmt.Println("We have it")
+			//return
+		} else if !ok {
+			//fmt.Println("pending[ask.plRef]: ", ok)
 			when := ask.When
 			pending[ask.plRef] = &when // add the requests to the map
 			s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
-		} // don't update the when if it already existed...
+		}
+		//if !ok {
+		//	when := ask.When
+		//	pending[ask.plRef] = &when // add the requests to the map
+		//	s.LogPrintf(logname, "Ask %d/%d/%d %d", ask.DBH, ask.VM, ask.H, len(pending))
+		//} // don't update the when if it already existed...
 
 	}
 
