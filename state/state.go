@@ -414,7 +414,6 @@ type State struct {
 
 	// struct for state/missingMsgTracking.go
 	MissingMessageResponse
-
 }
 
 var _ interfaces.IState = (*State)(nil)
