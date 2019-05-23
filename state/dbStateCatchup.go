@@ -24,7 +24,18 @@ func (list *DBStateList) Catchup() {
 		for {
 			// get the height of the saved blocks
 			hs := func() uint32 {
+				// get the current block being built
 				l := list.State.GetLLeaderHeight()
+				// get the hightest block in the database
+				b := list.State.GetDBHeightAtBoot()
+
+				// don't request states that are in the database at boot time
+				if b > l {
+					return b
+				}
+
+				// if it is minute 0 don't request the prev block that hasn't
+				// been saved yet (l-1)
 				if list.State.GetCurrentMinute() == 0 {
 					if l < 2 {
 						return 0
@@ -38,6 +49,8 @@ func (list *DBStateList) Catchup() {
 			hk := func() uint32 {
 				a := list.State.GetHighestAck()
 				k := list.State.GetHighestKnownBlock()
+				// check that known is more than 2 ahead of acknowledged to make
+				// sure not to ask for blocks that haven't finished
 				if k > a+2 {
 					return k
 				}
