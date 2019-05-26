@@ -104,7 +104,9 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	}
 
 	switch msg.Type() {
-	case constants.DBSTATE_MSG, constants.DATA_RESPONSE, constants.MISSING_MSG, constants.MISSING_DATA, constants.MISSING_ENTRY_BLOCKS, constants.DBSTATE_MISSING_MSG, constants.ENTRY_BLOCK_RESPONSE:
+	case constants.DBSTATE_MSG, constants.DATA_RESPONSE, constants.MISSING_MSG, constants.MISSING_DATA,
+		constants.MISSING_ENTRY_BLOCKS, constants.DBSTATE_MISSING_MSG, constants.ENTRY_BLOCK_RESPONSE,
+		constants.MISSING_MSG_RESPONSE:
 		// Allow these thru as they do not have Ack's (they don't change processlists)
 	default:
 		// Make sure we don't put in an old ack'd message (outside our repeat filter range)
@@ -583,7 +585,12 @@ func (s *State) ReviewHolding() {
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
+	cnt := 0
 	for k, v := range s.Holding {
+		cnt++
+		if (cnt&0xFF) == 0 && primitives.NewTimestampNow().GetTimeMilli()-now.GetTimeMilli() > 200 {
+			break
+		}
 
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
@@ -610,6 +617,8 @@ func (s *State) ReviewHolding() {
 			if !eom.IsLocal() && eom.DBHeight > saved {
 				s.HighestKnown = eom.DBHeight
 			}
+			go func() { s.msgQueue <- eom }()
+			continue
 		}
 
 		dbsigmsg, ok := v.(*messages.DirectoryBlockSignature)
