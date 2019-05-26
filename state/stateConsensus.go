@@ -544,7 +544,7 @@ func (s *State) ReviewHolding() {
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
 	}
-	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 300 {
+	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 120 {
 		return
 	}
 
@@ -588,7 +588,7 @@ func (s *State) ReviewHolding() {
 	cnt := 0
 	for k, v := range s.Holding {
 		cnt++
-		if (cnt&0xFF) == 0 && primitives.NewTimestampNow().GetTimeMilli()-now.GetTimeMilli() > 200 {
+		if (cnt&0xFF) == 0 && primitives.NewTimestampNow().GetTimeMilli()-now.GetTimeMilli() > 100 {
 			break
 		}
 
