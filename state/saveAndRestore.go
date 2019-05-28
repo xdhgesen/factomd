@@ -249,18 +249,9 @@ func (a *SaveState) IsSameAs(b *SaveState) bool {
 		return false
 	}
 
-	//Replay *Replay
-
 	if a.LeaderTimestamp.IsSameAs(b.LeaderTimestamp) == false {
 		return false
 	}
-
-	//Holding map[[32]byte]interfaces.IMsg
-	//XReview []interfaces.IMsg
-	//Acks    map[[32]byte]interfaces.IMsg
-	//Commits map[[32]byte][]interfaces.IMsg
-
-	//InvalidMessages map[[32]byte]interfaces.IMsg
 
 	if a.EntryBlockDBHeightComplete != b.EntryBlockDBHeightComplete {
 		return false
@@ -268,7 +259,6 @@ func (a *SaveState) IsSameAs(b *SaveState) bool {
 	if a.EntryBlockDBHeightProcessing != b.EntryBlockDBHeightProcessing {
 		return false
 	}
-	//MissingEntryBlocks []MissingEntryBlock
 
 	if a.EntryDBHeightComplete != b.EntryDBHeightComplete {
 		return false
@@ -279,7 +269,6 @@ func (a *SaveState) IsSameAs(b *SaveState) bool {
 	if a.EntryDBHeightProcessing != b.EntryDBHeightProcessing {
 		return false
 	}
-	//MissingEntries []MissingEntry
 
 	if a.FactoshisPerEC != b.FactoshisPerEC {
 		return false
@@ -336,10 +325,6 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	}
 
 	ss.DBHeight = dbht
-
-	// state.AddStatus(fmt.Sprintf("Save state at dbht: %d", ss.DBHeight))
-
-	//	ss.Replay = state.Replay.Save()
 	ss.LeaderTimestamp = d.DirectoryBlock.GetTimestamp()
 
 	ss.FedServers = append(ss.FedServers, pln.FedServers...)
@@ -390,21 +375,9 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.Syncing = false
 
 	ss.Holding = make(map[[32]byte]interfaces.IMsg)
-	//for k := range state.Holding {
-	//ss.Holding[k] = state.Holding[k]
-	//}
-
 	ss.XReview = append(ss.XReview, state.XReview...)
-
 	ss.Acks = make(map[[32]byte]interfaces.IMsg)
-	//for k := range state.Acks {
-	//	ss.Acks[k] = state.Acks[k]
-	//}
-
 	ss.Commits = state.Commits.Copy()
-	// for k, c := range state.Commits {
-	// 	ss.Commits[k] = c
-	// }
 
 	ss.InvalidMessages = make(map[[32]byte]interfaces.IMsg)
 	for k := range state.InvalidMessages {
@@ -420,12 +393,6 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.FERPriority = state.FERPriority
 	ss.FERPrioritySetHeight = state.FERPrioritySetHeight
 
-	/*
-		err := SaveTheState(ss)
-		if err != nil {
-			panic(err)
-		}
-	*/
 	if ss.IdentityControl == nil {
 		atomic.WhereAmIMsg("no identity manager")
 	}
@@ -608,10 +575,6 @@ func (ss *SaveState) RestoreFactomdState(s *State) {
 	s.HighestKnown = ss.DBHeight + 2
 	s.Hold.Init()
 
-	//TODO: Rip all these maps and arrays out. they are not needed... famous last words.
-	for k := range ss.Holding {
-		s.Hold.Holding[k] = ss.Holding[k]
-	}
 	s.XReview = append(s.XReview[:0], ss.XReview...)
 
 	s.Acks = make(map[[32]byte]interfaces.IMsg)

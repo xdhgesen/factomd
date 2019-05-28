@@ -52,7 +52,7 @@ func (hl *HoldingList) FillHoldingMap() {
 }
 
 
-func (hl *HoldingList) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
+func (hl *HoldingList) GetHoldingMap() map[[32]byte]interfaces.IMsg {
 	// request holding queue from state from outside state scope
 	hl.mutex.RLock()
 	defer hl.mutex.RUnlock()

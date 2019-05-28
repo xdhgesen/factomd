@@ -13,8 +13,10 @@ import (
 func TestLoadHoldingMap(t *testing.T) {
 	state := testHelper.CreateAndPopulateTestStateAndStartValidator()
 
-	hque := state.Hold.LoadHoldingMap()
-	if len(hque) != len(state.Hold.HoldingMap) {
+	hque := state.Hold.GetHoldingMap()
+
+	// TODO add a better test
+	if len(hque) != len(state.LoadHoldingMap()) {
 		t.Errorf("Error with holding Map Length")
 	}
 }

@@ -1440,7 +1440,7 @@ func (s *State) LoadSpecificMsgAndAck(dbheight uint32, vmIndex int, plistheight 
 }
 
 func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
-	return s.Hold.LoadHoldingMap()
+	return s.Hold.GetHoldingMap()
 }
 
 // this is called from the APIs that do not have access directly to the Acks.  State makes a copy and puts it in AcksMap
