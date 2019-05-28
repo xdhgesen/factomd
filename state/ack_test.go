@@ -206,7 +206,7 @@ func TestUnknownAcks(t *testing.T) {
 		t.Error("Should be unknown")
 	}
 
-	r, c := s.FetchEntryRevealAndCommitFromHolding(primitives.RandomHash())
+	r, c := s.Hold.FetchEntryRevealAndCommit(primitives.RandomHash())
 	if r != nil || c != nil {
 		t.Error("Should be nils")
 	}
@@ -237,7 +237,7 @@ func TestDblockConf(t *testing.T) {
 	s.Hold.AddToHolding(eh.Fixed(), commit)
 	s.Hold.ResetLast()
 	s.UpdateState()
-	_, c := s.FetchEntryRevealAndCommitFromHolding(eh)
+	_, c := s.Hold.FetchEntryRevealAndCommit(eh)
 	if c == nil {
 		t.Error("Should be found")
 	}

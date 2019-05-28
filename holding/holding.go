@@ -1,7 +1,10 @@
 package holding
 
 import (
+	"fmt"
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/common/messages"
 	"sync"
 	"time"
 )
@@ -82,3 +85,86 @@ func (hl *HoldingList) DeleteFromHolding(hash [32]byte) (removed bool) {
 func (hl *HoldingList) ResetLast() {
 	hl.last = 0
 }
+
+// FetchEntryRevealAndCommitFromHolding will look for the commit and reveal for a given hash.
+// It will check the hash as an entryhash and a txid, and return any reveals that match the entryhash
+// and any commits that match the entryhash or txid
+//
+//		Returns
+//			reveal = The reveal message if found
+//			commit = The commit message if found
+func (hl *HoldingList) FetchEntryRevealAndCommit(hash interfaces.IHash) (reveal interfaces.IMsg, commit interfaces.IMsg) {
+	q := hl.GetHoldingMap()
+	for _, h := range q {
+		switch {
+		case h.Type() == constants.COMMIT_CHAIN_MSG:
+			cm, ok := h.(*messages.CommitChainMsg)
+			if ok {
+				if cm.CommitChain.EntryHash.IsSameAs(hash) {
+					commit = cm
+				}
+
+				if hash.IsSameAs(cm.CommitChain.GetSigHash()) {
+					commit = cm
+				}
+			}
+		case h.Type() == constants.COMMIT_ENTRY_MSG:
+			cm, ok := h.(*messages.CommitEntryMsg)
+			if ok {
+				if cm.CommitEntry.EntryHash.IsSameAs(hash) {
+					commit = cm
+				}
+
+				if hash.IsSameAs(cm.CommitEntry.GetSigHash()) {
+					commit = cm
+				}
+			}
+		case h.Type() == constants.REVEAL_ENTRY_MSG:
+			rm, ok := h.(*messages.RevealEntryMsg)
+			if ok {
+				if rm.Entry.GetHash().IsSameAs(hash) {
+					reveal = rm
+				}
+			}
+		}
+	}
+	return
+}
+
+func (hl *HoldingList) FetchMessageByHash(hash interfaces.IHash) (int, byte, interfaces.IMsg, error) {
+	q := hl.GetHoldingMap()
+	for _, h := range q {
+		switch {
+		case h.Type() == constants.COMMIT_CHAIN_MSG:
+			var rm messages.CommitChainMsg
+			enb, err := h.MarshalBinary()
+			err = rm.UnmarshalBinary(enb)
+			if hash.IsSameAs(rm.CommitChain.GetSigHash()) {
+				return constants.AckStatusNotConfirmed, constants.REVEAL_ENTRY_MSG, h, err
+			}
+		case h.Type() == constants.COMMIT_ENTRY_MSG:
+			var rm messages.CommitEntryMsg
+			enb, err := h.MarshalBinary()
+			err = rm.UnmarshalBinary(enb)
+			if hash.IsSameAs(rm.CommitEntry.GetSigHash()) {
+				return constants.AckStatusNotConfirmed, constants.REVEAL_ENTRY_MSG, h, err
+			}
+		case h.Type() == constants.FACTOID_TRANSACTION_MSG:
+			var rm messages.FactoidTransaction
+			enb, err := h.MarshalBinary()
+			err = rm.UnmarshalBinary(enb)
+			if hash.IsSameAs(rm.Transaction.GetSigHash()) {
+				return constants.AckStatusNotConfirmed, constants.FACTOID_TRANSACTION_MSG, h, err
+			}
+		case h.Type() == constants.REVEAL_ENTRY_MSG:
+			var rm messages.RevealEntryMsg
+			enb, err := h.MarshalBinary()
+			err = rm.UnmarshalBinary(enb)
+			if hash.IsSameAs(rm.Entry.GetHash()) {
+				return constants.AckStatusNotConfirmed, constants.REVEAL_ENTRY_MSG, h, err
+			}
+		}
+	}
+	return constants.AckStatusUnknown, byte(0), nil, fmt.Errorf("Not Found")
+}
+

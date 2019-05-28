@@ -111,7 +111,7 @@ func (s *State) GetEntryCommitAckByTXID(hash interfaces.IHash) (status int, blkt
 	}
 
 	// If it was found in the PL or DBlock, it would return. All that is left is the holding map
-	_, commit = s.FetchEntryRevealAndCommitFromHolding(hash)
+	_, commit = s.Hold.FetchEntryRevealAndCommit(hash)
 	if commit != nil { // Found in holding
 		switch commit.Type() {
 		case constants.COMMIT_CHAIN_MSG:
@@ -198,7 +198,7 @@ func (s *State) GetEntryCommitAckByEntryHash(hash interfaces.IHash) (status int,
 
 	// At this point, we have the status of unknown. Any DBlock or Ack level has been covered above.
 	// If 'c' is not nil, then commit was found in the holding map.
-	_, c = s.FetchEntryRevealAndCommitFromHolding(hash)
+	_, c = s.Hold.FetchEntryRevealAndCommit(hash)
 	if c != nil {
 		status = constants.AckStatusNotConfirmed
 		commit = c
@@ -253,7 +253,7 @@ func (s *State) GetEntryRevealAckByEntryHash(hash interfaces.IHash) (status int,
 	// Not found in the database or the processlist. We can still check holding.
 	// If 'r' is not nil, then reveal was found in the holding map. Also return the
 	// commit msg if we had to look this far, it could save someone else calling us a lookup
-	r, c := s.FetchEntryRevealAndCommitFromHolding(hash)
+	r, c := s.Hold.FetchEntryRevealAndCommit(hash)
 	if r != nil {
 		status = constants.AckStatusNotConfirmed
 		if c != nil {
@@ -337,11 +337,10 @@ func (s *State) getACKStatus(hash interfaces.IHash, useOldMsgs bool) (int, inter
 			}
 		}
 
-		//	 We are now looking into the holding queue.  it should have been found by now if it is going to be
-		//	  if included has not been found, but we have no information, it should be unknown not unconfirmed.
-
+		// We are now looking into the holding queue.  it should have been found by now if it is going to be
+		// if included has not been found, but we have no information, it should be unknown not unconfirmed.
 		if s.IsStateFullySynced() {
-			status, _, _, _ := s.FetchHoldingMessageByHash(hash)
+			status, _, _, _ := s.Hold.FetchMessageByHash(hash)
 			return status, hash, nil, nil, nil
 
 		} else {
@@ -384,114 +383,6 @@ func (s *State) getACKStatus(hash interfaces.IHash, useOldMsgs bool) (int, inter
 
 	return constants.AckStatusDBlockConfirmed, hash, nil, dBlock.GetHeader().GetTimestamp(), nil
 
-}
-
-// FetchEntryRevealAndCommitFromHolding will look for the commit and reveal for a given hash.
-// It will check the hash as an entryhash and a txid, and return any reveals that match the entryhash
-// and any commits that match the entryhash or txid
-//
-//		Returns
-//			reveal = The reveal message if found
-//			commit = The commit message if found
-func (s *State) FetchEntryRevealAndCommitFromHolding(hash interfaces.IHash) (reveal interfaces.IMsg, commit interfaces.IMsg) {
-	q := s.LoadHoldingMap()
-	for _, h := range q {
-		switch {
-		case h.Type() == constants.COMMIT_CHAIN_MSG:
-			cm, ok := h.(*messages.CommitChainMsg)
-			if ok {
-				if cm.CommitChain.EntryHash.IsSameAs(hash) {
-					commit = cm
-				}
-
-				if hash.IsSameAs(cm.CommitChain.GetSigHash()) {
-					commit = cm
-				}
-			}
-		case h.Type() == constants.COMMIT_ENTRY_MSG:
-			cm, ok := h.(*messages.CommitEntryMsg)
-			if ok {
-				if cm.CommitEntry.EntryHash.IsSameAs(hash) {
-					commit = cm
-				}
-
-				if hash.IsSameAs(cm.CommitEntry.GetSigHash()) {
-					commit = cm
-				}
-			}
-		case h.Type() == constants.REVEAL_ENTRY_MSG:
-			rm, ok := h.(*messages.RevealEntryMsg)
-			if ok {
-				if rm.Entry.GetHash().IsSameAs(hash) {
-					reveal = rm
-				}
-			}
-		}
-	}
-	return
-}
-
-func (s *State) FetchHoldingMessageByHash(hash interfaces.IHash) (int, byte, interfaces.IMsg, error) {
-	q := s.LoadHoldingMap()
-	for _, h := range q {
-		switch {
-		//	case h.Type() == constants.EOM_MSG :
-		//	case h.Type() == constants.ACK_MSG :
-		//	case h.Type() == constants.FED_SERVER_FAULT_MSG :
-		//	case h.Type() == constants.AUDIT_SERVER_FAULT_MSG :
-		//	case h.Type() == constants.FULL_SERVER_FAULT_MSG :
-		case h.Type() == constants.COMMIT_CHAIN_MSG:
-			var rm messages.CommitChainMsg
-			enb, err := h.MarshalBinary()
-			err = rm.UnmarshalBinary(enb)
-			if hash.IsSameAs(rm.CommitChain.GetSigHash()) {
-				return constants.AckStatusNotConfirmed, constants.REVEAL_ENTRY_MSG, h, err
-			}
-		case h.Type() == constants.COMMIT_ENTRY_MSG:
-			var rm messages.CommitEntryMsg
-			enb, err := h.MarshalBinary()
-			err = rm.UnmarshalBinary(enb)
-			if hash.IsSameAs(rm.CommitEntry.GetSigHash()) {
-				return constants.AckStatusNotConfirmed, constants.REVEAL_ENTRY_MSG, h, err
-			}
-			//	case h.Type() == constants.DIRECTORY_BLOCK_SIGNATURE_MSG :
-			//	case h.Type() == constants.EOM_TIMEOUT_MSG :
-		case h.Type() == constants.FACTOID_TRANSACTION_MSG:
-			var rm messages.FactoidTransaction
-			enb, err := h.MarshalBinary()
-			err = rm.UnmarshalBinary(enb)
-			if hash.IsSameAs(rm.Transaction.GetSigHash()) {
-				return constants.AckStatusNotConfirmed, constants.FACTOID_TRANSACTION_MSG, h, err
-			}
-			//	case h.Type() == constants.HEARTBEAT_MSG :
-			//	case h.Type() == constants.INVALID_ACK_MSG :
-			//	case h.Type() == constants.INVALID_DIRECTORY_BLOCK_MSG :
-		case h.Type() == constants.REVEAL_ENTRY_MSG:
-			var rm messages.RevealEntryMsg
-			enb, err := h.MarshalBinary()
-			err = rm.UnmarshalBinary(enb)
-			if hash.IsSameAs(rm.Entry.GetHash()) {
-				return constants.AckStatusNotConfirmed, constants.REVEAL_ENTRY_MSG, h, err
-			}
-			//	case  h.Type() == constants.REQUEST_BLOCK_MSG :
-			//	case h.Type() == constants.SIGNATURE_TIMEOUT_MSG:
-			//	case h.Type() == constants.MISSING_MSG :
-			//	case h.Type() == constants.MISSING_DATA :
-			//	case h.Type() == constants.DATA_RESPONSE :
-			//	case h.Type() == constants.MISSING_MSG_RESPONSE:
-			//	case h.Type() == constants.DBSTATE_MSG :
-			//	case h.Type() == constants.DBSTATE_MISSING_MSG:
-			//	case h.Type() == constants.ADDSERVER_MSG:
-			//	case h.Type() == constants.CHANGESERVER_KEY_MSG:
-			//	case h.Type() == constants.REMOVESERVER_MSG:
-			//	case h.Type() == constants.BOUNCE_MSG:
-			//	case h.Type() == constants.BOUNCEREPLY_MSG:
-			//	case h.Type() == constants.MISSING_ENTRY_BLOCKS:
-			//	case h.Type() == constants.ENTRY_BLOCK_RESPONSE :
-
-		}
-	}
-	return constants.AckStatusUnknown, byte(0), nil, fmt.Errorf("Not Found")
 }
 
 func (s *State) FetchECTransactionByHash(hash interfaces.IHash) (interfaces.IECBlockEntry, error) {
@@ -554,6 +445,7 @@ func (s *State) FetchFactoidTransactionByHash(hash interfaces.IHash) (interfaces
 		}
 	}
 
+	// TODO: refactor
 	q := s.LoadHoldingMap()
 	for _, h := range q {
 		if h.Type() == constants.FACTOID_TRANSACTION_MSG {
@@ -629,6 +521,7 @@ func (s *State) FetchEntryByHash(hash interfaces.IHash) (interfaces.IEBEntry, er
 	// not in process lists.  try holding queue
 	// check holding queue
 
+	// TODO: refactor
 	q := s.LoadHoldingMap()
 	var re messages.RevealEntryMsg
 	for _, h := range q {
