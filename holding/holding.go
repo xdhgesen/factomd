@@ -168,3 +168,48 @@ func (hl *HoldingList) FetchMessageByHash(hash interfaces.IHash) (int, byte, int
 	return constants.AckStatusUnknown, byte(0), nil, fmt.Errorf("Not Found")
 }
 
+
+func (hl *HoldingList) GetEntry(hash interfaces.IHash) (interfaces.IEBEntry, error) {
+	q := hl.GetHoldingMap()
+	var re messages.RevealEntryMsg
+	for _, h := range q {
+		if h.Type() == constants.REVEAL_ENTRY_MSG {
+			enb, err := h.MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
+			err = re.UnmarshalBinary(enb)
+			if err != nil {
+				return nil, err
+			}
+			tx := re.Entry
+			if hash.IsSameAs(tx.GetHash()) {
+				return tx, nil
+			}
+		}
+	}
+	return nil, nil
+}
+
+
+func (hl *HoldingList) GetTransaction(hash interfaces.IHash) (tx interfaces.ITransaction, err error) {
+	q := hl.GetHoldingMap()
+	for _, h := range q {
+		if h.Type() == constants.FACTOID_TRANSACTION_MSG {
+			var rm messages.FactoidTransaction
+			enb, err := h.MarshalBinary()
+			if err != nil {
+				return nil, err
+			}
+			err = rm.UnmarshalBinary(enb)
+			if err != nil {
+				return nil, err
+			}
+			tx := rm.GetTransaction()
+			if tx.GetHash().IsSameAs(hash) {
+				return tx, nil
+			}
+		}
+	}
+	return nil, nil
+}

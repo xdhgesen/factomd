@@ -386,7 +386,6 @@ func (s *State) getACKStatus(hash interfaces.IHash, useOldMsgs bool) (int, inter
 }
 
 func (s *State) FetchECTransactionByHash(hash interfaces.IHash) (interfaces.IECBlockEntry, error) {
-	//TODO: expand to search data from outside database
 	if hash == nil {
 		return nil, nil
 	}
@@ -408,12 +407,10 @@ func (s *State) FetchECTransactionByHash(hash interfaces.IHash) (interfaces.IECB
 	}
 
 	dbase := s.GetDB()
-
 	return dbase.FetchECTransaction(hash)
 }
 
 func (s *State) FetchFactoidTransactionByHash(hash interfaces.IHash) (interfaces.ITransaction, error) {
-	//TODO: expand to search data from outside database
 	if hash == nil {
 		return nil, nil
 	}
@@ -445,33 +442,18 @@ func (s *State) FetchFactoidTransactionByHash(hash interfaces.IHash) (interfaces
 		}
 	}
 
-	// TODO: refactor
-	q := s.LoadHoldingMap()
-	for _, h := range q {
-		if h.Type() == constants.FACTOID_TRANSACTION_MSG {
-			var rm messages.FactoidTransaction
-			enb, err := h.MarshalBinary()
-			if err != nil {
-				return nil, err
-			}
-			err = rm.UnmarshalBinary(enb)
-			if err != nil {
-				return nil, err
-			}
-			tx := rm.GetTransaction()
-			if tx.GetHash().IsSameAs(hash) {
-				return tx, nil
-			}
-		}
+	tx, err := s.Hold.GetTransaction(hash)
+	if err != nil {
+		return nil, err
+	} else if tx != nil {
+		return tx, nil
+	} else {
+		dbase := s.GetDB()
+		return dbase.FetchFactoidTransaction(hash)
 	}
-
-	dbase := s.GetDB()
-
-	return dbase.FetchFactoidTransaction(hash)
 }
 
 func (s *State) FetchPaidFor(hash interfaces.IHash) (interfaces.IHash, error) {
-	//TODO: expand to search data from outside database
 	if hash == nil {
 		return nil, nil
 	}
@@ -495,13 +477,12 @@ func (s *State) FetchPaidFor(hash interfaces.IHash) (interfaces.IHash, error) {
 			}
 		}
 	}
-	dbase := s.GetDB()
 
+	dbase := s.GetDB()
 	return dbase.FetchPaidFor(hash)
 }
 
-func (s *State) FetchEntryByHash(hash interfaces.IHash) (interfaces.IEBEntry, error) {
-	//TODO: expand to search data from outside database
+func (s *State) FetchEntryByHash(hash interfaces.IHash) (tx interfaces.IEBEntry, err error) {
 	if hash == nil {
 		return nil, nil
 	}
@@ -511,7 +492,7 @@ func (s *State) FetchEntryByHash(hash interfaces.IHash) (interfaces.IEBEntry, er
 		keys := pl.GetKeysNewEntries()
 
 		for _, key := range keys {
-			tx := pl.GetNewEntry(key)
+			tx = pl.GetNewEntry(key)
 			if hash.IsSameAs(tx.GetHash()) {
 				return tx, nil
 			}
@@ -521,27 +502,13 @@ func (s *State) FetchEntryByHash(hash interfaces.IHash) (interfaces.IEBEntry, er
 	// not in process lists.  try holding queue
 	// check holding queue
 
-	// TODO: refactor
-	q := s.LoadHoldingMap()
-	var re messages.RevealEntryMsg
-	for _, h := range q {
-		if h.Type() == constants.REVEAL_ENTRY_MSG {
-			enb, err := h.MarshalBinary()
-			if err != nil {
-				return nil, err
-			}
-			err = re.UnmarshalBinary(enb)
-			if err != nil {
-				return nil, err
-			}
-			tx := re.Entry
-			if hash.IsSameAs(tx.GetHash()) {
-				return tx, nil
-			}
-		}
+	tx, err = s.Hold.GetEntry(hash)
+	if err != nil {
+		return nil, err
+	} else if tx != nil {
+		return tx, nil
+	} else {
+		dbase := s.GetDB()
+		return dbase.FetchEntry(hash)
 	}
-
-	dbase := s.GetDB()
-
-	return dbase.FetchEntry(hash)
 }
