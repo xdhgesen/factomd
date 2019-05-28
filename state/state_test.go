@@ -101,19 +101,11 @@ func TestGetDirectoryBlockByHeight(t *testing.T) {
 	}
 }
 
-func TestLoadHoldingMap(t *testing.T) {
-	state := testHelper.CreateAndPopulateTestStateAndStartValidator()
-
-	hque := state.Hold.LoadHoldingMap()
-	if len(hque) != len(state.Hold.HoldingMap) {
-		t.Errorf("Error with Holding Map Length")
-	}
-}
-
 func TestLoadAcksMap(t *testing.T) {
 	state := testHelper.CreateAndPopulateTestStateAndStartValidator()
 
 	hque := state.LoadAcksMap()
+
 	if len(hque) != len(state.Hold.HoldingMap) {
 		t.Errorf("Error with Acks Map Length")
 	}

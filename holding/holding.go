@@ -30,10 +30,7 @@ func (hl  *HoldingList) Get(key [32]byte) interfaces.IMsg {
 	return hl.Holding[key]
 }
 
-// this is executed in the state maintenance processes where the holding queue is in scope and can be queried
-//  This is what fills the HoldingMap while locking it against a read while building
 func (hl *HoldingList) FillHoldingMap() {
-	// once a second is often enough to rebuild the Ack list exposed to api
 
 	if hl.HoldingLast >= time.Now().Unix() {
 		return
