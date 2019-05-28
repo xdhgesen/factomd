@@ -180,7 +180,6 @@ func (m *FedVoteProposalMsg) LeaderExecute(state interfaces.IState) {
 func (m *FedVoteProposalMsg) FollowerExecute(is interfaces.IState) {
 	s := is.(*state.State)
 	if s.Elections.(*elections.Elections).Adapter == nil {
-		//s.Holding[m.GetMsgHash().Fixed()] = m
 		s.AddToHolding(m.GetMsgHash().Fixed(), m) // FedVoteProposalMsg.FollowerExecute
 
 		return

@@ -490,92 +490,11 @@ func (ss *SaveState) TrimBack(s *State, d *DBState) {
 	s.Saving = pss.Saving
 	s.Syncing = pss.Syncing
 
-	//s.Replay = pss.Replay.Save()
-	//s.Replay.s = s
-	//s.Replay.name = "Replay"
-
 	return
-	/*
-		pl.FedServers = append(pl.FedServers[0:], ppl.FedServers...)
-		pl.AuditServers = append(pl.AuditServers[0:], ppl.AuditServers...)
-
-		//s.Identities = append(s.Identities[:0], pss.Identities...)
-		//s.Authorities = append(s.Authorities[:0], pss.Authorities...)
-		//s.AuthorityServerCount = pss.AuthorityServerCount
-
-		s.Holding = make(map[[32]byte]interfaces.IMsg)
-		for k := range ss.Holding {
-			s.Holding[k] = pss.Holding[k]
-		}
-		s.XReview = append(s.XReview[:0], pss.XReview...)
-	*/
-
-	/**
-	ss.EOMsyncing = s.EOMsyncing
-
-	s.EOM = pss.EOM
-	s.EOMLimit = pss.EOMLimit
-	s.EOMProcessed = pss.EOMProcessed
-	s.EOMDone = pss.EOMDone
-	s.EOMMinute = pss.EOMMinute
-	s.EOMSys = pss.EOMSys
-	s.DBSig = pss.DBSig
-	s.DBSigLimit = pss.DBSigLimit
-	s.DBSigProcessed = pss.DBSigProcessed
-	s.DBSigDone = pss.DBSigDone
-	s.DBSigSys = pss.DBSigSys
-	s.Newblk = pss.Newblk
-	s.Saving = pss.Saving
-	s.Syncing = pss.Syncing
-
-	s.Holding = make(map[[32]byte]interfaces.IMsg)
-	for k := range ss.Holding {
-		s.Holding[k] = pss.Holding[k]
-	}
-	s.XReview = append(s.XReview[:0], pss.XReview...)
-
-	s.Acks = make(map[[32]byte]interfaces.IMsg)
-	for k := range pss.Acks {
-		s.Acks[k] = pss.Acks[k]
-	}
-
-	s.Commits = make(map[[32]byte][]interfaces.IMsg)
-	for k := range pss.Commits {
-		var c []interfaces.IMsg
-		s.Commits[k] = append(c, pss.Commits[k]...)
-	}
-
-	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg)
-	for k := range pss.InvalidMessages {
-		s.InvalidMessages[k] = pss.InvalidMessages[k]
-	}
-
-	// DBlock Height at which node has a complete set of eblocks+entries
-	s.EntryBlockDBHeightComplete = pss.EntryBlockDBHeightComplete
-	s.EntryBlockDBHeightProcessing = pss.EntryBlockDBHeightProcessing
-	s.MissingEntryBlocks = append(s.MissingEntryBlocks[:0], pss.MissingEntryBlocks...)
-
-	s.EntryBlockDBHeightComplete = pss.EntryDBHeightComplete
-	s.EntryDBHeightComplete = pss.EntryDBHeightComplete
-	s.EntryHeightComplete = pss.EntryHeightComplete
-	s.EntryDBHeightProcessing = pss.EntryBlockDBHeightProcessing
-	s.MissingEntries = append(s.MissingEntries[:0], pss.MissingEntries...)
-
-	s.FactoshisPerEC = pss.FactoshisPerEC
-	s.FERChainId = pss.FERChainId
-	s.ExchangeRateAuthorityAddress = pss.ExchangeRateAuthorityAddress
-
-	s.FERChangeHeight = pss.FERChangeHeight
-	s.FERChangePrice = pss.FERChangePrice
-	s.FERPriority = pss.FERPriority
-	s.FERPrioritySetHeight = pss.FERPrioritySetHeight
-
-	**/
 }
 
-func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
-	// We trim away the ProcessList under construction (and any others) so we can
-	// rebuild afresh.
+// We trim away the ProcessList under construction (and any others) so we can rebuild afresh.
+func (ss *SaveState) RestoreFactomdState(s *State) {
 	index := int(s.ProcessLists.DBHeightBase) - int(ss.DBHeight)
 	if index < 0 {
 		index = 0
@@ -605,6 +524,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	// Set this, as we know it to be true
 	s.DBHeightAtBoot = ss.DBHeight
 	s.ProcessLists.Lists = s.ProcessLists.Lists[:0]
+
 	// set DBHeightBase to avoid recursively loading process lists
 	s.ProcessLists.DBHeightBase = ss.DBHeight
 	pl := s.ProcessLists.Get(ss.DBHeight)
@@ -617,12 +537,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.DBStates.Complete = dindex                         // update the cached count of how many are complete
 	s.DBStates.ProcessHeight = ss.DBHeight               // Set the process height to where we are starting
 
-	//s.AddStatus(fmt.Sprintf("SAVESTATE Restoring the State to dbht: %d", ss.DBHeight))
-
 	s.LogPrintf("dbstateprocess", "restoring to DBH %d", ss.DBHeight)
-	//s.Replay = ss.Replay.Save()
-	//s.Replay.s = s
-	//s.Replay.name = "Replay"
 
 	s.SetLeaderTimestamp(ss.LeaderTimestamp)
 
@@ -650,7 +565,6 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.ECBalancesPMutex.Unlock()
 
 	// Restore IDControl
-	// TODO: Should this clone?
 	s.IdentityControl = ss.IdentityControl
 	if s.IdentityControl == nil {
 		atomic.WhereAmIMsg("Missing IdentityControl")
@@ -707,9 +621,6 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 
 	s.Commits = ss.Commits.Copy() // make(map[[32]byte]interfaces.IMsg)
 	s.Commits.s = s
-	// for k, c := range ss.Commits {
-	// 	s.Commits[k] = c
-	// }
 
 	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg)
 	for k := range ss.InvalidMessages {
@@ -790,15 +701,17 @@ func (ss *SaveState) MarshalBinary() (rval []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
+
 	err = buf.PushBool(ss.Leader)
 	if err != nil {
 		return nil, err
 	}
+
 	err = buf.PushVarInt(uint64(ss.LeaderVMIndex))
 	if err != nil {
 		return nil, err
 	}
-	//TODO: handle LeaderPL      *ProcessList
+
 	err = buf.PushVarInt(uint64(ss.CurrentMinute))
 	if err != nil {
 		return nil, err
@@ -868,23 +781,10 @@ func (ss *SaveState) MarshalBinary() (rval []byte, err error) {
 		return nil, err
 	}
 
-	//err = buf.PushBinaryMarshallable(ss.Replay)
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	err = buf.PushBinaryMarshallable(ss.LeaderTimestamp)
 	if err != nil {
 		return nil, err
 	}
-	/*
-		Holding map[[32]byte]interfaces.IMsg   // Hold Messages
-		XReview []interfaces.IMsg              // After the EOM, we must review the messages in Holding
-		Acks    map[[32]byte]interfaces.IMsg   // Hold Acknowledgements
-		Commits map[[32]byte][]interfaces.IMsg // Commit Messages
-
-		InvalidMessages map[[32]byte]interfaces.IMsg
-	*/
 
 	err = buf.PushUInt32(ss.EntryBlockDBHeightComplete)
 	if err != nil {
@@ -1045,7 +945,6 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	}
 	ss.LeaderVMIndex = int(l)
 
-	//TODO: handle LeaderPL      *ProcessList
 	l, err = buf.PopVarInt()
 	if err != nil {
 		return
@@ -1128,26 +1027,11 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 		return
 	}
 
-	//ss.Replay = new(Replay)
-	//err = buf.PopBinaryMarshallable(ss.Replay)
-	//if err != nil {
-	//	return
-	//}
-
 	ss.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(0)
 	err = buf.PopBinaryMarshallable(ss.LeaderTimestamp)
 	if err != nil {
 		return
 	}
-
-	/*
-		Holding map[[32]byte]interfaces.IMsg   // Hold Messages
-		XReview []interfaces.IMsg              // After the EOM, we must review the messages in Holding
-		Acks    map[[32]byte]interfaces.IMsg   // Hold Acknowledgements
-		Commits map[[32]byte][]interfaces.IMsg // Commit Messages
-
-		InvalidMessages map[[32]byte]interfaces.IMsg
-	*/
 
 	ss.EntryBlockDBHeightComplete, err = buf.PopUInt32()
 	if err != nil {

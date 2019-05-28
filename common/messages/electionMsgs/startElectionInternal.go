@@ -66,7 +66,6 @@ func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	// TODO: State related things about starting an election
 	pl := s.ProcessLists.Get(m.DBHeight)
 	if pl == nil {
-		//s.Holding[m.GetHash().Fixed()] = m
 		s.AddToHolding(m.GetMsgHash().Fixed(), m) // StartElectionInternal.FollowerExecute
 		return
 	}
@@ -80,43 +79,6 @@ func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	}
 
 	m.VMHeight = vm.Height
-	// TODO: Process all messages that we can. Then trim to the first non-processed message
-	// TODO: This is incase a leader sends out ack 10, but not 9. We need to trim back to 8 because 9 does not exist
-	// TODO: Do not trim EOMs or DBsigs, as they may not be processed until certain conditions.
-
-	//end := len(vm.List)
-	//if end > vm.Height {
-	//	for _, msg := range vm.List[vm.Height:] {
-	//		if msg != nil {
-	//			hash := msg.GetRepeatHash()
-	//			s.Replay.Clear(constants.INTERNAL_REPLAY, hash.Fixed())
-	//			s.Holding[msg.GetMsgHash().Fixed()] = msg
-	//		}
-	//	}
-	//}
-	//
-	//// Trim the height to the last processed message
-	//trimto := vm.Height
-	//pre := len(vm.List)
-	//if trimto < len(vm.List) {
-	//	// When trimming, we need to check if trimto+1 is an EOM or DBSig. In which case, do not trim
-	//	// the EOM or DBSig
-	//	if len(vm.List) > trimto {
-	//		// There exists an item at +1
-	//		if _, ok := vm.List[vm.Height].(*messages.EOM); ok {
-	//			trimto += 1
-	//		} else if _, ok := vm.List[vm.Height].(*messages.DirectoryBlockSignature); ok {
-	//			trimto += 1
-	//		}
-	//	}
-	//
-	//	vm.List = vm.List[:trimto]
-	//	vm.ListAck = vm.ListAck[:trimto]
-	//}
-	//post := len(vm.List)
-	//if pre != post {
-	//	fmt.Printf("Trimmed!, VM: %d %s from %d to %d\n", m.VMIndex, s.FactomNodeName, pre, post)
-	//}
 
 	// Send to elections
 	is.ElectionsQueue().Enqueue(m)

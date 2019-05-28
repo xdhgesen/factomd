@@ -909,7 +909,6 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 					s.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
 					delete(s.Acks, msgHashFixed)
-					//delete(s.Holding, msgHashFixed)
 
 					s.DeleteFromHolding(msgHashFixed, msg, "msg.Process done")
 				} else {
@@ -1016,7 +1015,6 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 		s.LogPrintf("processList", "Drop "+hint)
 		TotalHoldingQueueOutputs.Inc()
 		TotalAcksOutputs.Inc()
-		//delete(s.Holding, msgHash.Fixed())
 
 		s.DeleteFromHolding(m.GetMsgHash().Fixed(), m, "Toss"+hint)
 		delete(s.Acks, msgHash.Fixed())

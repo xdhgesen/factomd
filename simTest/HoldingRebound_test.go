@@ -150,6 +150,5 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 		//tend := waitForEmptyHolding(state0, fmt.Sprintf("SLEEP", BatchID))
 		//bal := engine.GetBalanceEC(state0, a.EcPub())
 		//assert.Equal(t, bal, int64(0))
-		//assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
 	}
 }

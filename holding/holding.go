@@ -28,10 +28,6 @@ func (hl *HoldingList) Messages() map[[32]byte]interfaces.IMsg {
 
 func (hl  *HoldingList) Get(key [32]byte) interfaces.IMsg {
 	return hl.Holding[key]
-
-}
-
-func(hl *HoldingList) SetLastNow() {
 }
 
 // this is executed in the state maintenance processes where the holding queue is in scope and can be queried
