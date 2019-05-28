@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/FactomProject/factomd/holding"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -133,9 +134,7 @@ type State struct {
 
 	//  pending entry/transaction api calls for the holding queue do not have proper scope
 	//  This is used to create a temporary, correctly scoped holding queue snapshot for the calls on demand
-	HoldingMutex sync.RWMutex
-	HoldingLast  int64
-	HoldingMap   map[[32]byte]interfaces.IMsg
+	Hold  holding.HoldingList
 
 	// Elections are managed through the Elections Structure
 	EFactory  interfaces.IElectionsFactory
@@ -267,7 +266,6 @@ type State struct {
 	// ====
 	// For Follower
 	ResendHolding interfaces.Timestamp         // Timestamp to gate resending holding to neighbors
-	Holding       map[[32]byte]interfaces.IMsg // Hold Messages
 	XReview       []interfaces.IMsg            // After the EOM, we must review the messages in Holding
 	Acks          map[[32]byte]interfaces.IMsg // Hold Acknowledgements
 	Commits       *SafeMsgMap                  //  map[[32]byte]interfaces.IMsg // Commit Messages
@@ -960,7 +958,7 @@ func (s *State) Init() {
 	s.FReplay.name = "FReplay"
 
 	// Set up maps for the followers
-	s.Holding = make(map[[32]byte]interfaces.IMsg)
+	s.Hold.Init()
 	s.Acks = make(map[[32]byte]interfaces.IMsg)
 	s.Commits = NewSafeMsgMap("commits", s) //make(map[[32]byte]interfaces.IMsg)
 
@@ -1442,31 +1440,7 @@ func (s *State) LoadSpecificMsgAndAck(dbheight uint32, vmIndex int, plistheight 
 }
 
 func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
-	// request holding queue from state from outside state scope
-	s.HoldingMutex.RLock()
-	defer s.HoldingMutex.RUnlock()
-	localMap := s.HoldingMap
-
-	return localMap
-}
-
-// this is executed in the state maintenance processes where the holding queue is in scope and can be queried
-//  This is what fills the HoldingMap while locking it against a read while building
-func (s *State) fillHoldingMap() {
-	// once a second is often enough to rebuild the Ack list exposed to api
-
-	if s.HoldingLast < time.Now().Unix() {
-
-		localMap := make(map[[32]byte]interfaces.IMsg)
-		for i, msg := range s.Holding {
-			localMap[i] = msg
-		}
-		s.HoldingLast = time.Now().Unix()
-		s.HoldingMutex.Lock()
-		defer s.HoldingMutex.Unlock()
-		s.HoldingMap = localMap
-
-	}
+	return s.Hold.LoadHoldingMap()
 }
 
 // this is called from the APIs that do not have access directly to the Acks.  State makes a copy and puts it in AcksMap
@@ -1937,7 +1911,7 @@ func (s *State) UpdateState() (progress bool) {
 	}
 
 	// check to see if a holding queue list request has been made
-	s.fillHoldingMap()
+	s.Hold.FillHoldingMap()
 	s.fillAcksMap()
 
 entryHashProcessing:

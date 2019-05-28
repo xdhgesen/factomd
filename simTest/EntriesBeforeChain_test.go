@@ -75,11 +75,11 @@ func TestEntriesBeforeChain(t *testing.T) {
 	//fmt.Printf("Bal: => %v", bal)
 	assert.Equal(t, int64(0), bal)
 
-	for _, v := range state0.Holding {
+	for _, v := range state0.Hold.Messages() {
 		s, _ := v.JSONString()
 		println(s)
 	}
 
-	assert.Equal(t, 0, len(state0.Holding), "messages stuck in holding")
+	assert.Equal(t, 0, state0.Hold.Len(), "messages stuck in holding")
 
 }

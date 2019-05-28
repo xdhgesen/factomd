@@ -260,14 +260,6 @@ func ComposeChainCommit(pkey *primitives.PrivateKey, c *factom.Chain) (*messages
 	return m, nil
 }
 
-func ComposeChainReveal(pkey *primitives.PrivateKey) (*messages.RevealEntryMsg, error) {
-	//e := entryCreditBlock.NewCommitChain()
-
-	// FIXME
-	m := new(messages.RevealEntryMsg)
-	return m, nil
-}
-
 func WaitForAnyDeposit(s *state.State, ecPub string) int64 {
 	return WaitForEcBalance(s, ecPub, 1)
 }
@@ -281,7 +273,7 @@ func WaitForEmptyHolding(s *state.State, msg string) time.Time {
 	t := time.Now()
 	s.LogPrintf(logName, "WaitForEmptyHolding %v", msg)
 
-	for len(s.Holding) > 0 {
+	for s.Hold.Len() > 0 {
 		time.Sleep(time.Millisecond * 10)
 	}
 
@@ -318,7 +310,7 @@ func WatchMessageLists() *time.Ticker {
 				f := n.State
 
 				list := []interface{}{
-					len(f.Holding),
+					f.Hold.Len(),
 					len(f.Acks),
 					len(f.MsgQueue()),
 					f.InMsgQueue().Length(),

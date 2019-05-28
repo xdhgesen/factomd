@@ -648,8 +648,7 @@ func SimControl(listenTo int, listenStdin bool) {
 					if len(b) == 1 || b[1] == 'h' {
 						f := fnodes[ListenTo]
 						fmt.Println("Holding:")
-						for k := range f.State.Holding {
-							v := f.State.Holding[k]
+						for k, v := range f.State.Hold.Messages() {
 							vf := v.Validate(f.State)
 							if v != nil {
 								repeat := f.State.Replay.IsHashUnique(constants.REVEAL_REPLAY, v.GetHash().Fixed())
@@ -668,9 +667,9 @@ func SimControl(listenTo int, listenStdin bool) {
 								os.Stderr.WriteString(fmt.Sprintf("%s v %d %x cnt %d notYet: %v commitKey-%x \n", c.String(), vf, k, c.GetResendCnt(), repeat, k[:6]))
 								cc, ok1 := c.(*messages.CommitChainMsg)
 								cm, ok2 := c.(*messages.CommitEntryMsg)
-								if ok1 && f.State.Holding[cc.CommitChain.EntryHash.Fixed()] != nil {
+								if ok1 && f.State.Hold.Get(cc.CommitChain.EntryHash.Fixed()) != nil {
 									os.Stderr.WriteString(" cc MATCH!\n")
-								} else if ok2 && f.State.Holding[cm.CommitEntry.EntryHash.Fixed()] != nil {
+								} else if ok2 && f.State.Hold.Get(cm.CommitEntry.EntryHash.Fixed()) != nil {
 									os.Stderr.WriteString(" ce MATCH!\n")
 								} else {
 									os.Stderr.WriteString(" no match\n")
