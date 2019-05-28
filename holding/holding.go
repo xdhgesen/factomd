@@ -7,32 +7,36 @@ import (
 )
 
 type HoldingList struct {
-	HoldingMutex sync.RWMutex
-	HoldingLast  int64
-	HoldingMap   map[[32]byte]interfaces.IMsg
-	Holding      map[[32]byte]interfaces.IMsg
+	mutex      sync.RWMutex
+	last       int64
+	holdingMap map[[32]byte]interfaces.IMsg
+	holding    map[[32]byte]interfaces.IMsg
 }
 
 func (hl *HoldingList) Init() {
-	hl.Holding = make(map[[32]byte]interfaces.IMsg)
-	hl.HoldingMap = make(map[[32]byte]interfaces.IMsg)
+	hl.holding = make(map[[32]byte]interfaces.IMsg)
+	hl.holdingMap = make(map[[32]byte]interfaces.IMsg)
 }
 
 func (hl *HoldingList) Len() int {
-	return len(hl.Holding)
+	return len(hl.holding)
+}
+
+func (hl *HoldingList) HoldingMapLen() int {
+	return len(hl.holdingMap)
 }
 
 func (hl *HoldingList) Messages() map[[32]byte]interfaces.IMsg {
-	return hl.Holding
+	return hl.holding
 }
 
 func (hl  *HoldingList) Get(key [32]byte) interfaces.IMsg {
-	return hl.Holding[key]
+	return hl.holding[key]
 }
 
 func (hl *HoldingList) FillHoldingMap() {
 
-	if hl.HoldingLast >= time.Now().Unix() {
+	if hl.last >= time.Now().Unix() {
 		return
 	}
 
@@ -40,37 +44,41 @@ func (hl *HoldingList) FillHoldingMap() {
 	for i, msg := range hl.Messages() {
 		localMap[i] = msg
 	}
-	hl.HoldingLast = time.Now().Unix()
+	hl.last = time.Now().Unix()
 
-	hl.HoldingMutex.Lock()
-	defer hl.HoldingMutex.Unlock()
-	hl.HoldingMap = localMap
+	hl.mutex.Lock()
+	defer hl.mutex.Unlock()
+	hl.holdingMap = localMap
 }
 
 
 func (hl *HoldingList) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
 	// request holding queue from state from outside state scope
-	hl.HoldingMutex.RLock()
-	defer hl.HoldingMutex.RUnlock()
-	localMap := hl.HoldingMap
+	hl.mutex.RLock()
+	defer hl.mutex.RUnlock()
+	localMap := hl.holdingMap
 
 	return localMap
 }
 
 func (hl *HoldingList) AddToHolding(hash [32]byte, msg interfaces.IMsg) (added bool) {
-	_, found := hl.Holding[hash]
+	_, found := hl.holding[hash]
 	if !found {
-		hl.Holding[hash] = msg
+		hl.holding[hash] = msg
 		return true
 	}
 	return false
 }
 
 func (hl *HoldingList) DeleteFromHolding(hash [32]byte) (removed bool) {
-	_, found := hl.Holding[hash]
+	_, found := hl.holding[hash]
 	if found {
-		delete(hl.Holding, hash)
+		delete(hl.holding, hash)
 		return true
 	}
 	return false
+}
+
+func (hl *HoldingList) ResetLast() {
+	hl.last = 0
 }

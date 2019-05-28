@@ -106,7 +106,7 @@ func TestLoadAcksMap(t *testing.T) {
 
 	hque := state.LoadAcksMap()
 
-	if len(hque) != len(state.Hold.HoldingMap) {
+	if len(hque) != len(state.Hold.LoadHoldingMap()) {
 		t.Errorf("Error with Acks Map Length")
 	}
 

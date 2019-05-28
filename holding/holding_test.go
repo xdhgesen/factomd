@@ -15,6 +15,6 @@ func TestLoadHoldingMap(t *testing.T) {
 
 	hque := state.Hold.LoadHoldingMap()
 	if len(hque) != len(state.Hold.HoldingMap) {
-		t.Errorf("Error with Holding Map Length")
+		t.Errorf("Error with holding Map Length")
 	}
 }
