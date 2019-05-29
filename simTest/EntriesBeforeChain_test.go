@@ -63,6 +63,8 @@ func TestEntriesBeforeChain(t *testing.T) {
 	state0.APIQueue().Enqueue(commit)
 	state0.APIQueue().Enqueue(reveal)
 
+	WaitMinutes(state0, 2)
+
 	amt := uint64(numEntries + 11) // Chain costs 10 + 1 per k so our chain costs 11
 	engine.FundECWallet(state0, b.FctPrivHash(), a.EcAddr(), amt*state0.GetFactoshisPerEC())
 	WaitForAnyDeposit(state0, a.EcPub())

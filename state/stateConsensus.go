@@ -572,11 +572,6 @@ func (s *State) ReviewHolding() {
 		}
 	}
 
-	// Set this flag, so it acts as a constant.  We will set s.LeaderNewMin to false
-	// after processing the Holding Queue.  Ensures we only do this one per minute.
-	//	processMinute := s.LeaderNewMin // Have we processed this minute
-	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
-
 	for k, v := range s.Hold.Messages() {
 
 		if int(highest)-int(saved) > 1000 {
@@ -2159,7 +2154,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		s.EOMDone = true // ProcessEOM
 		s.EOMSyncTime = time.Now().UnixNano()
 
-		s.LeaderNewMin = 0
 		for _, eb := range pl.NewEBlocks {
 			eb.AddEndOfMinuteMarker(byte(e.Minute + 1))
 		}

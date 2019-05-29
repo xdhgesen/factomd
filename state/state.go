@@ -218,7 +218,6 @@ type State struct {
 	TimestampAtBoot interfaces.Timestamp
 	OneLeader       bool
 	OutputAllowed   bool
-	LeaderNewMin    int
 	CurrentMinute   int
 
 	// These are the start times for blocks and minutes
