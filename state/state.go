@@ -134,7 +134,7 @@ type State struct {
 
 	//  pending entry/transaction api calls for the holding queue do not have proper scope
 	//  This is used to create a temporary, correctly scoped holding queue snapshot for the calls on demand
-	Hold  holding.HoldingList
+	Hold holding.HoldingList
 
 	// Elections are managed through the Elections Structure
 	EFactory  interfaces.IElectionsFactory
@@ -1436,10 +1436,6 @@ func (s *State) LoadSpecificMsgAndAck(dbheight uint32, vmIndex int, plistheight 
 		return nil, nil, fmt.Errorf("%s", "State process list does not include requested message/ack")
 	}
 	return msg, ackMsg, nil
-}
-
-func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
-	return s.Hold.GetHoldingMap()
 }
 
 // this is called from the APIs that do not have access directly to the Acks.  State makes a copy and puts it in AcksMap

@@ -67,20 +67,6 @@ func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
 	}
 }
 
-func (s *State) AddToHolding(hash [32]byte, msg interfaces.IMsg) {
-	if s.Hold.AddToHolding(hash, msg) {
-		s.LogMessage("holding", "add", msg)
-		TotalHoldingQueueInputs.Inc()
-	}
-}
-
-func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason string) {
-	if s.Hold.DeleteFromHolding(hash) {
-		s.LogMessage("holding", "delete "+reason, msg)
-		TotalHoldingQueueOutputs.Inc()
-	}
-}
-
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
 // for the replay filter.
 func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int) {
@@ -147,6 +133,14 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	}
 	if validToSend == -1 { // if the msg says drop then we drop...
 		return -1, -1
+	}
+	if validToSend == -2 { // if the msg says New hold then we don't execute...
+		return 0, -2
+	}
+
+	if validToSend != 1 { // if the msg says anything other than valid
+		s.LogMessage("badmsgs", fmt.Sprintf("Invalid validity code %d", validToSend), msg)
+		panic("unexpected validity code")
 	}
 
 	// if it is valid to send then we check other stuff ...
@@ -295,6 +289,10 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		// Sometimes messages we have already processed are in the msgQueue from holding when we execute them
 		// this check makes sure we don't put them back in holding after just deleting them
 		s.AddToHolding(msg.GetMsgHash().Fixed(), msg) // Add message where validToExecute==0
+		return false
+
+	case -2:
+		s.LogMessage("executeMsg", "new holding", msg)
 		return false
 
 	default:
@@ -950,7 +948,7 @@ func (s *State) FollowerExecuteMsg(m interfaces.IMsg) {
 	}
 }
 
-// exeute a msg with an optional delay (in factom seconds)
+// execute a msg with an optional delay (in factom seconds)
 func (s *State) repost(m interfaces.IMsg, delay int) {
 	//whereAmI := atomic.WhereAmIString(1)
 	go func() { // This is a trigger to issue the EOM, but we are still syncing.  Wait to retry.

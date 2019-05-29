@@ -10,15 +10,23 @@ import (
 )
 
 type HoldingList struct {
-	mutex      sync.RWMutex
-	last       int64
-	holdingMap map[[32]byte]interfaces.IMsg
-	holding    map[[32]byte]interfaces.IMsg
+	mutex        sync.RWMutex
+	last         int64
+	holdingMap   map[[32]byte]interfaces.IMsg
+	holding      map[[32]byte]interfaces.IMsg
+
+	// { [dependencyHash] => { [msgHash] => timeAdded } }
+	dependentMap map[[32]byte]map[[32]byte]int64
+}
+
+func now() int64 {
+	return time.Now().Unix()
 }
 
 func (hl *HoldingList) Init() {
 	hl.holding = make(map[[32]byte]interfaces.IMsg)
 	hl.holdingMap = make(map[[32]byte]interfaces.IMsg)
+	hl.dependentMap = make(map[[32]byte]map[[32]byte]int64)
 }
 
 func (hl *HoldingList) Len() int {
@@ -33,13 +41,13 @@ func (hl *HoldingList) Messages() map[[32]byte]interfaces.IMsg {
 	return hl.holding
 }
 
-func (hl  *HoldingList) Get(key [32]byte) interfaces.IMsg {
+func (hl *HoldingList) Get(key [32]byte) interfaces.IMsg {
 	return hl.holding[key]
 }
 
 func (hl *HoldingList) FillHoldingMap() {
 
-	if hl.last >= time.Now().Unix() {
+	if hl.last >= now() {
 		return
 	}
 
@@ -54,7 +62,6 @@ func (hl *HoldingList) FillHoldingMap() {
 	hl.holdingMap = localMap
 }
 
-
 func (hl *HoldingList) GetHoldingMap() map[[32]byte]interfaces.IMsg {
 	// request holding queue from state from outside state scope
 	hl.mutex.RLock()
@@ -64,7 +71,7 @@ func (hl *HoldingList) GetHoldingMap() map[[32]byte]interfaces.IMsg {
 	return localMap
 }
 
-func (hl *HoldingList) AddToHolding(hash [32]byte, msg interfaces.IMsg) (added bool) {
+func (hl *HoldingList) Add(hash [32]byte, msg interfaces.IMsg) (added bool) {
 	_, found := hl.holding[hash]
 	if !found {
 		hl.holding[hash] = msg
@@ -73,7 +80,43 @@ func (hl *HoldingList) AddToHolding(hash [32]byte, msg interfaces.IMsg) (added b
 	return false
 }
 
-func (hl *HoldingList) DeleteFromHolding(hash [32]byte) (removed bool) {
+func (hl *HoldingList) AddDependent(hash [32]byte, dependentHash [32]byte, msg interfaces.IMsg) (added bool) {
+	ok := hl.Add(hash, msg)
+
+	if hl.dependentMap[dependentHash] == nil {
+		hl.dependentMap[dependentHash] = make(map[[32]byte]int64)
+	}
+
+	if ok {
+		hl.dependentMap[dependentHash][hash] = now()
+	}
+	return ok
+}
+
+// retrieve and remove dependent messages from holding
+func (hl *HoldingList) GetDependents(dependentHash [32]byte) (result []interfaces.IMsg) {
+
+	hl.mutex.Lock()
+	defer hl.mutex.Unlock()
+
+	for msgHash := range hl.dependentMap[dependentHash] {
+		if msg := hl.holding[msgHash]; msg != nil {
+			result = append(result, msg)
+		}
+		delete(hl.holding, msgHash)
+		delete(hl.holdingMap, msgHash)
+	}
+	delete(hl.dependentMap, dependentHash)
+
+	return result
+}
+
+// delete message from holding and remove any dependency mappings
+func (hl *HoldingList) Delete(hash [32]byte) (removed bool) {
+
+	for _, dMap := range hl.dependentMap {
+		delete(dMap, hash)
+	}
 	_, found := hl.holding[hash]
 	if found {
 		delete(hl.holding, hash)
@@ -168,7 +211,6 @@ func (hl *HoldingList) FetchMessageByHash(hash interfaces.IHash) (int, byte, int
 	return constants.AckStatusUnknown, byte(0), nil, fmt.Errorf("Not Found")
 }
 
-
 func (hl *HoldingList) GetEntry(hash interfaces.IHash) (interfaces.IEBEntry, error) {
 	q := hl.GetHoldingMap()
 	var re messages.RevealEntryMsg
@@ -190,7 +232,6 @@ func (hl *HoldingList) GetEntry(hash interfaces.IHash) (interfaces.IEBEntry, err
 	}
 	return nil, nil
 }
-
 
 func (hl *HoldingList) GetTransaction(hash interfaces.IHash) (tx interfaces.ITransaction, err error) {
 	q := hl.GetHoldingMap()

@@ -234,7 +234,7 @@ func TestDblockConf(t *testing.T) {
 		t.Errorf("Should be TransAck, found %s", constants.AckStatusString(status))
 	}
 
-	s.Hold.AddToHolding(eh.Fixed(), commit)
+	s.Hold.Add(eh.Fixed(), commit)
 	s.Hold.ResetLast()
 	s.UpdateState()
 	_, c := s.Hold.FetchEntryRevealAndCommit(eh)

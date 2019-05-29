@@ -345,6 +345,12 @@ type IState interface {
 	CheckFileName(string) bool
 	AddToReplayFilter(mask int, hash [32]byte, timestamp Timestamp, systemtime Timestamp) bool
 
-	// Activations
+	// Activations -------------------------------------------------------
 	IsActive(id activations.ActivationType) bool
+
+	// Holding of dependent messages -------------------------------------
+	// Add a message to a dependent holding list
+	Add(h [32]byte, msg IMsg)
+	// expire any dependent messages that are in holding but are older than limit
+	ExecuteFromHolding(h [32]byte)
 }

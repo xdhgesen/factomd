@@ -331,7 +331,12 @@ func (fs *FactoidState) UpdateTransaction(rt bool, trans interfaces.ITransaction
 	}
 	for _, ecOut := range trans.GetECOutputs() {
 		ecbal := int64(ecOut.GetAmount()) / int64(fs.State.FactoshisPerEC)
-		fs.State.PutE(rt, ecOut.GetAddress().Fixed(), fs.State.GetE(rt, ecOut.GetAddress().Fixed())+ecbal)
+		fs.State.PutE(rt, ecOut.GetAddress().Fixed(), fs.State.GetE(rt, ecOut.GetAddress().Fixed())+ecbal) // Add EC's from FCT
+
+		// execute any messages that were waiting on this EC address
+		if rt == true {
+			fs.State.ExecuteFromHolding(ecOut.GetAddress().Fixed())
+		}
 	}
 	fs.State.NumTransactions++
 	return nil
