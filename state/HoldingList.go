@@ -14,10 +14,13 @@ func (s *State) Add(h [32]byte, msg interfaces.IMsg) {
 func (s *State) ExecuteFromHolding(h [32]byte) {
 	// get the list of messages waiting on this hash
 
+	s.LogPrintf("holding", "SKIP_enqueue_from_holding")
+	/* REVIEW: when this is disabled things still work
 	for _, m := range s.Hold.GetDependents(h) {
 		s.LogMessage("msgQueue", "enqueue_from_holding", m)
 		s.msgQueue <- m
 	}
+	*/
 }
 
 func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
