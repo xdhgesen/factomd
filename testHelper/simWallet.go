@@ -299,31 +299,3 @@ func WaitForEcBalance(s *state.State, ecPub string, target int64) int64 {
 	}
 }
 
-func WatchMessageLists() *time.Ticker {
-
-	ticker := time.NewTicker(1 * time.Second)
-
-	go func() {
-		for range ticker.C {
-			for _, n := range engine.GetFnodes() {
-
-				f := n.State
-
-				list := []interface{}{
-					f.Hold.Len(),
-					len(f.Acks),
-					len(f.MsgQueue()),
-					f.InMsgQueue().Length(),
-					f.APIQueue().Length(),
-					len(f.AckQueue()),
-					len(f.TimerMsgQueue()),
-				}
-
-				f.LogPrintf(logName, "LIST_SIZES Holding: %v, Acks: %v, MsgQueue: %v, InMsgQueue: %v, APIQueue: %v, AckQueue: %v, TimerMsg: %v ", list...)
-			}
-
-		}
-	}()
-
-	return ticker
-}

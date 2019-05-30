@@ -36,8 +36,6 @@ func TestHoldingRebound(t *testing.T) {
 	// REVIEW: changing simulation to LAF doesn't always pass cleanly on circle
 	// this may just mean we shouldn't check for empty holding
 	state0 := SetupSim("L", params, 9, 0, 0, t)
-	ticker := WatchMessageLists()
-	defer ticker.Stop()
 
 	if dropRate > 0 {
 		state0.LogPrintf(logName, "DROP_RATE:%v", dropRate)
@@ -143,12 +141,5 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 		if setDelay > 0 {
 			WaitBlocks(state0, int(setDelay)) // wait between batches
 		}
-
-		// FIXME: do a real test
-		// this may mean allowing for some types of entries to remain in holding
-
-		//tend := waitForEmptyHolding(state0, fmt.Sprintf("SLEEP", BatchID))
-		//bal := engine.GetBalanceEC(state0, a.EcPub())
-		//assert.Equal(t, bal, int64(0))
 	}
 }
