@@ -12,12 +12,7 @@ func (s *State) Add(h [32]byte, msg interfaces.IMsg) {
 // Execute a list of messages from holding that are dependant on a hash
 // the hash may be a EC address or a CainID or a height (ok heights are not really hashes but we cheat on that)
 func (s *State) ExecuteFromHolding(h [32]byte) {
-	// get the list of messages waiting on this hash
-
-	for _, m := range s.Hold.GetDependents(h) {
-		s.LogMessage("msgQueue", "enqueue_from_holding", m)
-		s.msgQueue <- m
-	}
+	s.Hold.ApplyDependents(h)
 }
 
 func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
@@ -38,6 +33,7 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 	}
 }
 
+// TODO: make use of this for other types of dependencies
 // put a height in the first 4 bytes of a hash so we can use it to look up dependent message in holding
 func HeightToHash(height uint32) [32]byte {
 	var h [32]byte
