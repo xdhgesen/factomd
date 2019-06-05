@@ -209,6 +209,10 @@ type State struct {
 	IgnoreDone    bool
 	IgnoreMissing bool
 
+	// Timout and Limit for outstanding missing DBState requests
+	RequestTimeout time.Duration
+	RequestLimit   int
+
 	LLeaderHeight   uint32
 	Leader          bool
 	LeaderVMIndex   int
@@ -292,6 +296,10 @@ type State struct {
 
 	// Directory Block State
 	DBStates *DBStateList // Holds all DBStates not yet processed.
+
+	StatesMissing  *StatesMissing
+	StatesWaiting  *StatesWaiting
+	StatesReceived *StatesReceived
 
 	// Having all the state for a particular directory block stored in one structure
 	// makes creating the next state, updating the various states, and setting up the next
@@ -538,6 +546,9 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.RpcPass = s.RpcPass
 	newState.RpcAuthHash = s.RpcAuthHash
 
+	newState.RequestTimeout = s.RequestTimeout
+	newState.RequestLimit = s.RequestLimit
+
 	newState.FactomdTLSEnable = s.FactomdTLSEnable
 	newState.factomdTLSKeyFile = s.factomdTLSKeyFile
 	newState.factomdTLSCertFile = s.factomdTLSCertFile
@@ -777,6 +788,8 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.ControlPanelPort = cfg.App.ControlPanelPort
 		s.RpcUser = cfg.App.FactomdRpcUser
 		s.RpcPass = cfg.App.FactomdRpcPass
+		s.RequestTimeout = time.Duration(cfg.App.RequestTimeout) * time.Second
+		s.RequestLimit = cfg.App.RequestLimit
 		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
 		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
 		s.FastBoot = cfg.App.FastBoot
@@ -981,6 +994,12 @@ func (s *State) Init() {
 	s.DBStates = new(DBStateList)
 	s.DBStates.State = s
 	s.DBStates.DBStates = make([]*DBState, 0)
+
+	s.StatesMissing = NewStatesMissing()
+	s.StatesWaiting = NewStatesWaiting()
+	s.StatesReceived = NewStatesReceived()
+
+	s.DBStates.Catchup()
 
 	switch s.NodeMode {
 	case "FULL":
@@ -1923,8 +1942,6 @@ func (s *State) UpdateState() (progress bool) {
 			progress = ProcessLists.UpdateState(dbheight)
 		}
 	}
-
-	s.DBStates.Catchup(false)
 
 	s.SetString()
 	if s.ControlPanelDataRequest {
