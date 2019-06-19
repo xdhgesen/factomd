@@ -46,3 +46,15 @@ Holding review time Does correlate w/ TPS graphs
 ```
 rate(factomd_state_review_holding_time{}[30s])
 ```
+
+### ERR
+
+See this error when running test in container
+
+```
+--- FAIL: TestLoadNewHolding (903.11s)
+    LoadNewHolding_test.go:84: LLHT: 0<=>13 moved 13
+    LoadNewHolding_test.go:84: LLHT: 13<=>23 moved 10
+    LoadNewHolding_test.go:84: LLHT: 23<=>25 moved 2
+    LoadNewHolding_test.go:86: only moved 2 blocks
+```

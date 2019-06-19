@@ -2,7 +2,6 @@ package longtest
 
 import (
 	"github.com/FactomProject/factomd/engine"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
 
@@ -66,8 +65,9 @@ func TestLoadNewHolding(t *testing.T) {
 	}
 
 	testRound := func() {
+		startHt := state0.GetDBHeightComplete()
 		time.Sleep(time.Second * 20) // wait network to be up
-		RunCmd("R5")                  // Load 5 tx/sec
+		RunCmd("R10")                  // Load 5 tx/sec
 		time.Sleep(time.Second * 260) // wait for rebound
 
 		LogStuck("held_during_load")
@@ -77,12 +77,15 @@ func TestLoadNewHolding(t *testing.T) {
 
 		LogStuck("stuck_after_load")
 
-		startHt := state0.GetDBHeightAtBoot()
 		endHt := state0.GetDBHeightComplete()
 
+		delta := endHt-startHt
 		// show progress made during this run
-		t.Logf("LLHT: %v<=>%v", startHt, endHt)
-		assert.True(t, endHt-startHt >= 9)
+		t.Logf("LLHT: %v<=>%v moved %v", startHt, endHt, delta)
+		if delta < 9 {
+			t.Fatalf("only moved %v blocks", delta)
+			panic("FAILED")
+		}
 	}
 
 	for { // loop forever
