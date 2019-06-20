@@ -10,6 +10,9 @@ import (
 // authority node configuration
 var nodesLoadNewHolding string = "LLLLLLLLFFFFFF"
 
+// run this test  from CLI:
+// go test -v ./longTest/... -run=TestSetupLoadNewHolding &&  go test -timeout=9999h -v ./longTest/... -run=TestLoadNewHolding
+
 /*
 1st Part - Deletes old test data and re-initializes a new network
 */
@@ -63,7 +66,7 @@ func TestLoadNewHolding(t *testing.T) {
 				}
 			}
 		}
-	 */
+	*/
 
 	for { // loop forever
 		select {
