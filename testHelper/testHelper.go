@@ -4,6 +4,8 @@ package testHelper
 
 import (
 	"os/exec"
+	"regexp"
+	"runtime"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
@@ -391,4 +393,27 @@ func SystemCall(cmd string) []byte {
 	}
 	fmt.Print(string(out))
 	return out
+}
+
+var testNameRe = regexp.MustCompile(`\.Test\w+$`)
+
+// find Test Function name in stack
+func GetTestName() (name string) {
+	targetFrameIndex := 4 // limit caller frame depth to check for a test name
+
+	programCounters := make([]uintptr, targetFrameIndex+2)
+	n := runtime.Callers(0, programCounters)
+
+	if n > 0 {
+		frames := runtime.CallersFrames(programCounters[:n])
+		var frameCandidate runtime.Frame
+		for more, frameIndex := true, 0; more && frameIndex <= targetFrameIndex; frameIndex++ {
+			frameCandidate, more = frames.Next()
+			if testNameRe.MatchString(frameCandidate.Function) {
+				return testNameRe.FindString(frameCandidate.Function)[1:]
+			}
+		}
+	}
+
+	return name
 }
