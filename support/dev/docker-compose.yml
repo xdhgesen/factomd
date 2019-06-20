@@ -11,10 +11,13 @@ services:
             - "8088"
             - "8110"
         ports:
+            - "8088:8088"
             - "8090:8090"
         volumes:
             - ./factom/factomd_1.conf:/root/.factom/m2/factomd.conf:ro
-        command: -sim_stdin=false -customnet=net -network=CUSTOM -startdelay=10 -logstash -logurl=logstash:8345
+        entrypoint:
+            - /bin/bash
+        command: -c "tail -f /dev/null"
         networks:
             factomd:
                 ipv4_address: 10.7.0.1
@@ -32,7 +35,9 @@ services:
             - "8190:8090"
         volumes:
             - ./factom/factomd_2.conf:/root/.factom/m2/factomd.conf:ro
-        command: -sim_stdin=false -customnet=net -network=CUSTOM -startdelay=10 -logstash -logurl=logstash:8345
+        entrypoint:
+            - /bin/bash
+        command: -c "tail -f /dev/null"
         networks:
             factomd:
                 ipv4_address: 10.7.0.2
@@ -50,7 +55,10 @@ services:
             - "8290:8090"
         volumes:
             - ./factom/factomd_3.conf:/root/.factom/m2/factomd.conf:ro
-        command: -sim_stdin=false -customnet=net -network=CUSTOM -startdelay=10 -logstash -logurl=logstash:8345
+        entrypoint:
+            - /bin/bash
+        command: -c "tail -f /dev/null"
+
         networks:
             factomd:
                 ipv4_address: 10.7.0.3
@@ -78,6 +86,7 @@ services:
             - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
         ports:
             - "5000:5000"
+            - "8345:8345"
         environment:
             LS_JAVA_OPTS: "-Xmx256m -Xms256m"
         networks:

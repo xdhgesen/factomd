@@ -47,7 +47,7 @@ func TestLoadNewHolding(t *testing.T) {
 	// adjust simulation parameters
 	RunCmd("s")  // show node state summary
 	RunCmd("Re") // keep reloading EC wallet on 'tight' schedule (only small amounts)
-	//RunCmd("r")  // rotate wsapi
+	RunCmd("r")  // rotate wsapi
 	//RunCmd("S10")  // message drop rate 1%
 	//RunCmd("F500") // add 500 ms delay to all messages
 
@@ -64,38 +64,36 @@ func TestLoadNewHolding(t *testing.T) {
 		}
 	}
 
-	testRound := func() {
-		startHt := state0.GetDBHeightComplete()
-		time.Sleep(time.Second * 20) // wait network to be up
-		RunCmd("R10")                  // Load 5 tx/sec
-		time.Sleep(time.Second * 260) // wait for rebound
-
-		LogStuck("held_during_load")
-
-		RunCmd("R0")                  // Load 0 tx/sec
-		time.Sleep(time.Second * 20) // wait for rebound
-
-		LogStuck("stuck_after_load")
-
-		endHt := state0.GetDBHeightComplete()
-
-		delta := endHt-startHt
-		// show progress made during this run
-		t.Logf("LLHT: %v<=>%v moved %v", startHt, endHt, delta)
-		if delta < 9 {
-			t.Fatalf("only moved %v blocks", delta)
-			panic("FAILED")
-		}
-	}
-
 	for { // loop forever
 		select {
-		case <-state0.ShutdownChan: {
-			break
-		}
-		default: {
-			testRound()
-		}
+		case <-state0.ShutdownChan:
+			{
+				break
+			}
+		default:
+			{
+				startHt := state0.GetDBHeightComplete()
+				time.Sleep(time.Second * 20)  // wait network to be up
+				RunCmd("R5")                 // Load 5 tx/sec
+				time.Sleep(time.Second * 260) // wait for rebound
+
+				LogStuck("held_during_load")
+
+				RunCmd("R0")                 // Load 0 tx/sec
+				time.Sleep(time.Second * 20) // wait for rebound
+
+				LogStuck("stuck_after_load")
+
+				endHt := state0.GetDBHeightComplete()
+
+				delta := endHt - startHt
+				// show progress made during this run
+				t.Logf("LLHT: %v<=>%v moved %v", startHt, endHt, delta)
+				if delta < 9 {
+					t.Fatalf("only moved %v blocks", delta)
+					panic("FAILED")
+				}
+			}
 
 		}
 	}
