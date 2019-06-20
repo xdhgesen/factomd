@@ -3,6 +3,8 @@ package testHelper_test
 import (
 	"crypto/rand"
 
+	"github.com/FactomProject/factomd/util"
+
 	"github.com/FactomProject/factomd/engine"
 
 	"github.com/FactomProject/ed25519"
@@ -174,4 +176,25 @@ func TestTxnCreate(t *testing.T) {
 	// test that we are sending to the address we thought
 	assert.Equal(t, outAddress, txn.Outputs[0].GetUserAddress())
 
+}
+
+// test that we can get the name of our test
+func TestGetName(t *testing.T) {
+	TestGetFoo := func() string {
+		// add extra frame depth
+		return GetTestName()
+	}
+	assert.Equal(t, "TestGetName", TestGetFoo())
+}
+
+func TestResetFactomHome(t *testing.T) {
+	s := GetSimTestHome(t)
+	t.Logf("simhome: %v", s)
+
+	h := ResetSimHome(t)
+
+	t.Logf("reset home: %v", h)
+	t.Logf("util home: %v", util.GetHomeDir())
+
+	assert.Equal(t, s, h)
 }
