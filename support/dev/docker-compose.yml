@@ -4,6 +4,7 @@ services:
     factomd_1:
         container_name: factomd_1
         build: ../../
+        image: factomproject/factomd:localdev
         depends_on:
             - logstash
             - nginx
@@ -12,12 +13,12 @@ services:
             - "8110"
         ports:
             - "8088:8088"
+            - "8110:8110"
             - "8090:8090"
         volumes:
             - ./factom/factomd_1.conf:/root/.factom/m2/factomd.conf:ro
-        entrypoint:
-            - /bin/bash
-        command: -c "tail -f /dev/null"
+            - ./factom/fnode1/:/root/.factom/m2/local-database:rw
+        command: -network=LOCAL -debuglog=.
         networks:
             factomd:
                 ipv4_address: 10.7.0.1
@@ -25,6 +26,7 @@ services:
     factomd_2:
         container_name: factomd_2
         build: ../../
+        image: factomproject/factomd:localdev
         depends_on:
             - logstash
             - nginx
@@ -35,9 +37,8 @@ services:
             - "8190:8090"
         volumes:
             - ./factom/factomd_2.conf:/root/.factom/m2/factomd.conf:ro
-        entrypoint:
-            - /bin/bash
-        command: -c "tail -f /dev/null"
+            - ./factom/fnode2/:/root/.factom/m2/local-database:rw
+        command: -network=LOCAL -debuglog=.
         networks:
             factomd:
                 ipv4_address: 10.7.0.2
@@ -45,6 +46,7 @@ services:
     factomd_3:
         container_name: factomd_3
         build: ../../
+        image: factomproject/factomd:localdev
         depends_on:
             - logstash
             - nginx
@@ -55,9 +57,8 @@ services:
             - "8290:8090"
         volumes:
             - ./factom/factomd_3.conf:/root/.factom/m2/factomd.conf:ro
-        entrypoint:
-            - /bin/bash
-        command: -c "tail -f /dev/null"
+            - ./factom/fnode3/:/root/.factom/m2/local-database:rw
+        command: -network=LOCAL -debuglog=.
 
         networks:
             factomd:

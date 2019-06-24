@@ -9,7 +9,7 @@ import (
 )
 
 // authority node configuration
-var nodesLoadNewHolding string = "LLLLLLLLFFFFFF"
+var nodesLoadNewHolding string = "LLLLLLLLFFFFFF" // 14 nodes
 
 /*
 1st Part - Deletes old test data and re-initializes a new network
@@ -72,9 +72,10 @@ func TestLoadNewHolding(t *testing.T) {
 			}
 		default:
 			{
+				// 300s (5min) increments of load
 				startHt := state0.GetDBHeightComplete()
-				time.Sleep(time.Second * 20)  // wait network to be up
-				RunCmd("R5")                 // Load 5 tx/sec
+				time.Sleep(time.Second * 20)  // give some lead time
+				RunCmd("R5")                  // Load 5 tx/sec
 				time.Sleep(time.Second * 260) // wait for rebound
 
 				LogStuck("held_during_load")
