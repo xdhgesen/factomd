@@ -37,6 +37,7 @@ import (
 	"github.com/FactomProject/factomd/wsapi"
 	"github.com/FactomProject/logrustash"
 
+	"regexp"
 	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
 	log "github.com/sirupsen/logrus"
 )
@@ -208,6 +209,9 @@ type State struct {
 	// own messages from the previously executing network can confuse you.
 	IgnoreDone    bool
 	IgnoreMissing bool
+	// Timout and Limit for outstanding missing DBState requests
+	RequestTimeout time.Duration
+	RequestLimit   int
 
 	LLeaderHeight   uint32
 	Leader          bool
@@ -229,6 +233,7 @@ type State struct {
 
 	EOMsyncing bool
 
+	EOMSyncTime  int64
 	EOM          bool // Set to true when the first EOM is encountered
 	EOMLimit     int
 	EOMProcessed int
@@ -292,6 +297,9 @@ type State struct {
 
 	// Directory Block State
 	DBStates *DBStateList // Holds all DBStates not yet processed.
+	StatesMissing  *StatesMissing
+	StatesWaiting  *StatesWaiting
+	StatesReceived *StatesReceived
 
 	// Having all the state for a particular directory block stored in one structure
 	// makes creating the next state, updating the various states, and setting up the next
@@ -331,6 +339,8 @@ type State struct {
 	// For Replay / journal
 	IsReplaying     bool
 	ReplayTimestamp interfaces.Timestamp
+	// State for the Entry Syncing process
+	EntrySyncState *EntrySync
 
 	MissingEntryBlockRepeat interfaces.Timestamp
 	// DBlock Height at which node has a complete set of eblocks+entries
@@ -411,7 +421,11 @@ type State struct {
 
 	reportedActivations   [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 	validatorLoopThreadID string
-
+	OutputRegEx               *regexp.Regexp
+	OutputRegExString         string
+	InputRegEx                *regexp.Regexp
+	InputRegExString          string
+	executeRecursionDetection map[[32]byte]interfaces.IMsg
 	// struct for state/missingMsgTracking.go
 	MissingMessageResponse
 }
@@ -536,6 +550,8 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.RpcPass = s.RpcPass
 	newState.RpcAuthHash = s.RpcAuthHash
 
+	newState.RequestTimeout = s.RequestTimeout
+	newState.RequestLimit = s.RequestLimit
 	newState.FactomdTLSEnable = s.FactomdTLSEnable
 	newState.factomdTLSKeyFile = s.factomdTLSKeyFile
 	newState.factomdTLSCertFile = s.factomdTLSCertFile
@@ -775,6 +791,13 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.ControlPanelPort = cfg.App.ControlPanelPort
 		s.RpcUser = cfg.App.FactomdRpcUser
 		s.RpcPass = cfg.App.FactomdRpcPass
+		// if RequestTimeout is not set by the configuration set it to 1/10th of the block time by default
+		if cfg.App.RequestTimeout == 0 {
+			s.RequestTimeout = time.Duration(cfg.App.DirectoryBlockInSeconds/10) * time.Second
+		} else {
+			s.RequestTimeout = time.Duration(cfg.App.RequestTimeout) * time.Second
+		}
+		s.RequestLimit = cfg.App.RequestLimit
 		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
 		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
 		s.FastBoot = cfg.App.FastBoot
@@ -827,6 +850,12 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		} else {
 			s.IdentityChainID = identity
 			s.LogPrintf("AckChange", "Load IdentityChainID \"%v\"", s.IdentityChainID.String())
+		}
+		if cfg.App.P2PIncoming > 0 {
+			p2p.MaxNumberIncomingConnections = cfg.App.P2PIncoming
+		}
+		if cfg.App.P2POutgoing > 0 {
+			p2p.NumberPeersToConnect = cfg.App.P2POutgoing
 		}
 	} else {
 		s.LogPath = "database/"
@@ -888,7 +917,6 @@ func (s *State) GetSalt(ts interfaces.Timestamp) uint32 {
 }
 
 func (s *State) Init() {
-	s.LogPrintf("WhereAmI", "Init %s", atomic.WhereAmIString(1))
 
 	if s.Salt == nil {
 		b := make([]byte, 32)
@@ -921,23 +949,25 @@ func (s *State) Init() {
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	}
 
-	s.ControlPanelChannel = make(chan DisplayState, 20)
+	s.TimeOffset = new(primitives.Timestamp) //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
+
+	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
+
+	s.ShutdownChan = make(chan int, 1)                //Channel to gracefully shut down.
 	s.tickerQueue = make(chan int, 100)                        //ticks from a clock
 	s.timerMsgQueue = make(chan interfaces.IMsg, 100)          //incoming eom notifications, used by leaders
-	s.TimeOffset = new(primitives.Timestamp)                   //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
+	s.ControlPanelChannel = make(chan DisplayState, 20)
 	s.networkInvalidMsgQueue = make(chan interfaces.IMsg, 100) //incoming message queue from the network messages
-	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
-	s.networkOutMsgQueue = NewNetOutMsgQueue(5000)                 //Messages to be broadcast to the network
-	s.inMsgQueue = NewInMsgQueue(constants.INMSGQUEUE_HIGH + 100)  //incoming message queue for Factom application messages
-	s.inMsgQueue2 = NewInMsgQueue(constants.INMSGQUEUE_HIGH + 100) //incoming message queue for Factom application messages
-	s.electionsQueue = NewElectionQueue(10000)                     //incoming message queue for Factom application messages
-	s.apiQueue = NewAPIQueue(100)                                  //incoming message queue from the API
-	s.ackQueue = make(chan interfaces.IMsg, 100)                   //queue of Leadership messages
-	s.msgQueue = make(chan interfaces.IMsg, 400)                   //queue of Follower messages
-	s.ShutdownChan = make(chan int, 1)                             //Channel to gracefully shut down.
-	s.MissingEntries = make(chan *MissingEntry, 10000)             //Entries I discover are missing from the database
-	s.UpdateEntryHash = make(chan *EntryUpdate, 10000)             //Handles entry hashes and updating Commit maps.
-	s.WriteEntry = make(chan interfaces.IEBEntry, 20000)           //Entries to be written to the database
+	s.networkOutMsgQueue = NewNetOutMsgQueue(constants.INMSGQUEUE_MED)       //Messages to be broadcast to the network
+	s.inMsgQueue = NewInMsgQueue(constants.INMSGQUEUE_HIGH)                  //incoming message queue for Factom application messages
+	s.inMsgQueue2 = NewInMsgQueue(constants.INMSGQUEUE_HIGH)                 //incoming message queue for Factom application messages
+	s.electionsQueue = NewElectionQueue(constants.INMSGQUEUE_HIGH)           //incoming message queue for Factom application messages
+	s.apiQueue = NewAPIQueue(constants.INMSGQUEUE_HIGH)                      //incoming message queue from the API
+	s.ackQueue = make(chan interfaces.IMsg, 50)                              //queue of Leadership messages
+	s.msgQueue = make(chan interfaces.IMsg, 50)                              //queue of Follower messages
+	s.MissingEntries = make(chan *MissingEntry, constants.INMSGQUEUE_HIGH)   //Entries I discover are missing from the database
+	s.UpdateEntryHash = make(chan *EntryUpdate, constants.INMSGQUEUE_HIGH)   //Handles entry hashes and updating Commit maps.
+	s.WriteEntry = make(chan interfaces.IEBEntry, constants.INMSGQUEUE_HIGH) //Entries to be written to the database
 
 	if s.Journaling {
 		f, err := os.Create(s.JournalFile)
@@ -979,6 +1009,11 @@ func (s *State) Init() {
 	s.DBStates.State = s
 	s.DBStates.DBStates = make([]*DBState, 0)
 
+	s.StatesMissing = NewStatesMissing()
+	s.StatesWaiting = NewStatesWaiting()
+	s.StatesReceived = NewStatesReceived()
+
+	s.DBStates.Catchup()
 	switch s.NodeMode {
 	case "FULL":
 		s.Leader = false
@@ -1447,7 +1482,7 @@ func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
 }
 
 // this is executed in the state maintenance processes where the holding queue is in scope and can be queried
-//  This is what fills the HoldingMap while locking it againstt a read while building
+//  This is what fills the HoldingMap while locking it against a read while building
 func (s *State) fillHoldingMap() {
 	// once a second is often enough to rebuild the Ack list exposed to api
 
@@ -1920,9 +1955,6 @@ func (s *State) UpdateState() (progress bool) {
 		}
 	}
 
-	p2 := s.DBStates.UpdateState()
-	s.LogPrintf("updateIssues", "ProcessList progress %v DBStates progress %v", progress, p2)
-	progress = progress || p2
 
 	s.SetString()
 	if s.ControlPanelDataRequest {
@@ -1938,7 +1970,6 @@ func (s *State) UpdateState() (progress bool) {
 	s.fillHoldingMap()
 	s.fillAcksMap()
 
-	eupdates := false
 entryHashProcessing:
 	for {
 		select {
@@ -1948,13 +1979,9 @@ entryHashProcessing:
 			// If the SetHashNow worked, then we should prohibit any commit that might be pending.
 			// Remove any commit that might be around.
 			s.Commits.Delete(e.Hash.Fixed())
-			eupdates = true
 		default:
 			break entryHashProcessing
 		}
-	}
-	if eupdates {
-		s.LogPrintf("updateIssues", "entryProcessing")
 	}
 	return
 }
@@ -2950,4 +2977,22 @@ func (s *State) IsActive(id activations.ActivationType) bool {
 	}
 
 	return rval
+}
+
+func (s *State) PassOutputRegEx(RegEx *regexp.Regexp, RegExString string) {
+	s.OutputRegEx = RegEx
+	s.OutputRegExString = RegExString
+}
+
+func (s *State) GetOutputRegEx() (*regexp.Regexp, string) {
+	return s.OutputRegEx, s.OutputRegExString
+}
+
+func (s *State) PassInputRegEx(RegEx *regexp.Regexp, RegExString string) {
+	s.InputRegEx = RegEx
+	s.InputRegExString = RegExString
+}
+
+func (s *State) GetInputRegEx() (*regexp.Regexp, string) {
+	return s.InputRegEx, s.InputRegExString
 }
