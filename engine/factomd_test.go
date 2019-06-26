@@ -64,7 +64,7 @@ func TestCatchup(t *testing.T) {
 	RunCmd("x")
 	RunCmd("R5") // Feed load
 	WaitBlocks(state0, 5)
-	RunCmd("R0") // Stop load
+	RunCmd("R0")          // Stop load
 	RunCmd("x")           // back online
 	WaitBlocks(state0, 3) // give him a few blocks to catch back up
 	//todo: check that the node01 caught up and finished 2nd pass sync

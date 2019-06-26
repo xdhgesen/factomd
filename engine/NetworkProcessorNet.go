@@ -175,6 +175,12 @@ func Peers(fnode *FactomNode) {
 				RepeatMsgs.Inc()
 				continue
 			}
+			if fnode.State.RecientMessage.NewMsgs == nil {
+				fnode.State.RecientMessage.NewMsgs = make(chan interfaces.IMsg, 100)
+			}
+
+			// send msg to MMRequest processing to suppress requests for messages we already have
+			fnode.State.RecientMessage.NewMsgs <- msg
 
 			//fnode.MLog.add2(fnode, false, fnode.State.FactomNodeName, "API", true, msg)
 			if t := msg.Type(); t == constants.REVEAL_ENTRY_MSG || t == constants.COMMIT_CHAIN_MSG || t == constants.COMMIT_ENTRY_MSG {
@@ -347,12 +353,12 @@ func Peers(fnode *FactomNode) {
 						fnode.State.InMsgQueue().Enqueue(msg)
 					}
 				}
-				if fnode.State.MissingMessageResponse.NewMsgs == nil {
-					fnode.State.MissingMessageResponse.NewMsgs = make(chan interfaces.IMsg, 100)
+				if fnode.State.RecientMessage.NewMsgs == nil {
+					fnode.State.RecientMessage.NewMsgs = make(chan interfaces.IMsg, 100)
 				}
 
 				// send msg to MMRequest processing to suppress requests for messages we already have
-				fnode.State.MissingMessageResponse.NewMsgs <- msg
+				fnode.State.RecientMessage.NewMsgs <- msg
 			} // For a peer read up to 100 messages {...}
 		} // for each peer {...}
 		if cnt == 0 {
