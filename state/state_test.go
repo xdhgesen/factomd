@@ -274,7 +274,7 @@ func TestBootStrappingIdentity(t *testing.T) {
 
 func TestIsStalled(t *testing.T) {
 	s := testHelper.CreateEmptyTestState()
-	s.Syncing = false
+	s.IsSyncing() = false
 	s.ProcessLists.DBHeightBase = 20
 	s.CurrentMinuteStartTime = time.Now().UnixNano()
 	if !s.IsStalled() {

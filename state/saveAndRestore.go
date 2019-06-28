@@ -387,7 +387,6 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.DBSigDone = false
 	ss.DBSigSys = true
 	ss.Saving = true
-	ss.Syncing = false
 
 	ss.Holding = make(map[[32]byte]interfaces.IMsg)
 	//for k := range state.Holding {
@@ -434,143 +433,8 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 }
 
 func (ss *SaveState) TrimBack(s *State, d *DBState) {
+	panic("trim back called")
 	return
-	pdbstate := d
-	d = s.DBStates.Get(int(ss.DBHeight + 1))
-	if pdbstate == nil {
-		return
-	}
-	// Don't do anything until we are within the current day
-	if s.GetHighestKnownBlock()-s.GetHighestSavedBlk() > 144 {
-		return
-	}
-
-	pss := pdbstate.SaveStruct
-	if pss == nil {
-		return
-	}
-	ppl := s.ProcessLists.Get(ss.DBHeight)
-	if ppl == nil {
-		return
-	}
-	pl := s.ProcessLists.Get(ss.DBHeight + 1)
-	if pl == nil {
-		return
-	}
-
-	for _, vm := range pl.VMs {
-		vm.LeaderMinute = 0
-		if vm.Height > 0 {
-			vm.Signed = true
-			vm.Synced = true
-			vm.Height = 0
-			vm.List = vm.List[:0]
-			vm.ListAck = vm.ListAck[:0]
-		} else {
-			vm.Signed = false
-			vm.Synced = false
-			vm.List = vm.List[:0]
-			vm.ListAck = vm.ListAck[:0]
-		}
-	}
-
-	ss.EOMsyncing = s.EOMsyncing
-
-	s.EOM = pss.EOM
-	s.EOMLimit = pss.EOMLimit
-	s.EOMProcessed = pss.EOMProcessed
-	s.EOMDone = pss.EOMDone
-	s.EOMMinute = pss.EOMMinute
-	s.EOMSys = pss.EOMSys
-	s.DBSig = pss.DBSig
-	s.DBSigLimit = pss.DBSigLimit
-	s.DBSigProcessed = pss.DBSigProcessed
-	s.DBSigDone = pss.DBSigDone
-	s.DBSigSys = pss.DBSigSys
-	s.Saving = pss.Saving
-	s.Syncing = pss.Syncing
-
-	//s.Replay = pss.Replay.Save()
-	//s.Replay.s = s
-	//s.Replay.name = "Replay"
-
-	return
-	/*
-		pl.FedServers = append(pl.FedServers[0:], ppl.FedServers...)
-		pl.AuditServers = append(pl.AuditServers[0:], ppl.AuditServers...)
-
-		//s.Identities = append(s.Identities[:0], pss.Identities...)
-		//s.Authorities = append(s.Authorities[:0], pss.Authorities...)
-		//s.AuthorityServerCount = pss.AuthorityServerCount
-
-		s.Holding = make(map[[32]byte]interfaces.IMsg)
-		for k := range ss.Holding {
-			s.Holding[k] = pss.Holding[k]
-		}
-		s.XReview = append(s.XReview[:0], pss.XReview...)
-	*/
-
-	/**
-	ss.EOMsyncing = s.EOMsyncing
-
-	s.EOM = pss.EOM
-	s.EOMLimit = pss.EOMLimit
-	s.EOMProcessed = pss.EOMProcessed
-	s.EOMDone = pss.EOMDone
-	s.EOMMinute = pss.EOMMinute
-	s.EOMSys = pss.EOMSys
-	s.DBSig = pss.DBSig
-	s.DBSigLimit = pss.DBSigLimit
-	s.DBSigProcessed = pss.DBSigProcessed
-	s.DBSigDone = pss.DBSigDone
-	s.DBSigSys = pss.DBSigSys
-	s.Newblk = pss.Newblk
-	s.Saving = pss.Saving
-	s.Syncing = pss.Syncing
-
-	s.Holding = make(map[[32]byte]interfaces.IMsg)
-	for k := range ss.Holding {
-		s.Holding[k] = pss.Holding[k]
-	}
-	s.XReview = append(s.XReview[:0], pss.XReview...)
-
-	s.Acks = make(map[[32]byte]interfaces.IMsg)
-	for k := range pss.Acks {
-		s.Acks[k] = pss.Acks[k]
-	}
-
-	s.Commits = make(map[[32]byte][]interfaces.IMsg)
-	for k := range pss.Commits {
-		var c []interfaces.IMsg
-		s.Commits[k] = append(c, pss.Commits[k]...)
-	}
-
-	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg)
-	for k := range pss.InvalidMessages {
-		s.InvalidMessages[k] = pss.InvalidMessages[k]
-	}
-
-	// DBlock Height at which node has a complete set of eblocks+entries
-	s.EntryBlockDBHeightComplete = pss.EntryBlockDBHeightComplete
-	s.EntryBlockDBHeightProcessing = pss.EntryBlockDBHeightProcessing
-	s.MissingEntryBlocks = append(s.MissingEntryBlocks[:0], pss.MissingEntryBlocks...)
-
-	s.EntryBlockDBHeightComplete = pss.EntryDBHeightComplete
-	s.EntryDBHeightComplete = pss.EntryDBHeightComplete
-	s.EntryHeightComplete = pss.EntryHeightComplete
-	s.EntryDBHeightProcessing = pss.EntryBlockDBHeightProcessing
-	s.MissingEntries = append(s.MissingEntries[:0], pss.MissingEntries...)
-
-	s.FactoshisPerEC = pss.FactoshisPerEC
-	s.FERChainId = pss.FERChainId
-	s.ExchangeRateAuthorityAddress = pss.ExchangeRateAuthorityAddress
-
-	s.FERChangeHeight = pss.FERChangeHeight
-	s.FERChangePrice = pss.FERChangePrice
-	s.FERPriority = pss.FERPriority
-	s.FERPrioritySetHeight = pss.FERPrioritySetHeight
-
-	**/
 }
 
 func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
@@ -589,7 +453,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 				vm.LeaderMinute = 0
 				if vm.Height > 0 {
 					vm.Signed = true
-					vm.Synced = true
+					vm.Synced = false
 					vm.Height = 0
 					vm.List = vm.List[:0]
 					vm.ListAck = vm.ListAck[:0]
@@ -680,21 +544,17 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.EOM = false
 	s.EOMLimit = ss.EOMLimit
 	s.EOMProcessed = ss.EOMProcessed
-	s.EOMDone = ss.EOMDone
 	s.EOMMinute = ss.EOMMinute
 	s.EOMSys = ss.EOMSys
 	s.DBSig = false
 	s.DBSigLimit = ss.DBSigLimit
 	s.DBSigProcessed = ss.DBSigProcessed
-	s.DBSigDone = ss.DBSigDone
-	s.DBSigSys = ss.DBSigSys
 	s.Saving = true
-	s.Syncing = false
 	s.HighestAck = ss.DBHeight + 1
 	s.HighestKnown = ss.DBHeight + 2
 	s.Holding = make(map[[32]byte]interfaces.IMsg)
 
-	//TODO: Rip all these maps and arrays out. they are not needed... famouus last words.
+	//TODO: Rip all these maps and arrays out. they are not needed... famous last words.
 	for k := range ss.Holding {
 		s.Holding[k] = ss.Holding[k]
 	}
@@ -863,7 +723,7 @@ func (ss *SaveState) MarshalBinary() (rval []byte, err error) {
 	if err != nil {
 		return nil, err
 	}
-	err = buf.PushBool(ss.Syncing)
+	err = buf.PushBool(false)
 	if err != nil {
 		return nil, err
 	}
@@ -1123,7 +983,7 @@ func (ss *SaveState) UnmarshalBinaryData(p []byte) (newData []byte, err error) {
 	if err != nil {
 		return
 	}
-	ss.Syncing, err = buf.PopBool()
+	_, err = buf.PopBool()
 	if err != nil {
 		return
 	}

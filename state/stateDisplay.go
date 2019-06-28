@@ -138,9 +138,9 @@ func DeepStateDisplayCopyDifference(s *State, prev *DisplayState) (*DisplayState
 	}
 
 	if s.LeaderPL != nil {
-		vms := s.LeaderPL.VMs
-		for _, v := range vms {
-			list := v.List
+		for i, _ := range s.LeaderPL.FedServers {
+			vm := s.LeaderPL.VMs[i]
+			list := vm.List
 			for _, msg := range list {
 				if msg == nil {
 					continue

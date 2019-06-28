@@ -24,9 +24,9 @@ func (s *State) CreateEOM(force bool, m interfaces.IMsg, vmIdx int) (eom *messag
 	// Put the System Height and Serial Hash into the EOM
 	eom.SysHeight = uint32(pl.System.Height)
 
-	if !force && s.Syncing && vm.Synced {
+	if !force && s.IsSyncing() && vm.Synced {
 		return nil, nil
-	} else if !s.Syncing {
+	} else if !s.IsSyncing() {
 		s.EOMMinute = int(s.CurrentMinute)
 	}
 

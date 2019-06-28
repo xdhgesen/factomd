@@ -238,15 +238,13 @@ type State struct {
 	EOM          bool // Set to true when the first EOM is encountered
 	EOMLimit     int
 	EOMProcessed int
-	EOMDone      bool
-	EOMMinute    int
-	EOMSys       bool // At least one EOM has covered the System List
+
+	EOMMinute int
+	EOMSys    bool // At least one EOM has covered the System List
 
 	DBSig          bool
 	DBSigLimit     int
 	DBSigProcessed int // Number of DBSignatures received and processed.
-	DBSigDone      bool
-	DBSigSys       bool // At least one DBSig has covered the System List
 
 	CreatedLastBlockFromDBState bool
 
@@ -256,8 +254,7 @@ type State struct {
 
 	DBSigFails int // Keep track of how many blockhash mismatches we've had to correct
 
-	Saving  bool // True if we are in the process of saving to the database
-	Syncing bool // Looking for messages from leaders to sync
+	Saving bool // True if we are in the process of saving to the database
 
 	NetStateOff            bool // Disable if true, Enable if false
 	DebugConsensus         bool // If true, dump consensus trace
@@ -690,16 +687,20 @@ func (s *State) GetCurrentTime() int64 {
 	return time.Now().UnixNano()
 }
 
-func (s *State) IsSyncing() bool {
-	return s.Syncing
+func (s *State) IsSyncing() (syncing bool) {
+	for i, _ := range s.LeaderPL.FedServers {
+		vm := s.LeaderPL.VMs[i]
+		syncing = syncing || vm.Synced
+	}
+	return syncing
 }
 
 func (s *State) IsSyncingEOMs() bool {
-	return s.Syncing && s.EOM && !s.EOMDone
+	return s.IsSyncing() && s.EOM
 }
 
 func (s *State) IsSyncingDBSigs() bool {
-	return s.Syncing && s.DBSig && !s.DBSigDone
+	return s.IsSyncing() && s.DBSig
 }
 
 func (s *State) DidCreateLastBlockFromDBState() bool {
