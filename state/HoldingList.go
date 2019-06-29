@@ -120,7 +120,7 @@ func (l *HoldingList) isMsgStale(msg interfaces.IMsg) (res bool) {
 			res = true
 		}
 	default:
-		l.s.LogMessage("newHolding", "SKIP_DBHT_REVIEW", msg)
+		//		l.s.LogMessage("newHolding", "SKIP_DBHT_REVIEW", msg)
 	}
 
 	if msg.GetTimestamp().GetTime().UnixNano() < l.s.GetFilterTimeNano() {
@@ -130,7 +130,7 @@ func (l *HoldingList) isMsgStale(msg interfaces.IMsg) (res bool) {
 	if res {
 		l.s.LogMessage("newHolding", "EXPIRE", msg)
 	} else {
-		l.s.LogMessage("newHolding", "NOT_EXPIRED", msg)
+		//		l.s.LogMessage("newHolding", "NOT_EXPIRED", msg)
 	}
 
 	return res

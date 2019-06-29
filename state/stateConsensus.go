@@ -1228,12 +1228,6 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		dbstate.Locked = false
 	}
 
-	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Clear SigType follower execute DBState:  !s.SigType(%v)", s.FactomNodeName, s.SigType))
-	// clear all the syncing flags because we are done with this block
-	s.EOM = false
-	s.DBSig = false
-	s.Saving = true
-
 	// At this point the block is good, make sure not to ask for it anymore
 	if !dbstatemsg.IsInDB {
 		s.StatesReceived.Notify <- msg.(*messages.DBStateMsg)
@@ -2233,7 +2227,11 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 	}
 
 	pl := s.ProcessLists.Get(dbheight)
-	vm := s.ProcessLists.Get(dbheight).VMs[msg.GetVMIndex()]
+	vm := pl.VMs[msg.GetVMIndex()]
+
+	s.LogPrintf("bodymr", "m-%x bodymr %x", dbs.GetMsgHash().Bytes()[:3], dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+	s.LogPrintf("bodymr", "dbstate %d bodymr %x", dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR().Fixed())
+
 	if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
 		pl.IncrementDiffSigTally()
 		s.LogPrintf("processList", "Failed. DBSig and DBlocks do not match Expected-Body-Mr: [%d]%x, Got: [%d]%x",
@@ -2263,16 +2261,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 		return false
 	}
 	// OK, we are going to process this DBSig.
-	// debug
-	if s.DebugExec() {
-		defer func() {
-			ids := s.GetUnsyncedServersString(dbheight)
-			if len(ids) > 0 {
-				s.LogPrintf("dbsig-eom", "Waiting for DBSigs from %s", ids)
-			}
-		}()
-	}
-
 	s.LogMessage("dbsig-eom", "ProcessDBSig ", msg)
 
 	// Put the stuff that only executes once at the start of DBSignatures here
@@ -2297,8 +2285,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 	dbs.Matches = true
 	s.AddDBSig(dbheight, dbs.ServerIdentityChainID, dbs.DBSignature)
 
-	s.DBSigProcessed++
-
 	InMsg := s.EFactory.NewDBSigSigInternal(
 		s.FactomNodeName,
 		dbs.DBHeight,
@@ -2312,18 +2298,23 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 	s.LogPrintf("dbsig-eom", "ProcessDBSig@%d/%d/%d minute %d, Syncing %v , DBSID %v, DBSigProcessed %v, DBSigLimit %v",
 		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.IsSyncing(), s.DBSig, s.DBSigProcessed, s.DBSigLimit)
 
-	// Put the stuff that executes once for set of DBSignatures (after I have them all) here
-	if s.DBSigProcessed >= s.DBSigLimit {
-		s.DBSig = false //ProcessDBSig done
-		for i, _ := range s.LeaderPL.FedServers {
-			vm := s.LeaderPL.VMs[i]
-			vm.Synced = false // ProcessDBSig finalize
-		}
-		s.LogPrintf("dbsig-eom", "ProcessDBSig complete for %d", dbs.Minute)
+	s.DBSigProcessed++
 
-		s.ReviewHolding()
-		s.Saving = false
-		s.DBSigProcessed = 0 // ProcessDBsig End
+	// If this is the last DBSig {...}
+	if s.DBSigProcessed >= s.DBSigLimit {
+
+		// clean up the flags now that we are done with the dbsig sync but do it after reporting unsync'd servers.
+		defer func() {
+			s.DBSig = false //ProcessDBSig done
+			for i, _ := range s.LeaderPL.FedServers {
+				vm := s.LeaderPL.VMs[i]
+				vm.Synced = false // ProcessDBSig finalize
+			}
+			s.LogPrintf("dbsig-eom", "ProcessDBSig complete for %d", dbs.Minute)
+
+			s.Saving = false
+			s.DBSigProcessed = 0 // ProcessDBsig End
+		}()
 
 		// process the Factoid state when we process the last DBSig
 		// Get DBSig for VM0
@@ -2360,10 +2351,17 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 		s.LogPrintf("dbsig", "ProcessDBSig(): 2nd ProcessDBSig(): %10s DBSig dbht %d leaderheight %d VMIndex %d Timestamp %x %d, leadertimestamp = %x %d",
 			s.FactomNodeName, dbs.DBHeight, s.LLeaderHeight, dbs.VMIndex, dbs.GetTimestamp().GetTimeMilli(), dbs.GetTimestamp().GetTimeMilli(), s.LeaderTimestamp.GetTimeMilliUInt64(), s.LeaderTimestamp.GetTimeMilliUInt64())
 
-	} else {
-		vm.Synced = true // ProcessDBsig
 	}
+	vm.Synced = true // ProcessDBsig
 	vm.Signed = true
+	// debug
+	if s.DebugExec() {
+		ids := s.GetUnsyncedServersString(dbheight)
+		if len(ids) > 0 {
+			s.LogPrintf("dbsig-eom", "Waiting for DBSigs from %s", ids)
+		}
+	}
+
 	return true
 }
 

@@ -459,6 +459,7 @@ func Run(s *state.State) {
 		switch valid {
 		case -1:
 			// Do not process
+			s.LogMessage("ElectionTrace", "Drop, invalid", msg)
 			continue
 		case 0:
 			// Drop the oldest message if at capacity
@@ -467,8 +468,10 @@ func Run(s *state.State) {
 			}
 			// Waiting will get drained when a new election begins, or we move forward
 			e.Waiting <- msg
+			s.LogMessage("ElectionTrace", "Hold", msg)
 			continue
 		}
+		s.LogMessage("ElectionTrace", "Execute", msg)
 		msg.ElectionProcess(s, e)
 
 		//if msg.(interfaces.IMsg).Type() != constants.INTERNALEOMSIG { // If it's not an EOM check the authority set
