@@ -597,7 +597,7 @@ func (c *Controller) managePeers() {
 		duration := time.Since(c.discovery.lastPeerSave)
 		// Every so often, tell the discovery service to save peers.
 		if PeerSaveInterval < duration {
-			c.logger.Debug("Saving peers")
+			c.logger.Debug("BetweenBlocks peers")
 			c.discovery.SavePeers()
 		}
 		duration = time.Since(c.lastPeerRequest)

@@ -137,7 +137,7 @@ func PrintState(state *State) {
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "DBSigProcessed", state.DBSigProcessed)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "KeepMismatch", state.KeepMismatch)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "DBSigFails", state.DBSigFails)
-	str = fmt.Sprintf("%s %35s = %+v\n", str, "Saving", state.Saving)
+	str = fmt.Sprintf("%s %35s = %+v\n", str, "BetweenBlocks", state.BetweenBlocks)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "Syncing", state.IsSyncing())
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "NetStateOff", state.NetStateOff)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "DebugConsensus", state.DebugConsensus)

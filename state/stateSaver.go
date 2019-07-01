@@ -125,10 +125,10 @@ func NetworkIDToFilename(networkName string, fileLocation string) string {
 }
 
 func SaveToFile(s *State, dbht uint32, b []byte, filename string) error {
-	fmt.Fprintf(os.Stderr, "%20s Saving %s for dbht %d\n", s.FactomNodeName, filename, dbht)
+	fmt.Fprintf(os.Stderr, "%20s BetweenBlocks %s for dbht %d\n", s.FactomNodeName, filename, dbht)
 	err := ioutil.WriteFile(filename, b, 0644)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "%20s Saving FailrueError: %v\n", s.FactomNodeName, err)
+		fmt.Fprintf(os.Stderr, "%20s BetweenBlocks FailrueError: %v\n", s.FactomNodeName, err)
 		return err
 	}
 	return nil

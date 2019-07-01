@@ -1318,7 +1318,7 @@ func (list *DBStateList) WriteDBStateToDebugFile(d *DBState) {
 	filename := fmt.Sprintf("processed_dbstate_%d.block", d.DirectoryBlock.GetDatabaseHeight()%10)
 	path := filepath.Join(list.State.LdbPath, list.State.Network, "dbstates", filename)
 
-	//fmt.Printf("Saving DBH %d to %s\n", list.State.LLeaderHeight, path)
+	//fmt.Printf("BetweenBlocks DBH %d to %s\n", list.State.LLeaderHeight, path)
 
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0775)
 	if err != nil {
@@ -1396,7 +1396,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				fct.GetTimestamp(),
 				d.DirectoryBlock.GetHeader().GetTimestamp())
 		}
-		list.State.Saving = false
+		list.State.BetweenBlocks = false
 		return
 	}
 
@@ -1577,7 +1577,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	list.State.NumFCTTrans += len(d.FactoidBlock.GetTransactions()) - 1
 
 	list.SavedHeight = uint32(dbheight)
-	list.State.Saving = false
+	list.State.BetweenBlocks = false
 	progress = true
 	d.ReadyToSave = false
 	d.Saved = true

@@ -46,7 +46,7 @@ func Save(receipt *Receipt) error {
 		}
 	}
 
-	fmt.Printf("Saving %v\n", fmt.Sprintf(dir+"/storeJSON.%v.block", entryID))
+	fmt.Printf("BetweenBlocks %v\n", fmt.Sprintf(dir+"/storeJSON.%v.block", entryID))
 
 	err = ioutil.WriteFile(fmt.Sprintf(dir+"/storeJSON.%v.block", entryID), data, 0777)
 	if err != nil {

@@ -107,7 +107,7 @@ type VM struct {
 	EomMinuteIssued int                  // Last Minute Issued on this VM (from the leader, when we are the leader)
 	LeaderMinute    int                  // Where the leader is in acknowledging messages
 	Synced          bool                 // Block Process on VM until the minute (or DBSig phase) is complete
-	EOMInFLight     bool                 // Block Leader Execute for VM until EOM is complete
+	EOMInFlight     bool                 // Block Leader Execute for VM until EOM is complete
 	heartBeat       int64                // Just ping ever so often if we have heard nothing.
 	Signed          bool                 // We have signed the previous block.
 	WhenFaulted     int64                // WhenFaulted is a timestamp of when this VM was faulted
@@ -717,6 +717,7 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, FedServers
 		p.State.LogPrintf("process", "Unexpected 0x%03x %v", xx, x)
 		s = "Unknown"
 	}
+
 	// divide ProcessListProcessCnt by a big number to make it not change the status string very often
 	return fmt.Sprintf("SyncingStatus: %d-:-%d 0x%03x %25s EOM/DBSIG %02d/%02d of %02d -- %d",
 		p.State.LeaderPL.DBHeight, p.State.CurrentMinute, xx, s, EOMProcessed, DBSigProcessed, FedServers, p.State.ProcessListProcessCnt/5000)
@@ -749,8 +750,10 @@ func (p *ProcessList) processVM(vm *VM) (progress bool) {
 		return false
 	}
 
-	s.LogPrintf("process", "start process for VM %d/%d/%d", vm.p.DBHeight, vm.VmIndex, vm.Height)
-	defer s.LogPrintf("process", "stop  process for VM %d/%d/%d", vm.p.DBHeight, vm.VmIndex, vm.Height)
+	if ValidationDebug {
+		s.LogPrintf("process", "start process for VM %d/%d/%d", vm.p.DBHeight, vm.VmIndex, vm.Height)
+		defer s.LogPrintf("process", "stop  process for VM %d/%d/%d", vm.p.DBHeight, vm.VmIndex, vm.Height)
+	}
 
 	defer p.UpdateStatus(s) // update the status after each VM
 
@@ -871,13 +874,13 @@ func (p *ProcessList) RemoveFromPL(vm *VM, j int, reason string) {
 }
 
 func (p *ProcessList) UpdateStatus(s *State) {
-	x := p.decodeState(s.IsSyncing(), s.DBSig, s.EOM, len(s.LeaderPL.FedServers), s.EOMProcessed, s.DBSigProcessed)
-	// Compute a syncing s string and report if it has changed
-	if x != "" && s.SyncingState[s.SyncingStateCurrent] != x {
-		s.LogPrintf("processStatus", x)
-		s.SyncingStateCurrent = (s.SyncingStateCurrent + 1) % len(s.SyncingState)
-		s.SyncingState[s.SyncingStateCurrent] = x
-	}
+	//x := p.decodeState(s.IsSyncing(), s.DBSig, s.EOM, len(s.LeaderPL.FedServers), s.EOMProcessed, s.DBSigProcessed)
+	//// Compute a syncing s string and report if it has changed
+	//if x != "" && s.SyncingState[s.SyncingStateCurrent] != x {
+	//	s.LogPrintf("processStatus", x)
+	//	s.SyncingStateCurrent = (s.SyncingStateCurrent + 1) % len(s.SyncingState)
+	//	s.SyncingState[s.SyncingStateCurrent] = x
+	//}
 }
 
 // Process messages and update our state.

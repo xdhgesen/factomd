@@ -549,7 +549,7 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 	s.DBSig = false
 	s.DBSigLimit = ss.DBSigLimit
 	s.DBSigProcessed = ss.DBSigProcessed
-	s.Saving = true
+	s.BetweenBlocks = true
 	s.HighestAck = ss.DBHeight + 1
 	s.HighestKnown = ss.DBHeight + 2
 	s.Holding = make(map[[32]byte]interfaces.IMsg)
