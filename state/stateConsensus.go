@@ -1562,6 +1562,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	ack.SendOut(s, ack)
 	eom.SendOut(s, eom)
 	s.FollowerExecuteEOM(eom)
+	s.LeaderPL.VMs[eom.VMIndex].EOMInFLight = true // Cannot generate ACK past this EOM until the minute is complete
 	s.UpdateState()
 }
 
@@ -2229,7 +2230,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 	pl := s.ProcessLists.Get(dbheight)
 	vm := pl.VMs[msg.GetVMIndex()]
 
-	s.LogPrintf("bodymr", "m-%x bodymr %x", dbs.GetMsgHash().Bytes()[:3], dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+	s.LogPrintf("bodymr", "M-%x  bodymr %x", dbs.GetMsgHash().Bytes()[:3], dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
 	s.LogPrintf("bodymr", "dbstate %d bodymr %x", dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR().Fixed())
 
 	if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {

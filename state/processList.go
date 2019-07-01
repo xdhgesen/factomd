@@ -106,7 +106,8 @@ type VM struct {
 	Height          int                  // Height of first unprocessed message (count of messages processed)
 	EomMinuteIssued int                  // Last Minute Issued on this VM (from the leader, when we are the leader)
 	LeaderMinute    int                  // Where the leader is in acknowledging messages
-	Synced          bool                 // Is this VM synced yet?
+	Synced          bool                 // Block Process on VM until the minute (or DBSig phase) is complete
+	EOMInFLight     bool                 // Block Leader Execute for VM until EOM is complete
 	heartBeat       int64                // Just ping ever so often if we have heard nothing.
 	Signed          bool                 // We have signed the previous block.
 	WhenFaulted     int64                // WhenFaulted is a timestamp of when this VM was faulted
