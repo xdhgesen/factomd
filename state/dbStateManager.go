@@ -957,7 +957,7 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
 
-		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : ", dbht, d.Locked, d.IsNew, d.Repeat)
+		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping %s: ", dbht, DBStateStatus(d))
 		return false
 	}
 
@@ -1011,7 +1011,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		return false
 	}
 
-	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d)", dbht)
+	s.LogPrintf("dbstateprocess", "Start ProcessBlocks(%d) %s", dbht, DBStateStatus(d))
+
+	defer func() { s.LogPrintf("dbstateprocess", "Stop ProcessBlocks(%d) %s", dbht, DBStateStatus(d)) }()
 
 	//
 	// ***** Apply the AdminBlock changes to the next DBState
@@ -1236,7 +1238,15 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 // If we do, we count that as progress.
 func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	dbheight := d.DirectoryBlock.GetHeader().GetDBHeight()
-	list.State.LogPrintf("dbstateprocess", "SignDB(%d)", dbheight)
+	list.State.LogPrintf("dbstateprocess", "Start SignDB(%d) %s", dbheight, DBStateStatus(d))
+	defer func() { list.State.LogPrintf("dbstateprocess", "Stop SignDB(%d) %s", dbheight, DBStateStatus(d)) }()
+
+	// Don't sign unless we are in minute 1 of the next block
+	if (int(list.State.LLeaderHeight)*10 + list.State.CurrentMinute) < (dbheight*10 + 1) {
+		list.State.LogPrintf("dbstateprocess", "SignDB(%d) Waiting for minute %d-:-1", dbheight+1)
+		return false
+	}
+
 	if d.Signed {
 		//s := list.State
 		//		s.MoveStateToHeight(dbheight + 1)
@@ -1282,7 +1292,7 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	//}
 
 	// Don't sign unless we are in minute 1
-	if list.State.CurrentMinute > 0 {
+	if list.State.CurrentMinute < 1 {
 		list.State.LogPrintf("dbstateprocess", "SignDB(%d) Waiting for minute 1!", dbheight)
 		return false
 	}
@@ -1357,7 +1367,10 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 	if !d.Signed || !d.ReadyToSave || list.State.DB == nil {
 		return
 	}
-	list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) Balance hash %x", d.DirectoryBlock.GetHeader().GetDBHeight(), list.State.Balancehash.Bytes()[:4])
+	list.State.LogPrintf("dbstateprocess", "Start SaveDBStateToDB(%d) %s", d.DirectoryBlock.GetHeader().GetDBHeight(), DBStateStatus(d))
+	defer func() {
+		list.State.LogPrintf("dbstateprocess", "Stop SaveDBStateToDB(%d) %s", d.DirectoryBlock.GetHeader().GetDBHeight(), DBStateStatus(d))
+	}()
 
 	// If this is a repeated block, and I have already saved at this height, then we can safely ignore
 	// this dbstate.
@@ -1400,6 +1413,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 				d.DirectoryBlock.GetHeader().GetTimestamp())
 		}
 		list.State.BetweenBlocks = false
+		list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) already saved!", d.DirectoryBlock.GetHeader().GetDBHeight())
 		return
 	}
 
@@ -1571,6 +1585,7 @@ func (list *DBStateList) SaveDBStateToDB(d *DBState) (progress bool) {
 			return
 		}
 		if !good {
+			list.State.LogPrintf("dbstateprocess", "SaveDBStateToDB(%d) !good, exit", d.DirectoryBlock.GetHeader().GetDBHeight())
 			return
 		}
 	}
@@ -1614,30 +1629,8 @@ func (list *DBStateList) UpdateState() (progress bool) {
 	if len(list.DBStates) != 0 {
 		l := "["
 		for _, d := range list.DBStates {
-			if d == nil {
-				l += "nil "
-			} else {
-				status := []byte("______")
-				if d.Locked {
-					status[0] = 'L'
-				}
-				if d.ReadyToSave {
-					status[1] = 'R'
-				}
-				if d.Signed {
-					status[2] = 'S'
-				}
-				if d.Saved {
-					status[3] = 'V'
-				}
-				if d.Repeat {
-					status[4] = 'D'
-				}
-				if d.SaveStruct != nil && d.SaveStruct.IdentityControl != nil {
-					status[5] = '!'
-				}
-				l += fmt.Sprintf("%d%s, ", d.DirectoryBlock.GetHeader().GetDBHeight(), string(status))
-			}
+			l += DBStateStatus(d)
+
 		}
 		l += "]"
 		s.LogPrintf("dbstateprocess", "updateState() %d %s", list.Base, l)
@@ -1695,6 +1688,33 @@ func (list *DBStateList) UpdateState() (progress bool) {
 	return
 }
 
+func DBStateStatus(d *DBState) string {
+
+	if d == nil {
+		return " nil "
+	}
+	status := []byte("______")
+	if d.Locked {
+		status[0] = 'L'
+	}
+	if d.ReadyToSave {
+		status[1] = 'R'
+	}
+	if d.Signed {
+		status[2] = 'S'
+	}
+	if d.Saved {
+		status[3] = 'V'
+	}
+	if d.Repeat {
+		status[4] = '+'
+	}
+	if d.SaveStruct != nil && d.SaveStruct.IdentityControl != nil {
+		status[5] = '!'
+	}
+	return fmt.Sprintf("DBHT-%d[%s], ", d.DirectoryBlock.GetHeader().GetDBHeight(), string(status))
+}
+
 func (list *DBStateList) Last() *DBState {
 	last := (*DBState)(nil)
 	for _, ds := range list.DBStates {
@@ -1719,8 +1739,7 @@ func (list *DBStateList) Put(dbState *DBState) bool {
 	dblk := dbState.DirectoryBlock
 	dbheight := dblk.GetHeader().GetDBHeight()
 
-	list.State.LogPrintf("dbstateprocess", "DBStateList put dbstate dbht %d locked %v signed %v saved %v",
-		dbheight, dbState.Locked, dbState.Signed, dbState.Saved)
+	list.State.LogPrintf("dbstateprocess", "DBStateList put dbstate %s", DBStateStatus(dbState))
 
 	// Count completed, done, don't have to do anything more to states,
 	// starting from the beginning (since base starts at zero).

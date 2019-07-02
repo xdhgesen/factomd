@@ -6,6 +6,7 @@ package databaseOverlay
 
 import (
 	"errors"
+
 	"github.com/FactomProject/factomd/anchor"
 	"github.com/FactomProject/factomd/common/directoryBlock/dbInfo"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -14,10 +15,7 @@ import (
 
 var BitcoinAnchorChainID = "df3ade9eec4b08d5379cc64270c30ea7315d8a8a1a69efe2b98a60ecdd69e604"
 var EthereumAnchorChainID = "6e4540d08d5ac6a1a394e982fb6a2ab8b516ee751c37420055141b94fe070bfe"
-var ValidAnchorChains = map[string]bool{
-	BitcoinAnchorChainID:  true,
-	EthereumAnchorChainID: true,
-}
+var ValidAnchorChains = map[string]bool{BitcoinAnchorChainID: true, EthereumAnchorChainID: true}
 
 func (dbo *Overlay) SetBitcoinAnchorRecordPublicKeysFromHex(publicKeys []string) error {
 	dbo.BitcoinAnchorRecordPublicKeys = nil
