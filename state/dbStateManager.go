@@ -1241,9 +1241,9 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	list.State.LogPrintf("dbstateprocess", "Start SignDB(%d) %s", dbheight, DBStateStatus(d))
 	defer func() { list.State.LogPrintf("dbstateprocess", "Stop SignDB(%d) %s", dbheight, DBStateStatus(d)) }()
 
-	// Don't sign unless we are in minute 1 of the next block
-	if (int(list.State.LLeaderHeight)*10 + list.State.CurrentMinute) < (dbheight*10 + 1) {
-		list.State.LogPrintf("dbstateprocess", "SignDB(%d) Waiting for minute %d-:-1", dbheight+1)
+	// Don't sign unless we are past minute 0 of the next block which implies the DBSIgs are all accounted for
+	if (int(list.State.LLeaderHeight)*10 + list.State.CurrentMinute) <= int(dbheight*10) {
+		list.State.LogPrintf("dbstateprocess", "SignDB(%d) Waiting for minute %d-:-1", dbheight, dbheight+1)
 		return false
 	}
 
