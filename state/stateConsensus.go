@@ -293,7 +293,6 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
 			s.LeaderPL.DBHeight+1 >= hkb {
 			if vml == 0 { // if we have not generated a DBSig ...
-
 				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
 				TotalXReviewQueueInputs.Inc()
 				s.XReview = append(s.XReview, msg)
@@ -711,30 +710,115 @@ func (s *State) ReviewHolding() {
 	TotalReviewHoldingTime.Add(float64(reviewHoldingTime.Nanoseconds()))
 }
 
+func (s *State) BeginMinute() {
+
+	dbheight := s.LLeaderHeight
+
+	// All minutes
+	{
+
+		s.CurrentMinuteStartTime = time.Now().UnixNano()
+		// If an we added or removed servers or elections tool place in minute 9, our lists will be unsorted. Fix that
+		s.LeaderPL.SortAuditServers()
+		s.LeaderPL.SortFedServers()
+
+		//force sync state to a rational  state for between minutes
+		s.Syncing = false    // BeginMinute
+		s.EOM = false        // BeginMinute
+		s.EOMDone = false    // BeginMinute
+		s.DBSig = false      // BeginMinute
+		s.EOMProcessed = 0   // BeginMinute
+		s.DBSigProcessed = 0 // BeginMinute
+		s.DBSigDone = false  // BeginMinute
+
+		for _, vm := range s.LeaderPL.VMs {
+			vm.Synced = false // movestatetoheight
+		}
+		s.ProcessLists.Get(dbheight + 1) // Make sure next PL exists
+
+	}
+	//
+
+	switch s.CurrentMinute {
+	case 0:
+		s.CurrentBlockStartTime = s.CurrentMinuteStartTime
+		// set the limits because we might have added servers
+		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
+		s.DBSigLimit = s.EOMLimit               // We add or remove server only on block boundaries
+
+		s.dbheights <- int(dbheight) // Notify MMR process we have moved on...
+		// update the elections thread
+		authlistMsg := s.EFactory.NewAuthorityListInternal(s.LeaderPL.FedServers, s.LeaderPL.AuditServers, s.LLeaderHeight)
+		s.ElectionsQueue().Enqueue(authlistMsg)
+
+		if s.Leader {
+			s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
+			// this used to be the commented out one but it doesn't actually process the dbsig...
+			//			s.UpdateState() // go process the DBSigs
+			// s.DBStates.UpdateState() // go process the DBSigs
+		}
+		s.Hold.ExecuteForNewHeight(dbheight) // execute held messages
+		s.DBStates.UpdateState()             // check if there is a next DBstate message to process...
+
+	case 1:
+		dbstate := s.GetDBState(dbheight - 1)
+		if dbstate != nil && !dbstate.Saved {
+			s.LogPrintf("dbstateprocess", "Set ReadyToSave %d", dbstate.DirectoryBlock.GetHeader().GetDBHeight())
+			dbstate.ReadyToSave = true
+		}
+		s.DBStates.UpdateState() // call to get the state signed now that the DBSigs have processed
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	case 8:
+	case 9:
+	case 10:
+	}
+
+	s.Hold.Review() // cleanup old messages
+
+}
+
+func (s *State) EndMinute() {
+	// All minutes
+	{
+
+	}
+	switch s.CurrentMinute {
+	case 0:
+	case 1:
+	case 2:
+	case 3:
+	case 4:
+	case 5:
+	case 6:
+	case 7:
+	case 8:
+	case 9:
+	case 10:
+	}
+}
+
 func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 	//	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) called from %s", dbheight, newMinute, atomic.WhereAmIString(1))
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d)", dbheight, newMinute)
 
+	if s.LLeaderHeight == dbheight && s.CurrentMinute == newMinute {
+		s.LogPrintf("dbstateprocess", "MoveStateToHeight for unchanged height @ %s", atomic.WhereAmIString(1))
+		return
+	}
+
+	s.EndMinute()         // execute all the activity that need to happen at the end of a minute
+	defer s.BeginMinute() // defer the activity that happens at the start of a minute
 	if (s.LLeaderHeight+1 == dbheight && newMinute == 0) || (s.LLeaderHeight == dbheight && s.CurrentMinute+1 == newMinute) {
 		// these are the allowed cases; move to nextblock-:-0 or move to next minute
 	} else {
 		s.LogPrintf("dbstateprocess", "State move between non-sequential heights from %d to %d", s.LLeaderHeight, dbheight)
 		if s.LLeaderHeight != dbheight {
 			fmt.Fprintf(os.Stderr, "State move between non-sequential heights from %d to %d\n", s.LLeaderHeight, dbheight)
-		}
-		//force sync state to a rational  state for between minutes
-		s.Syncing = false    // movestatetoheight
-		s.EOM = false        // movestatetoheight
-		s.EOMDone = false    // movestatetoheight
-		s.DBSig = false      // movestatetoheight
-		s.EOMProcessed = 0   // movestatetoheight
-		s.DBSigProcessed = 0 // movestatetoheight
-		s.DBSigDone = false  // movestatetoheight
-
-		if s.LeaderPL != nil {
-			for _, vm := range s.LeaderPL.VMs {
-				vm.Synced = false // movestatetoheight
-			}
 		}
 	}
 	// normally when loading by DBStates we jump from minute 0 to minute 0
@@ -762,82 +846,18 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 			panic("bad things are happening")
 		}
 
-		s.ProcessLists.Get(dbheight + 1) // Make sure next PL exists
-		// We are between blocks make sure we are setup to sync
-		// should already be true but if a DBSTATE got processed mid block
-		// there might be a circumstance where we get here in a weird state
-		// so make it the normal starting state
-
-		// update cached values that change with height
-		s.dbheights <- int(dbheight) // Notify MMR process we have moved on...
-
-		s.CurrentMinuteStartTime = time.Now().UnixNano()
-		s.CurrentBlockStartTime = s.CurrentMinuteStartTime
-
-		// If an we added or removed servers or elections tool place in minute 9, our lists will be unsorted. Fix that
-		s.LeaderPL.SortAuditServers()
-		s.LeaderPL.SortFedServers()
 		// check for identity change every time we start a new block before we look up our VM
 		s.CheckForIDChange()
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID) // MoveStateToHeight block
-
-		s.LogPrintf("executeMsg", "MoveStateToHeight set leader=%v, vmIndex = %v", s.Leader, s.LeaderVMIndex)
-		// update the elections thread
-		authlistMsg := s.EFactory.NewAuthorityListInternal(s.LeaderPL.FedServers, s.LeaderPL.AuditServers, s.LLeaderHeight)
-		s.ElectionsQueue().Enqueue(authlistMsg)
-
-		// Do not send out dbsigs while loading from disk
-		if s.Leader && !s.LeaderPL.DBSigAlreadySent && s.LLeaderHeight > s.DBHeightAtBoot {
-			s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
-		}
-		s.DBStates.UpdateState() // go process the DBSigs
-
-	} else if s.CurrentMinute != newMinute { // And minute
-		if newMinute == 1 {
-			dbstate := s.GetDBState(dbheight - 1)
-			if dbstate != nil && !dbstate.Saved {
-				s.LogPrintf("dbstateprocess", "Set ReadyToSave %d", dbstate.DirectoryBlock.GetHeader().GetDBHeight())
-				dbstate.ReadyToSave = true
-			}
-			s.DBStates.UpdateState() // call to get the state signed now that the DBSigs have processed
-		}
-		s.CurrentMinute = newMinute                                                            // Update just the minute
-		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute
-		s.LogPrintf("executeMsg", "MoveStateToHeight new minute set leader=%v, vmIndex = %v", s.Leader, s.LeaderVMIndex)
-		// We are between blocks make sure we are setup to sync
-		// should already be true but if a DBSTATE got processed mid block
-		// there might be a circumstance where we get here in a weird state
-		// so make it the normal starting state
-
-		s.CurrentMinuteStartTime = time.Now().UnixNano()
-		// If an election took place, our lists will be unsorted. Fix that
-		s.LeaderPL.SortAuditServers()
-		s.LeaderPL.SortFedServers()
+		defer s.Hold.ExecuteForNewHeight(dbheight)                                                   // execute held messages
 	}
 
-	{ // debug
-		vmSync := false
-		for _, vm := range s.LeaderPL.VMs {
-			if vm != nil {
-				vmSync = vmSync || vm.Synced
-			}
-		}
+	s.CurrentMinute = newMinute                                                            // Update just the minute
+	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute
+	s.LogPrintf("executeMsg", "MoveStateToHeight new minute set leader=%v, vmIndex = %v", s.Leader, s.LeaderVMIndex)
 
-		if s.Syncing || s.EOM || s.EOMDone || s.DBSig || (s.EOMProcessed != 0) || (s.DBSigProcessed != 0) || vmSync {
-			s.LogPrintf("executeMsg", "resetting syncstate in moveToHeight")
-			s.LogPrintf("executeMsg", "s.Syncing=%v s.EOM=%v s.EOMDone=%v s.DBSig=%v s.DBSigDone=%v s.EOMProcessed=%d s.DBSigProcessed=%v, vmSync = %v",
-				s.Syncing, s.EOM, s.EOMDone, s.DBSig, s.DBSigDone, s.EOMProcessed, s.DBSigProcessed, vmSync)
-
-		}
-	}
-
-	// set the limits because we might have added servers
-	s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
-	s.DBSigLimit = s.EOMLimit               // We add or remove server only on block boundaries
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", dbheight, newMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
 
-	s.Hold.ExecuteForNewHeight(dbheight) // execute held messages
-	s.Hold.Review()                      // cleanup old messages
 }
 
 // Adds blocks that are either pulled locally from a database, or acquired from peers.
@@ -1459,7 +1479,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	eom.SysHeight = uint32(pl.System.Height)
 
 	if vm.Synced {
-		s.LogMessage("executeMsg", "drop, already sync'd", m)
+		s.LogMessage("executeMsg", "what do I call this", m)
 		s.repost(m, 1) // Do not drop the message, we only generate 1 local eom per height/min, let validate drop it
 		return
 	}
@@ -1473,7 +1493,6 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 		s.LogPrintf("executeMsg", "EOM has wrong data expected DBH/VM/M %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
 		fix = true
 	}
-
 	// make sure EOM has the right data
 	eom.DBHeight = s.LLeaderHeight
 	eom.VMIndex = s.LeaderVMIndex
@@ -1835,6 +1854,9 @@ func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, inte
 // this call will do nothing.  Assumes the state for the leader is set properly
 func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 	s.LogPrintf("executeMsg", "SendDBSig(dbht=%d,vm=%d)", dbheight, vmIndex)
+	if s.LeaderPL.DBSigAlreadySent {
+		return
+	}
 	dbslog := consenLogger.WithFields(log.Fields{"func": "SendDBSig"})
 
 	ht := s.GetHighestSavedBlk()
