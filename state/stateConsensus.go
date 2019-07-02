@@ -960,12 +960,24 @@ func (s *State) repost(m interfaces.IMsg, delay int) {
 	//whereAmI := atomic.WhereAmIString(1)
 	go func() { // This is a trigger to issue the EOM, but we are still syncing.  Wait to retry.
 		if delay > 0 {
-			time.Sleep((time.Duration(s.DirectoryBlockInSeconds*delay/600) * time.Second)) // delay in Factom seconds
+			time.Sleep(time.Duration(delay) * s.FactomSecond()) // delay in Factom seconds
 		}
 		//s.LogMessage("MsgQueue", fmt.Sprintf("enqueue_%s(%d)", whereAmI, len(s.msgQueue)), m)
 		s.LogMessage("MsgQueue", fmt.Sprintf("enqueue (%d)", len(s.msgQueue)), m)
 		s.msgQueue <- m // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
 	}()
+}
+
+// FactomSecond finds the time duration of 1 second relative to 10min blocks.
+//		Blktime			EOMs		Second
+//		600s			60s			1s
+//		300s			30s			0.5s
+//		120s			12s			0.2s
+//		 60s			 6s			0.1s
+//		 30s			 3s			0.05s
+func (s *State) FactomSecond() time.Duration {
+	// Convert to time.second, then divide by 600
+	return time.Duration(s.DirectoryBlockInSeconds) * time.Second / 600
 }
 
 // Messages that will go into the Process List must match an Acknowledgement.
@@ -1035,7 +1047,6 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	s.Acks[ack.GetHash().Fixed()] = ack
 	// check if we have a message
 	m, _ := s.Holding[ack.GetHash().Fixed()]
-	s.LogMessage("newHolding", "FollowerExecuteAck ", m)
 
 	if m != nil {
 		// We have an ack and a matching message go execute the message!
@@ -1749,7 +1760,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		if entry != nil {
 			s.repost(entry, 0) // Try and execute the reveal for this commit
 		}
-		s.LogMessage("newHolding", "process", commitChain)
+		//s.LogMessage("newHolding", "process", commitChain)
 		s.ExecuteFromHolding(commitChain.GetHash().Fixed()) // process CommitChain
 		return true
 	}
@@ -1772,7 +1783,7 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		if entry != nil {
 			s.repost(entry, 0) // Try and execute the reveal for this commit
 		}
-		s.LogMessage("newHolding", "process", commitEntry)
+		//		s.LogMessage("newHolding", "process", commitEntry)
 		s.ExecuteFromHolding(commitEntry.GetHash().Fixed()) // process CommitEntry
 		return true
 	}
@@ -1830,7 +1841,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 
 		s.IncEntryChains()
 		s.IncEntries()
-		s.LogMessage("newHolding", "process", m)
+		//		s.LogMessage("newHolding", "process", m)
 		s.ExecuteFromHolding(chainID.Fixed()) // Process Reveal for Chain
 
 		return true
