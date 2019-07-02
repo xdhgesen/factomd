@@ -100,14 +100,14 @@ func (s *State) GetFilterTimeNano() int64 {
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
 // for the replay filter.
 // return:
-// ValidToSend -1 (invalir) 0(unknown) 1( valid to send)
+// ValidToSend -1 (invalid) 0(unknown) 1( valid to send)
 // validToExec -2 (in new holding) -1(invalid) 0(unknown) 1(follower execute) 2(leader execute)
 func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int) {
 	// check the time frame of messages with ACKs and reject any that are before the message filter time (before boot
 	// or outside the replay filter time frame)
 
 	defer func() {
-		s.LogMessage("msgvalidation", fmt.Sprintf("send=%d execute=%d local=%v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
+		s.LogMessage("msgvalidation", fmt.Sprintf("send=%2d execute=%2d local=%6v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
 	}()
 
 	// During boot ignore messages that are more than 15 minutes old...
@@ -731,6 +731,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) No change")
 		return
 	}
+	s.LogPrintf("dbstateprocess", "current = (%d-:-%d)", s.LLeaderHeight, s.CurrentMinute)
 
 	if (s.LLeaderHeight+1 == dbheight && newMinute == 0) || (s.LLeaderHeight == dbheight && s.CurrentMinute+1 == newMinute) {
 		// these are the allowed cases; move to nextblock-:-0 or move to next minute
@@ -795,9 +796,9 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		s.ElectionsQueue().Enqueue(authlistMsg)
 
 		if s.Leader && !s.LeaderPL.DBSigAlreadySent {
-			s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
+			defer s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
+			defer s.DBStates.UpdateState()                      // go process the DBSigs
 		}
-		s.DBStates.UpdateState() // go process the DBSigs
 
 	} else if s.CurrentMinute != newMinute { // And minute
 		if newMinute == 1 {
@@ -806,7 +807,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 				s.LogPrintf("dbstateprocess", "Set ReadyToSave %d", dbstate.DirectoryBlock.GetHeader().GetDBHeight())
 				dbstate.ReadyToSave = true
 			}
-			s.DBStates.UpdateState() // call to get the state signed now that the DBSigs have processed
+			//			s.DBStates.UpdateState() // call to get the state signed now that the DBSigs have processed
 		}
 		s.CurrentMinute = newMinute                                                            // Update just the minute
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute

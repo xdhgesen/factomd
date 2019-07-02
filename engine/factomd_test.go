@@ -48,6 +48,24 @@ func TestLoad(t *testing.T) {
 	ShutDownEverything(t)
 } // testLoad(){...}
 
+func TestLoadSingle(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+
+	// use a tree so the messages get reordered
+	state0 := SetupSim("L", map[string]string{"--debuglog": ""}, 15, 0, 0, t)
+
+	RunCmd("0")   // select 0
+	RunCmd("R30") // Feed load
+	WaitBlocks(state0, 10)
+	RunCmd("R0") // Stop load
+	WaitBlocks(state0, 1)
+	ShutDownEverything(t)
+} // testLoadSingle(){...}
+
 func TestCatchup(t *testing.T) {
 	if RanSimTest {
 		return
@@ -1527,7 +1545,7 @@ func TestDebugLocation(t *testing.T) {
 	}
 
 	// make sure the directory exists
-	err = os.MkdirAll(tempdir, os.ModePerm)
+	err = os.MkdirAll(tempdir, 0x755)
 	if err != nil {
 		panic(err)
 	}

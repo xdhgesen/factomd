@@ -768,7 +768,7 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 		return
 	}
 
-	//	list.State.LogPrintf("dbstateprocess", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
+	list.State.LogPrintf("dbstateprocess", "FixupLinks(%d,%d)", p.DirectoryBlock.GetHeader().GetDBHeight(), d.DirectoryBlock.GetHeader().GetDBHeight())
 	currentDBHeight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	previousDBHeight := p.DirectoryBlock.GetHeader().GetDBHeight()
 
@@ -1246,7 +1246,8 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 
 	// If we have the next dbstate in the list, then all the signatures for this dbstate
 	// have been checked, so we can consider this guy signed.
-	if dbheight == 0 || list.Get(int(dbheight+1)) != nil || d.Repeat == true {
+	nextBlock := list.Get(int(dbheight + 1))
+	if nextBlock != nil || d.Repeat == true {
 		d.Signed = true
 		//		s := list.State
 		//		s.MoveStateToHeight(dbheight+1, 0)
@@ -1255,15 +1256,17 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 		return true
 	}
 
-	pl := list.State.ProcessLists.Get(dbheight)
-	if pl == nil {
-		list.State.LogPrintf("dbstateprocess", "SignDB(%d) skip, no processlist!", d.DirectoryBlock.GetHeader().GetDBHeight())
-		return false
-	} else if !pl.Complete() {
-		list.State.LogPrintf("dbstateprocess", "SignDB(%d) skip, processlist not complete!", d.DirectoryBlock.GetHeader().GetDBHeight())
-		return false
+	var pl *ProcessList
+	if dbheight != 0 {
+		pl = list.State.ProcessLists.Get(dbheight)
+		if pl == nil {
+			list.State.LogPrintf("dbstateprocess", "SignDB(%d) skip, no processlist!", d.DirectoryBlock.GetHeader().GetDBHeight())
+			return false
+		} else if !pl.Complete() {
+			list.State.LogPrintf("dbstateprocess", "SignDB(%d) skip, processlist not complete!", d.DirectoryBlock.GetHeader().GetDBHeight())
+			return false
+		}
 	}
-
 	// If we don't have the next dbstate yet, see if we have all the signatures.
 	pl = list.State.ProcessLists.Get(dbheight + 1)
 	if pl == nil {
@@ -1278,8 +1281,8 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	//	return false
 	//}
 
-	// Don't sign unless we are in minute 0
-	if list.State.CurrentMinute != 0 {
+	// Don't sign unless we are in minute 1
+	if list.State.CurrentMinute > 0 {
 		list.State.LogPrintf("dbstateprocess", "SignDB(%d) Waiting for minute 1!", dbheight)
 		return false
 	}
