@@ -1,7 +1,10 @@
 package state
 
 import (
+	"sort"
 	"time"
+
+	"github.com/FactomProject/factomd/common/interfaces"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/messages"
@@ -29,6 +32,7 @@ type MMRInfo struct {
 
 // starts the MMR processing for this state
 func (s *State) StartMMR() {
+	// Missing message request handling.
 	go s.makeMMRs(s.asks, s.adds, s.dbheights)
 }
 
@@ -60,7 +64,7 @@ func (vm *VM) ReportMissing(height int, delay int64) {
 }
 
 func (s *State) Ask(DBHeight int, vmIndex int, height int, when int64) {
-	doWeHaveAckandMsg := s.MissingMessageResponse.GetAckANDMsg(DBHeight, vmIndex, height)
+	doWeHaveAckandMsg := s.MissingMessageResponse.GetAckANDMsg(DBHeight, vmIndex, height, s)
 
 	if doWeHaveAckandMsg {
 		return
@@ -196,7 +200,7 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 
 		select {
 
-		case msg := <- s.MissingMessageResponse.NewMsgs:
+		case msg := <-s.MissingMessageResponse.NewMsgs:
 			if msg.Type() == constants.ACK_MSG {
 				// adds Acks to a Ack map for MMR
 				s.MissingMessageResponse.AcksMap.Add(msg)
@@ -260,3 +264,116 @@ func (s *State) makeMMRs(asks <-chan askRef, adds <-chan plRef, dbheights <-chan
 		}
 	} // forever ...
 } // func  makeMMRs() {...}
+
+// MissingMessageResponseCache will cache all proceslist items from the last 2 blocks.
+// It can create MissingMessageResponses to peer requests, and prevent us from asking the network
+// if we already have something locally.
+type MissingMessageResponseCache struct {
+	// NewMsgs is the channel on which we receive acked messages to cache
+	NewMsgs chan interfaces.IMsg
+
+	// ACKCache is the cached acks from the last 2 blocks
+	AckMessageCache     AckCache
+	GeneralMessageCache MsgCache
+}
+
+type AckCache struct {
+	CurrentHeight int
+	// AckMap will only contain ack messages
+	AckMap map[int]map[plRef]interfaces.IMsg
+}
+
+func NewAckCache() *AckCache {
+	a := new(AckCache)
+	a.AckMap = make(map[int]map[plRef]interfaces.IMsg)
+	return a
+}
+
+// Expire for the AckCache will expire all acks older than 2 blocks.
+//	TODO: Is iterating over a map extra cost? Should we have a sorted list?
+//			Technically we can just call delete NewHeight-2 as long as we always
+//			Update every height
+func (a *AckCache) Expire(newHeight int) {
+	a.CurrentHeight = newHeight
+	for h, _ := range a.AckMap {
+		if a.HeightTooOld(h) {
+			delete(a.AckMap, h)
+		}
+	}
+}
+
+// AddAck will add an ack to the cache if it is not too old, and it is an ack
+func (a *AckCache) AddAck(m interfaces.IMsg) {
+	ack, ok := m.(*messages.Ack)
+	if !ok {
+		// Don't add non-acks
+		return
+	}
+	if a.HeightTooOld(int(ack.DBHeight)) || a.HeightTooFuture(int(ack.DBHeight)) {
+		return // Too old or too new to care about
+	}
+	plLoc := plRef{int(ack.DBHeight), ack.VMIndex, int(ack.Height)}
+	a.ensure(plLoc.DBH)
+	a.AckMap[plLoc.DBH][plLoc] = ack
+}
+
+func (a *AckCache) Get(dbHeight, vmIndex, plHeight int) interfaces.IMsg {
+	if a.AckMap[dbHeight] == nil {
+		return nil
+	}
+	return a.AckMap[dbHeight][plRef{dbHeight, vmIndex, plHeight}]
+}
+
+func (a *AckCache) ensure(height int) {
+	if a.AckMap[height] == nil {
+		a.AckMap[height] = make(map[plRef]interfaces.IMsg)
+	}
+}
+
+func (a *AckCache) HeightTooFuture(height int) bool {
+	// If the ack is from too far in the future, we can also ignore it
+	// TODO: Determine this
+	return false
+}
+
+// HeightTooOld determines if the ack height is too old for the ackcache
+func (a *AckCache) HeightTooOld(height int) bool {
+	// Eg: CurrentHeight = 10, so saved height is minimum 8. Below 8, we delete
+	if height < a.CurrentHeight-2 {
+		return true
+	}
+	return false
+}
+
+type MsgCache struct {
+	// MessageMap allows quick lookup for a message hash
+	MessageMap map[[32]byte]interfaces.IMsg
+	// MessageSlice is the sorted slice of messages by time. This is useful for
+	// expiring messages from the map without having to iterate over the entire list.
+	MessageSlice []interfaces.IMsg
+}
+
+func NewMsgCache() *MsgCache {
+	c := new(MsgCache)
+	c.MessageMap = make(map[[32]byte]interfaces.IMsg)
+	return c
+}
+
+func (c *MsgCache) AddMsg(m interfaces.IMsg) {
+	// Only add messages that need an
+	if !constants.NeedsAck(m.Type()) {
+		return
+	}
+
+	c.MessageMap[m.GetMsgHash().Fixed()] = m
+	c.InsertMsg(m)
+}
+
+func (c *MsgCache) InsertMsg(m interfaces.IMsg) {
+	index := sort.Search(len(c.MessageSlice), func(i int) bool {
+		return c.MessageSlice[i].GetTimestamp().GetTimeMilli() < m.GetTimestamp().GetTimeMilli()
+	})
+	c.MessageSlice = append(c.MessageSlice, (interfaces.IMsg)(nil))
+	copy(c.MessageSlice[index+1:], c.MessageSlice[index:])
+	c.MessageSlice[index] = m
+}
