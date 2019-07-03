@@ -45,7 +45,6 @@ func TestOne(t *testing.T) {
 	WaitBlocks(state0, 2)
 	ShutDownEverything(t)
 } // testOne(){...}
-
 func TestLoad(t *testing.T) {
 	if RanSimTest {
 		return
@@ -982,6 +981,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	ShutDownEverything(t)
 }
 
+
 func TestDBSigElection(t *testing.T) {
 	if RanSimTest {
 		return
@@ -1011,6 +1011,7 @@ func TestDBSigElection(t *testing.T) {
 
 	ShutDownEverything(t)
 }
+
 
 func TestCoinbaseCancel(t *testing.T) {
 	if RanSimTest {
@@ -1150,6 +1151,7 @@ func TestCoinbaseCancel(t *testing.T) {
 	//ShutDownEverythingWithoutAuthCheck(t)  see 9cf214e9140d767ea172b06a6e4b748475a9c494 for ShutDownEverythingWithoutAuthCheck()
 
 }
+
 
 func TestElection9(t *testing.T) {
 	if RanSimTest {

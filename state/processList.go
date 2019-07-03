@@ -708,7 +708,7 @@ var decodeMap map[foo]string = map[foo]string{
 	//foo{true, true, false, true, false, false, true, true, false}:     "Stop Syncing DBSig",              //0x0cb
 	//foo{true, false, false, false, false, false, false, false, false}: "Sync Only??",                     //0x100 ***
 	//foo{true, false, true, true, false, false, false, false, true}:   "Syncing EOM ... ",                 //0x10d
-	//foo{true, true, false, false, false, false, true, false, true}:    "Start Syncing DBSig",             //0x143
+	foo{true, true, false, false, false, false, true, false, true}: "Start Syncing DBSig", //0x143
 	//foo{true, false, true, false, false, false, true, false, true}:    "Syncing EOM Start (DBSIG !Done)", //0x145 ***
 	//foo{true, false, true, true, true, false, true, false, true}:      "Syncing EOM ... ",                //0x15d
 }
@@ -866,7 +866,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 			// Until the first couple signatures are processed, we will be 2 behind.
 			//TODO: Why is this in the execution per message per VM when it's global to the processlist -- clay
 			if s.WaitForEntries {
-				s.LogPrintf("processList", "s.WaitForEntries %d-:-%d [%d] > %d + 2", p.DBHeight, vm.LeaderMinute, s.EntryDBHeightComplete)
+				s.LogPrintf("process", "s.WaitForEntries %d-:-%d [%d] > %d + 2", p.DBHeight, vm.LeaderMinute, s.EntryDBHeightComplete)
 				break VMListLoop // Don't process further in this list, go to the next.
 			}
 
