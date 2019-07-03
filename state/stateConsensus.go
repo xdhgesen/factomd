@@ -103,9 +103,9 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	// check the time frame of messages with ACKs and reject any that are before the message filter time (before boot
 	// or outside the replay filter time frame)
 
-	//defer func() {
-	//	s.LogMessage("msgvalidation", fmt.Sprintf("send=%d execute=%d local=%v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
-	//}()
+	defer func() {
+		s.LogMessage("msgvalidation", fmt.Sprintf("send=%d execute=%d local=%v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
+	}()
 
 	// During boot ignore messages that are more than 15 minutes old...
 	if s.IgnoreMissing && msg.Type() != constants.DBSTATE_MSG {
@@ -242,6 +242,8 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		return false
 	}
 
+	s.LogMessage("executeMsg", "executeMsg()", msg)
+
 	s.SetString()
 	msg.ComputeVMIndex(s)
 
@@ -253,6 +255,7 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 
 	switch validToExecute {
 	case 1:
+
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
 			if !s.NoEntryYet(msg.GetHash(), nil) {
@@ -273,6 +276,7 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		var vml int = 0
 		var vmh int = 0
 		var vms bool = false
+		var vmi int = 0
 
 		if vm != nil {
 			vms = vm.Synced
@@ -282,35 +286,45 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			}
 		}
 		local := msg.IsLocal()
-		vmi := msg.GetVMIndex()
+
+		if !local {
+			vmi = msg.GetVMIndex()
+		} else {
+			vmi = s.LeaderVMIndex
+		}
 		hkb := s.GetHighestKnownBlock()
 
-		if s.RunLeader &&
-			s.Leader &&
-			!s.Saving && // if not between blocks
-			vm != nil && vmh == vml && // if we have processed to the end of the process list
-			(!s.Syncing || !vms) && // if not syncing or this VM is not yet synced
-			(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
-			s.LeaderPL.DBHeight+1 >= hkb {
-			if vml == 0 { // if we have not generated a DBSig ...
-				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
-				TotalXReviewQueueInputs.Inc()
-				s.XReview = append(s.XReview, msg)
-				s.LogMessage("executeMsg", "Missing DBSig use XReview", msg)
-			} else {
-				s.LogMessage("executeMsg", "LeaderExecute", msg)
-				msg.LeaderExecute(s)
-			}
-		} else {
-			s.LogMessage("executeMsg", "FollowerExecute", msg)
-			s.LogPrintf("executeMsg", "cause:"+
-				" s.RunLeader(%v) && s.Leader(%v) && !s.Saving(%v) &&	vm(%p) != nil && vmh(%v) == vml(%v) && "+
-				"(!s.Syncing(%v) || !vms(%v)) && (local(%v) || vmi(%v) == s.LeaderVMIndex(%v)) && "+
-				"s.LeaderPL.DBHeight(%v)+1 >= hkb(%v)",
-				s.RunLeader, s.Leader, s.Saving, vm, vmh, vml, s.Syncing, vms, local, vmi, s.LeaderVMIndex, s.LeaderPL.DBHeight, hkb)
+		// if I am not a leader or it not the VM I am leader for
+		if !s.Leader || vmi != s.LeaderVMIndex {
 			msg.FollowerExecute(s)
+		} else {
+			// should be leader executed but there are a few conditions that make us wait ...
+			if s.CurrentMinute < 10 && // Can't leader execute in minute 10 because we can't add to the process list
+				s.RunLeader && // Can't leader execute until we are done with ignore period
+				!s.Saving && // Can't leader exeucte if we are saving (same as minute ==10?)
+				vm != nil && vmh == vml && // if we have processed to the end of the process list
+				(!s.Syncing || !vms) && // if not syncing or this VM is not yet synced
+				(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
+				s.LeaderPL.DBHeight+1 >= hkb {
+				if vml == 0 { // if we have not generated a DBSig ...
+					s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
+					TotalXReviewQueueInputs.Inc()
+					s.XReview = append(s.XReview, msg)
+					s.LogMessage("executeMsg", "Missing DBSig use XReview", msg)
+				} else {
+					s.LogMessage("executeMsg", "LeaderExecute", msg)
+					msg.LeaderExecute(s)
+				}
+			} else {
+				s.LogMessage("executeMsg", "FollowerExecute", msg)
+				s.LogPrintf("executeMsg", "cause:"+
+					" s.RunLeader(%v) && s.Leader(%v) && !s.Saving(%v) &&	vm(%p) != nil && vmh(%v) == vml(%v) && "+
+					"(!s.Syncing(%v) || !vms(%v)) && (local(%v) || vmi(%v) == s.LeaderVMIndex(%v)) && "+
+					"s.LeaderPL.DBHeight(%v)+1 >= hkb(%v)",
+					s.RunLeader, s.Leader, s.Saving, vm, vmh, vml, s.Syncing, vms, local, vmi, s.LeaderVMIndex, s.LeaderPL.DBHeight, hkb)
+				msg.FollowerExecute(s)
+			}
 		}
-
 		return true
 
 	case 0:
@@ -320,7 +334,7 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		return false
 
 	case -2:
-		s.LogMessage("executeMsg", "back to new holding from executeMsg", msg)
+		s.LogMessage("executeMsg", "newHolding from executeMsg", msg)
 		return false
 
 	default:
@@ -1604,6 +1618,9 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	ack.SendOut(s, ack)
 	eom.SendOut(s, eom)
 	s.FollowerExecuteEOM(eom)
+	if s.CurrentMinute == 9 {
+		s.Saving = true
+	}
 	s.UpdateState()
 }
 
