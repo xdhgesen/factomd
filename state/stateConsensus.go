@@ -755,6 +755,8 @@ func (s *State) BeginMinute() {
 
 	switch s.CurrentMinute {
 	case 0:
+		s.DBStates.UpdateState() // check if there is a next DBstate message to process...
+
 		s.CurrentBlockStartTime = s.CurrentMinuteStartTime
 		// set the limits because we might have added servers
 		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
@@ -772,7 +774,6 @@ func (s *State) BeginMinute() {
 			// s.DBStates.UpdateState() // go process the DBSigs
 		}
 		s.Hold.ExecuteForNewHeight(dbheight) // execute held messages
-		s.DBStates.UpdateState()             // check if there is a next DBstate message to process...
 
 	case 1:
 		dbstate := s.GetDBState(dbheight - 1)
