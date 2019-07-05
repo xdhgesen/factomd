@@ -75,8 +75,8 @@ func (m *MSGMap) Add(msg interfaces.IMsg, s interfaces.IState) {
 
 func (m *MSGMap) Get(msg interfaces.IMsg, s interfaces.IState) bool {
 	hash := msg.GetHash().Fixed()
-	_, exists := m.Msgs[hash]
-	return exists
+	foundmsg, exists := m.Msgs[hash]
+	return foundmsg != nil && exists
 }
 
 // Called when we receive an ask for an MMR, we check to see if we have message in out Ask AND message maps and return true or false
@@ -87,5 +87,5 @@ func (am *MissingMessageResponse) GetAckANDMsg(DBHeight int, vmIndex int, height
 		msgExists := am.MsgsMap.Get(msg, s)
 		return msgExists
 	}
-	return exists
+	return false
 }

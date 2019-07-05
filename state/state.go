@@ -433,7 +433,14 @@ type State struct {
 	executeRecursionDetection map[[32]byte]interfaces.IMsg
 	Hold                      HoldingList
 
+	// MissingMessageResponse is a cache of the last 1000 msgs we receive such that when
+	// we send out a missing message, we can find that message locally before we ask the net
+	// TODO: Rename to be more accurate
 	MissingMessageResponse
+
+	// MissingMessageResponseHandler is a cache of the last 2 blocks of processed acks.
+	// It can handle and respond to missing message requests on it's own thread.
+	MissingMessageResponseHandler *MissingMessageResponseCache
 }
 
 var _ interfaces.IState = (*State)(nil)
@@ -1138,6 +1145,9 @@ func (s *State) Init() {
 	s.asks = make(chan askRef, 1)
 	s.adds = make(chan plRef, 1)
 	s.dbheights = make(chan int, 1)
+
+	// Allocate the missing message handler
+	s.MissingMessageResponseHandler = NewMissingMessageReponseCache(s)
 
 	if s.StateSaverStruct.FastBoot {
 		d, err := s.DB.FetchDBlockHead()
