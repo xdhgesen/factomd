@@ -10,6 +10,7 @@ import (
 	"hash"
 	"os"
 	"reflect"
+	"sort"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -72,6 +73,10 @@ func (s *State) AddToHolding(hash [32]byte, msg interfaces.IMsg) {
 	}
 	_, ok := s.Holding[hash]
 	if !ok {
+		s.HoldingList = append(s.HoldingList, msg)
+		sort.Slice(s.HoldingList, func(i, j int) bool {
+			return s.HoldingList[i].GetTimestamp().GetTimeMilliUInt64() > s.HoldingList[j].GetTimestamp().GetTimeMilliUInt64()
+		})
 		s.Holding[hash] = msg
 		s.LogMessage("holding", "add", msg)
 		TotalHoldingQueueInputs.Inc()
@@ -81,6 +86,13 @@ func (s *State) AddToHolding(hash [32]byte, msg interfaces.IMsg) {
 func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason string) {
 	_, ok := s.Holding[hash]
 	if ok {
+		for i, m := range s.HoldingList {
+			if m.GetMsgHash().Fixed() == hash {
+				for j, v := range s.HoldingList[i+1:] {
+					s.HoldingList[j+i] = v
+				}
+			}
+		}
 		delete(s.Holding, hash)
 		s.LogMessage("holding", "delete "+reason, msg)
 		TotalHoldingQueueOutputs.Inc()
@@ -604,7 +616,20 @@ func (s *State) ReviewHolding() {
 	//	processMinute := s.LeaderNewMin // Have we processed this minute
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
-	for k, v := range s.Holding {
+	startReview := time.Now().UnixNano() / int64(time.Millisecond)
+	cnt := 0
+	for _, v := range s.HoldingList {
+		k := v.GetMsgHash().Fixed()
+		if v == nil {
+			s.DeleteFromHolding(k, nil, "nil message")
+			continue
+		}
+		if cnt > 100 && time.Now().UnixNano()/int64(time.Millisecond)-startReview > 200 {
+			s.ResendHolding = primitives.NewTimestampNow()
+			return
+		}
+		cnt++
+
 		if int(highest)-int(saved) > 1000 {
 			TotalHoldingQueueOutputs.Inc()
 			//delete(s.Holding, k)
@@ -723,9 +748,6 @@ func (s *State) ReviewHolding() {
 		TotalXReviewQueueInputs.Inc()
 		s.XReview = append(s.XReview, v)
 		TotalHoldingQueueOutputs.Inc()
-		if len(s.XReview) > 200 {
-			break
-		}
 	}
 	reviewHoldingTime := time.Since(preReviewHoldingTime)
 	TotalReviewHoldingTime.Add(float64(reviewHoldingTime.Nanoseconds()))
@@ -2774,6 +2796,9 @@ func (s *State) NewAck(msg interfaces.IMsg, balanceHash interfaces.IHash) interf
 
 	ack.Sign(s)
 	ack.SetLocal(true)
+
+	s.LeaderPL.AddToProcessList(s, ack, msg)
+	s.LeaderPL.Process(s)
 
 	return ack
 }
