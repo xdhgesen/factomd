@@ -39,13 +39,13 @@ func TestOne(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LF", map[string]string{"--debuglog": ""}, 10, 0, 0, t)
+	state0 := SetupSim("LF", map[string]string{"--debuglog": "", "--fastsaverate": "5"}, 12, 0, 0, t)
 
 	RunCmd("0")   // select 2
 	RunCmd("R30") // Feed load
 	WaitBlocks(state0, 5)
 	RunCmd("R0") // Stop load
-	WaitBlocks(state0, 1)
+	WaitBlocks(state0, 2)
 	ShutDownEverything(t)
 } // testOne(){...}
 

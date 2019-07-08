@@ -505,16 +505,13 @@ ackLoop:
 				continue
 			}
 			// copy the messages we are responsible for and all msg that don't need ack
-			// messages that need ack will get processed when thier ack arrives
+			// messages that need ack will get processed when their ack arrives
 			if msg.GetVMIndex() == s.LeaderVMIndex || !constants.NeedsAck(msg.Type()) {
 				process = append(process, msg)
 			}
 		}
 		// toss everything else
 		s.XReview = s.XReview[:0]
-	}
-	if ValidationDebug {
-		s.LogPrintf("executeMsg", "end reviewHolding %d", len(s.XReview))
 	}
 
 	processXReviewTime := time.Since(preProcessXReviewTime)
@@ -523,7 +520,7 @@ ackLoop:
 	if len(process) != 0 {
 		preProcessProcChanTime := time.Now()
 		if ValidationDebug {
-			s.LogPrintf("executeMsg", "Start processloop %d", len(process))
+			s.LogPrintf("executeMsg", "Start executeloop %d", len(process))
 		}
 		for _, msg := range process {
 			newProgress := s.executeMsg(msg)
@@ -532,11 +529,10 @@ ackLoop:
 			}
 			progress = newProgress || progress //
 			s.LogMessage("executeMsg", "From process", msg)
-			s.UpdateState()
 		} // processLoop for{...}
 
 		if ValidationDebug {
-			s.LogPrintf("executeMsg", "end processloop")
+			s.LogPrintf("executeMsg", "end executeloop")
 		}
 		processProcChanTime := time.Since(preProcessProcChanTime)
 		TotalProcessProcChanTime.Add(float64(processProcChanTime.Nanoseconds()))
