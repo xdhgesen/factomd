@@ -45,6 +45,7 @@ func TestOne(t *testing.T) {
 	WaitBlocks(state0, 2)
 	ShutDownEverything(t)
 } // testOne(){...}
+
 func TestLoad(t *testing.T) {
 	if RanSimTest {
 		return
