@@ -12,23 +12,10 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
 
-	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/state"
 )
 
-func setNeedsAckToBouce() {
-	constants.NeedsAck = func(t byte) bool {
-		switch t {
-		case constants.BOUNCE_MSG:
-			return true
-		}
-		return false
-	}
-}
-
 func TestMissingMessageReponseCache(t *testing.T) {
-	setNeedsAckToBouce()
-
 	s := testHelper.CreateEmptyTestState()
 
 	// Check the expire expires n-2
@@ -146,7 +133,6 @@ func TestMissingMessageReponseCache(t *testing.T) {
 func TestSortedMsgCache(t *testing.T) {
 	totalLength := 4000
 	m := state.NewMsgCache()
-	setNeedsAckToBouce()
 
 	// Testing inserting order
 	for i := 0; i < totalLength; i++ {
