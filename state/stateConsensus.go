@@ -1058,6 +1058,17 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	}
 }
 
+func (s *State) getMsgFromHolding(h [32]byte) interfaces.IMsg {
+	// check if we have a message
+	m := s.Holding[h]
+
+	if m != nil {
+		return m
+	} else {
+		return s.Hold.GetDependentMsg(h)
+	}
+}
+
 // Ack messages always match some message in the Process List.   That is
 // done here, though the only msg that should call this routine is the Ack
 // message.
@@ -1086,8 +1097,7 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 	// Add the ack to the list of acks
 	TotalAcksInputs.Inc()
 	s.Acks[ack.GetHash().Fixed()] = ack
-	// check if we have a message
-	m, _ := s.Holding[ack.GetHash().Fixed()]
+	m := s.getMsgFromHolding(ack.GetHash().Fixed())
 
 	if m != nil {
 		// We have an ack and a matching message go execute the message!
@@ -1101,41 +1111,6 @@ func (s *State) FollowerExecuteAck(msg interfaces.IMsg) {
 		s.LogMessage("executeMsg", "No Msg, keep", ack)
 		//todo: should we ask MMR here?
 	}
-}
-
-func (s *State) ExecuteEntriesInDBState(dbmsg *messages.DBStateMsg) {
-	height := dbmsg.DirectoryBlock.GetDatabaseHeight()
-
-	if s.EntryDBHeightComplete > height {
-		return
-	}
-	s.LogPrintf("dbstateprocess", "Process entries in %d", height)
-	// If no Eblocks, leave
-	if len(dbmsg.EBlocks) == 0 {
-		return
-	}
-
-	// All DBStates that got here are valid, so just checking the DBlock hash works
-	dblock, err := s.DB.FetchDBlockByHeight(height)
-	if err != nil || dblock == nil {
-		consenLogger.WithFields(log.Fields{"func": "ExecuteEntriesInDBState", "height": height}).Warnf("Dblock fetched is nil")
-		return // This is a weird case
-	}
-
-	if !dbmsg.DirectoryBlock.GetHash().IsSameAs(dblock.GetHash()) {
-		consenLogger.WithFields(log.Fields{"func": "ExecuteEntriesInDBState", "height": height}).Errorf("Bad DBState. DBlock does not match found")
-		return // Bad DBlock
-	}
-
-	for _, e := range dbmsg.Entries {
-		s.WriteEntry <- e
-	}
-
-	if err != nil {
-		consenLogger.WithFields(log.Fields{"func": "ExecuteEntriesInDBState", "height": height}).Errorf("Was unable to execute multibatch")
-		return
-	}
-	// todo: Should we move the EntryDBHeightComplete here?
 }
 
 func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
@@ -1400,9 +1375,8 @@ func (s *State) FollowerExecuteDataResponse(m interfaces.IMsg) {
 		if !ok {
 			return
 		}
-		if len(s.WriteEntry) < cap(s.WriteEntry) {
-			s.WriteEntry <- entry // DataResponse
-		}
+		s.WriteEntry <- entry // DataResponse
+
 	}
 }
 
@@ -1810,7 +1784,7 @@ func (s *State) ProcessCommitChain(dbheight uint32, commitChain interfaces.IMsg)
 		if entry != nil {
 			s.repost(entry, 0) // Try and execute the reveal for this commit
 		}
-		//s.LogMessage("newHolding", "process", commitChain)
+		//s.LogMessage("dependentHolding", "process", commitChain)
 		s.ExecuteFromHolding(commitChain.GetHash().Fixed()) // process CommitChain
 		return true
 	}
@@ -1833,7 +1807,7 @@ func (s *State) ProcessCommitEntry(dbheight uint32, commitEntry interfaces.IMsg)
 		if entry != nil {
 			s.repost(entry, 0) // Try and execute the reveal for this commit
 		}
-		//		s.LogMessage("newHolding", "process", commitEntry)
+		//		s.LogMessage("dependentHolding", "process", commitEntry)
 		s.ExecuteFromHolding(commitEntry.GetHash().Fixed()) // process CommitEntry
 		return true
 	}
@@ -1888,10 +1862,10 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 		// Put it in our list of new Entry Blocks for this Directory Block
 		s.PutNewEBlocks(dbheight, chainID, eb)
 		s.PutNewEntries(dbheight, myhash, msg.Entry)
-
+		s.WriteEntry <- msg.Entry
 		s.IncEntryChains()
 		s.IncEntries()
-		//		s.LogMessage("newHolding", "process", m)
+		//		s.LogMessage("dependentHolding", "process", m)
 		s.ExecuteFromHolding(chainID.Fixed()) // Process Reveal for Chain
 
 		return true
@@ -1920,6 +1894,7 @@ func (s *State) ProcessRevealEntry(dbheight uint32, m interfaces.IMsg) (worked b
 	// Put it in our list of new Entry Blocks for this Directory Block
 	s.PutNewEBlocks(dbheight, chainID, eb)
 	s.PutNewEntries(dbheight, myhash, msg.Entry)
+	s.WriteEntry <- msg.Entry
 
 	s.IncEntries()
 	return true
@@ -2126,9 +2101,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 				entries := []interfaces.IEBEntry{}
 				for _, v := range pl.NewEBlocks {
 					eBlocks = append(eBlocks, v)
-				}
-				for _, v := range pl.NewEntries {
-					entries = append(entries, v)
 				}
 
 				dbstate := s.AddDBState(true, s.LeaderPL.DirectoryBlock, s.LeaderPL.AdminBlock, s.GetFactoidState().GetCurrentBlock(), s.LeaderPL.EntryCreditBlock, eBlocks, entries)
