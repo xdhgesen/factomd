@@ -101,15 +101,16 @@ func TestCatchup(t *testing.T) {
 	RunCmd("x")
 	RunCmd("R5") // Feed load
 	WaitBlocks(state0, 5)
-	RunCmd("R0")          // Stop load
-	RunCmd("x")           // back online
-	WaitBlocks(state0, 3) // give him a few blocks to catch back up
+	RunCmd("R0")           // Stop load
+	RunCmd("x")            // back online
+	WaitBlocks(state0, 3)  // give him a few blocks to catch back up
+	WaitMinutes(state0, 1) // get away from the block edge
 	//todo: check that the node01 caught up and finished 2nd pass sync
 	dbht0 := state0.GetLLeaderHeight()
 	dbht1 := state1.GetLLeaderHeight()
 
 	if dbht0 != dbht1 {
-		t.Fatalf("Node 7 was at dbheight %d which didn't match Node 6 at dbheight %d", dbht0, dbht1)
+		t.Fatalf("Node 0 was at dbheight %d which didn't match Node 1 at dbheight %d", dbht0, dbht1)
 	}
 
 	ShutDownEverything(t)
@@ -249,7 +250,7 @@ func TestMakeALeader(t *testing.T) {
 }
 
 //
-//func TestActivationHeightElection(t *testing.T) {
+//func Test/**/ActivationHeightElection(t *testing.T) {
 //	if RanSimTest {
 //		return
 //	}

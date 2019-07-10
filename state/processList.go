@@ -43,7 +43,7 @@ type ProcessList struct {
 	VMs          []*VM       // Process list for each server (up to 32)
 	ServerMap    [10][64]int // Map of FedServers to all Servers for each minute
 	System       VM          // System Faults and other system wide messages
-	diffSigTally int /* Tally of how many VMs have provided different
+	diffSigTally int         /* Tally of how many VMs have provided different
 		                    					             Directory Block Signatures than what we have
 	                                            (discard DBlock if > 1/2 have sig differences) */
 	// messages processed in this list
@@ -724,6 +724,7 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, FedServers
 }
 
 var extraDebug bool = false
+
 func (p *ProcessList) processVM(vm *VM) (progress bool) {
 
 	if vm.Synced {
@@ -927,7 +928,6 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 	}
 	return progress
 }
-
 
 func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces.IMsg) {
 	//s.LogMessage("processList", "Message:", m) // also logged with the ack
