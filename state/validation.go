@@ -15,7 +15,7 @@ import (
 	"github.com/FactomProject/factomd/util/atomic"
 )
 
-var ValidationDebug bool = false
+var ValidationDebug bool = true
 
 // This is the tread with access to state. It does process and update state
 func (s *State) DoProcessing() {
@@ -35,16 +35,19 @@ func (s *State) DoProcessing() {
 		if ValidationDebug {
 			s.LogPrintf("executeMsg", "start validate.process")
 		}
-
 		for i1 = 0; p1 && i1 < 20; i1++ {
 			p1 = s.Process()
 		}
 
 		if ValidationDebug {
+			s.LogPrintf("executeMsg", "end validate.process %d", i1)
 			s.LogPrintf("executeMsg", "start validate.updatestate")
 		}
 		for i2 = 0; p2 && i2 < 20; i2++ {
 			p2 = s.UpdateState()
+		}
+		if ValidationDebug {
+			s.LogPrintf("executeMsg", "end validate.updatestate %d", i2)
 		}
 		if !p1 && !p2 {
 			// No work? Sleep for a bit

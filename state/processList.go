@@ -43,7 +43,7 @@ type ProcessList struct {
 	VMs          []*VM       // Process list for each server (up to 32)
 	ServerMap    [10][64]int // Map of FedServers to all Servers for each minute
 	System       VM          // System Faults and other system wide messages
-	diffSigTally int         /* Tally of how many VMs have provided different
+	diffSigTally int /* Tally of how many VMs have provided different
 		                    					             Directory Block Signatures than what we have
 	                                            (discard DBlock if > 1/2 have sig differences) */
 	// messages processed in this list
@@ -717,7 +717,6 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, FedServers
 		p.State.LogPrintf("process", "Unexpected 0x%03x %v", xx, x)
 		s = "Unknown"
 	}
-
 	// divide ProcessListProcessCnt by a big number to make it not change the status string very often
 	return fmt.Sprintf("SyncingStatus: %d-:-%d 0x%03x %25s EOM/DBSIG %02d/%02d of %02d -- %d",
 		p.State.LeaderPL.DBHeight, p.State.CurrentMinute, xx, s, EOMProcessed, DBSigProcessed, FedServers, p.State.ProcessListProcessCnt/5000)
@@ -725,7 +724,6 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, FedServers
 }
 
 var extraDebug bool = false
-
 func (p *ProcessList) processVM(vm *VM) (progress bool) {
 
 	if vm.Synced {
@@ -929,6 +927,7 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 	}
 	return progress
 }
+
 
 func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces.IMsg) {
 	//s.LogMessage("processList", "Message:", m) // also logged with the ack
