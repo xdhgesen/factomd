@@ -286,7 +286,7 @@ func TestSaveRestore(t *testing.T) {
 		ss2.Saving = v
 	}
 	{
-		v := ss.IsSyncing()
+		v := ss.Syncing
 		ss2.Syncing = !v
 		if ss.IsSameAs(ss2) {
 			t.Error("Note that we should be able to detect changes.")
