@@ -62,6 +62,9 @@ func (lg *LoadGenerator) Run() {
 		addSend := lg.PerSecond.Load()
 		lg.ToSend += addSend
 		top := lg.ToSend / 10      // ToSend is in tenths so get the integer part
+		if top == 0 {
+			top = 1
+		}
 		lg.ToSend = lg.ToSend % 10 // save an fractional part for next iteration
 		if addSend == 0 {
 			lg.running.Store(false)
