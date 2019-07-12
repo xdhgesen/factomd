@@ -189,7 +189,7 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	var msgVmIndex int
 	pMsgVmIndex := msg.GetVMIndex()
 	// if the message is local and we are a leader then claim it belongs to our VM so it will leader execute
-	if !msg.IsLocal() && s.Leader {
+	if msg.IsLocal() && s.Leader {
 		msgVmIndex = s.LeaderVMIndex
 	} else {
 
@@ -2364,6 +2364,8 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.IsSyncing(), s.DBSig, s.DBSigProcessed, s.DBSigLimit)
 
 	s.DBSigProcessed++
+	vm.Synced = true // ProcessDBSig Stop processing  in the VM until the minute advances
+	s.LogPrintf("executemsg", "set vm.Synced(%d) (EOM)", vm.VmIndex)
 
 	s.LogPrintf("dbsig-eom", " DBSIG %d of %d", s.DBSigProcessed, s.DBSigLimit)
 
