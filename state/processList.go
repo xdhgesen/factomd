@@ -759,7 +759,7 @@ func (p *ProcessList) processVM(vm *VM) (progress bool) {
 	progress = false // assume we will not process any messages
 
 	// process any unprocessed messages
-	for j := vm.Height; j < len(vm.List); j++ {
+	for j := vm.Height; j < len(vm.List) && !vm.Synced; j++ {
 
 		s.ProcessListProcessCnt++
 

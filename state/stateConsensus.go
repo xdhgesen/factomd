@@ -2365,7 +2365,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 
 	s.DBSigProcessed++
 	vm.Synced = true // ProcessDBSig Stop processing  in the VM until the minute advances
-	s.LogPrintf("executemsg", "set vm.Synced(%d) (EOM)", vm.VmIndex)
+	s.LogPrintf("executemsg", "set vm.Synced(%d) (DBSIG)", vm.VmIndex)
 
 	s.LogPrintf("dbsig-eom", " DBSIG %d of %d", s.DBSigProcessed, s.DBSigLimit)
 
