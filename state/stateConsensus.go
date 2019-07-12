@@ -816,6 +816,44 @@ func (s *State) BeginMinute() {
 	case 8:
 	case 9:
 	case 10:
+		s.BetweenBlocks = true // we are now between block. Do not leader execute anything until the DBSigs are all counted.
+		s.LogPrintf("dbsig-eom", "Start new block")
+		eBlocks := []interfaces.IEntryBlock{}
+		entries := []interfaces.IEBEntry{}
+		for _, v := range s.LeaderPL.NewEBlocks {
+			eBlocks = append(eBlocks, v)
+		}
+		for _, v := range s.LeaderPL.NewEntries {
+			entries = append(entries, v)
+		}
+
+		dbstate := s.AddDBState(true, s.LeaderPL.DirectoryBlock, s.LeaderPL.AdminBlock, s.GetFactoidState().GetCurrentBlock(), s.LeaderPL.EntryCreditBlock, eBlocks, entries)
+		if dbstate == nil {
+			dbstate = s.DBStates.Get(int(s.LeaderPL.DirectoryBlock.GetHeader().GetDBHeight()))
+		}
+		dbht := int(dbstate.DirectoryBlock.GetHeader().GetDBHeight())
+		if dbht != int(s.LLeaderHeight) {
+			panic("EOM10")
+		}
+		if dbht > 0 {
+			prev := s.DBStates.Get(dbht - 1)
+			s.DBStates.FixupLinks(prev, dbstate)
+		} else {
+			panic("EOM11")
+		}
+
+		s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
+
+		s.Commits.RemoveExpired(s)
+
+		for k := range s.Acks {
+			v := s.Acks[k].(*messages.Ack)
+			if v.DBHeight < s.LLeaderHeight {
+				TotalAcksOutputs.Inc()
+				delete(s.Acks, k)
+				s.LogMessage("executeMsg", "Drop, expired", v)
+			}
+		}
 	}
 
 	s.Hold.Review() // cleanup old messages
@@ -2156,47 +2194,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 		} else {
 			s.MoveStateToHeight(s.LLeaderHeight, s.CurrentMinute+1)
-		}
-
-		if s.CurrentMinute == 10 {
-			s.BetweenBlocks = true // we are now between block. Do not leader execute anything until the DBSigs are all counted.
-			s.LogPrintf("dbsig-eom", "Start new block")
-			eBlocks := []interfaces.IEntryBlock{}
-			entries := []interfaces.IEBEntry{}
-			for _, v := range pl.NewEBlocks {
-				eBlocks = append(eBlocks, v)
-			}
-			for _, v := range pl.NewEntries {
-				entries = append(entries, v)
-			}
-
-			dbstate := s.AddDBState(true, s.LeaderPL.DirectoryBlock, s.LeaderPL.AdminBlock, s.GetFactoidState().GetCurrentBlock(), s.LeaderPL.EntryCreditBlock, eBlocks, entries)
-			if dbstate == nil {
-				dbstate = s.DBStates.Get(int(s.LeaderPL.DirectoryBlock.GetHeader().GetDBHeight()))
-			}
-			dbht := int(dbstate.DirectoryBlock.GetHeader().GetDBHeight())
-			if dbht != int(s.LLeaderHeight) {
-				panic("EOM10")
-			}
-			if dbht > 0 {
-				prev := s.DBStates.Get(dbht - 1)
-				s.DBStates.FixupLinks(prev, dbstate)
-			} else {
-				panic("EOM11")
-			}
-
-			s.TempBalanceHash = s.FactoidState.GetBalanceHash(true)
-
-			s.Commits.RemoveExpired(s)
-
-			for k := range s.Acks {
-				v := s.Acks[k].(*messages.Ack)
-				if v.DBHeight < s.LLeaderHeight {
-					TotalAcksOutputs.Inc()
-					delete(s.Acks, k)
-					s.LogMessage("executeMsg", "Drop, expired", v)
-				}
-			}
 		}
 	}
 	return true
