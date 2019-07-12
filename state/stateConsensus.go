@@ -187,10 +187,12 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	// only valid to send messages past here
 
 	var msgVmIndex int
+	pMsgVmIndex := msg.GetVMIndex()
 	// if the message is local and we are a leader then claim it belongs to our VM so it will leader execute
 	if !msg.IsLocal() && s.Leader {
 		msgVmIndex = s.LeaderVMIndex
 	} else {
+
 		msg.ComputeVMIndex(s)
 		msgVmIndex = msg.GetVMIndex()
 	}
@@ -217,6 +219,9 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 		s.LogMessage("executeMsg", " FollowerExec -- Execute", msg)
 		return 1, 1 // If it's destine for FollowerExecute we can let it go
 	}
+
+	s.LogMessage("executeMsg", "LX", msg)
+	s.LogPrintf("executeMsg", "LX because L=%v local=%v  vm=%d mvm=%d pVMI=%d NA=%v", s.Leader, msg.IsLocal(), s.LeaderVMIndex, msgVmIndex, pMsgVmIndex, constants.NeedsAck(msg.Type()))
 
 	// only messages that need leader execute make it past here
 
