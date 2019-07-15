@@ -248,7 +248,11 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	s.UseLogstash = p.UseLogstash
 	s.LogstashURL = p.LogstashURL
 
-	go StartProfiler(p.MemProfileRate, p.ExposeProfiling)
+	d, err := time.ParseDuration(p.ProfileBlocks)
+	if err != nil {
+		panic(err)
+	}
+	go StartProfiler(p.MemProfileRate, p.ExposeProfiling, d)
 
 	s.AddPrefix(p.Prefix)
 	s.SetOut(false)

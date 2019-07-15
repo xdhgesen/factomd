@@ -60,6 +60,7 @@ func StartSim(GivenNodes string, UserAddedOptions map[string]string) *state.Stat
 		"--port":                "37001",
 		"--controlpanelport":    "37002",
 		"--networkport":         "37003",
+		"--profileblocks":       "10ms", // Turn on profiling for blocking over 10ms
 	}
 
 	// loop thru the test specific options and overwrite or append to the DefaultOptions

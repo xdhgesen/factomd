@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"runtime"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -17,8 +18,9 @@ import (
 // StartProfiler runs the go pprof tool
 // `go tool pprof http://localhost:6060/debug/pprof/profile`
 // https://golang.org/pkg/net/http/pprof/
-func StartProfiler(mpr int, expose bool) {
+func StartProfiler(mpr int, expose bool, blockProfile time.Duration) {
 	_ = log.Print
+	runtime.SetBlockProfileRate(int(blockProfile))
 	runtime.MemProfileRate = mpr
 	pre := "localhost"
 	if expose {

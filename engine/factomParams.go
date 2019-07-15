@@ -67,6 +67,7 @@ func init() {
 	flag.StringVar(&p.FactomdLocations, "selfaddr", "", "comma separated IPAddresses and DNS names of this factomd to use when creating a cert file")
 	flag.IntVar(&p.MemProfileRate, "mpr", 512*1024, "Set the Memory Profile Rate to update profiling per X bytes allocated. Default 512K, set to 1 to profile everything, 0 to disable.")
 	flag.BoolVar(&p.ExposeProfiling, "exposeprofiler", false, "Setting this exposes the profiling port to outside localhost.")
+	flag.StringVar(&p.ProfileBlocks, "profileblocks", "0s", "Setting this profiles any blocking action over this time set.")
 	flag.StringVar(&p.LogPort, "logPort", "6060", "Port for pprof logging")
 	flag.IntVar(&p.PortOverride, "port", 0, "Port where we serve WSAPI;  default 8088")
 	flag.IntVar(&p.ControlPanelPortOverride, "controlpanelport", 0, "Port for control panel webserver;  Default 8090")

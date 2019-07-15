@@ -65,6 +65,7 @@ type FactomParams struct {
 	TorUpload                bool
 	Sim_Stdin                bool
 	ExposeProfiling          bool
+	ProfileBlocks            string
 	UseLogstash              bool
 	LogstashURL              string
 	Sync2                    int
