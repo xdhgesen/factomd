@@ -2132,8 +2132,13 @@ func (s *State) GetUnsyncedServers(dbheight uint32) []interfaces.IHash {
 }
 
 // GetUnsyncedServersString returns a string with the short IDs for all unsynced VMs
-func (s *State) GetUnsyncedServersString(dbheight uint32) string {
-	var ids string
+func (s *State) GetUnsyncedServersString(dbheight uint32) (ids string) {
+	// This is a debug function and should never panic/crash us
+	defer func() {
+		if r := recover(); r != nil {
+			ids = "PANIC"
+		}
+	}()
 	for _, id := range s.GetUnsyncedServers(dbheight) {
 		ids = ids + "," + id.String()[6:12]
 	}

@@ -252,7 +252,10 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	if err != nil {
 		panic(err)
 	}
-	go StartProfiler(p.MemProfileRate, p.ExposeProfiling, d)
+	// If we set DisableProfiler to true, we will not start the profiler
+	if !p.DisableProfiler {
+		go StartProfiler(p.MemProfileRate, p.ExposeProfiling, d)
+	}
 
 	s.AddPrefix(p.Prefix)
 	s.SetOut(false)
