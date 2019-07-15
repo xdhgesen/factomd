@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FactomProject/factomd/common/primitives/random"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -27,6 +29,25 @@ var r = Replay{}
 var spanMin int64 = 60 // How many hours +/- that will be valid (1== valid 1 hour in the past to 1 hour in the future)
 var speed int64 = 1000 // Speed in milliseconds (max) that we will move the clock
 var _ = pprof.Cmdline
+
+func BenchmarkReplay(b *testing.B) {
+	br := Replay{}
+	totalMsgs := 10000
+
+	second := int64(1000)
+	minute := second * 60
+	//hour := minute * 60
+
+	now := primitives.NewTimestampNow()
+	for i := 0; i < totalMsgs; i++ {
+		rt := primitives.NewTimestampFromMilliseconds(uint64(primitives.NewTimestampNow().GetTimeMilli() - random.RandInt64Between(-55*minute, 1*minute)))
+		br.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, primitives.RandomHash().Fixed(), rt, now)
+	}
+
+	for i := 0; i < b.N; i++ {
+		br.IsHashUnique(constants.INTERNAL_REPLAY, primitives.RandomHash().Fixed())
+	}
+}
 
 func Test_Replay(test *testing.T) {
 	type mh struct {
