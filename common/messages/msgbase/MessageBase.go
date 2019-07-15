@@ -217,12 +217,12 @@ func (m *MessageBase) SentInvalid() bool {
 }
 
 // Try and Resend.  Return true if we should keep the message, false if we should give up.
-func (m *MessageBase) Expire(s interfaces.IState) (rtn bool) {
-	now := s.GetTimestamp().GetTimeMilli()
+func (m *MessageBase) Expire(now interfaces.Timestamp) (rtn bool) {
+	milli := now.GetTimeMilli()
 	if m.expire == 0 {
-		m.expire = now
+		m.expire = milli
 	}
-	if now-m.expire > 60*60*1000 { // Keep messages for some length before giving up.
+	if milli-m.expire > 60*60*1000 { // Keep messages for some length before giving up.
 		rtn = true
 	}
 	return

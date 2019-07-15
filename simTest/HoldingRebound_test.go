@@ -28,7 +28,6 @@ func TestHoldingRebound(t *testing.T) {
 	params := map[string]string{}
 	state0 := SetupSim("L", params, 12, 0, 0, t)
 
-
 	e := factom.Entry{
 		ChainID: id,
 		ExtIDs:  extids,

@@ -553,16 +553,20 @@ func (s *State) ReviewHolding() {
 	}
 
 	if ValidationDebug {
-		s.LogPrintf("executeMsg", "Start reviewHolding")
-		defer s.LogPrintf("executeMsg", "end reviewHolding holding=%d, xreview=%d", len(s.Holding), len(s.XReview))
+		s.LogPrintf("executeMsg", "start Commits.Cleanup")
 	}
 	s.Commits.Cleanup(s)
 	s.DB.Trim()
 
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "start reviewHolding")
+		defer s.LogPrintf("executeMsg", "end reviewHolding holding=%d, xreview=%d", len(s.Holding), len(s.XReview))
+	}
+
 	// Set the resend time at the END of the function. This prevents the time it takes to execute this function
 	// from reducing the time we allow before another review
 	defer func() {
-		s.ResendHolding = now
+		s.ResendHolding = s.GetTimestamp()
 	}()
 	// Anything we are holding, we need to reprocess.
 	s.XReview = make([]interfaces.IMsg, 0)
@@ -585,14 +589,13 @@ func (s *State) ReviewHolding() {
 	s.LeaderNewMin++ // Either way, don't do it again until the ProcessEOM resets LeaderNewMin
 
 	for k, v := range s.Holding {
-		if int(highest)-int(saved) > 1000 {
-			TotalHoldingQueueOutputs.Inc()
-			//delete(s.Holding, k)
-			s.DeleteFromHolding(k, v, "HKB-HSB>1000")
-			continue // No point in executing if we think we can't hold this.
+
+		// don't let this take over 100 ms
+		if s.GetTimestamp().GetTimeMilli()-now.GetTimeMilli() > 100 {
+			break
 		}
 
-		if v.Expire(s) {
+		if v.Expire(now) {
 			s.LogMessage("executeMsg", "expire from holding", v)
 			s.ExpireCnt++
 			TotalHoldingQueueOutputs.Inc()
@@ -607,6 +610,7 @@ func (s *State) ReviewHolding() {
 				s.DeleteFromHolding(k, v, "old EOM")
 				continue
 			}
+			//todo: move to execute not here
 			if !eom.IsLocal() && eom.DBHeight > saved {
 				s.HighestKnown = eom.DBHeight
 			}
@@ -620,6 +624,7 @@ func (s *State) ReviewHolding() {
 				s.DeleteFromHolding(k, v, "Old DBSig")
 				continue
 			}
+			//todo: move to execute not here
 			if !dbsigmsg.IsLocal() && dbsigmsg.DBHeight > saved {
 				s.HighestKnown = dbsigmsg.DBHeight
 			}
@@ -687,9 +692,9 @@ func (s *State) ReviewHolding() {
 			}
 		default:
 		}
-		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
+
 		if re, ok := v.(*messages.RevealEntryMsg); ok {
-			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
+			if !s.NoEntryYet(re.GetHash(), now) {
 				s.DeleteFromHolding(re.GetHash().Fixed(), re, "already committed reveal")
 				s.Commits.Delete(re.GetHash().Fixed())
 				continue

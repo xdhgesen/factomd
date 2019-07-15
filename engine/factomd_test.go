@@ -563,7 +563,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "60"}, 10, 7, 7, t)
+	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "30", "--debuglog": "."}, 10, 7, 7, t)
 
 	WaitForMinute(state0, 2)
 
@@ -593,7 +593,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		return
 	}
 	RanSimTest = true
-	// only have one leader because if you are not the leader responcible for the FCT transaction then
+	// only have one leader because if you are not the leader responsible for the FCT transaction then
 	// you will return transACK before teh balance is updated which will make thsi test fail.
 	state0 := SetupSim("LAF", map[string]string{}, 6, 0, 0, t)
 	WaitForMinute(state0, 1)

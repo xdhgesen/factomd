@@ -188,7 +188,7 @@ func Peers(fnode *FactomNode) {
 
 		// Put any broadcasts from our peers into our BroadcastIn queue
 		for i, peer := range fnode.Peers {
-			fromPeer := fmt.Sprintf("peer-%d", i)
+			fromPeer := peer.GetNameTo()
 			for j := 0; j < 100; j++ {
 				var msg interfaces.IMsg
 				var err error
