@@ -20,7 +20,8 @@ func main() {
 	// uncomment StartProfiler() to run the pprof tool (for testing)
 
 	//  Go Optimizations...
-	runtime.GOMAXPROCS(runtime.NumCPU()) // TODO: should be *2 to use hyperthreadding? -- clay
+	numCPU := runtime.NumCPU()
+	runtime.GOMAXPROCS(numCPU) // TODO: should be *2 to use hyperthreadding? -- clay
 
 	fmt.Println("Command Line Arguments:")
 

@@ -563,7 +563,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "30", "--debuglog": "."}, 10, 7, 7, t)
+	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "30", "--debuglog": ""}, 10, 7, 7, t)
 
 	WaitForMinute(state0, 2)
 

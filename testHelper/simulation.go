@@ -66,10 +66,16 @@ func StartSim(GivenNodes string, UserAddedOptions map[string]string) *state.Stat
 	// loop thru the test specific options and overwrite or append to the DefaultOptions
 	if UserAddedOptions != nil && len(UserAddedOptions) != 0 {
 		for key, value := range UserAddedOptions {
-			if key != "--debuglog" && value != "" {
-				CmdLineOptions[key] = value
+			if key == "--debuglog" {
+				if value != "" {
+					CmdLineOptions[key] = value + "|" + CmdLineOptions[key] // add debug log flags to the default
+				} else {
+					delete(CmdLineOptions, key) // explicit disable logs on empty regex.
+				}
 			} else {
-				CmdLineOptions[key] = value + "|" + CmdLineOptions[key] // add debug log flags to the default
+				if value != "" {
+					CmdLineOptions[key] = value
+				}
 			}
 			// remove options not supported by the current flags set so we can merge this update into older code bases
 		}
