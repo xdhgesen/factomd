@@ -57,7 +57,7 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLF", map[string]string{}, 15, 0, 0, t)
+	state0 := SetupSim("LLF", map[string]string{"--debuglog": "."}, 15, 0, 0, t)
 
 	RunCmd("2")   // select 2
 	RunCmd("R30") // Feed load
@@ -563,7 +563,7 @@ func TestMultiple7Election(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "30", "--debuglog": ""}, 10, 7, 7, t)
+	state0 := SetupSim("LLLLLLLLLFLLFLFLLLFLAAFAAAAFA", map[string]string{"--blktime": "40", "--faulttime": "5", "--debuglog": "fault|net"}, 10, 7, 7, t)
 
 	WaitForMinute(state0, 2)
 
