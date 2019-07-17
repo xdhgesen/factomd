@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"runtime/debug"
 	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -952,14 +951,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	s := list.State
 
-	s.LogPrintf("ProcessBlocks", "\n%s", debug.Stack())
-	s.LogPrintf("ProcessBlocks", "\n")
-
-	if dbht != list.State.FactoidState.(*FactoidState).DBHeight {
-		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping %d %d", dbht, dbht, list.State.FactoidState.(*FactoidState).DBHeight)
-		//return false
-	}
-
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
@@ -967,8 +958,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : ", dbht, d.Locked, d.IsNew, d.Repeat)
 		return false
 	}
-
-	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Process d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : ", dbht, d.Locked, d.IsNew, d.Repeat)
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
 	// go forward.
