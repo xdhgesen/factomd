@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -951,14 +952,23 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 
 	s := list.State
 
+	s.LogPrintf("ProcessBlocks", "\n%s", debug.Stack())
+	s.LogPrintf("ProcessBlocks", "\n")
+
+	if dbht != list.State.FactoidState.(*FactoidState).DBHeight {
+		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping %d %d", dbht, dbht, list.State.FactoidState.(*FactoidState).DBHeight)
+		//return false
+	}
+
 	// If we are locked, the block has already been processed.  If the block IsNew then it has not yet had
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
-
 		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : ", dbht, d.Locked, d.IsNew, d.Repeat)
 		return false
 	}
+
+	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Process d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : ", dbht, d.Locked, d.IsNew, d.Repeat)
 
 	// If we detect that we have processed at this height, flag the dbstate as a repeat, progress is good, and
 	// go forward.
@@ -1016,8 +1026,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	//
 	//list.State.AddStatus(fmt.Sprintf("PROCESSBLOCKS:  Processing Admin Block at dbht: %d", d.AdminBlock.GetDBHeight()))
 	err := d.AdminBlock.UpdateState(list.State)
-
-	s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) after update auth %d/%d ", dbht, len(pl.FedServers), len(pl.AuditServers))
 
 	if err != nil {
 		panic(err)
@@ -1212,9 +1220,9 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		// if we are following by blocks then this move us forward but if we are following by minutes the
 		// code in ProcessEOM for minute 10 will have moved us forward
 		s.SetLeaderTimestamp(d.DirectoryBlock.GetTimestamp())
-		s.MoveStateToHeight(dbht+1, 0)
 		// todo: is there a reason not to do this in MoveStateToHeight?
 		fs.(*FactoidState).DBHeight = dbht + 1
+		s.MoveStateToHeight(dbht+1, 0)
 	}
 
 	// Note about dbsigs.... If we processed the previous minute, then we generate the DBSig for the next block.

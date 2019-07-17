@@ -902,7 +902,6 @@ func (s *State) AddDBState(isNew bool,
 		s.LogPrintf("dbstateprocess", "unexpected: ht > s.LLeaderHeight  at %d added %d", s.LLeaderHeight, ht)
 
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Add DBState: s.SigType(%v)", s.FactomNodeName, s.SigType))
-		s.MoveStateToHeight(ht, 0) // AddDBState()
 		s.StartDelay = s.GetTimestamp().GetTimeMilli()
 		s.RunLeader = false
 		LeaderPL := s.ProcessLists.Get(s.LLeaderHeight)
@@ -934,11 +933,6 @@ func (s *State) AddDBState(isNew bool,
 				s.LeaderVMIndex = LeaderVMIndex
 			}
 		}
-		for s.ProcessLists.UpdateState(s.LLeaderHeight) {
-		}
-	}
-	if ht == 0 && s.LLeaderHeight == 0 {
-		s.MoveStateToHeight(1, 0)
 	}
 
 	return dbState
@@ -1139,6 +1133,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		}
 		return
 	}
+	s.LogPrintf("dbstateprocess", "FollowerExecuteDBState exec %d", dbheight)
 
 	if dbstatemsg.IsLast { // this is the last DBState in this load
 		s.DBFinished = true // Normal case
@@ -1222,6 +1217,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		//s.AddStatus(fmt.Sprintf("FollowerExecuteDBState(): dbstate added from network at ht %d", dbheight))
 		dbstate.ReadyToSave = true
 		dbstate.Locked = false
+		s.LogPrintf("dbstateprocess", "FollowerExecuteDBState set1 false %d", dbheight)
 		dbstate.Signed = true
 		s.DBStateAppliedCnt++
 	} else {
@@ -1229,6 +1225,7 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		dbstate.Saved = true
 		dbstate.IsNew = false
 		dbstate.Locked = false
+		s.LogPrintf("dbstateprocess", "FollowerExecuteDBState set2 false %d", dbheight)
 	}
 
 	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Clear SigType follower execute DBState:  !s.SigType(%v)", s.FactomNodeName, s.SigType))
