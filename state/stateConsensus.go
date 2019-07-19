@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/entryBlock"
 	"github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/factoid"
-	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -39,33 +38,6 @@ var _ = (*hash.Hash32)(nil)
 // Returns true if some message was processed.
 //***************************************************************
 
-func (s *State) CheckFileName(name string) bool {
-	return messages.CheckFileName(name)
-}
-
-func (s *State) DebugExec() (ret bool) {
-	return globals.Params.DebugLogRegEx != ""
-}
-
-func (s *State) LogMessage(logName string, comment string, msg interfaces.IMsg) {
-	if s.DebugExec() {
-		if s == nil {
-			messages.StateLogMessage("unknown", 0, 0, logName, comment, msg)
-		} else {
-			messages.StateLogMessage(s.FactomNodeName, int(s.LLeaderHeight), int(s.CurrentMinute), logName, comment, msg)
-		}
-	}
-}
-
-func (s *State) LogPrintf(logName string, format string, more ...interface{}) {
-	if s.DebugExec() {
-		if s == nil {
-			messages.StateLogPrintf("unknown", 0, 0, logName, format, more...)
-		} else {
-			messages.StateLogPrintf(s.FactomNodeName, int(s.LLeaderHeight), int(s.CurrentMinute), logName, format, more...)
-		}
-	}
-}
 func (s *State) AddToHolding(hash [32]byte, msg interfaces.IMsg) {
 	if msg.Type() == constants.VOLUNTEERAUDIT {
 		s.LogMessage("holding election?", "add", msg)

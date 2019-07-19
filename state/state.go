@@ -170,8 +170,6 @@ type State struct {
 
 	tickerQueue            chan int
 	timerMsgQueue          chan interfaces.IMsg
-	TimeOffset             interfaces.Timestamp
-	MaxTimeOffset          interfaces.Timestamp
 	networkOutMsgQueue     NetOutMsgQueue
 	networkInvalidMsgQueue chan interfaces.IMsg
 	inMsgQueue             InMsgMSGQueue
@@ -343,10 +341,6 @@ type State struct {
 	// Web Services
 	Port int
 
-	// For Replay / journal
-	IsReplaying     bool
-	ReplayTimestamp interfaces.Timestamp
-
 	// State for the Entry Syncing process
 	EntrySyncState *EntrySync
 
@@ -397,6 +391,14 @@ type State struct {
 	// Logstash
 	UseLogstash bool
 	LogstashURL string
+
+	// Logging
+	// 	It probably shouldn't be an unnamed field, but this way we don't break all the code
+	//	places that touch the logs.
+	*StateLogger
+
+	// TimeStamp Controller
+	TimestampModules
 
 	// Plugins
 	useTorrents             bool
@@ -1180,6 +1182,7 @@ func (s *State) Init() {
 	}
 
 	s.Logger = log.WithFields(log.Fields{"node-name": s.GetFactomNodeName(), "identity": s.GetIdentityChainID().String()})
+	s.StateLogger = NewStateLogger(s)
 
 	// Set up Logstash Hook for Logrus (if enabled)
 	if s.UseLogstash {
@@ -2196,24 +2199,6 @@ func (s *State) Logf(level string, format string, args ...interface{}) {
 
 func (s *State) GetAuditHeartBeats() []interfaces.IMsg {
 	return s.AuditHeartBeats
-}
-
-func (s *State) SetIsReplaying() {
-	s.IsReplaying = true
-}
-
-func (s *State) SetIsDoneReplaying() {
-	s.IsReplaying = false
-	s.ReplayTimestamp = nil
-}
-
-// Returns a millisecond timestamp
-func (s *State) GetTimestamp() interfaces.Timestamp {
-	if s.IsReplaying == true {
-		fmt.Println("^^^^^^^^ IsReplying is true")
-		return s.ReplayTimestamp
-	}
-	return primitives.NewTimestampNow()
 }
 
 func (s *State) GetTimeOffset() interfaces.Timestamp {
