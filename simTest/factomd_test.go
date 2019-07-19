@@ -50,6 +50,7 @@ func TestLoad(t *testing.T) {
 	if RanSimTest {
 		return
 	}
+	state.MMR_enable = false // No MMR for you!
 
 	RanSimTest = true
 

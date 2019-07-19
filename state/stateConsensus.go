@@ -241,7 +241,6 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		s.LogMessage("badEvents", "Nil hash in executeMsg", msg)
 		return false
 	}
-
 	s.LogMessage("executeMsg", "executeMsg()", msg)
 
 	s.SetString()
@@ -255,7 +254,6 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 
 	switch validToExecute {
 	case 1:
-
 		switch msg.Type() {
 		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
 			if !s.NoEntryYet(msg.GetHash(), nil) {
@@ -286,7 +284,6 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			}
 		}
 		local := msg.IsLocal()
-
 		vmi = msg.GetVMIndex()
 		hkb := s.GetHighestKnownBlock()
 
@@ -297,10 +294,15 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			(!s.Syncing || !vms) && // if not syncing or this VM is not yet synced
 			(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
 			s.LeaderPL.DBHeight+1 >= hkb {
-
-			s.LogMessage("executeMsg", "LeaderExecute", msg)
-			msg.LeaderExecute(s)
-
+			if vml == 0 { // if we have not generated a DBSig ...
+				s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
+				TotalXReviewQueueInputs.Inc()
+				s.XReview = append(s.XReview, msg)
+				s.LogMessage("executeMsg", "Missing DBSig use XReview", msg)
+			} else {
+				s.LogMessage("executeMsg", "LeaderExecute", msg)
+				msg.LeaderExecute(s)
+			}
 		} else {
 			s.LogMessage("executeMsg", "FollowerExecute", msg)
 			s.LogPrintf("executeMsg", "cause:"+
