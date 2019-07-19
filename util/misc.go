@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/FactomProject/factomd/log"
+	log "github.com/sirupsen/logrus"
 )
 
 // a simple file/line trace function, with optional comment(s)
