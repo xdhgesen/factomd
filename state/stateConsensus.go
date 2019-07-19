@@ -287,44 +287,30 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		}
 		local := msg.IsLocal()
 
-		if !local {
-			vmi = msg.GetVMIndex()
-		} else {
-			vmi = s.LeaderVMIndex
-		}
+		vmi = msg.GetVMIndex()
 		hkb := s.GetHighestKnownBlock()
 
-		// if I am not a leader or it not the VM I am leader for
-		if !s.Leader || vmi != s.LeaderVMIndex {
-			msg.FollowerExecute(s)
+		if s.RunLeader &&
+			s.Leader &&
+			!s.Saving && // if not between blocks
+			vm != nil && vmh == vml && // if we have processed to the end of the process list
+			(!s.Syncing || !vms) && // if not syncing or this VM is not yet synced
+			(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
+			s.LeaderPL.DBHeight+1 >= hkb {
+
+			s.LogMessage("executeMsg", "LeaderExecute", msg)
+			msg.LeaderExecute(s)
+
 		} else {
-			// should be leader executed but there are a few conditions that make us wait ...
-			if s.CurrentMinute < 10 && // Can't leader execute in minute 10 because we can't add to the process list
-				s.RunLeader && // Can't leader execute until we are done with ignore period
-				!s.Saving && // Can't leader exeucte if we are saving (same as minute ==10?)
-				vm != nil && vmh == vml && // if we have processed to the end of the process list
-				(!s.Syncing || !vms) && // if not syncing or this VM is not yet synced
-				(local || vmi == s.LeaderVMIndex) && // if it's a local message or it a message for our VM
-				s.LeaderPL.DBHeight+1 >= hkb {
-				if vml == 0 { // if we have not generated a DBSig ...
-					s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
-					TotalXReviewQueueInputs.Inc()
-					s.XReview = append(s.XReview, msg)
-					s.LogMessage("executeMsg", "Missing DBSig use XReview", msg)
-				} else {
-					s.LogMessage("executeMsg", "LeaderExecute", msg)
-					msg.LeaderExecute(s)
-				}
-			} else {
-				s.LogMessage("executeMsg", "FollowerExecute", msg)
-				s.LogPrintf("executeMsg", "cause:"+
-					" s.RunLeader(%v) && s.Leader(%v) && !s.Saving(%v) &&	vm(%p) != nil && vmh(%v) == vml(%v) && "+
-					"(!s.Syncing(%v) || !vms(%v)) && (local(%v) || vmi(%v) == s.LeaderVMIndex(%v)) && "+
-					"s.LeaderPL.DBHeight(%v)+1 >= hkb(%v)",
-					s.RunLeader, s.Leader, s.Saving, vm, vmh, vml, s.Syncing, vms, local, vmi, s.LeaderVMIndex, s.LeaderPL.DBHeight, hkb)
-				msg.FollowerExecute(s)
-			}
+			s.LogMessage("executeMsg", "FollowerExecute", msg)
+			s.LogPrintf("executeMsg", "cause:"+
+				" s.RunLeader(%v) && s.Leader(%v) && !s.Saving(%v) &&	vm(%p) != nil && vmh(%v) == vml(%v) && "+
+				"(!s.Syncing(%v) || !vms(%v)) && (local(%v) || vmi(%v) == s.LeaderVMIndex(%v)) && "+
+				"s.LeaderPL.DBHeight(%v)+1 >= hkb(%v)",
+				s.RunLeader, s.Leader, s.Saving, vm, vmh, vml, s.Syncing, vms, local, vmi, s.LeaderVMIndex, s.LeaderPL.DBHeight, hkb)
+			msg.FollowerExecute(s)
 		}
+
 		return true
 
 	case 0:
@@ -334,7 +320,7 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		return false
 
 	case -2:
-		s.LogMessage("executeMsg", "newHolding from executeMsg", msg)
+		s.LogMessage("executeMsg", "dependentHolding from executeMsg", msg)
 		return false
 
 	default:
@@ -491,6 +477,9 @@ emptyLoop:
 		}
 		// toss everything else
 		s.XReview = s.XReview[:0]
+	}
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "end reviewHolding %d", len(s.XReview))
 	}
 
 	processXReviewTime := time.Since(preProcessXReviewTime)
@@ -809,6 +798,8 @@ func (s *State) EndMinute() {
 	case 7:
 	case 8:
 	case 9:
+		s.Saving = true
+
 	case 10:
 	}
 }
@@ -860,7 +851,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		// check for identity change every time we start a new block before we look up our VM
 		s.CheckForIDChange()
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID) // MoveStateToHeight block
-		defer s.Hold.ExecuteForNewHeight(dbheight)                                                   // execute held messages
+
 	}
 
 	s.CurrentMinute = newMinute                                                            // Update just the minute
@@ -1526,9 +1517,6 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	ack.SendOut(s, ack)
 	eom.SendOut(s, eom)
 	s.FollowerExecuteEOM(eom)
-	if s.CurrentMinute == 9 {
-		s.Saving = true
-	}
 	s.UpdateState()
 }
 
