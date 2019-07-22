@@ -6,7 +6,9 @@ package wsapi
 
 import (
 	"io"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -29,11 +31,16 @@ func NewLogFromConfig(logPath, logLevel, prefix string) *log.Entry {
 
 	logger := log.New()
 	logger.SetOutput(logFile)
-	lvl, err := log.ParseLevel(logLevel)
-	if err != nil {
-		panic(err)
+	if strings.ToLower(logLevel) == "none" {
+		log.SetLevel(log.PanicLevel)
+		log.SetOutput(ioutil.Discard)
+	} else {
+		lvl, err := log.ParseLevel(logLevel)
+		if err != nil {
+			panic(err)
+		}
+		logger.SetLevel(lvl)
 	}
-	logger.SetLevel(lvl)
 	return logger.WithField("prefix", prefix)
 }
 
