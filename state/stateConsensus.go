@@ -192,7 +192,7 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	if msg.IsLocal() && s.Leader {
 		msgVmIndex = s.LeaderVMIndex
 	} else {
-	msg.ComputeVMIndex(s)
+		msg.ComputeVMIndex(s)
 		msgVmIndex = msg.GetVMIndex()
 	}
 
@@ -223,11 +223,6 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	s.LogPrintf("executeMsg", "LX because L=%v local=%v  vm=%d mvm=%d pVMI=%d NA=%v", s.Leader, msg.IsLocal(), s.LeaderVMIndex, msgVmIndex, pMsgVmIndex, constants.NeedsAck(msg.Type()))
 
 	// only messages that need leader execute make it past here
-
-	if s.LeaderPL.VMs[s.LeaderVMIndex].EOMInFlight {
-		s.LogMessage("executeMsg", "LeaderExec -- Hold, VM has EOM in flight", msg)
-		return 0, 0 // Don't execute (add to the process list) after an EOM until we have moved minutes
-	}
 
 	var vm *VM = s.LeaderPL.VMs[s.LeaderVMIndex]
 
@@ -294,35 +289,18 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		msg.SendOut(s, msg)
 	}
 
-	switch validToExecute {
-	case 1:
-		switch msg.Type() {
-		case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
-			if !s.NoEntryYet(msg.GetHash(), nil) {
-				s.DeleteFromHolding(msg.GetMsgHash().Fixed(), msg, "AlreadyCommitted") // delete commit
-				s.DeleteFromHolding(msg.GetHash().Fixed(), msg, "AlreadyCommitted")    // delete reveal
-				s.Commits.Delete(msg.GetHash().Fixed())
-				s.LogMessage("executeMsg", "drop, already committed", msg)
-				return true
-			}
-			s.AddToHolding(msg.GetMsgHash().Fixed(), msg) // add valid commit/reveal to holding in case it fails to get added
-		}
-
+	switch msg.Type() {
+	case constants.REVEAL_ENTRY_MSG, constants.COMMIT_ENTRY_MSG, constants.COMMIT_CHAIN_MSG:
+		s.AddToHolding(msg.GetMsgHash().Fixed(), msg) // add valid commit/reveal to holding in case it fails to get added
+	}
 	switch validToExecute {
 	case 2: // Leader Execute
-				s.LogMessage("executeMsg", "LeaderExecute", msg)
-				msg.LeaderExecute(s)
+		s.LogMessage("executeMsg", "LeaderExecute", msg)
+		msg.LeaderExecute(s)
 		return true
 	case 1: // Follower Execute
-			s.LogMessage("executeMsg", "FollowerExecute", msg)
-			s.LogPrintf("executeMsg", "cause:"+
-				" s.RunLeader(%v) && s.Leader(%v) && !s.Saving(%v) &&	vm(%p) != nil && vmh(%v) == vml(%v) && "+
-				"(!s.Syncing(%v) || !vms(%v)) && (local(%v) || vmi(%v) == s.LeaderVMIndex(%v)) && "+
-				"s.LeaderPL.DBHeight(%v)+1 >= hkb(%v)",
-				s.RunLeader, s.Leader, s.Saving, vm, vmh, vml, s.Syncing, vms, local, vmi, s.LeaderVMIndex, s.LeaderPL.DBHeight, hkb)
-			msg.FollowerExecute(s)
-		}
-
+		s.LogMessage("executeMsg", "FollowerExecute", msg)
+		msg.FollowerExecute(s)
 		return true
 
 	case 0:
@@ -451,18 +429,19 @@ func (s *State) Process() (progress bool) {
 	preEmptyLoopTime := time.Now()
 emptyLoop:
 	for {
+		var msg interfaces.IMsg
 		select {
-// We have prioritizedMsgQueue listed twice, meaning it has 2 chances to be
+		// We have prioritizedMsgQueue listed twice, meaning it has 2 chances to be
 		// randomly selected to unblock and execute.
 		case msg = <-s.prioritizedMsgQueue:
 			s.LogMessage("prioritizedMsgQueue", "Execute", msg)
 		case msg = <-s.prioritizedMsgQueue:
 			s.LogMessage("prioritizedMsgQueue", "Execute", msg)
-		case msg := <-s.msgQueue:
+		case msg = <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
-			case msg = <-s.ackQueue:
+		case msg = <-s.ackQueue:
 			s.LogMessage("ackQueue", "Execute", msg)
-		
+
 		default:
 			break emptyLoop
 		}
@@ -470,7 +449,6 @@ emptyLoop:
 	}
 	emptyLoopTime := time.Since(preEmptyLoopTime)
 	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
-
 
 	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
@@ -724,8 +702,7 @@ func (s *State) ReviewHolding() {
 }
 
 func (s *State) BeginMinute() {
-
-	dbheight := s.LLeaderHeight
+	s.LogPrintf("dbstateprocess", "EndMinute(%d-:-%d)", s.LLeaderHeight, s.CurrentMinute)
 
 	// All minutes
 	{
@@ -733,26 +710,20 @@ func (s *State) BeginMinute() {
 		for i, _ := range s.LeaderPL.FedServers {
 			vm := s.LeaderPL.VMs[i]
 
-			if vm.Synced {
-				s.LogPrintf("executemsg", "clear vm.synced(%d)", i)
+			if !vm.Synced {
+				s.LogPrintf("executemsg", "Found vm.synced(%d) clear", i)
 			}
-			if vm.EOMInFlight {
-				s.LogPrintf("executemsg", "clear vm.EOMInFlight(%d)", i)
-			}
-
-			vm.Synced = false      // movestatetoheight
-			vm.EOMInFlight = false // movestatetoheight
+			vm.Synced = false // BeginMinute
 		}
-		s.EOMProcessed = 0   // movestatetoheight
-		s.DBSigProcessed = 0 // movestatetoheight
-		s.LogPrintf("dbsig-eom", "reset DBSigProcessed in moveStateToHeight (step)")
+		s.EOMProcessed = 0   // BeginMinute
+		s.DBSigProcessed = 0 // BeginMinute
+		s.LogPrintf("dbsig-eom", "reset DBSigProcessed in BeginMinute (step)")
 
 		// set the limits because we might have added servers
 		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
 		s.DBSigLimit = s.EOMLimit               // We add or remove server only on block boundaries
-		s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", s.LLeaderHeight, s.CurrentMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
-		s.Hold.ExecuteForNewHeight(dbheight) // execute held messages for this height
-		s.Hold.Review()                      // cleanup old messages
+		s.LogPrintf("dbstateprocess", "BeginMinute(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", s.LLeaderHeight, s.CurrentMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
+		s.Hold.Review() // cleanup old messages
 		s.CurrentMinuteStartTime = time.Now().UnixNano()
 		// If an we added or removed servers or elections tool place in minute 9, our lists will be unsorted. Fix that
 		s.LeaderPL.SortAuditServers()
@@ -765,37 +736,31 @@ func (s *State) BeginMinute() {
 		s.DBSigProcessed = 0 // BeginMinute
 
 		for _, vm := range s.LeaderPL.VMs {
-			vm.Synced = false // movestatetoheight
+			vm.Synced = false // BeginMinute
 		}
-		s.ProcessLists.Get(dbheight + 1) // Make sure next PL exists
-
+		s.ProcessLists.Get(s.LLeaderHeight + 1) // Make sure next PL exists
 	}
 	//
 
 	switch s.CurrentMinute {
 	case 0:
-		s.DBStates.UpdateState() // check if there is a next DBstate message to process...
-
 		s.CurrentBlockStartTime = s.CurrentMinuteStartTime
 		// set the limits because we might have added servers
 		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
 		s.DBSigLimit = s.EOMLimit               // We add or remove server only on block boundaries
 
-		s.dbheights <- int(dbheight) // Notify MMR process we have moved on...
+		s.dbheights <- int(s.LLeaderHeight) // Notify MMR process we have moved on...
 		// update the elections thread
 		authlistMsg := s.EFactory.NewAuthorityListInternal(s.LeaderPL.FedServers, s.LeaderPL.AuditServers, s.LLeaderHeight)
 		s.ElectionsQueue().Enqueue(authlistMsg)
 
 		if s.Leader {
-			s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
-			// this used to be the commented out one but it doesn't actually process the dbsig...
-			//			s.UpdateState() // go process the DBSigs
-			// s.DBStates.UpdateState() // go process the DBSigs
+			s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // BeginMinute()
 		}
-		s.Hold.ExecuteForNewHeight(dbheight) // execute held messages
+		s.Hold.ExecuteForNewHeight(s.LLeaderHeight) // execute held messages
 
 	case 1:
-		dbstate := s.GetDBState(dbheight - 1)
+		dbstate := s.GetDBState(s.LLeaderHeight - 1)
 		if dbstate != nil && !dbstate.Saved {
 			s.LogPrintf("dbstateprocess", "Set ReadyToSave %d", dbstate.DirectoryBlock.GetHeader().GetDBHeight())
 			dbstate.ReadyToSave = true
@@ -855,6 +820,8 @@ func (s *State) BeginMinute() {
 }
 
 func (s *State) EndMinute() {
+	s.LogPrintf("dbstateprocess", "EndMinute(%d-:-%d)", s.LLeaderHeight, s.CurrentMinute)
+
 	// All minutes
 	{
 
@@ -882,9 +849,9 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) No change")
 		return
 	}
+
 	s.EndMinute()         // execute all the activity that need to happen at the end of a minute
 	defer s.BeginMinute() // defer the activity that happens at the start of a minute
-	s.LogPrintf("dbstateprocess", "current = (%d-:-%d)", s.LLeaderHeight, s.CurrentMinute)
 
 	if (s.LLeaderHeight+1 == dbheight && newMinute == 0) || (s.LLeaderHeight == dbheight && s.CurrentMinute+1 == newMinute) {
 		// these are the allowed cases; move to nextblock-:-0 or move to next minute
@@ -893,12 +860,6 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		if s.LLeaderHeight != dbheight {
 			fmt.Fprintf(os.Stderr, "State move between non-sequential heights from %d to %d\n", s.LLeaderHeight, dbheight)
 		}
-		//force sync state to a rational  state for between minutes
-		s.EOM = false        // movestatetoheight
-		s.DBSig = false      // movestatetoheight
-		s.EOMProcessed = 0   // movestatetoheight
-		s.DBSigProcessed = 0 // movestatetoheight
-		s.LogPrintf("dbsig-eom", "reset DBSigProcessed in moveStateToHeight (jump)")
 	}
 	// normally when loading by DBStates we jump from minute 0 to minute 0
 	// when following by minute we jump from minute 10 to minute 0
@@ -911,8 +872,6 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		if newMinute != 0 {
 			panic(fmt.Sprintf("Can't jump to the middle of a block minute: %d", newMinute))
 		}
-		s.DBStates.UpdateState()
-
 		// update cached values that change with current minute
 		s.CurrentMinute = 0                // Update height and minute
 		s.LLeaderHeight = uint32(dbheight) // Update height and minute
@@ -926,26 +885,11 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		// check for identity change every time we start a new block before we look up our VM
 		s.CheckForIDChange()
 		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID) // MoveStateToHeight block
-
-		// update the elections thread
-		authlistMsg := s.EFactory.NewAuthorityListInternal(s.LeaderPL.FedServers, s.LeaderPL.AuditServers, s.LLeaderHeight)
-		s.ElectionsQueue().Enqueue(authlistMsg)
-
-		if s.Leader && !s.LeaderPL.DBSigAlreadySent {
-			defer s.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
-			defer s.DBStates.UpdateState()                      // go process the DBSigs
-		}
-		}
-		s.CurrentMinute = newMinute                                                            // Update just the minute
-		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute
-		s.LogPrintf("executeMsg", "MoveStateToHeight new minute set leader=%v, vmIndex = %v", s.Leader, s.LeaderVMIndex)
-		// We are between blocks make sure we are setup to sync
-		// should already be true but if a DBSTATE got processed mid block
-		// there might be a circumstance where we get here in a weird state
-		// so make it the normal starting state
+	}
+	s.CurrentMinute = newMinute                                                            // Update just the minute
+	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute
 
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", dbheight, newMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
-
 }
 
 // Adds blocks that are either pulled locally from a database, or acquired from peers.
@@ -1304,7 +1248,6 @@ func (s *State) FollowerExecuteDBState(msg interfaces.IMsg) {
 		dbstate.Locked = false
 	}
 
-
 	// At this point the block is good, make sure not to ask for it anymore
 	if !dbstatemsg.IsInDB {
 		s.StatesReceived.Notify <- msg.(*messages.DBStateMsg)
@@ -1534,12 +1477,6 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 		return
 	}
 
-	// If we have not been working for at least half the period (half the minute) then ignore the ticker
-	// The following test is simply checking if we have used half our time (in nanoseconds) to process.
-	if s.EOMSyncTime != 0 && (time.Now().UnixNano()-s.EOMSyncTime) < int64(s.DirectoryBlockInSeconds)*time.Second.Nanoseconds()/10/2 {
-		return
-	}
-
 	pl := s.ProcessLists.Get(s.LLeaderHeight)
 	vm := pl.VMs[s.LeaderVMIndex]
 
@@ -1565,7 +1502,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	eom.SysHeight = uint32(pl.System.Height)
 
 	if vm.Synced {
-		s.LogMessage("executeMsg", ""repost, already sync'd", m)
+		s.LogMessage("executeMsg", "repost, already	 sync'd", m)
 		s.repost(m, 1) // Do not drop the message, we only generate 1 local eom per height/min, let validate drop it
 		return
 	}
@@ -1600,10 +1537,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	s.Acks[eom.GetMsgHash().Fixed()] = ack
 	ack.SendOut(s, ack)
 	eom.SendOut(s, eom)
-	s.LeaderPL.VMs[eom.VMIndex].EOMInFlight = true // Cannot generate ACK past this EOM until the minute is complete
-	s.LogPrintf("executemsg", "set vm.EOMInFlight(%d)", eom.VMIndex)
-	s.FollowerExecuteEOM(eom)
-	s.UpdateState()
+	pl.AddToProcessList(s, ack, eom)
 }
 
 func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
@@ -1654,7 +1588,7 @@ func (s *State) LeaderExecuteDBSig(m interfaces.IMsg) {
 	m.SetLeaderChainID(ack.GetLeaderChainID())
 	m.SetMinute(ack.Minute)
 
-	s.ProcessLists.Get(ack.DBHeight).AddToProcessList(s, ack, m)
+	pl.AddToProcessList(s, ack, m)
 }
 
 func (s *State) LeaderExecuteCommitChain(m interfaces.IMsg) {
@@ -1968,7 +1902,6 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 	}
 
 	if !vm.Signed {
-
 		if !pl.DBSigAlreadySent {
 
 			dbs, _ := s.CreateDBSig(dbheight, vmIndex)
@@ -1980,8 +1913,12 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 			dbs.LeaderExecute(s)
 			vm.Signed = true
 			pl.DBSigAlreadySent = true
+		} else {
+			s.LogPrintf("executeMsg", "DBSIG already sent")
 		}
 		// used to ask here for the message we already made and sent...
+	} else {
+		s.LogPrintf("executeMsg", "vm not signed!")
 	}
 }
 
@@ -2001,11 +1938,11 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	if s.DebugExec() {
 		defer func() {
 			if s.CurrentMinute != 10 {
-			ids := s.GetUnsyncedServersString(dbheight)
-			if len(ids) > 0 {
-				s.LogPrintf("dbsig-eom", "Waiting for EOMs from %s", ids)
+				ids := s.GetUnsyncedServersString(dbheight)
+				if len(ids) > 0 {
+					s.LogPrintf("dbsig-eom", "Waiting for EOMs from %s", ids)
+				}
 			}
-		}
 		}()
 	}
 
@@ -2032,19 +1969,19 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// Get prev DBLOCK
 
-		dbstate := s.GetDBState(dbheight - 1)
+	dbstate := s.GetDBState(dbheight - 1)
 	// Panic had arose when leaders would reboot and the follower was on a future minute
-		if dbstate == nil {
-			//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState == nil: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
-			s.LogPrintf("dbsig-eom", "ProcessEOM wait prev dbstate == nil")
-			return false
-		}
-		if !dbstate.Saved && s.CurrentMinute > 0 {
-			//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState not saved: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
-			s.LogPrintf("dbsig-eom", "ProcessEOM wait prev !dbstate.Saved")
+	if dbstate == nil {
+		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState == nil: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
+		s.LogPrintf("dbsig-eom", "ProcessEOM wait prev dbstate == nil")
+		return false
+	}
+	if !dbstate.Saved && s.CurrentMinute > 0 {
+		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d DBState not saved: return on s.SigType(%v) && int(e.Minute(%v)) > s.EOMMinute(%v)", s.FactomNodeName, e.VMIndex, s.SigType, e.Minute, s.EOMMinute))
+		s.LogPrintf("dbsig-eom", "ProcessEOM wait prev !dbstate.Saved")
 		panic("EOM5")
-			return false
-		}
+		return false
+	}
 
 	s.LogMessage("dbsig-eom", "ProcessEOM ", msg)
 
@@ -2053,14 +1990,14 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		s.LogPrintf("dbsig-eom", "ProcessEOM start EOM processing for %d", e.Minute)
 
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Start SigType Processing: !s.SigType(%v) SigType: %s", s.FactomNodeName, e.VMIndex, s.SigType, e.String()))
-		s.EOM = true       // ProcessEOM start
+		s.EOM = true // ProcessEOM start
 		if s.EOMProcessed != 0 {
 			panic("non-zero EOMProcessed")
 		}
 		s.EOMProcessed = 0 // ProcessEOM start
 		s.EOMLimit = len(pl.FedServers)
 		if s.IsSyncing() {
-			panic("Eom processed but already syncing")
+			panic("EOM processed but already syncing")
 		}
 		s.EOMMinute = int(e.Minute)
 		s.EOMsyncing = true
@@ -2068,22 +2005,22 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	}
 
 	// What I do for each EOM
-		s.LogPrintf("dbsig-eom", "ProcessEOM Handle VM(%v) minute %d", msg.GetVMIndex(), e.Minute)
+	s.LogPrintf("dbsig-eom", "ProcessEOM Handle VM(%v) minute %d", msg.GetVMIndex(), e.Minute)
 
-		InMsg := s.EFactory.NewEomSigInternal(
-			s.FactomNodeName,
-			e.DBHeight,
-			uint32(e.Minute),
-			msg.GetVMIndex(),
-			uint32(vm.Height),
-			e.ChainID,
-		)
-		s.electionsQueue.Enqueue(InMsg)
+	InMsg := s.EFactory.NewEomSigInternal(
+		s.FactomNodeName,
+		e.DBHeight,
+		uint32(e.Minute),
+		msg.GetVMIndex(),
+		uint32(vm.Height),
+		e.ChainID,
+	)
+	s.electionsQueue.Enqueue(InMsg)
 
-		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Process Once: !e.Processed(%v) SigType: %s", s.FactomNodeName, e.VMIndex, e.Processed, e.String()))
-		vm.LeaderMinute++
-		s.EOMProcessed++
-		//fmt.Println(fmt.Sprintf("EOM PROCESS: %10s vm %2d EOMProcessed++ (%2d)", s.FactomNodeName, e.VMIndex, s.EOMProcessed))
+	//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Process Once: !e.Processed(%v) SigType: %s", s.FactomNodeName, e.VMIndex, e.Processed, e.String()))
+	vm.LeaderMinute++
+	s.EOMProcessed++
+	//fmt.Println(fmt.Sprintf("EOM PROCESS: %10s vm %2d EOMProcessed++ (%2d)", s.FactomNodeName, e.VMIndex, s.EOMProcessed))
 	vm.Synced = true // ProcessEOM Stop processing  in the VM until the minute advances
 	s.LogPrintf("executemsg", "set vm.Synced(%d) (EOM)", vm.VmIndex)
 
@@ -2112,7 +2049,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			if s.CurrentMinute != int(e.Minute) {
 				s.LogPrintf("dbsig-eom", "Follower jump to minute %d from %d", s.CurrentMinute, int(e.Minute))
 				panic("EOM6")
-	}
+			}
 			s.MoveStateToHeight(e.DBHeight, int(e.Minute+1))
 
 		} else {
@@ -2176,73 +2113,73 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 
 	dbs := msg.(*messages.DirectoryBlockSignature)
 
-		highestCompletedBlk := s.GetHighestCompletedBlk()
-		if s.LLeaderHeight > 0 && highestCompletedBlk+1 < s.LLeaderHeight {
+	highestCompletedBlk := s.GetHighestCompletedBlk()
+	if s.LLeaderHeight > 0 && highestCompletedBlk+1 < s.LLeaderHeight {
 
-			pl := s.ProcessLists.Get(dbs.DBHeight - 1)
-			if !pl.Complete() {
-				dbstate := s.DBStates.Get(int(dbs.DBHeight - 1))
-				if dbstate == nil || (!dbstate.Locked && !dbstate.Saved) {
-					db, _ := s.DB.FetchDBlockByHeight(dbs.DBHeight - 1)
-					if db == nil {
-						//fmt.Printf("ProcessDBSig(): %10s Previous Process List isn't complete. %s\n", s.FactomNodeName, dbs.String())
-						return false
-					}
+		pl := s.ProcessLists.Get(dbs.DBHeight - 1)
+		if !pl.Complete() {
+			dbstate := s.DBStates.Get(int(dbs.DBHeight - 1))
+			if dbstate == nil || (!dbstate.Locked && !dbstate.Saved) {
+				db, _ := s.DB.FetchDBlockByHeight(dbs.DBHeight - 1)
+				if db == nil {
+					//fmt.Printf("ProcessDBSig(): %10s Previous Process List isn't complete. %s\n", s.FactomNodeName, dbs.String())
+					return false
 				}
 			}
 		}
+	}
 
-		dblk, err := s.DB.FetchDBlockByHeight(dbheight - 1)
-		if dblk != nil {
-			hashes := dblk.GetEntryHashes()
-			if hashes != nil {
-				messages.LogPrintf("marshalsizes.txt", "DirectoryBlock unmarshaled entry count: %d", len(hashes))
-			}
+	dblk, err := s.DB.FetchDBlockByHeight(dbheight - 1)
+	if dblk != nil {
+		hashes := dblk.GetEntryHashes()
+		if hashes != nil {
+			messages.LogPrintf("marshalsizes.txt", "DirectoryBlock unmarshaled entry count: %d", len(hashes))
 		}
-		if err != nil || dblk == nil {
-			dbstate := s.GetDBState(dbheight - 1)
-			if dbstate == nil || !(!dbstate.IsNew || dbstate.Locked || dbstate.Saved) {
-				//fmt.Println(fmt.Sprintf("ProcessingDBSig(): %10s The prior dbsig %d is nil", s.FactomNodeName, dbheight-1))
-				return false
-			}
-			dblk = dbstate.DirectoryBlock
+	}
+	if err != nil || dblk == nil {
+		dbstate := s.GetDBState(dbheight - 1)
+		if dbstate == nil || !(!dbstate.IsNew || dbstate.Locked || dbstate.Saved) {
+			//fmt.Println(fmt.Sprintf("ProcessingDBSig(): %10s The prior dbsig %d is nil", s.FactomNodeName, dbheight-1))
+			return false
 		}
+		dblk = dbstate.DirectoryBlock
+	}
 	pl := s.ProcessLists.Get(dbheight)
 	vm := pl.VMs[msg.GetVMIndex()]
 
 	//s.LogPrintf("bodymr", "M-%x  bodymr %x", dbs.GetMsgHash().Bytes()[:3], dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
 	//s.LogPrintf("bodymr", "dbstate %d bodymr %x", dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR().Fixed())
 
-		if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
-			pl.IncrementDiffSigTally()
-			s.LogPrintf("processList", "Failed. DBSig and DBlocks do not match Expected-Body-Mr: [%d]%x, Got: [%d]%x",
-				dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR().Fixed(), dbs.DirectoryBlockHeader.GetDBHeight(), dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+	if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
+		pl.IncrementDiffSigTally()
+		s.LogPrintf("processList", "Failed. DBSig and DBlocks do not match Expected-Body-Mr: [%d]%x, Got: [%d]%x",
+			dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR().Fixed(), dbs.DirectoryBlockHeader.GetDBHeight(), dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
 
-			// If the Directory block hash doesn't work for me, then the dbsig doesn't work for me, so
-			// toss it and ask our neighbors for another one.
+		// If the Directory block hash doesn't work for me, then the dbsig doesn't work for me, so
+		// toss it and ask our neighbors for another one.
 		pl.RemoveFromPL(vm, 0, "Bad DBSig BodyMR mismatch")
-			return false
-		}
+		return false
+	}
 
-		// Adds DB Sig to be added to Admin block if passes sig checks
-		data, err := dbs.DirectoryBlockHeader.MarshalBinary()
-		if err != nil {
+	// Adds DB Sig to be added to Admin block if passes sig checks
+	data, err := dbs.DirectoryBlockHeader.MarshalBinary()
+	if err != nil {
 		// if we can't martial the  dblock header we are pretty dead. Need a dbstate to recover.
 		//  todo: should ask for a DBstate here.
-			return false
-		}
-		if !dbs.DBSignature.Verify(data) {
-			s.LogPrintf("processList", "Failed. DBSig.DBSignature.Verify()")
-			// If the signature fails, then ask for another one.
+		return false
+	}
+	if !dbs.DBSignature.Verify(data) {
+		s.LogPrintf("processList", "Failed. DBSig.DBSignature.Verify()")
+		// If the signature fails, then ask for another one.
 		pl.RemoveFromPL(vm, 0, "Bad DBSig DBSignature.Verify failed")
-			return false
-		}
+		return false
+	}
 
-		valid, err := s.FastVerifyAuthoritySignature(data, dbs.DBSignature, dbs.DBHeight)
-		if err != nil || valid != 1 {
+	valid, err := s.FastVerifyAuthoritySignature(data, dbs.DBSignature, dbs.DBHeight)
+	if err != nil || valid != 1 {
 		pl.RemoveFromPL(vm, 0, "Bad DBSig FastVerifyAuthoritySignature failed")
-			return false
-		}
+		return false
+	}
 	// OK, we are going to process this DBSig.
 	s.LogMessage("dbsig-eom", "ProcessDBSig ", msg)
 
@@ -2257,29 +2194,27 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 			panic(fmt.Sprintf("First DBSig but DBSigProcessed = %d", s.DBSigProcessed))
 		}
 		s.DBSigLimit = len(pl.FedServers)
-		// if we load a dbstate then we might have been mid sync ...
-		for i, _ := range s.LeaderPL.FedServers {
-			vm := s.LeaderPL.VMs[i]
-			vm.Synced = false // ProcessDBsig Start
+		if s.IsSyncing() {
+			s.LogPrintf("process", "DBSig process when we are syncing.")
+			panic("DBSIG0")
 		}
 		pl.ResetDiffSigTally()
 	}
 
 	s.LogPrintf("dbsig-eom", "ProcessDBSig Handle VM(%v) minute %d", msg.GetVMIndex(), dbs.Minute)
 
-		dbs.Matches = true
-		s.AddDBSig(dbheight, dbs.ServerIdentityChainID, dbs.DBSignature)
+	dbs.Matches = true
+	s.AddDBSig(dbheight, dbs.ServerIdentityChainID, dbs.DBSignature)
 
-
-		InMsg := s.EFactory.NewDBSigSigInternal(
-			s.FactomNodeName,
-			dbs.DBHeight,
-			uint32(0),
-			msg.GetVMIndex(),
-			uint32(vm.Height),
-			dbs.LeaderChainID,
-		)
-		s.electionsQueue.Enqueue(InMsg)
+	InMsg := s.EFactory.NewDBSigSigInternal(
+		s.FactomNodeName,
+		dbs.DBHeight,
+		uint32(0),
+		msg.GetVMIndex(),
+		uint32(vm.Height),
+		dbs.LeaderChainID,
+	)
+	s.electionsQueue.Enqueue(InMsg)
 	// debug
 	s.LogPrintf("dbsig-eom", "ProcessDBSig@%d/%d/%d minute %d, Syncing %v , DBSID %v, DBSigProcessed %v, DBSigLimit %v",
 		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.IsSyncing(), s.DBSig, s.DBSigProcessed, s.DBSigLimit)
@@ -2299,7 +2234,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 			for i, _ := range s.LeaderPL.FedServers {
 				vm := s.LeaderPL.VMs[i]
 				vm.Synced = false // ProcessDBSig finalize
-				}
+			}
 			s.LogPrintf("dbsig-eom", "ProcessDBSig complete for %d", dbs.Minute)
 
 			s.BetweenBlocks = false // No longer between blocks
@@ -2339,7 +2274,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 
 		s.LogPrintf("dbsig", "ProcessDBSig(): 2nd ProcessDBSig(): %10s DBSig dbht %d leaderheight %d VMIndex %d Timestamp %x %d, leadertimestamp = %x %d",
 			s.FactomNodeName, dbs.DBHeight, s.LLeaderHeight, dbs.VMIndex, dbs.GetTimestamp().GetTimeMilli(), dbs.GetTimestamp().GetTimeMilli(), s.LeaderTimestamp.GetTimeMilliUInt64(), s.LeaderTimestamp.GetTimeMilliUInt64())
-		}
+	}
 	vm.Synced = true // ProcessDBsig
 	s.LogPrintf("executemsg", "set vm.Synced(%d) DBSig", vm.VmIndex)
 
@@ -2349,8 +2284,8 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) (rval bool) {
 		ids := s.GetUnsyncedServersString(dbheight)
 		if len(ids) > 0 {
 			s.LogPrintf("dbsig-eom", "Waiting for DBSigs from %s", ids)
-	}
 		}
+	}
 	return true
 }
 
