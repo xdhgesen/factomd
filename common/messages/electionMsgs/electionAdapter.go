@@ -149,10 +149,10 @@ func NewElectionAdapter(e *elections.Elections, dbHash interfaces.IHash) *Electi
 //	convert returned message to imsg
 //	return
 func (ea *ElectionAdapter) Execute(msg interfaces.IMsg) interfaces.IMsg {
+	ea.Election.LogMessage("election", fmt.Sprintf("adapter_exec %d", ea.Electing), msg)
 
 	if ea.ElectionProcessed {
 		ea.Election.State.LogMessage("ElectionTrace", "drop, election processed", msg)
-
 		return nil // If that election is complete, just return
 	}
 
