@@ -18,12 +18,12 @@ var peerLogger = packageLogger.WithField("subpack", "peer")
 // Data structures and functions related to peers (eg other nodes in the network)
 
 type Last100 struct {
-	Msgs map[[32]byte]bool
+	Msgs     map[[32]byte]bool
 	MsgOrder [100][32]byte
-	N int
+	N        int
 }
 
-func (l* Last100) Add(hash [32]byte) {
+func (l *Last100) Add(hash [32]byte) {
 	if l.Msgs == nil {
 		l.Msgs = make(map[[32]byte]bool, 0)
 	}
@@ -31,10 +31,10 @@ func (l* Last100) Add(hash [32]byte) {
 	delete(l.Msgs, prevous)
 	l.Msgs[hash] = true
 	l.MsgOrder[l.N] = hash
-	l.N = (l.N + 1)%100
+	l.N = (l.N + 1) % 100
 }
 
-func (l* Last100) Get(hash [32]byte) bool {
+func (l *Last100) Get(hash [32]byte) bool {
 	_, exists := l.Msgs[hash]
 	return exists
 }

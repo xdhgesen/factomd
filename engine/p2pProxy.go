@@ -52,7 +52,7 @@ type FactomMessage struct {
 	PeerHash string
 	AppHash  string
 	AppType  string
-	msg 	 interfaces.IMsg
+	msg      interfaces.IMsg
 }
 
 func (e *FactomMessage) JSONByte() ([]byte, error) {
@@ -107,7 +107,7 @@ func (f *P2PProxy) GetNameTo() string {
 }
 
 func (f *P2PProxy) Send(msg interfaces.IMsg) error {
-	f.msg = msg;
+	f.msg = msg
 	data, err := msg.MarshalBinary()
 	if err != nil {
 		f.logger.WithField("send-error", err).Error()
