@@ -17,6 +17,7 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/util/atomic"
 
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -1400,4 +1401,40 @@ func DoesFileExists(path string, t *testing.T) {
 		t.Logf("Found file %s", path)
 	}
 
+}
+
+func TestCatchupEveryMinute(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+	//							  01234567890
+	state0 := SetupSim("LFFFFFFFFFF", map[string]string{"--debuglog": ".", "--blktime": "15"}, 12, 1, 1, t)
+
+	StatusEveryMinute(state0)
+
+	// knock followers off one per minute
+	for i := 0; i < 10; i++ {
+		s := GetFnodes()[i+1].State
+		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitMinutes(s, 1)
+		RunCmd("x")
+	}
+	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
+	WaitBlocks(state0, 2) // wait till they cannot catch up by MMR
+	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
+	WaitMinutes(state0, 1)
+	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
+
+	// bring them all back
+	for i := 0; i < 10; i++ {
+		s := GetFnodes()[i+1].State
+		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitMinutes(s, 1)
+		RunCmd("x")
+	}
+
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
 }
