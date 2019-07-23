@@ -332,6 +332,8 @@ func FedServerVM(serverMap [10][64]int, numberOfFedServers int, minute int, fedI
 	return -1
 }
 
+// return if node is a leader and it's VM Index.
+// Important that between blocks(minute 10) returns the values as it it was minute 9
 func (p *ProcessList) GetVirtualServers(minute int, identityChainID interfaces.IHash) (found bool, index int) {
 	//fmt.Fprintf(os.Stderr, "GetVirtualServers(%d,%x)", minute, identityChainID.Bytes()[3:6])
 	found, fedIndex := p.GetFedServerIndexHash(identityChainID)

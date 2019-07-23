@@ -715,9 +715,7 @@ func (s *State) BeginMinute() {
 			}
 			vm.Synced = false // BeginMinute
 		}
-		s.EOMProcessed = 0   // BeginMinute
-		s.DBSigProcessed = 0 // BeginMinute
-		s.LogPrintf("dbsig-eom", "reset DBSigProcessed in BeginMinute (step)")
+		s.EOMProcessed = 0 // BeginMinute
 
 		// set the limits because we might have added servers
 		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
@@ -730,10 +728,8 @@ func (s *State) BeginMinute() {
 		s.LeaderPL.SortFedServers()
 
 		//force sync state to a rational  state for between minutes
-		s.EOM = false        // BeginMinute
-		s.DBSig = false      // BeginMinute
-		s.EOMProcessed = 0   // BeginMinute
-		s.DBSigProcessed = 0 // BeginMinute
+		s.EOM = false      // BeginMinute
+		s.EOMProcessed = 0 // BeginMinute
 
 		for _, vm := range s.LeaderPL.VMs {
 			vm.Synced = false // BeginMinute
@@ -744,6 +740,10 @@ func (s *State) BeginMinute() {
 
 	switch s.CurrentMinute {
 	case 0:
+		s.DBSig = false      // BeginMinute 0
+		s.DBSigProcessed = 0 // BeginMinute 0
+		s.LogPrintf("dbsig-eom", "reset DBSigProcessed in BeginMinute 0")
+
 		s.CurrentBlockStartTime = s.CurrentMinuteStartTime
 		// set the limits because we might have added servers
 		s.EOMLimit = len(s.LeaderPL.FedServers) // We add or remove server only on block boundaries
@@ -828,6 +828,7 @@ func (s *State) EndMinute() {
 	}
 	switch s.CurrentMinute {
 	case 0:
+		s.DBStates.UpdateState() // call to get the state signed now that the DBSigs have processed
 	case 1:
 	case 2:
 	case 3:
@@ -842,16 +843,14 @@ func (s *State) EndMinute() {
 }
 
 func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
-	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) called from %s", dbheight, newMinute, atomic.WhereAmIString(1))
-	//s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d)", dbheight, newMinute)
 
 	if s.LLeaderHeight == dbheight && s.CurrentMinute == newMinute {
 		s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) No change")
 		return
 	}
 
-	s.EndMinute()         // execute all the activity that need to happen at the end of a minute
-	defer s.BeginMinute() // defer the activity that happens at the start of a minute
+	s.EndMinute() // execute all the activity that need to happen at the end of a minute
+	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) called from %s", dbheight, newMinute, atomic.WhereAmIString(1))
 
 	if (s.LLeaderHeight+1 == dbheight && newMinute == 0) || (s.LLeaderHeight == dbheight && s.CurrentMinute+1 == newMinute) {
 		// these are the allowed cases; move to nextblock-:-0 or move to next minute
@@ -884,12 +883,13 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 
 		// check for identity change every time we start a new block before we look up our VM
 		s.CheckForIDChange()
-		s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID) // MoveStateToHeight block
+	} else {
+		s.CurrentMinute = newMinute // Update just the minute
 	}
-	s.CurrentMinute = newMinute                                                            // Update just the minute
-	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight minute
+	s.Leader, s.LeaderVMIndex = s.LeaderPL.GetVirtualServers(newMinute, s.IdentityChainID) // MoveStateToHeight
 
 	s.LogPrintf("dbstateprocess", "MoveStateToHeight(%d-:-%d) leader=%v leaderPL=%p, leaderVMIndex=%d", dbheight, newMinute, s.Leader, s.LeaderPL, s.LeaderVMIndex)
+	s.BeginMinute() // Activity that happens at the start of a minute
 }
 
 // Adds blocks that are either pulled locally from a database, or acquired from peers.
@@ -928,47 +928,6 @@ func (s *State) AddDBState(isNew bool,
 		s.LogPrintf("dbstateprocess", "AddDBState out of order! at %d added %d", s.LLeaderHeight, ht)
 		fmt.Fprintf(os.Stderr, "AddDBState() out of order! at %d added %d\n", s.LLeaderHeight, ht)
 		//panic("AddDBState out of order!")
-	}
-	if ht > s.LLeaderHeight {
-		s.LogPrintf("dbstateprocess", "unexpected: ht > s.LLeaderHeight  at %d added %d", s.LLeaderHeight, ht)
-		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s Add DBState: s.SigType(%v)", s.FactomNodeName, s.SigType))
-		s.MoveStateToHeight(ht, 0) // AddDBState()
-		s.StartDelay = s.GetTimestamp().GetTimeMilli()
-		s.RunLeader = false
-		LeaderPL := s.ProcessLists.Get(s.LLeaderHeight)
-
-		if s.LLeaderHeight != 0 && s.LeaderPL != LeaderPL {
-			s.LogPrintf("ExecuteMsg", "AddDBState: Unexpected change in LeaderPL")
-			s.LeaderPL = LeaderPL
-		}
-		s.SetLeaderTimestamp(dbState.DirectoryBlock.GetTimestamp()) // move the leader timestamp to the start of the block
-		{
-			// Okay, we have just loaded a new DBState.  The temp balances are no longer valid, if they exist.  Nuke them.
-			s.LeaderPL.FactoidBalancesTMutex.Lock()
-			s.LeaderPL.FactoidBalancesT = map[[32]byte]int64{}
-			s.LeaderPL.FactoidBalancesTMutex.Unlock()
-
-			s.LeaderPL.ECBalancesTMutex.Lock()
-			s.LeaderPL.ECBalancesT = map[[32]byte]int64{}
-			s.LeaderPL.ECBalancesTMutex.Unlock()
-		}
-
-		Leader, LeaderVMIndex := s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID) // AddDBState()
-		{                                                                                         // debug
-			if s.Leader != Leader {
-				s.LogPrintf("executeMsg", "State.AddDBState() unexpectedly setting s.Leader to %v", Leader)
-				s.Leader = Leader
-			}
-			if s.LeaderVMIndex != LeaderVMIndex {
-				s.LogPrintf("executeMsg", "State.AddDBState()  unexpectedly setting s.LeaderVMIndex to %v", LeaderVMIndex)
-				s.LeaderVMIndex = LeaderVMIndex
-			}
-		}
-		for s.ProcessLists.UpdateState(s.LLeaderHeight) {
-		}
-	}
-	if ht == 0 && s.LLeaderHeight == 0 {
-		s.MoveStateToHeight(1, 0)
 	}
 
 	return dbState

@@ -135,6 +135,7 @@ func TestTXTimestampsAndBlocks(t *testing.T) {
 	RunCmd("x")
 	RunCmd("R0") // turn off the load
 }
+
 func TestLoad2(t *testing.T) {
 	if RanSimTest {
 		return
@@ -147,7 +148,7 @@ func TestLoad2(t *testing.T) {
 	StatusEveryMinute(state0)
 
 	RunCmd("4") // select node 4
-	RunCmd("x") // take out 7 from the network
+	RunCmd("x") // take out 4 from the network
 	WaitBlocks(state0, 1)
 	WaitForMinute(state0, 1)
 
@@ -163,14 +164,15 @@ func TestLoad2(t *testing.T) {
 	WaitBlocks(state0, 3)
 	WaitMinutes(state0, 3)
 
-	ht7 := GetFnodes()[1].State.GetLLeaderHeight()
-	ht6 := GetFnodes()[4].State.GetLLeaderHeight()
+	ht1 := GetFnodes()[1].State.GetLLeaderHeight()
+	ht4 := GetFnodes()[4].State.GetLLeaderHeight()
 
-	if ht7 != ht6 {
-		t.Fatalf("Node 7 was at dbheight %d which didn't match Node 6 at dbheight %d", ht7, ht6)
+	if ht1 != ht4 {
+		t.Fatalf("Node 1 was at dbheight %d which didn't match Node 4 at dbheight %d", ht1, ht4)
 	}
 	ShutDownEverything(t)
 } //TestLoad2(){...}
+
 // The intention of this test is to detect the EC overspend/duplicate commits (FD-566) bug.
 // the bug happened when the FCT transaction and the commits arrived in different orders on followers vs the leader.
 // Using a message delay, drop and tree network makes this likely
@@ -337,7 +339,7 @@ func TestAnElection(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLAAF", map[string]string{"--debuglog": ".", "--blktime": "15"}, 9, 1, 1, t)
+	state0 := SetupSim("LLLAF", map[string]string{"--debuglog": ".", "--blktime": "15"}, 9, 1, 1, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
@@ -366,7 +368,6 @@ func TestAnElection(t *testing.T) {
 		t.Fatalf("Node 3 or 4  should be a leader")
 	}
 
-	WaitForAllNodes(state0)
 	ShutDownEverything(t)
 }
 
