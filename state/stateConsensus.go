@@ -702,7 +702,7 @@ func (s *State) ReviewHolding() {
 }
 
 func (s *State) BeginMinute() {
-	s.LogPrintf("dbstateprocess", "EndMinute(%d-:-%d)", s.LLeaderHeight, s.CurrentMinute)
+	s.LogPrintf("dbstateprocess", "BeginMinute(%d-:-%d)", s.LLeaderHeight, s.CurrentMinute)
 
 	// All minutes
 	{
@@ -795,8 +795,10 @@ func (s *State) BeginMinute() {
 			panic("EOM10")
 		}
 		if dbht > 0 {
-			prev := s.DBStates.Get(dbht - 1)
-			s.DBStates.FixupLinks(prev, dbstate)
+			//prev := s.DBStates.Get(dbht - 1)
+			//s.DBStates.FixupLinks(prev, dbstate)
+			s.DBStates.UpdateState() // call to get the state signed now that the DBSigs have processed
+
 		} else {
 			panic("EOM11")
 		}
