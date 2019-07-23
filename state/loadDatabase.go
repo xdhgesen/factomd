@@ -35,16 +35,16 @@ func humanizeDuration(duration time.Duration) string {
 }
 
 func LoadDatabase(s *State) {
-	var blkCnt uint32
+	var blkCnt int = -1 // assume database is empty
 
 	head, err := s.DB.FetchDBlockHead()
 	if err == nil && head != nil {
-		blkCnt = head.GetHeader().GetDBHeight()
+		blkCnt = int(head.GetHeader().GetDBHeight())
+		s.DBHeightAtBoot = uint32(blkCnt)
+		fmt.Fprintf(os.Stderr, "%20s Loading blocks from disk. Database load going from %d (savestate) to %d (disk)\n", s.GetFactomNodeName(), s.GetDBHeightComplete(), s.DBHeightAtBoot)
 	}
-	// prevent MMR processing from happening for blocks being loaded from the database
-	s.DBHeightAtBoot = blkCnt
-	fmt.Fprintf(os.Stderr, "%20s Loading blocks from disk. Database load going from %d (savestate) to %d (disk)\n", s.GetFactomNodeName(), s.GetDBHeightComplete(), s.DBHeightAtBoot)
 
+	// prevent MMR processing from happening for blocks being loaded from the database
 	first := time.Now()
 	last := first
 	time.Sleep(time.Second)
@@ -106,7 +106,7 @@ func LoadDatabase(s *State) {
 		s.Print("\r", "\\|/-"[i%4:i%4+1])
 	}
 
-	if blkCnt == 0 {
+	if blkCnt == -1 {
 		s.Println("\n***********************************")
 		s.Println("******* New Database **************")
 		s.Println("***********************************\n")
