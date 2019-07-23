@@ -1410,7 +1410,7 @@ func TestCatchupEveryMinute(t *testing.T) {
 
 	RanSimTest = true
 	//							  01234567890
-	state0 := SetupSim("LFFFFFFFFFF", map[string]string{"--debuglog": ".", "--blktime": "15"}, 12, 1, 1, t)
+	state0 := SetupSim("LFFFFFFFFFF", map[string]string{"--debuglog": ".", "--blktime": "6"}, 20, 1, 1, t)
 
 	StatusEveryMinute(state0)
 
@@ -1418,8 +1418,8 @@ func TestCatchupEveryMinute(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		s := GetFnodes()[i+1].State
 		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitForMinute(s, i)
 		RunCmd("x")
-		WaitMinutes(s, 1)
 	}
 	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
 	WaitBlocks(state0, 2) // wait till they cannot catch up by MMR
@@ -1427,13 +1427,13 @@ func TestCatchupEveryMinute(t *testing.T) {
 	WaitMinutes(state0, 1)
 	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
 
+	RunCmd("T25") // switch to 25 second blocks because dbstate catchup code fails at 6 second blocks
 	// bring them all back
 	for i := 0; i < 10; i++ {
 		state0.LogPrintf("test", "%s %d %s", atomic.WhereAmIString(0), i)
-		s := GetFnodes()[i+1].State
 		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitMinutes(state0, 1)
 		RunCmd("x")
-		WaitMinutes(s, 1)
 	}
 
 	WaitForAllNodes(state0)
