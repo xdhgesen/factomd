@@ -1418,8 +1418,8 @@ func TestCatchupEveryMinute(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		s := GetFnodes()[i+1].State
 		RunCmd(fmt.Sprintf("%d", i+1))
-		WaitMinutes(s, 1)
 		RunCmd("x")
+		WaitMinutes(s, 1)
 	}
 	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
 	WaitBlocks(state0, 2) // wait till they cannot catch up by MMR
@@ -1429,10 +1429,11 @@ func TestCatchupEveryMinute(t *testing.T) {
 
 	// bring them all back
 	for i := 0; i < 10; i++ {
+		state0.LogPrintf("test", "%s %d %s", atomic.WhereAmIString(0), i)
 		s := GetFnodes()[i+1].State
 		RunCmd(fmt.Sprintf("%d", i+1))
-		WaitMinutes(s, 1)
 		RunCmd("x")
+		WaitMinutes(s, 1)
 	}
 
 	WaitForAllNodes(state0)

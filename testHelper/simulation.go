@@ -49,7 +49,7 @@ func StartSim(GivenNodes string, UserAddedOptions map[string]string) *state.Stat
 		"--network":             "LOCAL",
 		"--net":                 "alot+",
 		"--enablenet":           "false",
-		"--blktime":             "40",
+		"--blktime":             "15",
 		"--count":               fmt.Sprintf("%v", len(GivenNodes)),
 		"--startdelay":          "1",
 		"--stdoutlog":           "out.txt",
@@ -166,12 +166,12 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 				return
 			default:
 				if int(state0.GetLLeaderHeight())-3 > height { // always give us 3 extra block to finish
-					fmt.Printf("Test Timeout: Expected %d blocks (%s)\n", height, calctime.String())
-					panic(fmt.Sprintf("Test Timeout: Expected %d blocks (%s)\n", height, calctime.String()))
+					fmt.Printf("%s: Test Timeout: Expected %d blocks (%s)\n", GetTestName(), height, calctime.String())
+					panic(fmt.Sprintf("%s: Test Timeout: Expected %d blocks (%s)\n", GetTestName(), height, calctime.String()))
 				}
 				if time.Now().After(endTime) {
-					fmt.Printf("Test Timeout: Expected it to take %s (%d blocks)\n", calctime.String(), height)
-					panic(fmt.Sprintf("Test Timeout: Expected it to take %s (%d blocks)\n", calctime.String(), height))
+					fmt.Printf("%s: Test Timeout: Expected it to take %s (%d blocks)\n", GetTestName(), calctime.String(), height)
+					panic(fmt.Sprintf("%s: Test Timeout: Expected it to take %s (%d blocks)\n", GetTestName(), calctime.String(), height))
 				}
 				time.Sleep(1 * time.Second)
 			}
@@ -187,7 +187,7 @@ func SetupSim(GivenNodes string, UserAddedOptions map[string]string, height int,
 	l := len(GivenNodes)
 	t.Logf("Allocated %d nodes", l)
 	if len(engine.GetFnodes()) != l {
-		t.Fatalf("Should have allocated %d nodes", l)
+		t.Fatalf("%s: Should have allocated %d nodes", GetTestName(), l)
 		t.Fail()
 	}
 	if Audits == 0 && Leaders == 0 {
@@ -206,7 +206,7 @@ func creatingNodes(creatingNodes string, state0 *state.State, t *testing.T) {
 	simFnodes := engine.GetFnodes()
 	nodes := len(simFnodes)
 	if len(creatingNodes) > nodes {
-		t.Fatalf("Should have allocated %d nodes", len(creatingNodes))
+		t.Fatalf("%s: Should have allocated %d nodes", GetTestName(), len(creatingNodes))
 	}
 	WaitForMinute(state0, 1)
 	for i, c := range []byte(creatingNodes) {
@@ -432,11 +432,11 @@ func AssertAuthoritySet(t *testing.T, givenNodes string) {
 	for i, c := range []byte(givenNodes) {
 		switch c {
 		case 'L':
-			assert.True(t, nodes[i].State.Leader, "Expected node %v to be a leader", i)
+			assert.True(t, nodes[i].State.Leader, "%s: Expected node %v to be a leader", GetTestName(), i)
 		case 'A':
-			assert.True(t, isAuditor(i), "Expected node %v to be an auditor", i)
+			assert.True(t, isAuditor(i), "%s: Expected node %v to be an auditor", GetTestName(), i)
 		default:
-			assert.True(t, isFollower(i), "Expected node %v to be a follower", i)
+			assert.True(t, isFollower(i), "%s: Expected node %v to be a follower", GetTestName(), i)
 		}
 	}
 }
@@ -447,16 +447,16 @@ func CheckAuthoritySet(t *testing.T) {
 
 	if leadercnt != Leaders {
 		engine.PrintOneStatus(0, 0)
-		t.Fatalf("found %d leaders, expected %d", leadercnt, Leaders)
+		t.Fatalf("%s: found %d leaders, expected %d", GetTestName(), leadercnt, Leaders)
 	}
 	if auditcnt != Audits {
 		engine.PrintOneStatus(0, 0)
-		t.Fatalf("found %d audit servers, expected %d", auditcnt, Audits)
+		t.Fatalf("%s: found %d audit servers, expected %d", GetTestName(), auditcnt, Audits)
 		t.Fail()
 	}
 	if followercnt != Followers {
 		engine.PrintOneStatus(0, 0)
-		t.Fatalf("found %d followers, expected %d", followercnt, Followers)
+		t.Fatalf("%s: found %d followers, expected %d", GetTestName(), followercnt, Followers)
 		t.Fail()
 	}
 }
@@ -489,7 +489,7 @@ func ShutDownEverything(t *testing.T) {
 	time.Sleep(time.Duration(globals.Params.BlkTime) * time.Second)
 
 	if currentHeight < fnodes[0].State.LLeaderHeight {
-		t.Fatal("Failed to shut down factomd via ShutdownChan")
+		t.Fatal("%s: Failed to shut down factomd via ShutdownChan", GetTestName())
 	}
 
 	engine.PrintOneStatus(0, 0) // Print a final status
