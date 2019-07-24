@@ -1439,3 +1439,34 @@ func TestCatchupEveryMinute(t *testing.T) {
 	WaitForAllNodes(state0)
 	ShutDownEverything(t)
 }
+
+func TestElectionEveryMinute(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+	//							  01234567890123456789012345678901
+	state0 := SetupSim("LLLLLLLLLLLLLLLLLLLLLAAAAAAAAAAF", map[string]string{"--debuglog": ".", "--blktime": "60"}, 20, 10, 1, t)
+
+	StatusEveryMinute(state0)
+	RunCmd("T120")
+	WaitMinutes(state0, 1)
+
+	// knock followers off one per minute
+	for i := 0; i < 10; i++ {
+		s := GetFnodes()[i+1].State
+		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitForMinute(s, i+1) // wait for election to complete
+		RunCmd("x")
+	}
+	WaitMinutes(state0, 1)
+	// bring them all back
+	for i := 0; i < 10; i++ {
+		RunCmd(fmt.Sprintf("%d", i+1))
+		RunCmd("x")
+	}
+
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+}

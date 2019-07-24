@@ -236,7 +236,9 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 		return 0, 0 // If the VM has not yet process to the end we must wait to process this
 	}
 
-	if s.IsSyncing() {
+	// We explicitly allow leader execution of EOM and DBSig messages while syncing because maybe we started sync
+	// because we processed someone elses EOM/DBSIG... Do we need to distinguish which sync type it is?
+	if s.IsSyncing() && msg.Type() != constants.EOM_MSG && msg.Type() != constants.DIRECTORY_BLOCK_SIGNATURE_MSG {
 		s.LogMessage("executeMsg", "LeaderExec -- Sync in progress", msg)
 		return 0, 0 // If we are mid sync then don't leader execute
 	}
@@ -427,6 +429,10 @@ func (s *State) Process() (progress bool) {
 
 	// Process inbound messages
 	preEmptyLoopTime := time.Now()
+	i := 0
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "start executeMsgLoop")
+	}
 emptyLoop:
 	for {
 		var msg interfaces.IMsg
@@ -445,10 +451,17 @@ emptyLoop:
 		default:
 			break emptyLoop
 		}
+		i++
 		progress = s.executeMsg(msg) || progress
+		if i > 25 {
+			break
+		}
 	}
 	emptyLoopTime := time.Since(preEmptyLoopTime)
 	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
+	if ValidationDebug {
+		s.LogPrintf("executeMsg", "end executeMsgLoop %d", i)
+	}
 
 	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
@@ -468,9 +481,6 @@ emptyLoop:
 		}
 		// toss everything else
 		s.XReview = s.XReview[:0]
-	}
-	if ValidationDebug {
-		s.LogPrintf("executeMsg", "end reviewHolding %d", len(s.XReview))
 	}
 
 	processXReviewTime := time.Since(preProcessXReviewTime)
