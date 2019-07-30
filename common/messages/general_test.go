@@ -12,7 +12,7 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	. "github.com/FactomProject/factomd/common/messages"
-	. "github.com/FactomProject/factomd/common/messages/msgsupport"
+	msgs "github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/testHelper"
 )
@@ -24,17 +24,17 @@ func TestUnmarshalNil(t *testing.T) {
 		}
 	}()
 
-	_, _, err := UnmarshalMessageData(nil)
+	_, _, err := msgs.UnmarshalMessageData(nil)
 	if err == nil {
 		t.Errorf("Error is nil when it shouldn't be")
 	}
 
-	_, _, err = UnmarshalMessageData([]byte{})
+	_, _, err = msgs.UnmarshalMessageData([]byte{})
 	if err == nil {
 		t.Errorf("Error is nil when it shouldn't be")
 	}
 
-	_, _, err = UnmarshalMessageData([]byte{0xFF})
+	_, _, err = msgs.UnmarshalMessageData([]byte{0xFF})
 	if err == nil {
 		t.Errorf("Error is nil when it shouldn't be")
 	}
@@ -77,7 +77,7 @@ func testUnmarshalMsg(m interfaces.IMsg) error {
 		return err
 	}
 
-	nd, nm, err := UnmarshalMessageData(d)
+	nd, nm, err := msgs.UnmarshalMessageData(d)
 	if err != nil {
 		return err
 	}
