@@ -1205,6 +1205,22 @@ func SimControl(listenTo int, listenStdin bool) {
 					continue
 				}
 
+				if b[1] == 'z' && len(b) > 2 {
+					off, err := strconv.ParseFloat(string(b[2:]), 64)
+					if err != nil {
+						_, _ = fmt.Fprintf(os.Stderr, "Error with timeoffset for servers: %v\n", err)
+						continue
+					} else if off > 60 {
+						_, _ = fmt.Fprintf(os.Stderr, "Provided %f but need a value between 0 and 60", off)
+						continue
+					}
+					for _, fnode := range fnodes {
+						_, _ = fmt.Fprintf(os.Stderr, "Time Offset was %10f\n", float64(fnode.State.TimeOffset)/1000000000)
+						fnode.State.TimeOffset = time.Duration(int64(rand.Float64() * off * float64(time.Second)))
+						_, _ = fmt.Fprintf(os.Stderr, "Time Offset is  %10f\n", float64(fnode.State.TimeOffset)/1000000000)
+					}
+				}
+
 				if b[1] == 'e' {
 					b = b[1:]
 					if loadGenerator.tight.Load() {
@@ -1424,6 +1440,7 @@ func SimControl(listenTo int, listenStdin bool) {
 				os.Stderr.WriteString("Rnnn          Set load generator to write entries at nnn per second\n")
 				os.Stderr.WriteString("Re            Turn on 'tight' mode, that buys ECs in only small amounts when running Rnnn\n")
 				os.Stderr.WriteString("Rtnnn         Add a signed constant to the timestamp of load generator FCT TXs.\n")
+				os.Stderr.WriteString("Rznnn         Offset the times sending EOMs by a random amount up to nnn\n")
 
 				//os.Stderr.WriteString("i[m/b/a][N]   Shows only the Mhash, block signing key, or anchor key up to the Nth identity\n")
 				//os.Stderr.WriteString("isN           Shows only Nth identity\n")

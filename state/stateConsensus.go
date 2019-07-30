@@ -960,6 +960,7 @@ func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 	if m.IsLocal() && !s.Leader {
 		return // This is an internal EOM message.  We are not a leader so ignore.
 	} else if m.IsLocal() {
+		s.SyncExtraTick++
 		s.repost(m, 1) // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
 		return
 	}
@@ -1959,6 +1960,12 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		//fmt.Println(fmt.Sprintf("EOM PROCESS: %10s vm %2d Done! s.EOMDone(%v) && s.EOMSys(%v)", s.FactomNodeName, e.VMIndex, s.EOMDone, s.EOMSys))
 		s.EOMProcessed--
 		if s.EOMProcessed <= 0 { // why less than or equal?
+
+			s.SyncEnd = time.Now()
+
+			took := s.SyncTick.Sub(s.SyncStart)
+			s.TimeOffset = time.Duration(took.Nanoseconds() / 4)
+
 			s.SendHeartBeat() // Only do this once per minute
 			s.LogPrintf("dbsig-eom", "ProcessEOM complete for %d", e.Minute)
 			// setup to sync next minute ...
@@ -2048,6 +2055,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// What I do once  for all VMs at the beginning of processing a particular EOM
 	if !s.EOM {
+		s.SyncStart = time.Now()
+
 		s.LogPrintf("dbsig-eom", "ProcessEOM start EOM processing for %d", e.Minute)
 
 		//fmt.Println(fmt.Sprintf("SigType PROCESS: %10s vm %2d Start SigType Processing: !s.SigType(%v) SigType: %s", s.FactomNodeName, e.VMIndex, s.SigType, e.String()))

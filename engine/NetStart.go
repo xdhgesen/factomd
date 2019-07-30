@@ -77,7 +77,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	fmt.Println(fmt.Sprintf("factom config: %s", FactomConfigFilename))
 	s.LoadConfig(FactomConfigFilename, p.NetworkName)
 	s.OneLeader = p.Rotate
-	s.TimeOffset = primitives.NewTimestampFromMilliseconds(uint64(p.TimeOffset))
+	s.TimeOffset = time.Duration(int64(p.TimeOffset) * 1000000)
 	s.StartDelayLimit = p.StartDelay * 1000
 	s.Journaling = p.Journaling
 	s.FactomdVersion = FactomdVersion

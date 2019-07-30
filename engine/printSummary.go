@@ -83,6 +83,14 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 		prt = fmt.Sprintf("%s EB Complete %d EB Processing %d Entries Complete %d Faults %d\n", prt, f.State.EntryBlockDBHeightComplete, f.State.EntryBlockDBHeightProcessing, f.State.EntryDBHeightComplete, totalServerFaults)
 	}
 
+	dbstates := fnodes[0].State.DBStates.DBStates
+	if len(dbstates) >= 2 {
+		ctime := dbstates[len(dbstates)-1].DirectoryBlock.GetTimestamp().GetTime()
+		ltime := dbstates[len(dbstates)-2].DirectoryBlock.GetTimestamp().GetTime()
+		delta := ctime.Sub(ltime)
+		prt = prt + fmt.Sprintf("Blocktime = %5.2f\n", float64(delta/1000000000))
+	}
+
 	sumOut := 0
 	sumIn := 0
 	cnt := len(f.Peers)

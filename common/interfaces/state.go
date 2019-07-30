@@ -6,6 +6,7 @@ package interfaces
 
 import (
 	"regexp"
+	"time"
 
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/constants/runstate"
@@ -245,7 +246,7 @@ type IState interface {
 	SetNetStateOff(bool)
 
 	GetTimestamp() Timestamp
-	GetTimeOffset() Timestamp
+	GetTimeOffset() time.Duration
 
 	GetTrueLeaderHeight() uint32
 	Print(a ...interface{}) (n int, err error)

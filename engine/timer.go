@@ -6,19 +6,22 @@ package engine
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/FactomProject/factomd/state"
+
 	"github.com/FactomProject/factomd/common/interfaces"
-	s "github.com/FactomProject/factomd/state"
 )
 
-var _ = (*s.State)(nil)
+func Timer(si interfaces.IState) {
 
-func Timer(state interfaces.IState) {
+	s := si.(*state.State)
+
 	time.Sleep(2 * time.Second)
 
 	billion := int64(1000000000)
-	period := int64(state.GetDirectoryBlockInSeconds()) * billion
+	period := int64(s.GetDirectoryBlockInSeconds()) * billion
 	tenthPeriod := period / 10
 
 	now := time.Now().UnixNano() // Time in billionths of a second
@@ -27,17 +30,13 @@ func Timer(state interfaces.IState) {
 
 	next := now + wait + tenthPeriod
 
-	if state.GetOut() {
-		state.Print(fmt.Sprintf("Time: %v\r\n", time.Now()))
-	}
-
 	time.Sleep(time.Duration(wait))
 
 	for {
 		for i := 0; i < 10; i++ {
 			// Don't stuff messages into the system if the
 			// Leader is behind.
-			for j := 0; j < 10 && len(state.AckQueue()) > 1000; j++ {
+			for j := 0; j < 10 && len(s.AckQueue()) > 1000; j++ {
 				time.Sleep(time.Millisecond * 10)
 			}
 
@@ -52,27 +51,20 @@ func Timer(state interfaces.IState) {
 			time.Sleep(time.Duration(wait))
 
 			// Delay some number of milliseconds.
-			time.Sleep(time.Duration(state.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
+			time.Sleep(s.GetTimeOffset())
+			last := s.SyncTick
+			s.SyncTick = time.Now()
 
-			state.TickerQueue() <- i
+			_, _ = fmt.Fprintf(os.Stderr, "%20s Time : %s  diff %10.2f\n",
+				s.FactomNodeName,
+				s.SyncTick.String(),
+				float64(s.SyncTick.Sub(last)/1000000000))
 
-			period = int64(state.GetDirectoryBlockInSeconds()) * billion
+			s.TickerQueue() <- i
+
+			period = int64(s.GetDirectoryBlockInSeconds()) * billion
 			tenthPeriod = period / 10
 
 		}
 	}
-}
-
-func PrintBusy(state interfaces.IState, i int) {
-	s := state.(*s.State)
-
-	if len(s.ShutdownChan) == 0 {
-		if state.GetOut() {
-			state.Print(fmt.Sprintf("\r%19s: %s %s",
-				"Timer",
-				state.String(),
-				(string)((([]byte)("-\\|/-\\|/-="))[i])))
-		}
-	}
-
 }

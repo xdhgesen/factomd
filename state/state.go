@@ -168,10 +168,15 @@ type State struct {
 	ResendCnt int
 	ExpireCnt int
 
-	tickerQueue            chan int
-	timerMsgQueue          chan interfaces.IMsg
-	TimeOffset             interfaces.Timestamp
-	MaxTimeOffset          interfaces.Timestamp
+	tickerQueue   chan int
+	timerMsgQueue chan interfaces.IMsg
+	TimeOffset    time.Duration
+	MaxTimeOffset interfaces.Timestamp
+	SyncStart     time.Time
+	SyncEnd       time.Time
+	SyncTick      time.Time
+	SyncExtraTick int
+
 	networkOutMsgQueue     NetOutMsgQueue
 	networkInvalidMsgQueue chan interfaces.IMsg
 	inMsgQueue             InMsgMSGQueue
@@ -954,8 +959,8 @@ func (s *State) Init() {
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	}
 
-	s.Hold.Init(s)                           // setup the dependant holding map
-	s.TimeOffset = new(primitives.Timestamp) //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
+	s.Hold.Init(s)                  // setup the dependant holding map
+	s.TimeOffset = time.Duration(0) //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
 
 	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
 
@@ -2196,7 +2201,7 @@ func (s *State) GetTimestamp() interfaces.Timestamp {
 	return primitives.NewTimestampNow()
 }
 
-func (s *State) GetTimeOffset() interfaces.Timestamp {
+func (s *State) GetTimeOffset() time.Duration {
 	return s.TimeOffset
 }
 
