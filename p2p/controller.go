@@ -18,6 +18,8 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/FactomProject/factomd/common/messages"
+
 	"github.com/FactomProject/factomd/common/primitives"
 
 	log "github.com/sirupsen/logrus"
@@ -274,6 +276,7 @@ func (c *Controller) ReloadSpecialPeers(newPeersConfig string) {
 
 	for _, peer := range toBeAdded {
 		c.specialPeers[peer.Address] = peer
+		messages.LogPrintf("fnode0_peers.txt", "ReloadSpecialPeers %s", peer.Hash)
 		c.DialPeer(*peer, true)
 	}
 }
@@ -293,6 +296,7 @@ func (c *Controller) ReloadSpecialPeers(newPeersConfig string) {
 
 func (c *Controller) dialSpecialPeers() {
 	for _, peer := range c.specialPeers {
+		messages.LogPrintf("fnode0_peers.txt", "dialSpecialPeers %s", peer.Hash)
 		c.DialPeer(*peer, true) // these are persistent connections
 	}
 }
@@ -622,6 +626,7 @@ func (c *Controller) fillOutgoingSlots(openSlots int) {
 		if !c.connections.ConnectedTo(peer.Address) && newPeers < openSlots {
 			c.logger.Debugf("newPeers: %d < openSlots: %d We think we are not already connected to: %s so dialing.", newPeers, openSlots, peer.AddressPort())
 			newPeers = newPeers + 1
+			messages.LogPrintf("fnode0_peers.txt", "fillOutgoingSlots %s", peer.Hash)
 			c.DialPeer(peer, false)
 		}
 	}

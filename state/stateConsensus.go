@@ -10,6 +10,7 @@ import (
 	"hash"
 	"os"
 	"reflect"
+	"runtime"
 	"sort"
 	"time"
 
@@ -1387,6 +1388,11 @@ func (s *State) FollowerExecuteRevealEntry(m interfaces.IMsg) {
 }
 
 func (s *State) LeaderExecute(m interfaces.IMsg) {
+
+	if m.GetVMIndex() != s.LeaderVMIndex {
+		runtime.Breakpoint()
+	}
+
 	vm := s.LeaderPL.VMs[s.LeaderVMIndex]
 	if len(vm.List) != vm.Height {
 		s.repost(m, 1) // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
@@ -2675,6 +2681,13 @@ func (s *State) GetNewHash() (rval interfaces.IHash) {
 func (s *State) NewAck(msg interfaces.IMsg, balanceHash interfaces.IHash) interfaces.IMsg {
 
 	vmIndex := msg.GetVMIndex()
+
+	// if the VM index is not the leader we are or we are an audit and the message is an EOM or DBSIG. We make these when we volunteer.
+	// s.LeaderVMIndex == -1 is more we are not a leader than we are an audit but ... for now.
+	if vmIndex != s.LeaderVMIndex && !(s.LeaderVMIndex == -1 && (msg.Type() == constants.EOM_MSG || msg.Type() == constants.DIRECTORY_BLOCK_SIGNATURE_MSG)) {
+		runtime.Breakpoint()
+	}
+
 	leaderMinute := byte(s.ProcessLists.Get(s.LLeaderHeight).VMs[vmIndex].LeaderMinute)
 
 	// these don't affect the msg hash, just for local use...

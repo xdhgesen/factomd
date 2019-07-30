@@ -10,6 +10,7 @@ import (
 	"hash/crc32"
 	"net"
 	"os"
+	"runtime/debug"
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages"
@@ -427,6 +428,7 @@ func (c *Connection) processSends() {
 			// Just ignore the possible nil pointer error that can occur because
 			// we have cleared the pointer to the encoder or decoder outside this
 			// go routine.
+			messages.LogPrintf("fnode0_peers", "processSends() recover %v\n%s", r, debug.Stack())
 		}
 	}()
 
@@ -505,7 +507,7 @@ func (c *Connection) sendParcel(parcel Parcel) {
 		c.metrics.BytesSent += parcel.Header.Length
 		c.metrics.MessagesSent += 1
 	default:
-		messages.LogPrintf("fnode0_peers.txt", "sendParcel(%s) M-%s", c.peer.Hash, parcel.Header.AppHash[:6], err.Error())
+		messages.LogPrintf("fnode0_peers.txt", "sendParcel(%s) M-%s Err:%s", c.peer.Hash, parcel.Header.AppHash[:6], err.Error())
 		c.Errors <- err
 	}
 }
@@ -523,6 +525,7 @@ func (c *Connection) processReceives() {
 			// Just ignore the possible nil pointer error that can occur because
 			// we have cleared the pointer to the encoder or decoder outside this
 			// go routine.
+			messages.LogPrintf("fnode0_peers", "processReceives() recover err:%v\n%s", r, debug.Stack())
 		}
 	}()
 
@@ -542,7 +545,7 @@ func (c *Connection) processReceives() {
 							parcel.Header.AppType = fmt.Sprintf("%d", msg.Type())
 							messages.LogPrintf("fnode0_peers.txt", "processReceives(%s) M-%s %d of %d", c.peer.Hash, parcel.Header.AppHash[:6], parcel.Header.PartNo+1, parcel.Header.PartsTotal)
 						} else {
-							messages.LogPrintf("fnode0_peers.txt", "counld not unmartial %s", err.Error())
+							messages.LogPrintf("fnode0_peers.txt", "processReceives(%s): could not unmarshal err:%s", c.peer.Hash, err.Error())
 						}
 					}
 				}
@@ -553,7 +556,7 @@ func (c *Connection) processReceives() {
 				c.ReceiveParcel <- &parcel
 				c.TimeLastpacket = time.Now()
 			default: // error
-				messages.LogPrintf("fnode0_peers.txt", "processReceives(%s) %s", c.peer.Hash, err.Error())
+				messages.LogPrintf("fnode0_peers.txt", "processReceives(%s) err:%s", c.peer.Hash, err.Error())
 				c.Errors <- err
 				time.Sleep(100 * time.Millisecond) // give some time to handle states
 			}
@@ -574,7 +577,7 @@ func (c *Connection) handleNetErrors(toss bool) {
 				if err != nil {
 					c.logger.WithField("func", "HandleNetErrors").Warnf("Going offline due to -- %s", err.Error())
 				}
-				messages.LogPrintf("fnode0_peers.txt", "handleNetErrors(%s) %s", c.peer.Hash, err.Error())
+				messages.LogPrintf("fnode0_peers.txt", "handleNetErrors(%s) Going offline due to err: %s", c.peer.Hash, err.Error())
 				c.goOffline()
 			}
 			done = true
@@ -589,6 +592,7 @@ func (c *Connection) handleNetErrors(toss bool) {
 func (c *Connection) handleParcel(parcel Parcel) {
 	defer func() {
 		if r := recover(); r != nil {
+			messages.LogPrintf("fnode0_peers", "handleParcel() recover %v\n%s", r, debug.Stack())
 			c.peer.demerit() /// so someone DDoS or just incompatible will eventually be cut off after 200+ panics
 			fmt.Fprintf(os.Stdout, "Caught Exception in connection %s: %v\n", c.peer.PeerFixedIdent(), r)
 			return
@@ -699,7 +703,7 @@ func (c *Connection) pingPeer() {
 	durationLastPing := time.Since(c.timeLastPing)
 	if PingInterval < durationLastContact && PingInterval < durationLastPing {
 		if MaxNumberOfRedialAttempts < c.attempts {
-			messages.LogPrintf("fnode0_peers.txt", "pingPeer(%s) no reply %s", c.peer.Hash)
+			messages.LogPrintf("fnode0_peers.txt", "pingPeer(%s) no reply", c.peer.Hash)
 			c.goOffline()
 			return
 		} else {
