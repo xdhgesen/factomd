@@ -37,6 +37,9 @@ func (l *Last100) Add(hash [32]byte) {
 
 //Check if we have a message in the short history
 func (l *Last100) Get(hash [32]byte) bool {
+	if l.Msgs == nil {
+		l.Msgs = make(map[[32]byte]bool, 0)
+	}
 	_, exists := l.Msgs[hash]
 	return exists
 }

@@ -155,7 +155,7 @@ func (e *CommandDisconnect) String() string {
 //////////////////////////////////////////////////////////////////////
 // Public (exported) methods.
 //
-// The surface for interfacting with this is very minimal to avoid deadlocks
+// The surface for interfacing with this is very minimal to avoid deadlocks
 // and allow maximum concurrency.
 // Other than setup, these API communicate with the controller via the
 // command channel.
