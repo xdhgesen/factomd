@@ -398,9 +398,10 @@ func (c *Connection) goOffline() {
 	if nil != c.conn {
 		defer c.conn.Close()
 	}
+	c.state = ConnectionOffline
+	time.Sleep(100 * time.Millisecond) // give the other treads a change to see the new state
 	c.decoder = nil
 	c.encoder = nil
-	c.state = ConnectionOffline
 	c.attempts = 0
 	c.peer.demerit()
 }
@@ -410,11 +411,6 @@ func (c *Connection) goShutdown() {
 	c.logger.Debug("Connection shutting down")
 	c.goOffline()
 	c.updatePeer()
-	if nil != c.conn {
-		defer c.conn.Close()
-	}
-	c.decoder = nil
-	c.encoder = nil
 	c.state = ConnectionShuttingDown
 }
 
@@ -428,7 +424,7 @@ func (c *Connection) processSends() {
 			// Just ignore the possible nil pointer error that can occur because
 			// we have cleared the pointer to the encoder or decoder outside this
 			// go routine.
-			messages.LogPrintf("fnode0_peers", "processSends() recover %v\n%s", r, debug.Stack())
+			messages.LogPrintf("fnode0_peers.txt", "processSends() recover %v\n%s", r, debug.Stack())
 		}
 	}()
 
@@ -501,9 +497,17 @@ func (c *Connection) sendParcel(parcel Parcel) {
 
 	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
 	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline))
+
+	if parcel.Header.Type == TypeMessagePart {
+		messages.LogPrintf("fnode0_peers.txt", "sendParcel(%s) M-%s", c.peer.Hash, parcel.Header.AppHash[:6])
+	} else {
+		messages.LogPrintf("fnode0_peers.txt", "sendParcel(%s) %s", c.peer.Hash, CommandStrings[parcel.Header.Type])
+	}
+
 	err := c.encoder.Encode(parcel)
 	switch {
 	case nil == err:
+		messages.LogPrintf("fnode0_peers.txt", "sendParcel(%s) M-%s sent", c.peer.Hash, parcel.Header.AppHash[:6])
 		c.metrics.BytesSent += parcel.Header.Length
 		c.metrics.MessagesSent += 1
 	default:
@@ -525,7 +529,7 @@ func (c *Connection) processReceives() {
 			// Just ignore the possible nil pointer error that can occur because
 			// we have cleared the pointer to the encoder or decoder outside this
 			// go routine.
-			messages.LogPrintf("fnode0_peers", "processReceives() recover err:%v\n%s", r, debug.Stack())
+			messages.LogPrintf("fnode0_peers.txt", "processReceives() recover err:%v\n%s", r, debug.Stack())
 		}
 	}()
 
@@ -547,9 +551,10 @@ func (c *Connection) processReceives() {
 						} else {
 							messages.LogPrintf("fnode0_peers.txt", "processReceives(%s): could not unmarshal err:%s", c.peer.Hash, err.Error())
 						}
+					} else {
+						messages.LogPrintf("fnode0_peers.txt", "processReceives(%s) got %s parcel", c.peer.Hash, CommandStrings[parcel.Header.Type])
 					}
 				}
-
 				c.metrics.BytesReceived += parcel.Header.Length
 				c.metrics.MessagesReceived += 1
 				parcel.Header.PeerAddress = c.peer.Address
@@ -592,7 +597,7 @@ func (c *Connection) handleNetErrors(toss bool) {
 func (c *Connection) handleParcel(parcel Parcel) {
 	defer func() {
 		if r := recover(); r != nil {
-			messages.LogPrintf("fnode0_peers", "handleParcel() recover %v\n%s", r, debug.Stack())
+			messages.LogPrintf("fnode0_peers.txt", "handleParcel() recover %v\n%s", r, debug.Stack())
 			c.peer.demerit() /// so someone DDoS or just incompatible will eventually be cut off after 200+ panics
 			fmt.Fprintf(os.Stdout, "Caught Exception in connection %s: %v\n", c.peer.PeerFixedIdent(), r)
 			return
@@ -724,7 +729,7 @@ func (c *Connection) updatePeer() {
 func (c *Connection) updateStats() {
 	if time.Second < time.Since(c.timeLastMetrics) {
 		c.timeLastMetrics = time.Now()
-		c.metrics.PeerAddress = c.peer.Address
+		c.metrics.PeerAddress = c.peer.Address + ":" + c.peer.Port
 		c.metrics.PeerQuality = c.peer.QualityScore
 		c.metrics.PeerType = c.peer.PeerTypeString()
 		c.metrics.ConnectionState = connectionStateStrings[c.state]
