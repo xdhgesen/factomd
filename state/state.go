@@ -172,9 +172,13 @@ type State struct {
 	timerMsgQueue chan interfaces.IMsg
 	TimeOffset    time.Duration
 	MaxTimeOffset interfaces.Timestamp
+
+	SyncError     time.Duration
+	SyncIntegral  time.Duration
 	SyncStart     time.Time
 	SyncEnd       time.Time
 	SyncTick      time.Time
+	SyncEOMIssue  time.Time
 	SyncExtraTick int
 
 	networkOutMsgQueue     NetOutMsgQueue

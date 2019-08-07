@@ -5,8 +5,6 @@
 package engine
 
 import (
-	"fmt"
-	"os"
 	"time"
 
 	"github.com/FactomProject/factomd/state"
@@ -52,13 +50,7 @@ func Timer(si interfaces.IState) {
 
 			// Delay some number of milliseconds.
 			time.Sleep(s.GetTimeOffset())
-			last := s.SyncTick
 			s.SyncTick = time.Now()
-
-			_, _ = fmt.Fprintf(os.Stderr, "%20s Time : %s  diff %10.2f\n",
-				s.FactomNodeName,
-				s.SyncTick.String(),
-				float64(s.SyncTick.Sub(last)/1000000000))
 
 			s.TickerQueue() <- i
 

@@ -1500,6 +1500,8 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	ack := s.NewAck(m, nil).(*messages.Ack) // LeaderExecuteEOM()
 	eom.SetLocal(false)
 
+	s.SyncEOMIssue = time.Now()
+
 	if fix {
 		s.LogMessage("executeMsg", "fixed EOM", eom)
 		s.LogMessage("executeMsg", "matching ACK", ack)
@@ -1963,8 +1965,19 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 			s.SyncEnd = time.Now()
 
-			took := s.SyncTick.Sub(s.SyncStart)
-			s.TimeOffset = time.Duration(took.Nanoseconds() / 4)
+			KP := .20
+			KI := .01
+			KD := .80
+
+			//
+			SError := -s.SyncEnd.Sub(s.SyncStart)
+
+			s.SyncIntegral = s.SyncIntegral + SError
+			derivative := SError - s.SyncError
+			output := KP*float64(SError) + KI*float64(s.SyncIntegral) + KD*float64(derivative) + float64(time.Duration(100*time.Millisecond))
+			s.SyncError = SError
+
+			s.TimeOffset = time.Duration(output)
 
 			s.SendHeartBeat() // Only do this once per minute
 			s.LogPrintf("dbsig-eom", "ProcessEOM complete for %d", e.Minute)
