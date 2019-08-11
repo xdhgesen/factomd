@@ -15,7 +15,6 @@ import (
 func Timer(si interfaces.IState) {
 
 	s := si.(*state.State)
-
 	time.Sleep(2 * time.Second)
 
 	billion := int64(1000000000)
@@ -46,10 +45,13 @@ func Timer(si interfaces.IState) {
 				wait = next - now
 				next += tenthPeriod
 			}
-			time.Sleep(time.Duration(wait))
-
+			w := time.Duration(wait) + s.GetTimeOffset()
+			if w < 0 {
+				w = 0
+			}
+			time.Sleep(w)
+			s.LogPrintf("eomsync", "Wait %s", w.String())
 			// Delay some number of milliseconds.
-			time.Sleep(s.GetTimeOffset())
 			s.SyncTick = time.Now()
 
 			s.TickerQueue() <- i
