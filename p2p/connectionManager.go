@@ -10,6 +10,8 @@ package p2p
 import (
 	"fmt"
 	"math/rand"
+
+	"github.com/FactomProject/factomd/common/messages"
 )
 
 type ConnectionManager struct {
@@ -112,6 +114,10 @@ func (cm *ConnectionManager) GetRandom() *Connection {
 func (cm *ConnectionManager) GetAllRegular(msgHash [32]byte) []*Connection {
 
 	selection := cm.getMatching(func(c *Connection) bool {
+
+		if c.peer.PrevMsgs.Get(msgHash) {
+			messages.LogPrintf("fnode0_peers.txt", "Skip M-%x to %s", msgHash, c.peer.Address)
+		}
 
 		b := c.IsOnline() && !c.peer.IsSpecial() && c.metrics.BytesReceived > 0 && !c.peer.PrevMsgs.Get(msgHash)
 		return b

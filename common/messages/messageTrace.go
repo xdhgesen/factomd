@@ -21,8 +21,8 @@ var (
 	enabled    map[string]bool
 	TestRegex  *regexp.Regexp
 	sequence   int
-	history    *([16384][32]byte) // Last 16k messages logged
-	h          int                // head of history
+	history    *([163840][32]byte) // Last 16k messages logged
+	h          int                 // head of history
 	msgmap     map[[32]byte]interfaces.IMsg
 )
 
@@ -120,7 +120,7 @@ func addmsg(msg interfaces.IMsg) {
 
 	hash := mh.Fixed()
 	if history == nil {
-		history = new([16384][32]byte)
+		history = new([163840][32]byte)
 	}
 	if msgmap == nil {
 		msgmap = make(map[[32]byte]interfaces.IMsg)

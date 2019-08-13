@@ -55,13 +55,13 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLF", map[string]string{}, 15, 0, 0, t)
+	state0 := SetupSim("LLLFFFFF", map[string]string{"--debuglog": "network|proc|exec|hold|msgque", "--blktime": "50"}, 18, 0, 0, t)
 
 	RunCmd("2")   // select 2
 	RunCmd("R30") // Feed load
-	WaitBlocks(state0, 10)
+	WaitBlocks(state0, 5)
 	RunCmd("R0") // Stop load
-	WaitBlocks(state0, 1)
+	WaitBlocks(state0, 3)
 	ShutDownEverything(t)
 } // testLoad(){...}
 

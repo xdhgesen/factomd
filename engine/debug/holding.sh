@@ -61,23 +61,23 @@ BEGIN {count=0; bucks=100; typeOfLog[0]=0; holding[0]= "foo"; delete holding[0];
 
 $4~/^add/ {
     count++;
-    hash = substr($0,index($0,"R-"),8);   
+    hash = substr($0,index($0,"M-"),8);   
 #    print "add", hash
     if(hash in everything) {
       print "Duplicate", hash, FILENAME,FNR;
     } else {
       everything[hash]=0;
     }
-    
     timestamp[hash]=$2
     everything[hash]++;
     holding[hash] = $0;
 }
 
 $4~/delete/ {
-    hash = substr($0,index($0,"R-"),8);   
+    hash = substr($0,index($0,"M-"),8);   
 #    print "del", hash
     delete holding[hash];
+
     age["combined"][hash]=time2sec($2) - time2sec(timestamp[hash])
     
     rest= substr($0,index($0,"M-")+39); 

@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 
 	log "github.com/sirupsen/logrus"
@@ -688,6 +689,7 @@ func (c *Controller) broadcast(parcel Parcel, full bool) {
 		return
 	}
 	for _, connection := range randomSelection {
+		messages.LogPrintf("fnode0_peers.txt", "Send M-%x to %s", msgHash, connection.peer.Address)
 		BlockFreeChannelSend(connection.SendChannel, ConnectionParcel{Parcel: parcel})
 		connection.peer.PrevMsgs.Add(msgHash) // record that we know this peer has seen this message
 	}
