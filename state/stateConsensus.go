@@ -447,7 +447,7 @@ func (s *State) Process() (progress bool) {
 	// Process inbound messages
 	preEmptyLoopTime := time.Now()
 emptyLoop:
-	for {
+	for i := 0; i < 100; i++ {
 		var msg interfaces.IMsg
 		select {
 		// We have prioritizedMsgQueue listed twice, meaning it has 2 chances to be
@@ -458,6 +458,10 @@ emptyLoop:
 			s.LogMessage("prioritizedMsgQueue", "Execute", msg)
 		case msg = <-s.msgQueue:
 			s.LogMessage("msgQueue", "Execute", msg)
+		case msg = <-s.ackQueue:
+			s.LogMessage("ackQueue", "Execute", msg)
+		case msg = <-s.ackQueue:
+			s.LogMessage("ackQueue", "Execute", msg)
 		case msg = <-s.ackQueue:
 			s.LogMessage("ackQueue", "Execute", msg)
 		default:
@@ -552,7 +556,7 @@ func (s *State) ReviewHolding() {
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
 	}
-	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 100 {
+	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 20 {
 		return
 	}
 
@@ -585,13 +589,11 @@ func (s *State) ReviewHolding() {
 	}
 
 	// if the sorted holding is empty or built for the wrong VM
-	if len(s.HoldingList) == 0 || s.HoldingVM != s.LeaderVMIndex {
+	if len(s.HoldingList) == 0 {
 		s.HoldingVM = s.LeaderVMIndex // save the VM I used in making this sorted list
-		sorted := make([]interfaces.IMsg, len(s.Holding))
-		i := 0
+		sorted := make([]interfaces.IMsg, 0, len(s.Holding))
 		for _, v := range s.Holding {
-			sorted[i] = v
-			i++
+			sorted = append(sorted, v)
 		}
 		sort.Slice(sorted,
 			func(i, j int) bool {
@@ -610,7 +612,7 @@ func (s *State) ReviewHolding() {
 	cnt := 1
 processholdinglist:
 	for {
-		if cnt&0x1F == 0 && s.GetTimestamp().GetTimeMilli()-now.GetTimeMilli() > 200 {
+		if cnt&0x1F == 0 && s.GetTimestamp().GetTimeMilli()-now.GetTimeMilli() > 20 {
 			fmt.Print("cnt ", cnt, " ")
 			break processholdinglist
 		}
@@ -2111,7 +2113,11 @@ func (s *State) GetUnsyncedServers(dbheight uint32) []interfaces.IHash {
 	var ids []interfaces.IHash
 	p := s.ProcessLists.Get(dbheight)
 	for index, l := range s.GetFedServers(dbheight) {
-		vmIndex := p.ServerMap[s.CurrentMinute][index]
+		c := s.CurrentMinute
+		if c == 10 {
+			c = 9
+		}
+		vmIndex := p.ServerMap[c][index]
 		vm := p.VMs[vmIndex]
 		if !vm.Synced {
 			ids = append(ids, l.GetChainID())

@@ -1119,9 +1119,7 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 
 	// If we add the message to the process list, ensure we actually process that
 	// message, so the next msg will be able to added without going into holding.
-	if ack.IsLocal() {
-		for p.Process(s) {
-		}
+	for p.DBHeight > 0 && p.Process(s) {
 	}
 
 	// Both the ack and the message hash to the same GetHash()
