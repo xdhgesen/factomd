@@ -24,9 +24,9 @@ func GetHardCodedGrants() []HardGrant {
 	case "LOCAL":
 		hardcodegrants = []HardGrant{
 			// waiting for "real-ish" data from brian
-			//HardGrant{21, 2, validateAddress("FA3oajkmHMfqkNMMShmqpwDThzMCuVrSsBwiXM2kYFVRz3MzxNAJ")}, // Pay Clay 2
+			HardGrant{21, 2, validateAddress("FA3oajkmHMfqkNMMShmqpwDThzMCuVrSsBwiXM2kYFVRz3MzxNAJ")}, // Pay Clay 2
 			HardGrant{31, 4, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 4
-			//HardGrant{21, 3, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 3
+			HardGrant{21, 3, validateAddress("FA3Ga2XcaheS5NgQ3q22gBpLgE6tXmPu1GhjdU2FsdN2QPMzKJET")}, // Pay Bob 3
 
 			// Note to future grant implementers.  To test the grants that you have coded up on mainnet before deployment on your local machine use this procedure.
 			// - Code all the grants and add them to the MAIN section. Use the correct activation height, where Height % 25 = 1
@@ -43,21 +43,6 @@ func GetHardCodedGrants() []HardGrant {
 			// - Check you are on the second node by pressing s <enter> to print out the summary.  It should show "1 f FNode01" to indicate focus is on the new simnode.  This means you are viewing that control panel now.
 			// - Refersh the control panel and make sure that it downloads the blockchain and is keeping up with the first simnode and is not stalled on either of the grant blocks.
 
-			// Copy (and replace) the new grants to be tested here:
-			// Centis BV total: 1200 FCT (300 FCT * 2 months) + (600 FCT * 1 month) = 1200 FCT lowered upon request
-			HardGrant{11, 1200e8, validateAddress("FA2hvRaci9Kks9cLNkEUFcxzUJuUFaaAE1eWYLqa2qk1k9pVFVBp")},
-			// The 42nd Factoid total: 1800 FCT
-			HardGrant{11, 1800e8, validateAddress("FA3AEL2H9XZy3n199USs2poCEJBkK1Egy6JXhLehfLJjUYMKh1zS")},
-			// Factom, Inc. total: 1800 FCT
-			HardGrant{11, 1800e8, validateAddress("FA2teRURMYTdYAA97zdh7rZDkxNtR1nhjryo34aaskjYqsqRSwZq")},
-			// Canonical Ledgers total: 1800 FCT
-			HardGrant{11, 1800e8, validateAddress("FA2PEXgRiPd14NzUP47XfVTgEnvjtLSebBZvnM8gM7cJAMuqWs89")},
-			// DBGrow total: 1800 FCT
-			HardGrant{11, 1800e8, validateAddress("FA3HSuFo9Soa5ZnG82JHqyKiRi4Pw17LxPTo9AsCaFNLCGkXkgsu")},
-			
-			
-			
-			
 			// ********************************
 			// **** Grant Round 2019-3 ****
 			// ********************************
@@ -70,14 +55,14 @@ func GetHardCodedGrants() []HardGrant {
 			// [Factom Inc.-16] Oracle Master -- 900 FCT
 
 			// Factom Inc. total: 900 FCT
-			HardGrant{21, 900e8, validateAddress("FA3fpiZ91MCRRFjVGfNXK4pg7vx3BT3aSRyoVqgptZCX7N5BNR8P")},
+			HardGrant{11, 900e8, validateAddress("FA3fpiZ91MCRRFjVGfNXK4pg7vx3BT3aSRyoVqgptZCX7N5BNR8P")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Factom Inc.-17] Anchor Master -- 660 FCT
 
 			// Factom Inc. total: 660 FCT
-			HardGrant{21, 660e8, validateAddress("FA3jySUFtLXb1VdAJJ5NRVNYEtZ4EBSkDB7yn6LuKGQ4P1ntARhx")},
+			HardGrant{11, 660e8, validateAddress("FA3jySUFtLXb1VdAJJ5NRVNYEtZ4EBSkDB7yn6LuKGQ4P1ntARhx")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
@@ -85,121 +70,120 @@ func GetHardCodedGrants() []HardGrant {
 			// Guide Compensation 2019-07-21 - 2019-08-17
 
 			// Factom Inc. total: 1800 FCT
-			HardGrant{21, 1800e8, validateAddress("FA2teRURMYTdYAA97zdh7rZDkxNtR1nhjryo34aaskjYqsqRSwZq")},
+			HardGrant{11, 1800e8, validateAddress("FA2teRURMYTdYAA97zdh7rZDkxNtR1nhjryo34aaskjYqsqRSwZq")},
 
 			// TRGG3R LLC total: 1800 FCT
-			HardGrant{21, 1800e8, validateAddress("FA2oecgJW3XWnXzHhQQoULmMeKC97uAgHcPd4kEowTb3csVkbDc9")},
+			HardGrant{11, 1800e8, validateAddress("FA2oecgJW3XWnXzHhQQoULmMeKC97uAgHcPd4kEowTb3csVkbDc9")},
 
 			// DBGrow Inc total: 1800 FCT
-			HardGrant{21, 1800e8, validateAddress("FA3HSuFo9Soa5ZnG82JHqyKiRi4Pw17LxPTo9AsCaFNLCGkXkgsu")},
+			HardGrant{11, 1800e8, validateAddress("FA3HSuFo9Soa5ZnG82JHqyKiRi4Pw17LxPTo9AsCaFNLCGkXkgsu")},
 
 			// The 42nd Factoid AS total: 1800 FCT
-			HardGrant{21, 1800e8, validateAddress("FA3AEL2H9XZy3n199USs2poCEJBkK1Egy6JXhLehfLJjUYMKh1zS")},
+			HardGrant{11, 1800e8, validateAddress("FA3AEL2H9XZy3n199USs2poCEJBkK1Egy6JXhLehfLJjUYMKh1zS")},
 
 			// Centis BV total: 1800 FCT
-			HardGrant{21, 1800e8, validateAddress("FA2hvRaci9Kks9cLNkEUFcxzUJuUFaaAE1eWYLqa2qk1k9pVFVBp")},
+			HardGrant{11, 1800e8, validateAddress("FA2hvRaci9Kks9cLNkEUFcxzUJuUFaaAE1eWYLqa2qk1k9pVFVBp")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Factomize-7] Core and General Development -- 8747 FCT
 
 			// Factomize total: 8747 FCT
-			HardGrant{21, 8747e8, validateAddress("FA3nsSjUy5uSkqMEug8t3VcehZn5w2ciSMpgqFEEsMRwMrHoa9k3")},
+			HardGrant{11, 8747e8, validateAddress("FA3nsSjUy5uSkqMEug8t3VcehZn5w2ciSMpgqFEEsMRwMrHoa9k3")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Sphereon-7] Core development continuation -- 8093 FCT
 
 			// Sphereon total: 8093 FCT
-			HardGrant{21, 8093e8, validateAddress("FA3P6cLv2Ct2P6SStqhhqagFp9u8kpca9XyJHbhB68v1jeZNFpG8")},
+			HardGrant{11, 8093e8, validateAddress("FA3P6cLv2Ct2P6SStqhhqagFp9u8kpca9XyJHbhB68v1jeZNFpG8")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Bedrock Solutions-De Facto-Crypto Logic-The Factoid Authority-4] Factom Open Node Continuity -- 1126 FCT
 
 			// The Factoid Authority total: 188 FCT
-			HardGrant{21, 188e8, validateAddress("FA2LV4s7LKA9BTgWaJNvcr9Yq8rpiH2XD3vEPY3nwSiNSrnRgkpK")},
+			HardGrant{11, 188e8, validateAddress("FA2LV4s7LKA9BTgWaJNvcr9Yq8rpiH2XD3vEPY3nwSiNSrnRgkpK")},
 
 			// Crypto Logic total: 188 FCT
-			HardGrant{21, 188e8, validateAddress("FA29wMUjN38BVLbJs6dR6gHHdBys2mpo3wy565JCjquUQTGqNZfb")},
+			HardGrant{11, 188e8, validateAddress("FA29wMUjN38BVLbJs6dR6gHHdBys2mpo3wy565JCjquUQTGqNZfb")},
 
 			// Bedrock Solutions total: 375 FCT
-			HardGrant{21, 375e8, validateAddress("FA2FqYZPfBeRWq7fWSFEhassT5zpMQZm8jwus3yWbzeN3PZPWybm")},
+			HardGrant{11, 375e8, validateAddress("FA2FqYZPfBeRWq7fWSFEhassT5zpMQZm8jwus3yWbzeN3PZPWybm")},
 
 			// De Facto total: 375 FCT
-			HardGrant{21, 375e8, validateAddress("FA2YeMbN8Z1SsT7Yqw6Np85kWwtFVg2CyJKMDFnuXTawWuWPtzvX")},
+			HardGrant{11, 375e8, validateAddress("FA2YeMbN8Z1SsT7Yqw6Np85kWwtFVg2CyJKMDFnuXTawWuWPtzvX")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Factom Inc.-18] Protocol Development -- 38940 FCT
 
 			// Nolan Bauer total: 300 FCT
-			HardGrant{21, 300e8, validateAddress("FA2oecgJW3XWnXzHhQQoULmMeKC97uAgHcPd4kEowTb3csVkbDc9")},
+			HardGrant{11, 300e8, validateAddress("FA2oecgJW3XWnXzHhQQoULmMeKC97uAgHcPd4kEowTb3csVkbDc9")},
 
 			// factomatic total: 300 FCT
-			HardGrant{21, 300e8, validateAddress("FA2944TXTDQKdJDp3TLSANjgMjwK2pQnTSkzE3kQcHWKetCCphcH")},
+			HardGrant{11, 300e8, validateAddress("FA2944TXTDQKdJDp3TLSANjgMjwK2pQnTSkzE3kQcHWKetCCphcH")},
 
 			// David Kuiper total: 300 FCT
-			HardGrant{21, 300e8, validateAddress("FA2FqYZPfBeRWq7fWSFEhassT5zpMQZm8jwus3yWbzeN3PZPWybm")},
+			HardGrant{11, 300e8, validateAddress("FA2FqYZPfBeRWq7fWSFEhassT5zpMQZm8jwus3yWbzeN3PZPWybm")},
 
 			// Factom Inc. total: 38040 FCT
-			HardGrant{21, 38040e8, validateAddress("FA3LwCDE3ZdFkr9nE1Keb5JcHgwXVWpEHydshT1x2qKFdvZELVQz")},
+			HardGrant{11, 38040e8, validateAddress("FA3LwCDE3ZdFkr9nE1Keb5JcHgwXVWpEHydshT1x2qKFdvZELVQz")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Matt York-Luciap Technology Inc.-DBGrow-Canonical Ledgers-1] FAT Smart Contracts 2 - Development -- 13750 FCT
 
 			// David Chapman total: 300 FCT
-			HardGrant{21, 300e8, validateAddress("FA3nsSjUy5uSkqMEug8t3VcehZn5w2ciSMpgqFEEsMRwMrHoa9k3")},
+			HardGrant{11, 300e8, validateAddress("FA3nsSjUy5uSkqMEug8t3VcehZn5w2ciSMpgqFEEsMRwMrHoa9k3")},
 
 			// Luciap Technology Inc. total: 200 FCT
-			HardGrant{21, 200e8, validateAddress("FA2kWsMnSXTV9RS2yEGkEGP2yUFrawZQVj5Hp8WqPnZUUBFCpiaH")},
+			HardGrant{11, 200e8, validateAddress("FA2kWsMnSXTV9RS2yEGkEGP2yUFrawZQVj5Hp8WqPnZUUBFCpiaH")},
 
 			// Matt York total: 200 FCT
-			HardGrant{21, 200e8, validateAddress("FA35Kd1Ac1aQXEHPxYTR6jNDPuwVoh6APQQGKViceQTedyE7J2vV")},
+			HardGrant{11, 200e8, validateAddress("FA35Kd1Ac1aQXEHPxYTR6jNDPuwVoh6APQQGKViceQTedyE7J2vV")},
 
 			// Canonical Ledgers total: 5500 FCT
-			HardGrant{21, 5500e8, validateAddress("FA2xccSAfhGm5k4tPaXF9741xkQ52drWjoJodQhpPxDxepdqasMM")},
+			HardGrant{11, 5500e8, validateAddress("FA2xccSAfhGm5k4tPaXF9741xkQ52drWjoJodQhpPxDxepdqasMM")},
 
 			// DBGrow total: 7550 FCT
-			HardGrant{21, 7550e8, validateAddress("FA3HSuFo9Soa5ZnG82JHqyKiRi4Pw17LxPTo9AsCaFNLCGkXkgsu")},
+			HardGrant{11, 7550e8, validateAddress("FA3HSuFo9Soa5ZnG82JHqyKiRi4Pw17LxPTo9AsCaFNLCGkXkgsu")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Go Immutable-2] PR & Social Media Management Continuation -- 22500 FCT
 
 			// Go Immutable total: 22500 FCT
-			HardGrant{21, 22500e8, validateAddress("FA2LwHgp7LyoY5SG1vxjLaQ2QtdyepfaqYUTsiTgprtkiP6geCk7")},
+			HardGrant{11, 22500e8, validateAddress("FA2LwHgp7LyoY5SG1vxjLaQ2QtdyepfaqYUTsiTgprtkiP6geCk7")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Factoshi-1] Graff - A GraphQL wrapper for the factomd RPC API -- 2950 FCT
 
 			// Factoshi total: 2950 FCT
-			HardGrant{21, 2950e8, validateAddress("FA2tsEih6kyzNSBtbkzZ31HUGF8QQB7RPBFouBVfYyUZk24QkPr2")},
+			HardGrant{11, 2950e8, validateAddress("FA2tsEih6kyzNSBtbkzZ31HUGF8QQB7RPBFouBVfYyUZk24QkPr2")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Marketing Committee-2] Rebranding Services -- 10000 FCT
 
 			// Marketing Committee total: 10000 FCT
-			HardGrant{21, 10000e8, validateAddress("FA3i8WbLoRvmWmpRLEBYENLZdEBK9TNG74UWrvHAGWgAyW11iHBu")},
+			HardGrant{11, 10000e8, validateAddress("FA3i8WbLoRvmWmpRLEBYENLZdEBK9TNG74UWrvHAGWgAyW11iHBu")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [AroundTheBox-1] Develop Free Excel Add-In -- 680 FCT
 
 			// AroundTheBox total: 680 FCT
-			HardGrant{21, 680e8, validateAddress("FA28qK3QjFEupwjmY3qvM1CdNCrik33my8fdmxJwj1ea5iKCnbXF")},
+			HardGrant{11, 680e8, validateAddress("FA28qK3QjFEupwjmY3qvM1CdNCrik33my8fdmxJwj1ea5iKCnbXF")},
 			// --------------------------------------------------------
 
 			// --------------------------------------------------------
 			// [Kompendium-4] Rust Client Library for the Factom Protocol -- 2400 FCT
 
 			// Kompendium total: 2400 FCT
-			HardGrant{21, 2400e8, validateAddress("FA3KMPNX8AKdY3tjyKMzZ5cAkqUv97d3QqkJeQnVXk6PXSVgArnr")},
+			HardGrant{11, 2400e8, validateAddress("FA3KMPNX8AKdY3tjyKMzZ5cAkqUv97d3QqkJeQnVXk6PXSVgArnr")},
 			// --------------------------------------------------------
-			
 			
 		}
 	case "CUSTOM":
