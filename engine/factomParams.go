@@ -90,6 +90,7 @@ func init() {
 	flag.StringVar(&p.NodeName, "nodename", "", "Assign a name to the node")
 	flag.StringVar(&p.ControlPanelSetting, "controlpanelsetting", "", "Can set to 'disabled', 'readonly', or 'readwrite' to overwrite config file")
 	flag.BoolVar(&p.FullHashesLog, "fullhasheslog", false, "true create a log of all unique hashes seen during processing")
+	flag.BoolVar(&p.FullBroadcast, "fullbroadcast", false, "true forces node to always broadcast to every peer")
 }
 
 func ParseCmdLine(args []string) *FactomParams {

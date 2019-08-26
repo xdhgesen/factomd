@@ -78,6 +78,7 @@ type FactomParams struct {
 	NodeName                 string
 	FactomHome               string
 	FullHashesLog            bool // Log all unique full hashes
+	FullBroadcast            bool // always broadcast to every peer
 }
 
 /****************************************************************

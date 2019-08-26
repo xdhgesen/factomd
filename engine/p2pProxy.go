@@ -7,9 +7,8 @@ package engine
 import (
 	"bytes"
 	"fmt"
+	"github.com/FactomProject/factomd/common/globals"
 	"os"
-
-	// "github.com/FactomProject/factomd/common/constants"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -121,6 +120,10 @@ func (f *P2PProxy) Send(msg interfaces.IMsg) error {
 		appType := fmt.Sprintf("%d", msg.Type())
 		message := FactomMessage{Message: data, PeerHash: msg.GetNetworkOrigin(), AppHash: hash, AppType: appType}
 		switch {
+		case globals.Params.FullBroadcast:
+			msgLogger.Debug("Forced sending full broadcast message")
+			message.PeerHash = p2p.FullBroadcastFlag
+			break
 		case !msg.IsPeer2Peer() && msg.IsFullBroadcast():
 			msgLogger.Debug("Sending full broadcast message")
 			message.PeerHash = p2p.FullBroadcastFlag
