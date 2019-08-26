@@ -108,6 +108,7 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 		// Allow these thru as they do not have Ack's (they don't change processlists)
 	default:
 		// Make sure we don't put in an old ack'd message (outside our repeat filter range)
+		// TODO: refactor getter/setter around this logic
 		tlim := int64(Range * 60 * 2 * 1000000000)                       // Filter hold two hours of messages, one in the past one in the future
 		filterTime := s.GetMessageFilterTimestamp().GetTime().UnixNano() // this is the start of the filter
 

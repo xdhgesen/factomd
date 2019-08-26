@@ -2229,6 +2229,7 @@ func (s *State) GetLeaderTimestamp() interfaces.Timestamp {
 }
 
 func (s *State) GetMessageFilterTimestamp() interfaces.Timestamp {
+	// REVIEW: change this logic
 	if s.MessageFilterTimestamp == nil {
 		s.MessageFilterTimestamp = primitives.NewTimestampNow()
 	}
