@@ -29,6 +29,9 @@ func waitForLoaded(s *State) {
 	for !s.DBFinished {
 		time.Sleep(1 * time.Second)
 	}
+	if s.highestKnown < s.DBHeightAtBoot {
+		s.highestKnown = s.DBHeightAtBoot
+	}
 }
 
 // TODO: Redesign Catchup. Some assumptions were made that made this more
@@ -66,10 +69,16 @@ func (list *DBStateList) Catchup() {
 			return false
 		}
 
+		var hs, hk uint32
 		for {
 			start := time.Now()
 			// get the height of the saved blocks
-			hs := func() uint32 {
+			hs = func() (rval uint32) {
+				defer func() {
+					if hs != rval {
+						list.State.LogPrintf("dbstatecatchup", "HS = %d", rval)
+					}
+				}()
 				// Sets the floor for what we will be requesting
 				// AKA : What we have. In reality the receivedlist should
 				// indicate that we have it, however, because a dbstate
@@ -93,19 +102,24 @@ func (list *DBStateList) Catchup() {
 				return floor
 			}()
 
-			// get the hight of the known blocks
-			hk := func() uint32 {
+			// get the height of the known blocks
+			hk = func() (rval uint32) {
 				a := list.State.GetHighestAck()
 				k := list.State.GetHighestKnownBlock()
+				defer func() {
+					if hk != rval {
+						list.State.LogPrintf("dbstatecatchup", "HK = %d", rval)
+					}
+				}()
 				// check that known is more than 2 ahead of acknowledged to make
 				// sure not to ask for blocks that haven't finished
 				if k > a+2 {
-					return k
+					return k - 2
 				}
-				if a == 0 {
+				if a < 2 {
 					return a
 				}
-				return a - 1 // Acks are for height + 1 (sometimes +2 in min 0)
+				return a - 2 // Acks are for height + 1 (sometimes +2 in min 0)
 			}()
 
 			// The base means anything below we can toss
