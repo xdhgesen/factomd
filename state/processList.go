@@ -861,9 +861,6 @@ func (p *ProcessList) processVM(vm *VM) (progress bool) {
 			s.Replay.IsTSValidAndUpdateState(constants.INTERNAL_REPLAY, msgHashFixed, msg.GetTimestamp(), now)
 
 			delete(s.Acks, msgHashFixed)
-			//delete(s.Holding, msgHashFixed)
-
-			// REVIEW: does this leave msg in dependent holding?
 			s.DeleteFromHolding(msgHashFixed, msg, "msg.Process done")
 		} else {
 			s.LogMessage("process", fmt.Sprintf("retry %v/%v/%v", p.DBHeight, i, j), msg)
@@ -915,7 +912,6 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 
 	// Keep in mind, the process list is processing at a height one greater than the database. 1 is caught up.  2 is one behind.
 	// Until the first couple signatures are processed, we will be 2 behind.
-	//TODO: Why is this in the execution per message per VM when it's global to the processlist -- clay
 	if s.WaitForEntries {
 		s.LogPrintf("processList", "s.WaitForEntries %d-:-%d [%d] > %d + 2", p.DBHeight, s.CurrentMinute, s.EntryDBHeightComplete)
 		return progress // Don't process further in this list, go to the next.
@@ -925,14 +921,8 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 	// dif >2 means the second pass sync is not complete so don't process yet.
 	// this prevent you from becoming a leader when you don't have complete identities
 	if diff > 22 {
-		s.LogPrintf("process", "Waiting on saving")
-		s.LogPrintf("EntrySync", "Waiting on saving EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
-
 		// If we don't have the Entry Blocks (or we haven't processed the signatures) we can't do more.
-		// p.State.AddStatus(fmt.Sprintf("Can't do more: dbht: %d vm: %d vm-height: %d Entry Height: %d", p.DBHeight, i, j, s.EntryDBHeightComplete))
-		if extraDebug {
-			p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing %d-:-%d", s.EntryDBHeightComplete, s.LLeaderHeight, s.CurrentMinute)
-		}
+		p.State.LogPrintf("process", "Waiting on saving blocks to progress complete %d processing", s.EntryDBHeightComplete)
 		return false
 	}
 
@@ -1029,7 +1019,6 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 
 	toss := func(hint string) {
 		s.LogPrintf("processList", "Drop "+hint)
-		TotalHoldingQueueOutputs.Inc()
 		TotalAcksOutputs.Inc()
 
 		s.DeleteFromHolding(m.GetMsgHash().Fixed(), m, "Toss"+hint)
@@ -1086,9 +1075,8 @@ func (p *ProcessList) AddToProcessList(s *State, ack *messages.Ack, m interfaces
 	}
 
 	s.LogPrintf("executeMsg", "remove from holding M-%v|R-%v", m.GetMsgHash().String()[:6], m.GetRepeatHash().String()[:6])
-	TotalHoldingQueueOutputs.Inc()
-	TotalAcksOutputs.Inc()
 	s.DeleteFromHolding(msgHash.Fixed(), m, "Process()")
+	TotalAcksOutputs.Inc()
 	delete(s.Acks, msgHash.Fixed())
 	p.VMs[ack.VMIndex].List[ack.Height] = m
 	p.VMs[ack.VMIndex].ListAck[ack.Height] = ack
