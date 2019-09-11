@@ -2273,6 +2273,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Process the %d DBSig: %v", s.FactomNodeName, s.DBSigProcessed, dbs.String()))
 		if dbs.VMIndex == 0 {
+
 			dbsMilli := dbs.Timestamp.GetTimeMilliUInt64()
 			fs := s.FactoidState.(*FactoidState)
 			s.LogPrintf("dbsig", "1st ProcessDBSig(): %10s DBSig dbht %d leaderheight %d VMIndex %d Timestamp %x %d, leadertimestamp = %x %d",
