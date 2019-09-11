@@ -797,9 +797,9 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		if s.LLeaderHeight != s.LeaderPL.DBHeight {
 			panic("bad things are happening")
 		}
-	} else if s.CurrentMinute != newMinute { // And minute
-		s.CurrentMinute = newMinute // Update just the minute
 	}
+
+	s.CurrentMinute = newMinute // Update the minute
 
 	// fixup cached values for new minute
 	// If an election took place, our lists will be unsorted. Fix that
@@ -2232,7 +2232,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		} else {
 			vm.Signed = true
 		}
-		//s.LeaderPL.AdminBlock
 		return true
 	}
 
@@ -2418,12 +2417,6 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 		//		s.LogPrintf("dbsig-eom", "DBSIGDone written %v @ %s", s.DBSigDone, atomic.WhereAmIString(0))
 	}
 	return false
-	/*
-		err := s.LeaderPL.AdminBlock.AddDBSig(dbs.ServerIdentityChainID, dbs.DBSignature)
-		if err != nil {
-			fmt.Printf("Error in adding DB sig to admin block, %s\n", err.Error())
-		}
-	*/
 }
 
 func (s *State) GetMsg(vmIndex int, dbheight int, height int) (interfaces.IMsg, error) {
