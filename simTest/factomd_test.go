@@ -16,14 +16,13 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
-	"github.com/FactomProject/factomd/common/primitives/random"
-
-	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/common/primitives/random"
 	. "github.com/FactomProject/factomd/engine"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
+	"github.com/FactomProject/factomd/util/atomic"
 	"github.com/FactomProject/factomd/wsapi"
 )
 
@@ -46,6 +45,79 @@ func TestOne(t *testing.T) {
 	ShutDownEverything(t)
 } // testOne(){...}
 
+func TestDualElections(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	state.MMR_enable = false // No MMR for you!
+
+	RanSimTest = true
+
+	// 							  01234567
+	state0 := SetupSim("LALLLALFFLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "20"}, 12, 0, 0, t)
+
+	WaitMinutes(state0, 8)
+	RunCmd("2")            // select 2
+	RunCmd("x")            // off the net
+	RunCmd("6")            // select 6
+	RunCmd("x")            // off the net
+	WaitMinutes(state0, 2) // wait for elections
+	RunCmd("2")            // select 2
+	RunCmd("x")            // on the net
+	RunCmd("6")            // select 6
+	RunCmd("x")            // on the net
+	WaitBlocks(state0, 2)  // wait till nodes should have updated by dbstate
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+} // TestDualElections(){...}
+
+func TestTripleElections(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	state.MMR_enable = false // No MMR for you!
+
+	RanSimTest = true
+	//                            0123456789AB
+	state0 := SetupSim("LALALALLLLFF", map[string]string{"--debuglog": ".", "--blktime": "20"}, 360, 30, 30, t)
+
+	for minute := 0; minute < 10; minute += 2 {
+		WaitForMinute(state0, minute)
+		RunCmd("2")            // select 1
+		RunCmd("x")            // off the net
+		RunCmd("4")            // select 2
+		RunCmd("x")            // off the net
+		RunCmd("6")            // select 3
+		RunCmd("x")            // off the net
+		WaitMinutes(state0, 2) // wait for elections
+		RunCmd("2")            // select 1
+		RunCmd("x")            // on the net
+		RunCmd("4")            // select 2
+		RunCmd("x")            // on the net
+		RunCmd("6")            // select 3
+		RunCmd("x")            // on the net
+		WaitBlocks(state0, 2)  // wait till nodes should have updated by dbstate
+
+		WaitForMinute(state0, minute+1)
+		RunCmd("1")            // select 1
+		RunCmd("x")            // off the net
+		RunCmd("3")            // select 2
+		RunCmd("x")            // off the net
+		RunCmd("5")            // select 3
+		RunCmd("x")            // off the net
+		WaitMinutes(state0, 2) // wait for elections
+		RunCmd("1")            // select 1
+		RunCmd("x")            // on the net
+		RunCmd("3")            // select 2
+		RunCmd("x")            // on the net
+		RunCmd("5")            // select 3
+		RunCmd("x")            // on the net
+		WaitBlocks(state0, 2)  // wait till nodes should have updated by dbstate
+
+	}
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+} // TestTripleElections(){...}
 func TestLoad(t *testing.T) {
 	if RanSimTest {
 		return
@@ -54,16 +126,42 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLF", map[string]string{}, 15, 0, 0, t)
+	state0 := SetupSim("LLLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 15, 0, 0, t)
 
-	RunCmd("2")   // select 2
-	RunCmd("R30") // Feed load
-	WaitBlocks(state0, 10)
+	RunCmd("2")    // select 2
+	RunCmd("w")    // feed load into follower
+	RunCmd("F200") // delay messages
+	RunCmd("R25")  // Feed load
+	WaitBlocks(state0, 3)
 	RunCmd("R0") // Stop load
-	WaitBlocks(state0, 1)
+	for state0.Hold.GetSize() > 10 || len(state0.Holding) > 10 {
+		WaitBlocks(state0, 1)
+	}
 	ShutDownEverything(t)
 } // testLoad(){...}
 
+// Test replicates a savestate restore bug when run twice. First run must complete 10 blocks.
+func TestErr(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+	state0 := SetupSim("LF", map[string]string{"--debuglog": ".", "--db": "LDB", "--controlpanelsetting": "readwrite",
+		"--network": "LOCAL", "--fastsaverate": "4", "--checkheads": "false", "--net": "alot",
+		"--blktime": "15", "--faulttimeout": "120000", "--enablenet": "false", "--startdelay": "1"},
+		150, 0, 0, t)
+
+	RunCmd("2")    // select 2
+	RunCmd("w")    // feed load into follower
+	RunCmd("F200") // delay messages
+	RunCmd("R0")   // Feed load
+	WaitBlocks(state0, 5)
+	RunCmd("R0") // Stop load
+	WaitBlocks(state0, 5)
+	// should check holding and queues cleared out
+	ShutDownEverything(t)
+} //TestErr(){...}
 func TestCatchup(t *testing.T) {
 	if RanSimTest {
 		return
@@ -87,7 +185,7 @@ func TestCatchup(t *testing.T) {
 	dbht1 := state1.GetLLeaderHeight()
 
 	if dbht0 != dbht1 {
-		t.Fatalf("Node 7 was at dbheight %d which didn't match Node 6 at dbheight %d", dbht0, dbht1)
+		t.Fatalf("Node 0 was at dbheight %d which didn't match Node 1 at dbheight %d", dbht0, dbht1)
 	}
 
 	ShutDownEverything(t)
@@ -128,7 +226,7 @@ func TestLoad2(t *testing.T) {
 	StatusEveryMinute(state0)
 
 	RunCmd("4") // select node 4
-	RunCmd("x") // take out 7 from the network
+	RunCmd("x") // take out 4 from the network
 	WaitBlocks(state0, 1)
 	WaitForMinute(state0, 1)
 
@@ -144,11 +242,11 @@ func TestLoad2(t *testing.T) {
 	WaitBlocks(state0, 3)
 	WaitMinutes(state0, 3)
 
-	ht7 := GetFnodes()[1].State.GetLLeaderHeight()
-	ht6 := GetFnodes()[4].State.GetLLeaderHeight()
+	ht1 := GetFnodes()[1].State.GetLLeaderHeight()
+	ht4 := GetFnodes()[4].State.GetLLeaderHeight()
 
-	if ht7 != ht6 {
-		t.Fatalf("Node 7 was at dbheight %d which didn't match Node 6 at dbheight %d", ht7, ht6)
+	if ht1 != ht4 {
+		t.Fatalf("Node 1 was at dbheight %d which didn't match Node 4 at dbheight %d", ht1, ht4)
 	}
 	ShutDownEverything(t)
 } //TestLoad2(){...}
@@ -213,7 +311,10 @@ func TestMakeALeader(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LF", map[string]string{"--fullhasheslog": "true"}, 5, 0, 0, t)
+	state0 := SetupSim("LF", map[string]string{}, 5, 0, 0, t)
+	RunCmd("g1")
+	WaitBlocks(state0, 2)
+	WaitMinutes(state0, 1)
 
 	RunCmd("1") // select node 1
 	RunCmd("l") // make him a leader
@@ -226,89 +327,90 @@ func TestMakeALeader(t *testing.T) {
 	ShutDownEverything(t)
 }
 
-func TestActivationHeightElection(t *testing.T) {
-	if RanSimTest {
-		return
-	}
+//func TestActivationHeightElection(t *testing.T) {
+//	if RanSimTest {
+//		return
+//	}
+//
+//	RanSimTest = true
+//
+//	state0 := SetupSim("LLLLLAAF", map[string]string{}, 16, 2, 2, t)
+//
+//	// Kill the last two leader to cause a double election
+//	RunCmd("3")
+//	RunCmd("x")
+//	RunCmd("4")
+//	RunCmd("x")
+//
+//	WaitMinutes(state0, 2) // make sure they get faulted
+//
+//	// bring them back
+//	RunCmd("3")
+//	RunCmd("x")
+//	RunCmd("4")
+//	RunCmd("x")
+//	WaitBlocks(state0, 2)
+//	WaitMinutes(state0, 1)
+//	WaitForAllNodes(state0)
+//	CheckAuthoritySet(t)
+//
+//	if GetFnodes()[3].State.Leader {
+//		t.Fatalf("Node 3 should not be a leader")
+//	}
+//	if GetFnodes()[4].State.Leader {
+//		t.Fatalf("Node 4 should not be a leader")
+//	}
+//	if !GetFnodes()[5].State.Leader {
+//		t.Fatalf("Node 5 should be a leader")
+//	}
+//	if !GetFnodes()[6].State.Leader {
+//		t.Fatalf("Node 6 should be a leader")
+//	}
+//
+//	CheckAuthoritySet(t)
+//
+//	if state0.IsActive(activations.ELECTION_NO_SORT) {
+//		t.Fatalf("ELECTION_NO_SORT active too early")
+//	}
+//
+//	for !state0.IsActive(activations.ELECTION_NO_SORT) {
+//		WaitBlocks(state0, 1)
+//	}
+//
+//	WaitForMinute(state0, 2) // Don't Fault at the end of a block
+//
+//	// Cause a new double elections by killing the new leaders
+//	RunCmd("5")
+//	RunCmd("x")
+//	RunCmd("6")
+//	RunCmd("x")
+//	WaitMinutes(state0, 2) // make sure they get faulted
+//	// bring them back
+//	RunCmd("5")
+//	RunCmd("x")
+//	RunCmd("6")
+//	RunCmd("x")
+//	WaitBlocks(state0, 3)
+//	WaitMinutes(state0, 1)
+//	WaitForAllNodes(state0)
+//	CheckAuthoritySet(t)
+//
+//	if GetFnodes()[5].State.Leader {
+//		t.Fatalf("Node 5 should not be a leader")
+//	}
+//	if GetFnodes()[6].State.Leader {
+//		t.Fatalf("Node 6 should not be a leader")
+//	}
+//	if !GetFnodes()[3].State.Leader {
+//		t.Fatalf("Node 3 should be a leader")
+//	}
+//	if !GetFnodes()[4].State.Leader {
+//		t.Fatalf("Node 4 should be a leader")
+//	}
+//
+//	ShutDownEverything(t)
+//}
 
-	RanSimTest = true
-
-	state0 := SetupSim("LLLLLAAF", map[string]string{}, 16, 2, 2, t)
-
-	// Kill the last two leader to cause a double election
-	RunCmd("3")
-	RunCmd("x")
-	RunCmd("4")
-	RunCmd("x")
-
-	WaitMinutes(state0, 2) // make sure they get faulted
-
-	// bring them back
-	RunCmd("3")
-	RunCmd("x")
-	RunCmd("4")
-	RunCmd("x")
-	WaitBlocks(state0, 2)
-	WaitMinutes(state0, 1)
-	WaitForAllNodes(state0)
-	CheckAuthoritySet(t)
-
-	if GetFnodes()[3].State.Leader {
-		t.Fatalf("Node 3 should not be a leader")
-	}
-	if GetFnodes()[4].State.Leader {
-		t.Fatalf("Node 4 should not be a leader")
-	}
-	if !GetFnodes()[5].State.Leader {
-		t.Fatalf("Node 5 should be a leader")
-	}
-	if !GetFnodes()[6].State.Leader {
-		t.Fatalf("Node 6 should be a leader")
-	}
-
-	CheckAuthoritySet(t)
-
-	if state0.IsActive(activations.ELECTION_NO_SORT) {
-		t.Fatalf("ELECTION_NO_SORT active too early")
-	}
-
-	for !state0.IsActive(activations.ELECTION_NO_SORT) {
-		WaitBlocks(state0, 1)
-	}
-
-	WaitForMinute(state0, 2) // Don't Fault at the end of a block
-
-	// Cause a new double elections by killing the new leaders
-	RunCmd("5")
-	RunCmd("x")
-	RunCmd("6")
-	RunCmd("x")
-	WaitMinutes(state0, 2) // make sure they get faulted
-	// bring them back
-	RunCmd("5")
-	RunCmd("x")
-	RunCmd("6")
-	RunCmd("x")
-	WaitBlocks(state0, 3)
-	WaitMinutes(state0, 1)
-	WaitForAllNodes(state0)
-	CheckAuthoritySet(t)
-
-	if GetFnodes()[5].State.Leader {
-		t.Fatalf("Node 5 should not be a leader")
-	}
-	if GetFnodes()[6].State.Leader {
-		t.Fatalf("Node 6 should not be a leader")
-	}
-	if !GetFnodes()[3].State.Leader {
-		t.Fatalf("Node 3 should be a leader")
-	}
-	if !GetFnodes()[4].State.Leader {
-		t.Fatalf("Node 4 should be a leader")
-	}
-
-	ShutDownEverything(t)
-}
 func TestAnElection(t *testing.T) {
 	if RanSimTest {
 		return
@@ -316,7 +418,7 @@ func TestAnElection(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLAAF", map[string]string{}, 9, 1, 1, t)
+	state0 := SetupSim("LLLAAF", map[string]string{"--blktime": "15"}, 9, 1, 1, t)
 
 	StatusEveryMinute(state0)
 	WaitMinutes(state0, 2)
@@ -335,22 +437,6 @@ func TestAnElection(t *testing.T) {
 	// wait for him to update via dbstate and become an audit
 	WaitBlocks(state0, 2)
 	WaitMinutes(state0, 1)
-
-	{ // debug holding queue
-
-		for _, fnode := range GetFnodes() {
-			s := fnode.State
-			for _, h := range s.Hold.Messages() {
-				for _, m := range h {
-					s.LogMessage("dependentHolding", "stuck", m)
-				}
-			}
-		}
-	}
-
-	state2 := GetFnodes()[2].State
-	WaitForBlock(state2, 7) // wait for sync w/ network
-
 	WaitForAllNodes(state0)
 
 	// PrintOneStatus(0, 0)
@@ -1157,7 +1243,7 @@ func TestElection9(t *testing.T) {
 	}
 	RanSimTest = true
 
-	state0 := SetupSim("LLAL", map[string]string{"--faulttimeout": "10"}, 88888, 1, 1, t)
+	state0 := SetupSim("LLAL", map[string]string{"--debuglog": "", "--faulttimeout": "10"}, 8, 1, 1, t)
 	StatusEveryMinute(state0)
 	CheckAuthoritySet(t)
 
@@ -1178,16 +1264,6 @@ func TestElection9(t *testing.T) {
 
 	WaitForAllNodes(state0)
 	ShutDownEverything(t)
-}
-func TestRandom(t *testing.T) {
-	if RanSimTest {
-		return
-	}
-	RanSimTest = true
-
-	if random.RandUInt8() > 200 {
-		t.Fatal("Failed")
-	}
 
 }
 
@@ -1198,6 +1274,9 @@ func TestBadDBStateUnderflow(t *testing.T) {
 
 	RanSimTest = true
 	state0 := SetupSim("LF", map[string]string{}, 6, 0, 0, t)
+	RunCmd("g1")
+	WaitBlocks(state0, 2)
+	WaitMinutes(state0, 1)
 
 	msg, err := state0.LoadDBState(state0.GetDBHeightComplete() - 1)
 	if err != nil {
@@ -1323,6 +1402,74 @@ func TestDBState(t *testing.T) {
 
 	WaitForAllNodes(state0) // if the follower isn't catching up this will timeout
 	PrintOneStatus(0, 0)
+	ShutDownEverything(t)
+}
+
+func TestCatchupEveryMinute(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+	//							  01234567890
+	state0 := SetupSim("LFFFFFFFFFF", map[string]string{"--debuglog": ".", "--blktime": "6"}, 20, 1, 1, t)
+
+	StatusEveryMinute(state0)
+
+	// knock followers off one per minute
+	for i := 0; i < 10; i++ {
+		s := GetFnodes()[i+1].State
+		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitForMinute(s, i)
+		RunCmd("x")
+	}
+	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
+	WaitBlocks(state0, 2) // wait till they cannot catch up by MMR
+	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
+	WaitMinutes(state0, 1)
+	state0.LogPrintf("test", "%s", atomic.WhereAmIString(0))
+
+	RunCmd("T25") // switch to 25 second blocks because dbstate catchup code fails at 6 second blocks
+	// bring them all back
+	for i := 0; i < 10; i++ {
+		state0.LogPrintf("test", "%s %d %s", atomic.WhereAmIString(0), i)
+		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitMinutes(state0, 1)
+		RunCmd("x")
+	}
+
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+}
+
+func TestElectionEveryMinute(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+	//							  01234567890123456789012345678901
+	state0 := SetupSim("LLLLLLLLLLLLLLLLLLLLLAAAAAAAAAAF", map[string]string{"--blktime": "60"}, 20, 10, 1, t)
+
+	StatusEveryMinute(state0)
+	s := GetFnodes()[1].State
+	WaitMinutes(s, 1) // wait for start of next minute on fnode01
+	// knock followers off one per minute
+	start := s.CurrentMinute
+	for i := 0; i < 10; i++ {
+		s := GetFnodes()[i+1].State
+		RunCmd(fmt.Sprintf("%d", i+1))
+		WaitForMinute(s, (start+i+1)%10) // wait for selected minute
+		RunCmd("x")
+	}
+	WaitMinutes(state0, 1)
+	// bring them all back
+	for i := 0; i < 10; i++ {
+		RunCmd(fmt.Sprintf("%d", i+1))
+		RunCmd("x")
+	}
+
+	WaitForAllNodes(state0) /// wait till everyone catches up
 	ShutDownEverything(t)
 }
 
