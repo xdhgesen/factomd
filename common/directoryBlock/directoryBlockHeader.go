@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var _ = fmt.Print
@@ -116,6 +118,10 @@ func (h *DBlockHeader) SetNetworkID(networkID uint32) {
 	h.NetworkID = networkID
 }
 
+func removeNL(s string) string {
+	return strings.Replace(strings.Replace(s, "\n", " ", -1), "  ", " ", -1)
+}
+
 func (h *DBlockHeader) GetBodyMR() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {
@@ -123,12 +129,13 @@ func (h *DBlockHeader) GetBodyMR() (rval interfaces.IHash) {
 			primitives.LogNilHashBug("DBlockHeader.GetBodyMR() saw an interface that was nil")
 		}
 	}()
-
+	fmt.Printf("))) GetBodyMR   HDR:  %p[%d] MR = %x %s @ %s\n", h, h.GetDBHeight(), h.BodyMR, removeNL(h.String()), atomic.WhereAmIString(1))
 	return h.BodyMR
 }
 
 func (h *DBlockHeader) SetBodyMR(bodyMR interfaces.IHash) {
 	h.BodyMR = bodyMR
+	fmt.Printf("))) SetBodyMR   HDR:  %p[%d] MR = %x %s @ %s\n", h, h.GetDBHeight(), h.BodyMR, removeNL(h.String()), atomic.WhereAmIString(1))
 }
 
 func (h *DBlockHeader) GetPrevKeyMR() (rval interfaces.IHash) {

@@ -2272,6 +2272,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 		//fmt.Println(fmt.Sprintf("ProcessDBSig(): %10s Process the %d DBSig: %v", s.FactomNodeName, s.DBSigProcessed, dbs.String()))
 		if dbs.VMIndex == 0 {
+
 			dbsMilli := dbs.Timestamp.GetTimeMilliUInt64()
 			fs := s.FactoidState.(*FactoidState)
 			s.LogPrintf("dbsig", "1st ProcessDBSig(): %10s DBSig dbht %d leaderheight %d VMIndex %d Timestamp %x %d, leadertimestamp = %x %d",
@@ -2326,6 +2327,9 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			pl.IncrementDiffSigTally()
 			s.LogPrintf("processList", "Failed. DBSig and DBlocks do not match Expected-Body-Mr: [%d]%x, Got: [%d]%x",
 				dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR().Fixed(), dbs.DirectoryBlockHeader.GetDBHeight(), dbs.DirectoryBlockHeader.GetBodyMR().Fixed())
+
+			fmt.Printf("))) ProcessDBSig DBLK:  %p[%d] MR = %x @ %s\n", dblk, dblk.GetHeader().GetDBHeight(), dblk.GetHeader().GetBodyMR(), atomic.WhereAmIString(1))
+			fmt.Printf("))) ProcessDBSig DBSig: %p[%d] MR = %x @ %s\n", dbs, dbs.DBHeight, dbs.DirectoryBlockHeader.GetBodyMR(), atomic.WhereAmIString(1))
 
 			// If the Directory block hash doesn't work for me, then the dbsig doesn't work for me, so
 			// toss it and ask our neighbors for another one.
