@@ -797,6 +797,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		if s.LLeaderHeight != s.LeaderPL.DBHeight {
 			panic("bad things are happening")
 		}
+		s.DBSigDone = false // movestatetoheight
 	}
 
 	s.CurrentMinute = newMinute // Update the minute
@@ -836,7 +837,6 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 	s.DBSig = false      // movestatetoheight
 	s.EOMProcessed = 0   // movestatetoheight
 	s.DBSigProcessed = 0 // movestatetoheight
-	s.DBSigDone = false  // movestatetoheight
 
 	if s.LeaderPL != nil {
 		for _, vm := range s.LeaderPL.VMs {
@@ -1969,7 +1969,6 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			// setup to sync next minute ...
 			s.Syncing = false  // ProcessEOM (EOM complete)
 			s.EOM = false      // ProcessEOM (EOM complete)
-			s.EOMDone = false  // ProcessEOM (EOM complete)
 			s.EOMProcessed = 0 // ProcessEOM (EOM complete)
 			for _, vm := range pl.VMs {
 				vm.Synced = false // ProcessEOM (EOM complete)
