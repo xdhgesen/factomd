@@ -23,7 +23,7 @@ func GetTime() uint64 {
 }
 
 //A structure for handling timestamps for messages
-type Timestamp uint64 //in miliseconds
+type Timestamp uint64 //in milliseconds
 var _ interfaces.BinaryMarshallable = (*Timestamp)(nil)
 var _ interfaces.Timestamp = (*Timestamp)(nil)
 
@@ -66,12 +66,12 @@ func (t *Timestamp) SetTimeNow() {
 	*t = Timestamp(GetTimeMilli())
 }
 
-func (t *Timestamp) SetTimeMilli(miliseconds int64) {
-	t.SetTime(uint64(miliseconds))
+func (t *Timestamp) SetTimeMilli(milliseconds int64) {
+	t.SetTime(uint64(milliseconds))
 }
 
-func (t *Timestamp) SetTime(miliseconds uint64) {
-	*t = Timestamp(miliseconds)
+func (t *Timestamp) SetTime(milliseconds uint64) {
+	*t = Timestamp(milliseconds)
 }
 
 func (t *Timestamp) SetTimeSeconds(seconds int64) {

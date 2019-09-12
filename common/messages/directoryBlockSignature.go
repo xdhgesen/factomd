@@ -300,10 +300,23 @@ func (m *DirectoryBlockSignature) UnmarshalBinaryData(data []byte) (newData []by
 
 	// TimeStamp
 	m.Timestamp = new(primitives.Timestamp)
+
+	//fmt.Printf(")))) DBSIG um ts data [%d]%x @ %s\n", len(newData), newData[:6], atomic.WhereAmIString(1))
+
 	newData, err = m.Timestamp.UnmarshalBinaryData(newData)
 	if err != nil {
 		return nil, err
 	}
+	//fmt.Printf(")))) DBSIG um ts %v @ %s\n", m.Timestamp.GetTimeMilli(), atomic.WhereAmIString(1))
+	//
+	//{
+	//	buf := &bytes.Buffer{}
+	//	err := binary.Write(buf, binary.BigEndian, m.Timestamp)
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	fmt.Printf(")))) DBSIG um ts data2 [%d]%x @ %s\n", buf.Len(), buf, atomic.WhereAmIString(1))
+	//}
 
 	m.SysHeight, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
 	hash := new(primitives.Hash)
@@ -349,6 +362,8 @@ func (m *DirectoryBlockSignature) UnmarshalBinaryData(data []byte) (newData []by
 	}
 
 	m.marshalCache = append(m.marshalCache, data[:len(data)-len(newData)]...)
+
+	//	fmt.Printf("))) unmarshal %s", m.String())
 
 	return newData, nil
 }
@@ -474,7 +489,7 @@ func (m *DirectoryBlockSignature) String() string {
 	}
 	headerHash, err := m.DirectoryBlockHeader.GetHeaderHash()
 
-	return fmt.Sprintf("%6s-VM%3d:          DBHt:%5d -- Signer[%x] PrevDBKeyMR[%x] HeaderHash[%x] BodyMR[%x] Timestamp[%d-%s] hash[%x] header - %s",
+	return fmt.Sprintf("%6s-VM%3d:          DBHt:%5d -- Signer[%x] PrevDBKeyMR[%x] HeaderHash[%x] BodyMR[%x] Timestamp %s[%d] hash[%x] header - %s",
 		"DBSig",
 		m.VMIndex,
 		m.DBHeight,
@@ -482,8 +497,8 @@ func (m *DirectoryBlockSignature) String() string {
 		m.DirectoryBlockHeader.GetPrevKeyMR().Bytes()[:3],
 		headerHash.Bytes()[:3],
 		m.DirectoryBlockHeader.GetBodyMR().Bytes()[:3],
-		m.Timestamp,
 		m.Timestamp.String(),
+		m.Timestamp.GetTimeMilli(),
 		m.GetHash().Bytes()[:3],
 		stringCompress(m.DirectoryBlockHeader.String()))
 
