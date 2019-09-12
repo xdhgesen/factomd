@@ -2386,7 +2386,7 @@ func (s *State) GotHeartbeat(heartbeatTS interfaces.Timestamp, dbheight uint32) 
 }
 
 func (s *State) SetLeaderTimestamp(ts interfaces.Timestamp) {
-	s.LogPrintf("executeMsg", "SetLeaderTimestamp(%s)", ts.String())
+	s.LogPrintf("executeMsg", "SetLeaderTimestamp(%s [%d]) @ %s", ts.String(), ts, atomic.WhereAmIString(1))
 
 	s.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64())
 	s.SetMessageFilterTimestamp(primitives.NewTimestampFromMilliseconds(ts.GetTimeMilliUInt64() - 60*60*1000)) // set message filter to one hour before this block started.

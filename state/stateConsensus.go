@@ -2276,7 +2276,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			dbsMilli := dbs.Timestamp.GetTimeMilliUInt64()
 			fs := s.FactoidState.(*FactoidState)
 			s.LogPrintf("dbsig", "1st ProcessDBSig(): %10s DBSig dbht %d leaderheight %d VMIndex %d Timestamp %x %d, leadertimestamp = %x %d",
-				s.FactomNodeName, dbs.DBHeight, s.LLeaderHeight, dbs.VMIndex, dbs.GetTimestamp().GetTimeMilli(), dbs.GetTimestamp().GetTimeMilli(), s.LeaderTimestamp.GetTimeMilliUInt64(), s.LeaderTimestamp.GetTimeMilliUInt64())
+				s.FactomNodeName, dbs.DBHeight, s.LLeaderHeight, dbs.VMIndex, dbs.GetTimestamp(), dbs.GetTimestamp().GetTimeMilli(), s.LeaderTimestamp.GetTimeMilliUInt64(), s.LeaderTimestamp.GetTimeMilliUInt64())
 
 			cbtx := fs.GetCurrentBlock().(*factoid.FBlock).Transactions[0].(*factoid.Transaction)
 			foo := cbtx.MilliTimestamp
