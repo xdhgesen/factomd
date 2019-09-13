@@ -2326,6 +2326,12 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			dblk = dbstate.DirectoryBlock
 		}
 
+		if dbs.VMIndex == 0 {
+			fs := s.FactoidState.(*FactoidState)
+			s.LogMessage("factoidblock", "", dbs)
+			s.LogPrintf("factoidblock", "%s", fs.GetCurrentBlock().(*factoid.FBlock).String())
+		}
+
 		if dbs.DirectoryBlockHeader.GetBodyMR().Fixed() != dblk.GetHeader().GetBodyMR().Fixed() {
 			pl.IncrementDiffSigTally()
 			s.LogPrintf("processList", "Failed. DBSig and DBlocks do not match Expected-Body-Mr: [%d]%x, Got: [%d]%x",
