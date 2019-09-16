@@ -767,9 +767,15 @@ func containsServer(haystack []interfaces.IServer, needle interfaces.IServer) bo
 }
 
 // p is previous, d is current
-func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
+func (list *DBStateList) FixupLinks(d *DBState) (progress bool) {
 	// If this block is new, then make sure all hashes are fully computed.
-	if !d.IsNew || p == nil {
+	if !d.IsNew {
+		return
+	}
+	dbht := d.DirectoryBlock.GetHeader().GetDBHeight()
+	p := list.State.DBStates.Get(int(dbht - 1))
+	if p == nil {
+		panic("Fixup Likes with not previous")
 		return
 	}
 
@@ -872,6 +878,12 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 		if err != nil {
 			panic(err)
 		}
+
+		{
+			fblock := d.FactoidBlock.(*factoid.FBlock)
+			coinbaseTx := fblock.Transactions[0]
+			list.State.LogPrintf("factoidblock", "Create CoinBaseTransaction %s", coinbaseTx.String())
+		}
 	}
 
 	// every 25 blocks +1 we add grant payouts
@@ -882,6 +894,11 @@ func (list *DBStateList) FixupLinks(p *DBState, d *DBState) (progress bool) {
 			err := d.AdminBlock.AddCoinbaseDescriptor(grantPayouts)
 			if err != nil {
 				panic(err)
+			}
+			{
+				fblock := d.FactoidBlock.(*factoid.FBlock)
+				coinbaseTx := fblock.Transactions[0]
+				list.State.LogPrintf("factoidblock", "Create GrantTransaction %s", coinbaseTx.String())
 			}
 		}
 	}
@@ -959,7 +976,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 	// its links patched, so we can't process it.  But if this is a repeat block (we have already processed
 	// at this height) then we simply return.
 	if d.Locked || d.IsNew || d.Repeat {
-
 		s.LogPrintf("dbstateprocess", "ProcessBlocks(%d) Skipping d.Locked(%v) || d.IsNew(%v) || d.Repeat(%v) : ", dbht, d.Locked, d.IsNew, d.Repeat)
 		return false
 	}
@@ -1166,29 +1182,6 @@ func (list *DBStateList) ProcessBlocks(d *DBState) (progress bool) {
 		}
 	}
 
-	// s := list.State
-	// // Time out commits every now and again.
-	// now := s.GetTimestamp()
-	// for k, msg := range s.Commits {
-	// 	{
-	// 		c, ok := msg.(*messages.CommitChainMsg)
-	// 		if ok && !s.NoEntryYet(c.CommitChain.EntryHash, now) {
-	// 			delete(s.Commits, k)
-	// 			continue
-	// 		}
-	// 	}
-	// 	c, ok := msg.(*messages.CommitEntryMsg)
-	// 	if ok && !s.NoEntryYet(c.CommitEntry.EntryHash, now) {
-	// 		delete(s.Commits, k)
-	// 		continue
-	// 	}
-
-	// 	_, ok = s.Replay.Valid(constants.TIME_TEST, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), now)
-	// 	if !ok {
-	// 		delete(s.Commits, k)
-	// 	}
-	// }
-
 	// Writing the DBState to a debug file allows for later analyzing the last block not saved to the database.
 	// Do not do this while loading from disk, as those blocks are already saved
 	if list.State.DBFinished && globals.Params.WriteProcessedDBStates {
@@ -1231,8 +1224,6 @@ func (list *DBStateList) SignDB(d *DBState) (process bool) {
 	dbheight := d.DirectoryBlock.GetHeader().GetDBHeight()
 	list.State.LogPrintf("dbstateprocess", "SignDB(%d)", dbheight)
 	if d.Signed {
-		//s := list.State
-		//		s.MoveStateToHeight(dbheight + 1)
 		list.State.LogPrintf("dbstateprocess", "SignDB(%d) done, already signed", dbheight)
 		return false
 	}
@@ -1654,7 +1645,7 @@ func (list *DBStateList) UpdateState() (progress bool) {
 		var p bool = false
 		// if this is not the first block then fixup the links
 		if i > 0 {
-			p = list.FixupLinks(list.DBStates[i-1], d)
+			p = list.FixupLinks(d)
 			progress = p || progress
 		}
 

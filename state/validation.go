@@ -25,8 +25,6 @@ func (s *State) DoProcessing() {
 	slp := false
 	i3 := 0
 
-	fmt.Printf("))) %s is %s\n", s.FactomNodeName, s.validatorLoopThreadID)
-
 	for s.GetRunState() == runstate.Running {
 
 		p1 := true

@@ -44,7 +44,6 @@ type FactomParams struct {
 	Prefix                   string
 	Rotate                   bool
 	TimeOffset               int
-	KeepMismatch             bool
 	StartDelay               int64
 	Deadline                 int
 	CustomNet                []byte

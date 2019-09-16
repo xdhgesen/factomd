@@ -301,22 +301,10 @@ func (m *DirectoryBlockSignature) UnmarshalBinaryData(data []byte) (newData []by
 	// TimeStamp
 	m.Timestamp = new(primitives.Timestamp)
 
-	//fmt.Printf(")))) DBSIG um ts data [%d]%x @ %s\n", len(newData), newData[:6], atomic.WhereAmIString(1))
-
 	newData, err = m.Timestamp.UnmarshalBinaryData(newData)
 	if err != nil {
 		return nil, err
 	}
-	//fmt.Printf(")))) DBSIG um ts %v @ %s\n", m.Timestamp.GetTimeMilli(), atomic.WhereAmIString(1))
-	//
-	//{
-	//	buf := &bytes.Buffer{}
-	//	err := binary.Write(buf, binary.BigEndian, m.Timestamp)
-	//	if err != nil {
-	//		panic(err)
-	//	}
-	//	fmt.Printf(")))) DBSIG um ts data2 [%d]%x @ %s\n", buf.Len(), buf, atomic.WhereAmIString(1))
-	//}
 
 	m.SysHeight, newData = binary.BigEndian.Uint32(newData[0:4]), newData[4:]
 	hash := new(primitives.Hash)

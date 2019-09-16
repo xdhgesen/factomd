@@ -9,14 +9,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"reflect"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/util/atomic"
 )
 
 var _ = fmt.Print
@@ -340,27 +338,11 @@ func (b *DirectoryBlock) BuildBodyMR() (interfaces.IHash, error) {
 	if len(hashes) == 0 {
 		hashes = append(hashes, primitives.Sha(nil))
 	}
-	r, w := io.Pipe()
-	go func(whereAmI string) {
-		fmt.Fprintf(w, "))) BuildBodyMR DBLK: %p[%d] hashs=[%d][", b, b.Header.GetDBHeight(), len(hashes))
-		for _, h := range hashes {
-			fmt.Fprintf(w, "%x ", h.Bytes()[:3])
-		}
-		fmt.Fprintf(w, "] @ %s\n", whereAmI)
-		w.Close()
-	}(atomic.WhereAmIString(1))
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(r)
-	r.Close()
-	fmt.Print(buf.String())
 
 	merkleTree := primitives.BuildMerkleTreeStore(hashes)
 	merkleRoot := merkleTree[len(merkleTree)-1]
 
 	b.GetHeader().SetBodyMR(merkleRoot)
-
-	fmt.Printf("))) BuildBodyMR DBLK: %p[%d] MR = %x @ %s\n", b, b.Header.GetDBHeight(), merkleRoot, atomic.WhereAmIString(1))
-	fmt.Printf("))) BuildBodyMR HDR:  %p[%d] MR = %x @ %s\n", b.Header, b.Header.GetDBHeight(), merkleRoot, atomic.WhereAmIString(1))
 
 	return merkleRoot, nil
 }

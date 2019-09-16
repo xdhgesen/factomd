@@ -107,7 +107,7 @@ func getTraceFile(name string) (f *os.File) {
 			panic(err)
 		}
 		files[name] = f
-		f.WriteString(time.Now().String() + "\n")
+		f.WriteString(name + " " + time.Now().String() + "\n")
 	}
 	return f
 }

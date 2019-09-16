@@ -1585,7 +1585,10 @@ func HandleV2Diagnostics(state interfaces.IState, params interface{}) (interface
 			eInfo.VmIndex = &vm
 			eInfo.FedIndex = &electing
 			eInfo.FedID = e.GetFedID().String()
-			eInfo.Round = &e.GetRound()[electing]
+			rounds := e.GetRound()
+			if len(rounds) > electing { // election might have finished mid query so avoid a index panic
+				eInfo.Round = &rounds[electing]
+			}
 		}
 	}
 	resp.ElectionInfo = eInfo
@@ -1595,7 +1598,7 @@ func HandleV2Diagnostics(state interfaces.IState, params interface{}) (interface
 
 //func HandleV2Accounts(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
 // height, acc, returnedLen, totalLen := state.GetFactoidState().GetFactiodAccounts(params)
-// h := new(FactiodAccounts)
+// h := new(FactoidAccounts)
 //
 // min, max := 0, 10
 //

@@ -1268,7 +1268,6 @@ func NewProcessList(state interfaces.IState, previous *ProcessList, dbheight uin
 		pl.SortFedServers()
 	} else {
 		pl.AddFedServer(state.GetNetworkBootStrapIdentity()) // Our default fed server, dependent on network type
-		// pl.AddFedServer(primitives.Sha([]byte("FNode0"))) // Our default for now fed server on LOCAL network
 	}
 
 	now := state.GetTimestamp()
