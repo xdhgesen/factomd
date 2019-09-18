@@ -52,6 +52,9 @@ If you prefer to run this in the background, use the `-d` option:
 docker-compose up -d
 ```
 
+NOTE: because it takes some time to initialize the dependent services (logstash may be the culprit)
+you may need to re-run this command to get the factomd nodes to stay up.
+
 After *docker-compose* finishes the startup, be sure to check the output of
 `docker ps` command to make sure all the services are running.
 
