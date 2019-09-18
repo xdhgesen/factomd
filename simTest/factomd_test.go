@@ -412,7 +412,7 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLAAF", map[string]string{}, 9, 4, 4, t)
+	state0 := SetupSim("LLLLLAAF", map[string]string{}, 12, 4, 4, t)
 
 	// get status from FNode02 because he is not involved in the elections
 	state2 := GetFnodes()[2].State
