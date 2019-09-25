@@ -54,7 +54,7 @@ func TestDualElections(t *testing.T) {
 	RanSimTest = true
 
 	// 							  01234567
-	state0 := SetupSim("LALLLALFFLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "20"}, 12, 0, 0, t)
+	state0 := SetupSim("LALLLALFFLLFFFF", map[string]string{"--debuglog": "", "--blktime": "20"}, 12, 0, 0, t)
 
 	WaitMinutes(state0, 8)
 	RunCmd("2")            // select 2
@@ -71,6 +71,45 @@ func TestDualElections(t *testing.T) {
 	ShutDownEverything(t)
 } // TestDualElections(){...}
 
+
+
+func TestElectionAfterTripleElections(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+	state.MMR_enable = false // No MMR for you!
+
+	RanSimTest = true
+
+	// 							  01234567
+	state0 := SetupSim("LALLLALFFLLFFLA", map[string]string{"--debuglog": ".", "--blktime": "20"}, 12, 0, 0, t)
+
+	WaitMinutes(state0, 8)
+	RunCmd("2")            // select 2
+	RunCmd("x")            // off the net
+	RunCmd("6")            // select 6
+	RunCmd("x")            // off the net
+	RunCmd("13")            // select 13
+	RunCmd("x")            // off the net
+	WaitMinutes(state0, 2) // wait for elections
+	RunCmd("2")            // select 2
+	RunCmd("x")            // on the net
+	RunCmd("6")            // select 6
+	RunCmd("x")            // on the net
+	RunCmd("13")            // select 13
+	RunCmd("x")            // on the net
+	WaitBlocks(state0, 3)  // wait till nodes should have updated by dbstate
+	RunCmd("3")            // select 3
+	RunCmd("x")            // off the net
+	WaitBlocks(state0, 2)  // wait till nodes should have updated by dbstate
+	RunCmd("3")            // select 3
+	RunCmd("x")            // on the net
+	WaitBlocks(state0, 2)  // wait till nodes should have updated by dbstate
+	WaitForAllNodes(state0)
+	ShutDownEverything(t)
+} // TestElectionAfterTripleElections(){...}
+
+
 func TestLoad(t *testing.T) {
 	if RanSimTest {
 		return
@@ -79,7 +118,7 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 15, 0, 0, t)
+	state0 := SetupSim("LLLLFFFF", map[string]string{"--blktime": "30"}, 20, 0, 0, t)
 
 	RunCmd("2")    // select 2
 	RunCmd("w")    // feed load into follower
@@ -412,7 +451,7 @@ func TestDBsigEOMElection(t *testing.T) {
 
 	RanSimTest = true
 
-	state0 := SetupSim("LLLLLAAF", map[string]string{}, 9, 4, 4, t)
+	state0 := SetupSim("LLLLLAAF", map[string]string{"--debuglog": ""}, 9, 4, 4, t)
 
 	// get status from FNode02 because he is not involved in the elections
 	state2 := GetFnodes()[2].State
@@ -1333,7 +1372,7 @@ func TestCatchupEveryMinute(t *testing.T) {
 
 	RanSimTest = true
 	//							  01234567890
-	state0 := SetupSim("LFFFFFFFFFF", map[string]string{"--debuglog": ".", "--blktime": "6"}, 20, 1, 1, t)
+	state0 := SetupSim("LFFFFFFFFFF", map[string]string{"--debuglog": "", "--blktime": "6"}, 20, 1, 1, t)
 
 	StatusEveryMinute(state0)
 

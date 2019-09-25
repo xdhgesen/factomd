@@ -58,12 +58,12 @@ func TestEntriesBeforeChain(t *testing.T) {
 		for x := 0; x < numEntries; x++ {
 			publish(x)
 		}
-
 	}
 
 	{ // create chain
 		e := factom.Entry{
 			ChainID: id,
+
 			ExtIDs:  extids,
 			Content: encode("Hello World!"),
 		}
@@ -76,7 +76,6 @@ func TestEntriesBeforeChain(t *testing.T) {
 		state0.APIQueue().Enqueue(commit)
 		state0.APIQueue().Enqueue(reveal)
 		lastentry = reveal.Entry.GetHash()
-
 	}
 
 	// REVIEW is this a good enough test for holding
@@ -92,12 +91,12 @@ func TestEntriesBeforeChain(t *testing.T) {
 		b.SendFCT(a, oneFct*10) // use account b to fund a.ConvertEC() from above
 
 		WaitForEcBalanceOver(state0, a.EcPub(), int64(ecMargin-1))
+
 	}
 
 	WaitBlocks(state0, 1) // give time for holding to clear
 	WaitForEcBalanceUnder(state0, a.EcPub(), int64(ecMargin+1))
 	WaitForEntry(state0, lastentry)
-
 	ShutDownEverything(t)
 	WaitForAllNodes(state0)
 
