@@ -79,7 +79,7 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 15, 0, 0, t)
+	state0 := SetupSim("LLLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "60"}, 15, 0, 0, t)
 
 	RunCmd("2")    // select 2
 	RunCmd("w")    // feed load into follower

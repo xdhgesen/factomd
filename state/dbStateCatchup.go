@@ -43,7 +43,15 @@ func (list *DBStateList) Catchup() {
 
 	factomSecond := list.State.FactomSecond()
 
-	requestTimeout := list.State.RequestTimeout * factomSecond
+	s := list.State
+	if s.RequestTimeout == 0 {
+		s.RequestTimeout = s.DirectoryBlockInSeconds / 20
+	}
+	if s.RequestTimeout == 0 {
+		s.RequestTimeout = 1
+	}
+
+	requestTimeout := time.Duration(list.State.RequestTimeout) * factomSecond
 	requestLimit := list.State.RequestLimit
 
 	// Wait for db to be loaded
