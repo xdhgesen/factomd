@@ -1528,8 +1528,9 @@ func printProcessList(watchPL *int, value int, listenTo *int) {
 func printMessages(Messages *int, value int, listenTo *int) {
 	fmt.Println("Printing Messages")
 	for *Messages == value {
-		fnode := fnodes[*listenTo]
-		fnode.MLog.PrtMsgs(fnode.State)
+		// FIXME:
+		//fnode := fnodes[*listenTo]
+		//fnode.MLog.PrtMsgs(fnode.State)
 
 		time.Sleep(2 * time.Second)
 	}

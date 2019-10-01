@@ -36,7 +36,6 @@ type FactomNode struct {
 	Index    int
 	State    *state.State
 	Peers    []interfaces.IPeer
-	MLog     *MsgLog
 	P2PIndex int
 }
 
@@ -568,7 +567,6 @@ func makeServer(s *state.State) *FactomNode {
 	fnode := new(FactomNode)
 	fnode.State = newState
 	fnodes = append(fnodes, fnode)
-	fnode.MLog = mLog
 
 	return fnode
 }

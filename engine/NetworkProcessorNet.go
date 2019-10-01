@@ -303,17 +303,14 @@ func Peers(fnode *FactomNode) {
 					}
 				}
 
-				//if state.GetOut() {
-				//	fnode.State.Println("In Coming!! ",msg)
-				//}
-
+				/*
 				var in string
 				if msg.IsPeer2Peer() {
 					in = "P2P In"
 				} else {
 					in = "PeerIn"
 				}
-				fnode.MLog.Add2(fnode, false, peer.GetNameTo(), fmt.Sprintf("%s %d", in, i+1), true, msg)
+				 */
 
 				// don't resend peer to peer messages or responses
 				if constants.NormallyPeer2Peer(msg.Type()) {
@@ -463,7 +460,6 @@ func NetworkOutputs(fnode *FactomNode) {
 					p = rand.Int() % len(fnode.Peers)
 				}
 				peer := fnode.Peers[p]
-				fnode.MLog.Add2(fnode, true, peer.GetNameTo(), "P2P out", true, msg)
 				if !fnode.State.GetNetStateOff() { // don't Send p2p messages if he is OFF
 					// Don't do a rand int if drop rate is 0
 					if fnode.State.GetDropRate() > 0 && rand.Int()%1000 < fnode.State.GetDropRate() {
@@ -496,8 +492,7 @@ func NetworkOutputs(fnode *FactomNode) {
 				}
 				// Don't resend to the node that sent it to you.
 				if i != p || wt > 1 {
-					bco := fmt.Sprintf("%s/%d/%d", "BCast", p, i)
-					fnode.MLog.Add2(fnode, true, peer.GetNameTo(), bco, true, msg)
+					//bco := fmt.Sprintf("%s/%d/%d", "BCast", p, i)
 					if !fnode.State.GetNetStateOff() { // Don't send him broadcast message if he is off
 						if fnode.State.GetDropRate() > 0 && rand.Int()%1000 < fnode.State.GetDropRate() && !msg.IsFullBroadcast() {
 							//drop the message, rather than processing it normally
