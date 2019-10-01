@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/FactomProject/factomd/simulation"
 	"log"
 	"strconv"
 	"strings"
@@ -20,8 +19,8 @@ import (
 	"github.com/FactomProject/factomd/common/identityEntries"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/simulation"
 	"github.com/FactomProject/factomd/state"
-	"github.com/FactomProject/factomd/wsapi"
 	"github.com/FactomProject/serveridentity/identity"
 )
 
@@ -83,8 +82,8 @@ func copyOver(st *state.State) {
 		eNew.ChainID = e.GetChainID().String()
 		eNew.Content = e.GetContent()
 
-		paramsRev := new(wsapi.EntryRequest)
-		paramsCom := new(wsapi.EntryRequest)
+		paramsRev := new(simulation.EntryRequest)
+		paramsCom := new(simulation.EntryRequest)
 		com, rev := getMessageStringEntry(eNew, ec)
 		paramsCom.Entry = com
 		paramsRev.Entry = rev
@@ -128,8 +127,8 @@ func buildMainChain(port int) {
 	c := factom.NewChain(e)
 
 	com, rev := getMessageStringChain(c, ec)
-	paramsRev := new(wsapi.EntryRequest)
-	paramsCom := new(wsapi.MessageRequest)
+	paramsRev := new(simulation.EntryRequest)
+	paramsCom := new(simulation.MessageRequest)
 
 	paramsCom.Message = com
 	paramsRev.Entry = rev
@@ -189,8 +188,8 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 			if err != nil {
 				continue
 			}
-			paramsRev := new(wsapi.EntryRequest)
-			paramsCom := new(wsapi.MessageRequest)
+			paramsRev := new(simulation.EntryRequest)
+			paramsCom := new(simulation.MessageRequest)
 
 			chain := factom.NewChain(entry)
 			com, rev := getMessageStringChain(chain, ec)
@@ -217,8 +216,8 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 			if err != nil {
 				continue
 			}
-			paramsRev := new(wsapi.EntryRequest)
-			paramsCom := new(wsapi.MessageRequest)
+			paramsRev := new(simulation.EntryRequest)
+			paramsCom := new(simulation.MessageRequest)
 
 			com, rev := getMessageStringEntry(entry, ec)
 			paramsCom.Message = com
@@ -238,58 +237,56 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 
 		com, rev, key, _ := makeBlockKey(ele, ec, false)
 		ele.NewBlockKey = key
-		mC := new(wsapi.MessageRequest)
+		mC := new(simulation.MessageRequest)
 		mC.Message = com
 		j := primitives.NewJSON2Request("commit-entry", 0, mC)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
-		mR := new(wsapi.EntryRequest)
+		mR := new(simulation.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
 		com, rev, _ = makeMHash(ele, ec)
-		mC = new(wsapi.MessageRequest)
+		mC = new(simulation.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
-		mR = new(wsapi.EntryRequest)
+		mR = new(simulation.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
 		com, rev, _ = makeBTCKey(ele, ec)
-		mC = new(wsapi.MessageRequest)
+		mC = new(simulation.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
 		_, _ = simulation.V2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
 
-		mR = new(wsapi.EntryRequest)
+		mR = new(simulation.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
 		_, _ = simulation.V2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
 
 		com, rev, _ = makeServerCoinbaseAddress(ele, ec, primitives.RandomHash())
-		mC = new(wsapi.MessageRequest)
+		mC = new(simulation.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
-		mR = new(wsapi.EntryRequest)
+		mR = new(simulation.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
 		com, rev, _ = makeServerEfficiency(ele, ec, 1000)
-		mC = new(wsapi.MessageRequest)
+		mC = new(simulation.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
 		_, _ = simulation.V2Request(j, st.GetPort())
 
-		mR = new(wsapi.EntryRequest)
+		mR = new(simulation.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
 		_, _ = simulation.V2Request(j, st.GetPort())
@@ -470,7 +467,7 @@ func changeSigningKey(auth interfaces.IHash, st *state.State) (*primitives.Priva
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, newKey, _ := makeBlockKey(ele, ec, true)
 			ele.NewBlockKey = newKey
-			m := new(wsapi.MessageRequest)
+			m := new(simulation.MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
@@ -479,7 +476,7 @@ func changeSigningKey(auth interfaces.IHash, st *state.State) (*primitives.Priva
 			if err != nil {
 				return nil, err
 			}
-			mr := new(wsapi.EntryRequest)
+			mr := new(simulation.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
 
@@ -503,19 +500,17 @@ func changeServerEfficiency(auth interfaces.IHash, st *state.State, eff uint16) 
 	for _, ele := range authKeyLibrary {
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, _ := makeServerEfficiency(ele, ec, eff)
-			m := new(wsapi.MessageRequest)
+			m := new(simulation.MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
 			_, err := simulation.V2Request(j, st.GetPort())
-			//wsapi.HandleV2Request(st, j)
 			if err != nil {
 				return err
 			}
-			mr := new(wsapi.EntryRequest)
+			mr := new(simulation.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			//wsapi.HandleV2Request(st, j)
 			_, err = simulation.V2Request(j, st.GetPort())
 			if err != nil {
 				return err
@@ -541,7 +536,7 @@ func changeServerCoinbaseAddress(auth interfaces.IHash, st *state.State, add str
 	for _, ele := range authKeyLibrary {
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, _ := makeServerCoinbaseAddress(ele, ec, faddHash)
-			m := new(wsapi.MessageRequest)
+			m := new(simulation.MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
@@ -550,7 +545,7 @@ func changeServerCoinbaseAddress(auth interfaces.IHash, st *state.State, add str
 			if err != nil {
 				return err
 			}
-			mr := new(wsapi.EntryRequest)
+			mr := new(simulation.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
 			_, err = simulation.V2Request(j, st.GetPort())
@@ -573,7 +568,7 @@ func cancelCoinbase(auth interfaces.IHash, st *state.State, h, i uint32) error {
 	for _, ele := range authKeyLibrary {
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, _ := makeCancelCoinbase(ele, ec, h, i)
-			m := new(wsapi.MessageRequest)
+			m := new(simulation.MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
@@ -581,7 +576,7 @@ func cancelCoinbase(auth interfaces.IHash, st *state.State, h, i uint32) error {
 			if err != nil {
 				return err
 			}
-			mr := new(wsapi.EntryRequest)
+			mr := new(simulation.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
 			_, err = simulation.V2Request(j, st.GetPort())

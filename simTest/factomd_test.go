@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/FactomProject/factomd/simulation"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -21,10 +20,10 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
 	. "github.com/FactomProject/factomd/engine"
+	"github.com/FactomProject/factomd/simulation"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/FactomProject/factomd/util/atomic"
-	"github.com/FactomProject/factomd/wsapi"
 )
 
 func TestOne(t *testing.T) {
@@ -615,9 +614,9 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 	}
 
 	type ackHelp struct {
-		Jsonrpc string                       `json:"jsonrps"`
-		Id      int                          `json:"id"`
-		Result  wsapi.GeneralTransactionData `json:"result"`
+		Jsonrpc string                            `json:"jsonrps"`
+		Id      int                               `json:"id"`
+		Result  simulation.GeneralTransactionData `json:"result"`
 	}
 
 	apiCall := func(state0 *state.State, arrayOfFactoidAccounts []string) *walletcall {
@@ -824,9 +823,9 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 	}
 
 	type ackHelpEC struct {
-		Jsonrpc string            `json:"jsonrps"`
-		Id      int               `json:"id"`
-		Result  wsapi.EntryStatus `json:"result"`
+		Jsonrpc string                 `json:"jsonrps"`
+		Id      int                    `json:"id"`
+		Result  simulation.EntryStatus `json:"result"`
 	}
 
 	apiCall := func(state0 *state.State, arrayOfECAccounts []string) *walletcall {
@@ -1218,7 +1217,7 @@ func TestBadDBStateUnderflow(t *testing.T) {
 	// fmt.Printf("---%x---\n", m_dbs[i:i+4])
 
 	s := hex.EncodeToString(m_dbs)
-	wsapi.HandleV2SendRawMessage(state0, map[string]string{"message": s})
+	simulation.HandleV2SendRawMessage(state0, map[string]string{"message": s})
 
 	WaitForMinute(state0, 1)
 	WaitForAllNodes(state0)

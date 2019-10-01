@@ -5,9 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/wsapi"
 	"io/ioutil"
 	"net/http"
 )
+
+/*
+Don't expose wsapi references directly to simulator
+*/
+
+type EntryRequest = wsapi.EntryRequest
+type MessageRequest = wsapi.MessageRequest
+type GeneralTransactionData = wsapi.GeneralTransactionData
+type EntryStatus = wsapi.EntryStatus
+type TransactionRequest = wsapi.TransactionRequest
+
+var HandleV2RawData = wsapi.HandleV2RawData
+var HandleV2SendRawMessage = wsapi.HandleV2SendRawMessage
+var SetState = wsapi.SetState
 
 func V2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
 	j, err := json.Marshal(req)

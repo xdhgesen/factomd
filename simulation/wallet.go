@@ -3,15 +3,12 @@ package simulation
 import (
 	"encoding/hex"
 	"fmt"
-
-	"github.com/FactomProject/factomd/common/interfaces"
-
 	ed "github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factomd/common/factoid"
+	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-	"github.com/FactomProject/factomd/wsapi"
 )
 
 // FundWallet()
@@ -56,7 +53,7 @@ func fundECWallet(st *state.State, inSec interfaces.IHash, outEC interfaces.IHas
 // create wsapi Post and invoke v2Request handler
 func PostTransaction(st *state.State, trans *factoid.Transaction) (error, string) {
 
-	t := new(wsapi.TransactionRequest)
+	t := new(TransactionRequest)
 	data, _ := trans.MarshalBinary()
 	t.Transaction = hex.EncodeToString(data)
 	j := primitives.NewJSON2Request("factoid-submit", 0, t)
