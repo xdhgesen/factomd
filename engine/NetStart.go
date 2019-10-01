@@ -537,19 +537,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		}
 		fmt.Printf("Paste the network info above into http://arborjs.org/halfviz to visualize the network\n")
 	}
-	// Initiate dbstate plugin if enabled. Only does so for first node,
-	// any more nodes on sim control will use default method
-	fnodes[0].State.SetTorrentUploader(p.TorUpload)
-	if p.TorManage {
-		fnodes[0].State.SetUseTorrent(true)
-		manager, err := LaunchDBStateManagePlugin(p.PluginPath, fnodes[0].State.InMsgQueue(), fnodes[0].State, fnodes[0].State.GetServerPrivateKey(), p.MemProfileRate)
-		if err != nil {
-			panic("Encountered an error while trying to use torrent DBState manager: " + err.Error())
-		}
-		fnodes[0].State.DBStateManager = manager
-	} else {
-		fnodes[0].State.SetUseTorrent(false)
-	}
 
 	if p.Journal != "" {
 		go LoadJournal(s, p.Journal)

@@ -396,12 +396,6 @@ type State struct {
 	UseLogstash bool
 	LogstashURL string
 
-	// Plugins
-	useTorrents             bool
-	torrentUploader         bool
-	Uploader                *UploadController // Controls the uploads of torrents. Prevents backups
-	DBStateManager          interfaces.IManagerController
-	HighestCompletedTorrent uint32
 	FastBoot                bool
 	FastBootLocation        string
 	FastSaveRate            int
@@ -3097,3 +3091,4 @@ func (s *State) GetDBFinished() bool {
 func (s *State) GetRunLeader() bool {
 	return s.RunLeader
 }
+

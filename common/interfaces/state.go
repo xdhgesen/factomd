@@ -337,10 +337,6 @@ type IState interface {
 	LoadHoldingMap() map[[32]byte]IMsg
 	LoadAcksMap() map[[32]byte]IMsg
 
-	// Plugins
-	UsingTorrent() bool
-	GetMissingDBState(height uint32) error
-
 	LogMessage(logName string, comment string, msg IMsg)
 	LogPrintf(logName string, format string, more ...interface{})
 
