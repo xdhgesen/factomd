@@ -12,7 +12,7 @@ import (
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/fnode"
 
 	"bufio"
 	"io"
@@ -43,7 +43,7 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	StartTime = time.Now()
 	fmt.Printf("Start time: %s\n", StartTime.String())
 
-	state0 := new(state.State)
+	state0 := new(fnode.State)
 	state0.RunState = runstate.New
 
 	// Setup the name to catch any early logging

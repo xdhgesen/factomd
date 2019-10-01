@@ -2,15 +2,14 @@ package engine
 
 import (
 	"fmt"
-	"github.com/FactomProject/factomd/fnode"
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/elections"
-	"github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/fnode"
 )
 
-func lookup(id interfaces.IHash) *state.State {
+func lookup(id interfaces.IHash) *fnode.State {
 	for _, fn := range fnode.GetFnodes() {
 		if fn.State.IdentityChainID.Fixed() == id.Fixed() {
 			return fn.State

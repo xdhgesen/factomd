@@ -9,13 +9,13 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
-	s "github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/fnode"
 )
 
-var _ = (*s.State)(nil)
+var _ = (*fnode.State)(nil)
 
 func Timer(stateI interfaces.IState) {
-	state := stateI.(*s.State)
+	state := stateI.(*fnode.State)
 	time.Sleep(2 * time.Second)
 
 	tenthPeriod := state.GetMinuteDuration()
@@ -56,17 +56,17 @@ func Timer(stateI interfaces.IState) {
 			state.TickerQueue() <- -1 // -1 indicated this is real minute cadence
 
 			tenthPeriod = state.GetMinuteDuration()
-			state.LogPrintf("ticker", "Tick! %d, wait=%s, tenthPeriod=%s", i, time.Duration(wait), time.Duration(tenthPeriod))
+			state.LogPrintf("ticker", "Tick! %d, wait=%fnode, tenthPeriod=%fnode", i, time.Duration(wait), time.Duration(tenthPeriod))
 		}
 	}
 }
 
 func PrintBusy(state interfaces.IState, i int) {
-	s := state.(*s.State)
+	s := state.(*fnode.State)
 
 	if len(s.ShutdownChan) == 0 {
 		if state.GetOut() {
-			state.Print(fmt.Sprintf("\r%19s: %s %s",
+			state.Print(fmt.Sprintf("\r%19s: %fnode %fnode",
 				"Timer",
 				state.String(),
 				(string)((([]byte)("-\\|/-\\|/-="))[i])))

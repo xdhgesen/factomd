@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"github.com/FactomProject/factomd/fnode"
 	"log"
 	"strconv"
 	"strings"
@@ -20,8 +19,8 @@ import (
 	"github.com/FactomProject/factomd/common/identityEntries"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/fnode"
 	"github.com/FactomProject/factomd/simulation"
-	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/serveridentity/identity"
 )
 
@@ -70,7 +69,7 @@ var (
 )
 
 // Copies identites from the old registration chain to the new
-func copyOver(st *state.State) {
+func copyOver(st *fnode.State) {
 	var err error
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
@@ -103,7 +102,7 @@ func copyOver(st *state.State) {
 	}
 }
 
-func setUpAuthorities(st *state.State, buildMain bool) []hardCodedAuthority {
+func setUpAuthorities(st *fnode.State, buildMain bool) []hardCodedAuthority {
 	authStack = make([]hardCodedAuthority, 0)
 	authKeyLibrary = make([]hardCodedAuthority, 0)
 	list := buildMessages()
@@ -146,7 +145,7 @@ func buildMainChain(port int) {
 	}
 }
 
-func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, int, error) {
+func authorityToBlockchain(total int, st *fnode.State) ([]hardCodedAuthority, int, error) {
 	madeAuths := make([]hardCodedAuthority, 0)
 	skipped := 0
 	sec, _ := hex.DecodeString(ecSec)
@@ -458,7 +457,7 @@ func getMessageStringChain(c *factom.Chain, ec *factom.ECAddress) (string, strin
 	return tC.Params.Message, tR.Params.Message
 }
 
-func changeSigningKey(auth interfaces.IHash, st *state.State) (*primitives.PrivateKey, error) {
+func changeSigningKey(auth interfaces.IHash, st *fnode.State) (*primitives.PrivateKey, error) {
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
 	if h, err := st.DB.FetchHeadIndexByChainID(auth); h == nil || err != nil {
@@ -492,7 +491,7 @@ func changeSigningKey(auth interfaces.IHash, st *state.State) (*primitives.Priva
 	return nil, errors.New("No identity found, it must be one of the pregenerated ones.")
 }
 
-func changeServerEfficiency(auth interfaces.IHash, st *state.State, eff uint16) error {
+func changeServerEfficiency(auth interfaces.IHash, st *fnode.State, eff uint16) error {
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
 	if h, err := st.DB.FetchHeadIndexByChainID(auth); h == nil || err != nil {
@@ -522,7 +521,7 @@ func changeServerEfficiency(auth interfaces.IHash, st *state.State, eff uint16) 
 	return errors.New("No identity found, it must be one of the pregenerated ones.")
 }
 
-func changeServerCoinbaseAddress(auth interfaces.IHash, st *state.State, add string) error {
+func changeServerCoinbaseAddress(auth interfaces.IHash, st *fnode.State, add string) error {
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
 	if h, err := st.DB.FetchHeadIndexByChainID(auth); h == nil || err != nil {
@@ -559,7 +558,7 @@ func changeServerCoinbaseAddress(auth interfaces.IHash, st *state.State, add str
 	return errors.New("No identity found, it must be one of the pregenerated ones.")
 }
 
-func cancelCoinbase(auth interfaces.IHash, st *state.State, h, i uint32) error {
+func cancelCoinbase(auth interfaces.IHash, st *fnode.State, h, i uint32) error {
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
 	if h, err := st.DB.FetchHeadIndexByChainID(auth); h == nil || err != nil {

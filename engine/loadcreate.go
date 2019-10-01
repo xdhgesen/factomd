@@ -17,7 +17,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
-	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
 )
@@ -30,11 +29,11 @@ type LoadGenerator struct {
 	running   atomic.AtomicBool      // We are running
 	tight     atomic.AtomicBool      // Only allocate ECs as needed (more EC purchases)
 	txoffset  int64                  // Offset to be added to the timestamp of created tx to test time limits.
-	state     *state.State           // Access to logging
+	state     *fnode.State           // Access to logging
 }
 
 // NewLoadGenerator makes a new load generator. The state is used for funding the transaction
-func NewLoadGenerator(s *state.State) *LoadGenerator {
+func NewLoadGenerator(s *fnode.State) *LoadGenerator {
 	lg := new(LoadGenerator)
 	lg.ECKey, _ = primitives.NewPrivateKeyFromHex(ecSec)
 	lg.stop = make(chan bool, 5)
