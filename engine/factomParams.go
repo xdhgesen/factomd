@@ -79,12 +79,9 @@ func init() {
 	flag.BoolVar(&p.Sim_Stdin, "sim_stdin", true, "If true, sim control reads from stdin.")
 	// Plugins
 	flag.StringVar(&p.PluginPath, "plugin", "", "Input the path to any plugin binaries")
-	// 	Torrent Plugin
-	flag.BoolVar(&p.TorManage, "tormanage", false, "Use torrent dbstate manager. Must have plugin binary installed and in $PATH")
-	flag.BoolVar(&p.TorUpload, "torupload", false, "Be a torrent uploader")
 	// Logstash connection (if used)
-	flag.BoolVar(&p.UseLogstash, "logstash", false, "If true, use Logstash")
-	flag.StringVar(&p.LogstashURL, "logurl", "localhost:8345", "Endpoint URL for Logstash")
+	//flag.BoolVar(&p.UseLogstash, "logstash", false, "If true, use Logstash")
+	//flag.StringVar(&p.LogstashURL, "logurl", "localhost:8345", "Endpoint URL for Logstash")
 	flag.IntVar(&p.Sync2, "sync2", -1, "Set the initial blockheight for the second Sync pass. Used to force a total sync, or skip unnecessary syncing of entries.")
 	flag.BoolVar(&p.WriteProcessedDBStates, "wrproc", true, "Write processed blocks to temporary debug file")
 	flag.StringVar(&p.CustomNetName, "customnet", "", "This string specifies a custom blockchain network ID.")
