@@ -5,7 +5,6 @@
 package messages_test
 
 import (
-	"io/ioutil"
 	"testing"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -200,6 +199,8 @@ func newSignedDirectoryBlockSignature() (*DirectoryBlockSignature, *identity.Aut
 //
 // 2000000000	         1.99 ns/op
 func BenchmarkValidateMakingFunctionNoUse(b *testing.B) {
+	b.Skipf("FIXME")
+	/*
 	s := testHelper.CreateEmptyTestState()
 	m, _, _ := newSignedDirectoryBlockSignature()
 	for i := 0; i < b.N; i++ {
@@ -209,12 +210,15 @@ func BenchmarkValidateMakingFunctionNoUse(b *testing.B) {
 		}
 		var _ = vlog
 	}
+	*/
 }
 
-//BenchmarkValidateMakingFunction tests the creating of the logger function and NOT using it.
+	//BenchmarkValidateMakingFunction tests the creating of the logger function and NOT using it.
 //
 //  1000000	      1312 ns/op
 func BenchmarkValidateMakingInstantiateNoUse(b *testing.B) {
+	b.Skipf("FIXME")
+	/*
 	s := testHelper.CreateEmptyTestState()
 	m, _, _ := newSignedDirectoryBlockSignature()
 	for i := 0; i < b.N; i++ {
@@ -222,6 +226,8 @@ func BenchmarkValidateMakingInstantiateNoUse(b *testing.B) {
 		vlog := log.WithFields(log.Fields{"msgheight": m.DBHeight, "lheight": s.GetLeaderHeight()})
 		var _ = vlog
 	}
+	*/
+
 }
 
 //BenchmarkValidateMakingFunctionUse tests the creating of the log function and using it.
@@ -233,6 +239,8 @@ func BenchmarkValidateMakingInstantiateNoUse(b *testing.B) {
 //  30000	     60523 ns/op
 
 func BenchmarkValidateMakingFunctionUse(b *testing.B) {
+	b.Skipf("FIXME")
+	/*
 	s := testHelper.CreateEmptyTestState()
 	m, _, _ := newSignedDirectoryBlockSignature()
 	log.SetOutput(ioutil.Discard)
@@ -243,4 +251,5 @@ func BenchmarkValidateMakingFunctionUse(b *testing.B) {
 		}
 		vlog("%s", "hello")
 	}
+	 */
 }

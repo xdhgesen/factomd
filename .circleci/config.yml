@@ -17,7 +17,7 @@ jobs:
       - run:
           name: Build and install the executable
           command: |
-              cd /tmp/go/src/github.com/FactomProject/factomd/
+              cd /go/src/github.com/FactomProject/factomd/
               ./build.sh
 
       - persist_to_workspace:

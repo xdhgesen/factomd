@@ -61,16 +61,3 @@ func Timer(stateI interfaces.IState) {
 	}
 }
 
-func PrintBusy(state interfaces.IState, i int) {
-	s := state.(*fnode.State)
-
-	if len(s.ShutdownChan) == 0 {
-		if state.GetOut() {
-			state.Print(fmt.Sprintf("\r%19s: %fnode %fnode",
-				"Timer",
-				state.String(),
-				(string)((([]byte)("-\\|/-\\|/-="))[i])))
-		}
-	}
-
-}

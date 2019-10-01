@@ -28,7 +28,7 @@ require (
 	github.com/FactomProject/web v0.1.0 // indirect
 	github.com/Netflix/go-expect v0.0.0-20190729225929-0e00d9168667 // indirect
 	github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973 // indirect
-	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
+	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
 	github.com/boltdb/bolt v1.3.1 // indirect
 	github.com/btcsuitereleases/btcutil v0.0.0-20150612230727-f2b1058a8255
 	github.com/cmars/basen v0.0.0-20150613233007-fe3947df716e // indirect
