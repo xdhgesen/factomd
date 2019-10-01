@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/FactomProject/factomd/simulation"
 	"math"
 	"os"
 	"time"
@@ -143,7 +144,7 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 	fmt.Println(">>>>>>>>>>>>>>>> Listening to Node", p.ListenTo)
 	fmt.Println(">>>>>>>>>>>>>>>>")
 
-	AddInterruptHandler(func() {
+	simulation.AddInterruptHandler(func() {
 		fmt.Print("<Break>\n")
 		fmt.Print("Gracefully shutting down the server...\n")
 		for _, fnode := range fnode.GetFnodes() {
@@ -269,13 +270,13 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 		makeServer(s) // We clone s to make all of our servers
 	}
 
-	addFnodeName(0) // bootstrap id doesn't change
+	fnode.AddFnodeName(0) // bootstrap id doesn't change
 
 	fnodes := fnode.GetFnodes()
 
 	// Modify Identities of new nodes
 	if len(fnodes) > 1 && len(s.Prefix) == 0 {
-		modifyLoadIdentities() // We clone s to make all of our servers
+		simulation.ModifyLoadIdentities() // We clone s to make all of our servers
 	}
 
 	// Setup the Skeleton Identity & Registration
@@ -378,54 +379,54 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 			var s string
 			fmt.Sscanf(scanner.Text(), "%d %s %d", &a, &s, &b)
 			if s == "--" {
-				AddSimPeer(fnodes, a, b)
+				simulation.AddSimPeer(fnodes, a, b)
 			}
 		}
 	case "square":
 		side := int(math.Sqrt(float64(p.Cnt)))
 
 		for i := 0; i < side; i++ {
-			AddSimPeer(fnodes, i*side, (i+1)*side-1)
-			AddSimPeer(fnodes, i, side*(side-1)+i)
+			simulation.AddSimPeer(fnodes, i*side, (i+1)*side-1)
+			simulation.AddSimPeer(fnodes, i, side*(side-1)+i)
 			for j := 0; j < side; j++ {
 				if j < side-1 {
-					AddSimPeer(fnodes, i*side+j, i*side+j+1)
+					simulation.AddSimPeer(fnodes, i*side+j, i*side+j+1)
 				}
-				AddSimPeer(fnodes, i*side+j, ((i+1)*side)+j)
+				simulation.AddSimPeer(fnodes, i*side+j, ((i+1)*side)+j)
 			}
 		}
 	case "long":
 		fmt.Println("Using long Network")
 		for i := 1; i < p.Cnt; i++ {
-			AddSimPeer(fnodes, i-1, i)
+			simulation.AddSimPeer(fnodes, i-1, i)
 		}
 		// Make long into a circle
 	case "loops":
 		fmt.Println("Using loops Network")
 		for i := 1; i < p.Cnt; i++ {
-			AddSimPeer(fnodes, i-1, i)
+			simulation.AddSimPeer(fnodes, i-1, i)
 		}
 		for i := 0; (i+17)*2 < p.Cnt; i += 17 {
-			AddSimPeer(fnodes, i%p.Cnt, (i+5)%p.Cnt)
+			simulation.AddSimPeer(fnodes, i%p.Cnt, (i+5)%p.Cnt)
 		}
 		for i := 0; (i+13)*2 < p.Cnt; i += 13 {
-			AddSimPeer(fnodes, i%p.Cnt, (i+7)%p.Cnt)
+			simulation.AddSimPeer(fnodes, i%p.Cnt, (i+7)%p.Cnt)
 		}
 	case "alot":
 		n := len(fnodes)
 		for i := 0; i < n; i++ {
-			AddSimPeer(fnodes, i, (i+1)%n)
-			AddSimPeer(fnodes, i, (i+5)%n)
-			AddSimPeer(fnodes, i, (i+7)%n)
+			simulation.AddSimPeer(fnodes, i, (i+1)%n)
+			simulation.AddSimPeer(fnodes, i, (i+5)%n)
+			simulation.AddSimPeer(fnodes, i, (i+7)%n)
 		}
 
 	case "alot+":
 		n := len(fnodes)
 		for i := 0; i < n; i++ {
-			AddSimPeer(fnodes, i, (i+1)%n)
-			AddSimPeer(fnodes, i, (i+5)%n)
-			AddSimPeer(fnodes, i, (i+7)%n)
-			AddSimPeer(fnodes, i, (i+13)%n)
+			simulation.AddSimPeer(fnodes, i, (i+1)%n)
+			simulation.AddSimPeer(fnodes, i, (i+5)%n)
+			simulation.AddSimPeer(fnodes, i, (i+7)%n)
+			simulation.AddSimPeer(fnodes, i, (i+13)%n)
 		}
 
 	case "tree":
@@ -434,8 +435,8 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 	treeloop:
 		for i := 0; true; i++ {
 			for j := 0; j <= i; j++ {
-				AddSimPeer(fnodes, index, row)
-				AddSimPeer(fnodes, index, row+1)
+				simulation.AddSimPeer(fnodes, index, row)
+				simulation.AddSimPeer(fnodes, index, row+1)
 				row++
 				index++
 				if index >= len(fnodes) {
@@ -448,16 +449,16 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 		circleSize := 7
 		index := 0
 		for {
-			AddSimPeer(fnodes, index, index+circleSize-1)
+			simulation.AddSimPeer(fnodes, index, index+circleSize-1)
 			for i := index; i < index+circleSize-1; i++ {
-				AddSimPeer(fnodes, i, i+1)
+				simulation.AddSimPeer(fnodes, i, i+1)
 			}
 			index += circleSize
 
-			AddSimPeer(fnodes, index, index-circleSize/3)
-			AddSimPeer(fnodes, index+2, index-circleSize-circleSize*2/3-1)
-			AddSimPeer(fnodes, index+3, index-(2*circleSize)-circleSize*2/3)
-			AddSimPeer(fnodes, index+5, index-(3*circleSize)-circleSize*2/3+1)
+			simulation.AddSimPeer(fnodes, index, index-circleSize/3)
+			simulation.AddSimPeer(fnodes, index+2, index-circleSize-circleSize*2/3-1)
+			simulation.AddSimPeer(fnodes, index+3, index-(2*circleSize)-circleSize*2/3)
+			simulation.AddSimPeer(fnodes, index+5, index-(3*circleSize)-circleSize*2/3+1)
 
 			if index >= len(fnodes) {
 				break
@@ -466,7 +467,7 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 	default:
 		fmt.Println("Didn't understand network type. Known types: mesh, long, circles, tree, loops.  Using a Long Network")
 		for i := 1; i < p.Cnt; i++ {
-			AddSimPeer(fnodes, i-1, i)
+			simulation.AddSimPeer(fnodes, i-1, i)
 		}
 
 	}
@@ -521,7 +522,7 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 	// REMOVED for refactor
 	//go controlPanel.ServeControlPanel(fnodes[0].State.ControlPanelChannel, fnodes[0].State, connectionMetricsChannel, p2pNetwork, Build, p.NodeName)
 
-	go SimControl(p.ListenTo, listenToStdin)
+	go simulation.SimControl(p.ListenTo, listenToStdin)
 
 }
 
@@ -554,7 +555,7 @@ func makeServer(s *fnode.State) *fnode.FactomNode {
 		newState.EFactory = new(electionMsgs.ElectionsFactory)
 	}
 
-	f:= new(fnode.FactomNode)
+	f := new(fnode.FactomNode)
 	f.State = newState
 	fnode.AddFnode(f)
 
@@ -610,11 +611,11 @@ func AddNode() {
 	i := len(fnodes)
 
 	makeServer(s)
-	modifyLoadIdentities()
+	simulation.ModifyLoadIdentities()
 
 	fnodes = GetFnodes()
 	fnodes[i].State.IntiateNetworkSkeletonIdentity()
 	fnodes[i].State.InitiateNetworkIdentityRegistration()
-	AddSimPeer(fnodes, i, i-1) // KLUDGE peer w/ only last node
+	simulation.AddSimPeer(fnodes, i, i-1) // KLUDGE peer w/ only last node
 	startServer(i, fnodes[i], true)
 }

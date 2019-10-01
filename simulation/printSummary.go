@@ -1,4 +1,4 @@
-package engine
+package simulation
 
 import (
 	"bytes"
@@ -29,7 +29,7 @@ func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
 }
 
 func GetSystemStatus(listenTo int, wsapiNode int) string {
-	fnodes := GetFnodes()
+	fnodes := fnode.GetFnodes()
 	f := fnodes[listenTo]
 	s := f.State
 	prt := "===SummaryStart===\n\n"

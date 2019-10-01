@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/FactomProject/factomd/simulation"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -27,6 +28,8 @@ import (
 var par = globals.FactomParams{}
 
 var quit = make(chan struct{})
+
+var PrintOneStatus = simulation.PrintOneStatus
 
 // SetupSim takes care of your options, and setting up nodes
 // pass in a string for nodes: 4 Leaders, 3 Audit, 4 Followers: "LLLLAAAFFFF" as the first argument
@@ -296,7 +299,7 @@ func createAuthoritySet(creatingNodes string, state0 *state.State, t *testing.T)
 func WaitForAllNodes(state *state.State) {
 	height := ""
 	simFnodes := engine.GetFnodes()
-	engine.PrintOneStatus(0, 0) // Print a status
+	PrintOneStatus(0, 0) // Print a status
 	fmt.Printf("Wait for all nodes done\n%s", height)
 	block := state.LLeaderHeight
 	minute := state.CurrentMinute
@@ -348,7 +351,7 @@ func StatusEveryMinute(s *state.State) {
 						n.State.SetString()
 					}
 
-					engine.PrintOneStatus(0, 0)
+					PrintOneStatus(0, 0)
 				} else {
 					return
 				}
@@ -504,16 +507,16 @@ func CheckAuthoritySet(t *testing.T) {
 	leadercnt, auditcnt, followercnt := CountAuthoritySet()
 
 	if leadercnt != Leaders {
-		engine.PrintOneStatus(0, 0)
+		PrintOneStatus(0, 0)
 		t.Fatalf("found %d leaders, expected %d", leadercnt, Leaders)
 	}
 	if auditcnt != Audits {
-		engine.PrintOneStatus(0, 0)
+		PrintOneStatus(0, 0)
 		t.Fatalf("found %d audit servers, expected %d", auditcnt, Audits)
 		t.Fail()
 	}
 	if followercnt != Followers {
-		engine.PrintOneStatus(0, 0)
+		PrintOneStatus(0, 0)
 		t.Fatalf("found %d followers, expected %d", followercnt, Followers)
 		t.Fail()
 	}
@@ -549,7 +552,7 @@ func ShutDownEverything(t *testing.T) {
 		t.Fatal("Failed to shut down factomd via ShutdownChan")
 	}
 
-	engine.PrintOneStatus(0, 0) // Print a final status
+	PrintOneStatus(0, 0) // Print a final status
 	fmt.Printf("Test took %d blocks and %s time\n", engine.GetFnodes()[0].State.LLeaderHeight, time.Now().Sub(startTime))
 }
 

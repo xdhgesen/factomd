@@ -1,6 +1,9 @@
 package fnode
 
 import (
+	"fmt"
+
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/state"
 )
@@ -26,4 +29,15 @@ func GetFnodes() []*FactomNode {
 
 func AddFnode(node *FactomNode) {
 	fnodes = append(fnodes, node)
+}
+
+func AddFnodeName(i int) {
+	// full name
+	name := fnodes[i].State.FactomNodeName
+	globals.FnodeNames[fnodes[i].State.IdentityChainID.String()] = name
+	// common short set
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[3:6])] = name
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:5])] = name
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:])] = name
+	globals.FnodeNames[fmt.Sprintf("%x", fnodes[i].State.IdentityChainID.Bytes()[:8])] = name
 }
