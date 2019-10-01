@@ -301,7 +301,6 @@ func (m *ChangeServerKeyMsg) String() string {
 
 }
 
-
 func (m *ChangeServerKeyMsg) IsSameAs(b *ChangeServerKeyMsg) bool {
 	if b == nil {
 		return false

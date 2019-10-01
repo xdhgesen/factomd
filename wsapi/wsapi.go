@@ -222,10 +222,10 @@ func genCertPair(certFile string, keyFile string, extraAddress string) error {
 	if extraAddress != "" {
 		externalAddresses = strings.Split(extraAddress, ",")
 		/*
-		for _, i := range externalAddresses {
-			//wsLog.Infof("adding %s to certificate\n", i)
-		}
-		 */
+			for _, i := range externalAddresses {
+				//wsLog.Infof("adding %s to certificate\n", i)
+			}
+		*/
 	}
 
 	cert, key, err := certs.NewTLSCertPair(org, validUntil, externalAddresses)

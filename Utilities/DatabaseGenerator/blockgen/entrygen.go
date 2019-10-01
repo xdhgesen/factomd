@@ -8,8 +8,8 @@ import (
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/state"
 	log "github.com/FactomProject/factomd/log"
+	"github.com/FactomProject/factomd/state"
 )
 
 type Range struct {

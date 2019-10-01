@@ -20,9 +20,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util/atomic"
-
 	//"github.com/FactomProject/factomd/database/databaseOverlay"
-
 )
 
 type ProcessList struct {

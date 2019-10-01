@@ -58,7 +58,6 @@ func (m *AuthorityListInternal) ElectionProcess(s interfaces.IState, elect inter
 	e.SetElections3()
 }
 
-
 func (m *AuthorityListInternal) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {
 		if rval != nil && reflect.ValueOf(rval).IsNil() {

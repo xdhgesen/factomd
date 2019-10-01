@@ -23,7 +23,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
-
 )
 
 // consenLogger is the general logger for all consensus related logs. You can add additional fields,

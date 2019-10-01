@@ -17,7 +17,6 @@ import (
 	"time"
 )
 
-
 type Discovery struct {
 	knownPeers map[string]Peer // peers we know about indexed by hash
 
@@ -60,10 +59,10 @@ func (d *Discovery) updatePeer(peer Peer) {
 	_, ok := d.knownPeers[peer.Address]
 	if !ok {
 		/*
-		d.logger.WithFields(log.Fields{
-			"address":     peer.Address,
-			"last_source": peer.LastSource()}).Infof("Discovered new peer")
-		 */
+			d.logger.WithFields(log.Fields{
+				"address":     peer.Address,
+				"last_source": peer.LastSource()}).Infof("Discovered new peer")
+		*/
 	}
 
 	d.knownPeers[peer.Address] = peer

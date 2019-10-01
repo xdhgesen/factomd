@@ -274,4 +274,3 @@ func (m *CommitChainMsg) String() string {
 		primitives.ConvertECAddressToUserStr(factoid.CreateAddress(primitives.NewHash(fixed[:]))))
 	return str
 }
-

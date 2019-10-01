@@ -14,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
-
 )
 
 // packageLogger is the general logger for all message related logs. You can add additional fields,

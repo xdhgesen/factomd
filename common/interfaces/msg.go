@@ -113,7 +113,6 @@ type IMsg interface {
 	IsStalled() bool
 	SetStall(bool)
 	Expire(IState) bool
-
 }
 
 // Internal Messaging supporting Elections

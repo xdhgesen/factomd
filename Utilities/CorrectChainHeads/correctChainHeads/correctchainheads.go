@@ -184,10 +184,10 @@ func FindHeads(f tools.Fetcher, conf CorrectChainHeadConfig) {
 			}
 		}
 		/*
-		//flog.Infof("Floating Check Complete. %d Eblocks remain unaccounted for", len(allEblks))
-		for k, h := range allEblks {
-			//flog.Infof("		|- %x missing. Prev: %s", k, h.String())
-		}
-		 */
+			//flog.Infof("Floating Check Complete. %d Eblocks remain unaccounted for", len(allEblks))
+			for k, h := range allEblks {
+				//flog.Infof("		|- %x missing. Prev: %s", k, h.String())
+			}
+		*/
 	}
 }

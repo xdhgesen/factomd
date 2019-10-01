@@ -320,4 +320,3 @@ func (m *RevealEntryMsg) String() string {
 
 	return str
 }
-

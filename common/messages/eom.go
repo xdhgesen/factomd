@@ -367,4 +367,3 @@ func (m *EOM) String() string {
 		m.GetMsgHash().Bytes()[:3],
 		local)
 }
-

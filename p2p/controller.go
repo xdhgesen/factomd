@@ -242,12 +242,12 @@ func (c *Controller) ReloadSpecialPeers(newPeersConfig string) {
 		if exists {
 			if oldPeer.Type == SpecialPeerCmdLine {
 				/*
-				c.logger.Warnf(
-					"Detected a peer removed from the config file,"+
-						" but it was earlier defined in the command line, ignoring: %s",
-					address,
-				)
-				 */
+					c.logger.Warnf(
+						"Detected a peer removed from the config file,"+
+							" but it was earlier defined in the command line, ignoring: %s",
+						address,
+					)
+				*/
 				continue
 			}
 			//c.logger.Infof("Detected a peer removed from the config file: %s", address)
@@ -311,12 +311,12 @@ func (c *Controller) acceptLoop(listener net.Listener) {
 		//connLogger := c.logger.WithField("remote_address", conn.RemoteAddr())
 
 		/*
-		if ok, reason := c.canConnectTo(conn); !ok {
-			//connLogger.Infof("Rejecting new connection request: %s", reason)
-			_ = conn.Close()
-			continue
-		}
-		 */
+			if ok, reason := c.canConnectTo(conn); !ok {
+				//connLogger.Infof("Rejecting new connection request: %s", reason)
+				_ = conn.Close()
+				continue
+			}
+		*/
 
 		c.AddPeer(conn) // Sends command to add the peer to the peers list
 		//connLogger.Infof("Accepting new incoming connection")

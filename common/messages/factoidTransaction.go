@@ -288,7 +288,6 @@ func (m *FactoidTransaction) String() string {
 	return rval
 }
 
-
 func (e *FactoidTransaction) JSONByte() ([]byte, error) {
 	return primitives.EncodeJSON(e)
 }

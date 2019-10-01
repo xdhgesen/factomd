@@ -234,7 +234,6 @@ func (m *MissingMsgResponse) String() string {
 		m.GetMsgHash().Bytes()[:3], m.GetOrigin(), m.GetNetworkOrigin())
 }
 
-
 func (m *MissingMsgResponse) ChainID() []byte {
 	return nil
 }
