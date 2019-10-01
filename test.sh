@@ -11,9 +11,22 @@ set -o pipefail
 # base go test command
 GO_TEST="go test -v -timeout=10m -vet=off"
 
-# list modules for CI testing
+#function listModules() {
+# glide nv | grep -v Utilities | grep -v elections | grep -v longTest | grep -v peerTest | grep -v simTest | grep -v activations | grep -v netTest | grep "\.\.\."
+#}
+
+function listAllSubmodules() {
+	go list ./... | sed 's/github.com\/FactomProject\/factomd//g' | grep '^\/\w\+$'
+}
+
 function listModules() {
-	glide nv | grep -v Utilities | grep -v elections | grep -v longTest | grep -v peerTest | grep -v simTest | grep -v activations | grep -v netTest | grep "\.\.\."
+	# original exclude list
+	MODS=$(listAllSubmodules | grep -v Utilities | grep -v elections | grep -v longTest | grep -v peerTest | grep -v simTest | grep -v activations | grep -v netTest)
+
+	# app submodule wildcard
+	for M in ${MODS[*]}; do
+		echo ".$M/... "
+	done
 }
 
 # formatted list of simTest/<testname>
