@@ -41,6 +41,8 @@ var ExpectedHeight, Leaders, Audits, Followers int
 var startTime, endTime time.Time
 var RanSimTest = false // only run 1 sim test at a time
 
+var GetFocus = simulation.GetFocus
+
 // start simulation without promoting nodes to the authority set
 // this is useful for creating scripts that will start/stop a simulation outside of the context of a unit test
 // this allows for consistent tweaking of a simulation to induce load add message loss or adjust timing

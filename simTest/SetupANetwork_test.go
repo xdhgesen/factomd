@@ -5,7 +5,6 @@ import "time"
 import (
 	"testing"
 
-	. "github.com/FactomProject/factomd/engine"
 	. "github.com/FactomProject/factomd/testHelper"
 )
 

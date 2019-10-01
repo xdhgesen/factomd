@@ -176,8 +176,6 @@ func TestLog(t *testing.T) {
 	s := testHelper.CreateAndPopulateTestStateAndStartValidator()
 	buf := new(bytes.Buffer)
 	//s.Logger = log.New(buf, "debug", "unit_test")
-	log.SetOutput(buf)
-	log.SetLevel(log.DebugLevel)
 
 	var levels []string = []string{"debug", "info", "warning", "error"}
 	for _, l := range levels {
@@ -272,6 +270,7 @@ func TestBootStrappingIdentity(t *testing.T) {
 }
 */
 
+// FIXME
 func TestIsStalled(t *testing.T) {
 	s := testHelper.CreateEmptyTestState()
 	s.Syncing = false
