@@ -15,12 +15,10 @@ import (
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
 
-	log "github.com/sirupsen/logrus"
 )
 
 // packageLogger is the general logger for all message related logs. You can add additional fields,
 // or create more context loggers off of this
-var packageLogger = log.WithFields(log.Fields{"package": "messages"})
 
 //General acknowledge message
 type Ack struct {
@@ -411,12 +409,6 @@ func (m *Ack) String() string {
 		m.LeaderChainID.Bytes()[3:6],
 		m.GetHash().Bytes()[:3])
 
-}
-
-func (m *Ack) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "ack", "dbheight": m.DBHeight, "vm": m.VMIndex,
-		"vmheight": m.Height, "server": m.LeaderChainID.String(),
-		"hash": m.GetHash().String()}
 }
 
 func (a *Ack) IsSameAs(b *Ack) bool {

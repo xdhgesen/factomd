@@ -14,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
 )
 
 //General acknowledge message
@@ -82,10 +81,6 @@ func (m *AddAuditInternal) ElectionProcess(is interfaces.IState, elect interface
 			e.LogPrintLeaders("election")
 		}
 	}
-}
-
-func (m *AddAuditInternal) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "AddAuditInternal", "dbheight": m.DBHeight, "newleader": m.ServerID.String()[4:12]}
 }
 
 func (m *AddAuditInternal) GetRepeatHash() (rval interfaces.IHash) {

@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 //A placeholder structure for messages
@@ -322,12 +321,3 @@ func (m *RevealEntryMsg) String() string {
 	return str
 }
 
-func (m *RevealEntryMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "revealentry",
-		"vm":         m.VMIndex,
-		"minute":     m.Minute,
-		"leaderid":   m.GetLeaderChainID().String(),
-		"entryhash":  m.Entry.GetHash().String(),
-		"entrychain": m.Entry.GetChainID().String(),
-		"hash":       m.GetHash().String()}
-}

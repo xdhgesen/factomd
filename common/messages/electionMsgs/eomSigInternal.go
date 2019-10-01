@@ -17,7 +17,6 @@ import (
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util/atomic"
-	log "github.com/sirupsen/logrus"
 )
 
 //General acknowledge message
@@ -232,10 +231,6 @@ func (m *EomSigInternal) GetServerID() (rval interfaces.IHash) {
 	}()
 
 	return m.ServerID
-}
-
-func (m *EomSigInternal) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "EomSigInternal", "dbheight": m.DBHeight, "newleader": m.ServerID.String()[4:12]}
 }
 
 func (m *EomSigInternal) GetRepeatHash() (rval interfaces.IHash) {

@@ -9,10 +9,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -30,7 +28,6 @@ import (
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = fmt.Print
@@ -82,24 +79,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	s.FactomdVersion = FactomdVersion
 	s.EFactory = new(electionMsgs.ElectionsFactory)
 
-	log.SetOutput(os.Stdout)
-	switch strings.ToLower(p.Loglvl) {
-	case "none":
-		log.SetOutput(ioutil.Discard)
-	case "debug":
-		log.SetLevel(log.DebugLevel)
-	case "info":
-		log.SetLevel(log.InfoLevel)
-	case "warning", "warn":
-		log.SetLevel(log.WarnLevel)
-	case "error":
-		log.SetLevel(log.ErrorLevel)
-	case "fatal":
-		log.SetLevel(log.FatalLevel)
-	case "panic":
-		log.SetLevel(log.PanicLevel)
-	}
-
 	// Command line override if provided
 	switch p.ControlPanelSetting {
 	case "disabled":
@@ -108,10 +87,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		s.ControlPanelSetting = 1
 	case "readwrite":
 		s.ControlPanelSetting = 2
-	}
-
-	if p.Logjson {
-		log.SetFormatter(&log.JSONFormatter{})
 	}
 
 	// Set the wait for entries flag

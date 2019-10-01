@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 //A placeholder structure for messages
@@ -246,14 +245,6 @@ func (m *Heartbeat) MarshalBinary() (data []byte, err error) {
 
 func (m *Heartbeat) String() string {
 	return fmt.Sprintf("HeartBeat ID[%x] dbht %d-:-%d ts %d", m.IdentityChainID.Bytes()[3:6], m.DBHeight, m.Minute, m.Timestamp.GetTimeSeconds())
-}
-
-func (m *Heartbeat) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "heartbeat",
-		"vm":        m.VMIndex,
-		"dbheight":  m.DBHeight,
-		"server":    m.IdentityChainID.String(),
-		"timestamp": m.Timestamp.GetTimeSeconds()}
 }
 
 func (m *Heartbeat) ChainID() []byte {

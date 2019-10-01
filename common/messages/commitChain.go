@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 //A placeholder structure for messages
@@ -276,12 +275,3 @@ func (m *CommitChainMsg) String() string {
 	return str
 }
 
-func (m *CommitChainMsg) LogFields() log.Fields {
-	if m.LeaderChainID == nil {
-		m.LeaderChainID = primitives.NewZeroHash()
-	}
-	return log.Fields{"category": "message", "messagetype": "commitchain", "vmindex": m.VMIndex,
-		"server":      m.LeaderChainID.String(),
-		"commitchain": m.CommitChain.EntryHash.String(),
-		"hash":        m.GetHash().String()}
-}

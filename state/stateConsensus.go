@@ -24,12 +24,10 @@ import (
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
 
-	log "github.com/sirupsen/logrus"
 )
 
 // consenLogger is the general logger for all consensus related logs. You can add additional fields,
 // or create more context loggers off of this
-var consenLogger = packageLogger.WithFields(log.Fields{"subpack": "consensus"})
 
 var _ = fmt.Print
 var _ = (*hash.Hash32)(nil)
@@ -178,7 +176,6 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 
 	_, ok := s.Replay.Valid(constants.INTERNAL_REPLAY, msg.GetRepeatHash().Fixed(), msg.GetTimestamp(), s.GetTimestamp())
 	if !ok {
-		consenLogger.WithFields(msg.LogFields()).Debug("executeMsg (Replay Invalid)")
 		s.LogMessage("executeMsg", "drop, INTERNAL_REPLAY", msg)
 		return -1, -1
 	}
@@ -1872,7 +1869,6 @@ func (s *State) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, inte
 // this call will do nothing.  Assumes the state for the leader is set properly
 func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 	s.LogPrintf("executeMsg", "SendDBSig(dbht=%d,vm=%d)", dbheight, vmIndex)
-	dbslog := consenLogger.WithFields(log.Fields{"func": "SendDBSig"})
 
 	ht := s.GetHighestSavedBlk()
 	if dbheight <= ht { // if it's in the past, just return.
@@ -1903,7 +1899,6 @@ func (s *State) SendDBSig(dbheight uint32, vmIndex int) {
 				return
 			}
 
-			dbslog.WithFields(dbs.LogFields()).WithFields(log.Fields{"lheight": s.GetLeaderHeight(), "node-name": s.GetFactomNodeName()}).Infof("Generate DBSig")
 			dbs.LeaderExecute(s)
 			vm.Signed = true
 			pl.DBSigAlreadySent = true

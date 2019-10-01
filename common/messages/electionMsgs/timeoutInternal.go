@@ -14,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = state.MakeMap
@@ -243,10 +242,6 @@ func (m *TimeoutInternal) GetServerID() (rval interfaces.IHash) {
 	}()
 
 	return nil
-}
-
-func (m *TimeoutInternal) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "TimeoutInternal", "dbheight": m.DBHeight}
 }
 
 func (m *TimeoutInternal) GetRepeatHash() (rval interfaces.IHash) {

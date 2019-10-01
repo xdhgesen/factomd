@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
-	log "github.com/sirupsen/logrus"
 )
 
 type Bounce struct {
@@ -314,10 +313,6 @@ func (m *Bounce) String() string {
 	avg := sum / divisor
 	str = str + fmt.Sprintf("Last Hop Took %3d.%03d Average Hop: %s%3d.%03d Hash: %x", elapse/1000, elapse%1000, sign, avg/1000, avg%1000, m.GetHash().Bytes()[:4])
 	return str
-}
-
-func (m *Bounce) LogFields() log.Fields {
-	return log.Fields{}
 }
 
 func (a *Bounce) IsSameAs(b *Bounce) bool {

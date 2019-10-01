@@ -14,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 //A placeholder structure for messages
@@ -289,12 +288,6 @@ func (m *FactoidTransaction) String() string {
 	return rval
 }
 
-func (m *FactoidTransaction) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "factoidtx",
-		"vm":      m.VMIndex,
-		"chainid": m.GetLeaderChainID().String(),
-		"hash":    m.GetHash().String()}
-}
 
 func (e *FactoidTransaction) JSONByte() ([]byte, error) {
 	return primitives.EncodeJSON(e)

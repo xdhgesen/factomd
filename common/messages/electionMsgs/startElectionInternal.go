@@ -14,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
 )
 
 //General acknowledge message
@@ -116,10 +115,6 @@ func (m *StartElectionInternal) GetMsgHash() (rval interfaces.IHash) {
 		m.MsgHash = primitives.RandomHash()
 	}
 	return m.MsgHash
-}
-
-func (m *StartElectionInternal) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "StartElectionInternal", "dbheight": m.DBHeight}
 }
 
 func (m *StartElectionInternal) GetRepeatHash() (rval interfaces.IHash) {

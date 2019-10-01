@@ -16,7 +16,7 @@ import (
 	"github.com/FactomProject/factomd/database/leveldb"
 	"github.com/FactomProject/factomd/database/mapdb"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
+	log "github.com/FactomProject/factomd/log"
 )
 
 // DBGenerator is able to create a database given a defined config

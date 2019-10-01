@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/goleveldb/leveldb/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = fmt.Print
@@ -97,10 +96,6 @@ func (m *FedVoteMsg) ComparisonMinute() int {
 
 func (m *FedVoteMsg) GetTimestamp() interfaces.Timestamp {
 	return m.TS.Clone()
-}
-
-func (m *FedVoteMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "FedVoteMsg", "dbheight": m.DBHeight}
 }
 
 func (m *FedVoteMsg) GetRepeatHash() (rval interfaces.IHash) {

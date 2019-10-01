@@ -12,11 +12,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-
-	log "github.com/sirupsen/logrus"
 )
-
-var faultLogger = packageLogger.WithFields(log.Fields{"subpack": "fault"})
 
 type FaultCore struct {
 	// The following 5 fields represent the "Core" of the message

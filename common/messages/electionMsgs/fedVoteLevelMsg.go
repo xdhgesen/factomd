@@ -17,7 +17,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/elections"
@@ -325,10 +324,6 @@ func (m *FedVoteLevelMsg) GetServerID() (rval interfaces.IHash) {
 	}()
 
 	return m.Signer
-}
-
-func (m *FedVoteLevelMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "FedVoteVolunteerMsg", "dbheight": m.DBHeight, "newleader": m.Signer.String()[4:12]}
 }
 
 func (m *FedVoteLevelMsg) GetRepeatHash() (rval interfaces.IHash) {

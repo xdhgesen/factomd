@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/goleveldb/leveldb/errors"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = fmt.Print
@@ -183,10 +182,6 @@ func (m *FedVoteVolunteerMsg) GetServerID() (rval interfaces.IHash) {
 		}
 	}()
 	return m.ServerID
-}
-
-func (m *FedVoteVolunteerMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "FedVoteVolunteerMsg", "dbheight": m.DBHeight, "newleader": m.ServerID.String()[4:12]}
 }
 
 func (m *FedVoteVolunteerMsg) GetRepeatHash() (rval interfaces.IHash) {

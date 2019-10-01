@@ -13,7 +13,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
-	log "github.com/sirupsen/logrus"
 )
 
 //General acknowledge message
@@ -96,10 +95,6 @@ func (m *RemoveLeaderInternal) GetServerID() (rval interfaces.IHash) {
 	}()
 
 	return m.ServerID
-}
-
-func (m *RemoveLeaderInternal) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "RemoveLeaderInternal", "dbheight": m.DBHeight, "newleader": m.ServerID.String()[4:12]}
 }
 
 func (m *RemoveLeaderInternal) GetRepeatHash() (rval interfaces.IHash) {

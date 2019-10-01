@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = fmt.Print
@@ -36,7 +35,6 @@ var _ = fmt.Print
 
 // packageLogger is the general logger for all engine related logs. You can add additional fields,
 // or create more context loggers off of this
-var packageLogger = log.WithFields(log.Fields{"package": "engine"})
 
 func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	fmt.Printf("Go compiler version: %s\n", runtime.Version())

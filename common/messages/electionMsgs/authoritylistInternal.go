@@ -13,7 +13,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
-	log "github.com/sirupsen/logrus"
 )
 
 //General acknowledge message
@@ -59,9 +58,6 @@ func (m *AuthorityListInternal) ElectionProcess(s interfaces.IState, elect inter
 	e.SetElections3()
 }
 
-func (m *AuthorityListInternal) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "AuthorityListInternal", "dbheight": m.DBHeight}
-}
 
 func (m *AuthorityListInternal) GetRepeatHash() (rval interfaces.IHash) {
 	defer func() {

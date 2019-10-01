@@ -37,21 +37,15 @@ import (
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
-	"github.com/FactomProject/factomd/wsapi"
-	"github.com/FactomProject/logrustash"
 
 	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
-	log "github.com/sirupsen/logrus"
 )
 
 // packageLogger is the general logger for all package related logs. You can add additional fields,
 // or create more context loggers off of this
-var packageLogger = log.WithFields(log.Fields{"package": "state"})
-
 var _ = fmt.Print
 
 type State struct {
-	Logger            *log.Entry
 	RunState          runstate.RunState
 	NetworkController *p2p.Controller
 	Salt              interfaces.IHash
@@ -971,14 +965,12 @@ func (s *State) Init() {
 	s.TimestampAtBoot = primitives.NewTimestampNow()
 
 	if s.LogPath == "stdout" {
-		wsapi.InitLogs(s.LogPath, s.LogLevel)
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	} else {
 		er := os.MkdirAll(s.LogPath, 0775)
 		if er != nil {
 			// fmt.Println("Could not create " + s.LogPath + "\n error: " + er.Error())
 		}
-		wsapi.InitLogs(s.LogPath+s.FactomNodeName+".log", s.LogLevel)
 		//s.Logger = log.NewLogFromConfig(s.LogPath, s.LogLevel, "State")
 	}
 
@@ -1196,34 +1188,12 @@ func (s *State) Init() {
 		}
 	}
 
-	s.Logger = log.WithFields(log.Fields{"node-name": s.GetFactomNodeName(), "identity": s.GetIdentityChainID().String()})
-
-	// Set up Logstash Hook for Logrus (if enabled)
-	if s.UseLogstash {
-		err := s.HookLogstash()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
+	//s.Logger = log.WithFields(log.Fields{"node-name": s.GetFactomNodeName(), "identity": s.GetIdentityChainID().String()})
 
 	if globals.Params.WriteProcessedDBStates {
 		path := filepath.Join(s.LdbPath, s.Network, "dbstates")
 		os.MkdirAll(path, 0775)
 	}
-}
-
-func (s *State) HookLogstash() error {
-	hook, err := logrustash.NewAsyncHook("tcp", s.LogstashURL, "factomdLogs")
-	if err != nil {
-		return err
-	}
-
-	hook.ReconnectBaseDelay = time.Second // Wait for one second before first reconnect.
-	hook.ReconnectDelayMultiplier = 2
-	hook.MaxReconnectRetries = 10
-
-	s.Logger.Logger.Hooks.Add(hook)
-	return nil
 }
 
 func (s *State) GetEntryBlockDBHeightComplete() uint32 {
@@ -2184,29 +2154,11 @@ func (s *State) initServerKeys() {
 }
 
 func (s *State) Log(level string, message string) {
-	packageLogger.WithFields(s.Logger.Data).Info(message)
+	//packageLogger.WithFields(s.Logger.Data).Info(message)
 }
 
 func (s *State) Logf(level string, format string, args ...interface{}) {
-	llog := packageLogger.WithFields(s.Logger.Data)
-	switch level {
-	case "emergency":
-		llog.Panicf(format, args...)
-	case "alert":
-		llog.Panicf(format, args...)
-	case "critical":
-		llog.Panicf(format, args...)
-	case "error":
-		llog.Errorf(format, args...)
-	case "llog":
-		llog.Warningf(format, args...)
-	case "info":
-		llog.Infof(format, args...)
-	case "debug":
-		llog.Debugf(format, args...)
-	default:
-		llog.Infof(format, args...)
-	}
+	// FIXME
 }
 
 func (s *State) GetAuditHeartBeats() []interfaces.IMsg {

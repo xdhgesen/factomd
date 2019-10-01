@@ -9,7 +9,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
+	log "github.com/FactomProject/factomd/log"
 )
 
 type Range struct {

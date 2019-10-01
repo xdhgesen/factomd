@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"runtime"
 
-	log "github.com/sirupsen/logrus"
+	log "github.com/FactomProject/factomd/log"
 )
 
 // StartProfiler runs the go pprof tool

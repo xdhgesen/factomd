@@ -4,10 +4,6 @@
 
 package interfaces
 
-import (
-	log "github.com/sirupsen/logrus"
-)
-
 /**************************
  * IRCD  Interface for Redeem Condition Datastructures (RCD)
  *
@@ -118,8 +114,6 @@ type IMsg interface {
 	SetStall(bool)
 	Expire(IState) bool
 
-	// Equivalent to String() for logging
-	LogFields() log.Fields
 }
 
 // Internal Messaging supporting Elections

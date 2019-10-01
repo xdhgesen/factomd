@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 type BounceReply struct {
@@ -253,10 +252,6 @@ func (m *BounceReply) String() string {
 
 	str = str + fmt.Sprintf("Last Hop Took %d.%03d", elapse/1000, elapse%1000)
 	return str
-}
-
-func (m *BounceReply) LogFields() log.Fields {
-	return log.Fields{}
 }
 
 func (a *BounceReply) IsSameAs(b *BounceReply) bool {

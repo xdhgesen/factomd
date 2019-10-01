@@ -15,7 +15,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
+	//log "github.com/FactomProject/factomd/log"
 )
 
 // Communicate a Admin Block Change
@@ -301,10 +301,6 @@ func (m *ChangeServerKeyMsg) String() string {
 
 }
 
-func (m *ChangeServerKeyMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "changeserverkey",
-		"server": m.IdentityChainID.String(), "hash": m.GetHash().String()}
-}
 
 func (m *ChangeServerKeyMsg) IsSameAs(b *ChangeServerKeyMsg) bool {
 	if b == nil {

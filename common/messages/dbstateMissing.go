@@ -15,7 +15,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 // Communicate a Directory Block State
@@ -295,12 +294,6 @@ func (m *DBStateMissing) MarshalBinary() (rval []byte, err error) {
 
 func (m *DBStateMissing) String() string {
 	return fmt.Sprintf("DBStateMissing: %d-%d", m.DBHeightStart, m.DBHeightEnd)
-}
-
-func (m *DBStateMissing) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "dbstatemissing",
-		"dbheightstart": m.DBHeightStart,
-		"dbheightend":   m.DBHeightEnd}
 }
 
 func NewDBStateMissing(state interfaces.IState, dbheightStart uint32, dbheightEnd uint32) interfaces.IMsg {

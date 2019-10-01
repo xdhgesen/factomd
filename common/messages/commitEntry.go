@@ -15,7 +15,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 //A placeholder structure for messages
@@ -229,16 +228,6 @@ func (m *CommitEntryMsg) String() string {
 		m.GetHash().Bytes()[:3],
 		m.StringOfMsgBase())
 	return str
-}
-
-func (m *CommitEntryMsg) LogFields() log.Fields {
-	if m.LeaderChainID == nil {
-		m.LeaderChainID = primitives.NewZeroHash()
-	}
-	return log.Fields{"category": "message", "messagetype": "commitentry", "vmindex": m.VMIndex,
-		"server":      m.LeaderChainID.String(),
-		"commitchain": m.CommitEntry.GetEntryHash().String(),
-		"hash":        m.GetHash().String()}
 }
 
 // Validate the message, given the state.  Three possible results:

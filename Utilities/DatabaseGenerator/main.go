@@ -10,7 +10,7 @@ import (
 	"math/rand"
 
 	"github.com/FactomProject/factomd/Utilities/DatabaseGenerator/blockgen"
-	log "github.com/sirupsen/logrus"
+	log "github.com/FactomProject/factomd/log"
 	"gopkg.in/yaml.v2"
 )
 

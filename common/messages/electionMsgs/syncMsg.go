@@ -14,7 +14,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/state"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ = fmt.Print
@@ -96,10 +95,6 @@ func (m *SyncMsg) GetServerID() (rval interfaces.IHash) {
 	}()
 
 	return m.ServerID
-}
-
-func (m *SyncMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "FedVoteMsg", "dbheight": m.DBHeight, "newleader": m.ServerID.String()[4:12]}
 }
 
 func (m *SyncMsg) GetRepeatHash() (rval interfaces.IHash) {

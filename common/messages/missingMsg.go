@@ -15,7 +15,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 //Structure to request missing messages in a node's process list
@@ -219,15 +218,6 @@ func (m *MissingMsg) String() string {
 		str,
 		m.SystemHeight,
 		m.GetMsgHash().Bytes()[:3], m.GetOrigin(), m.GetNetworkOrigin())
-}
-
-func (m *MissingMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "missingmsg",
-		"vm":        m.VMIndex,
-		"dbheight":  m.DBHeight,
-		"asking":    m.Asking.String(),
-		"sysheight": m.SystemHeight,
-		"hash":      m.GetMsgHash().String()}
 }
 
 func (m *MissingMsg) ChainID() []byte {

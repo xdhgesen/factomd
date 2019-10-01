@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 // Communicate a Directory Block State
@@ -299,11 +298,6 @@ func (m *DataResponse) MarshalBinary() (rval []byte, err error) {
 
 func (m *DataResponse) String() string {
 	return fmt.Sprintf("DataResponse Type: %2d Hash: %x", m.DataType, m.DataHash.Bytes())
-}
-
-func (m *DataResponse) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "dataresponse", "datatype": m.DataType,
-		"datahash": m.DataHash.String()}
 }
 
 func NewDataResponse(state interfaces.IState, dataObject interfaces.BinaryMarshallable,

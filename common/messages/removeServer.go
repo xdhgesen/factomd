@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
 
 // Communicate a Directory Block State
@@ -260,13 +259,6 @@ func (m *RemoveServerMsg) String() string {
 		&m.Timestamp,
 		m.GetMsgHash().Bytes()[:3])
 
-}
-
-func (m *RemoveServerMsg) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "removeserver",
-		"server":     m.ServerChainID.String()[4:10],
-		"servertype": m.ServerType,
-		"hash":       m.GetMsgHash().String()[:6]}
 }
 
 func (m *RemoveServerMsg) IsSameAs(b *RemoveServerMsg) bool {

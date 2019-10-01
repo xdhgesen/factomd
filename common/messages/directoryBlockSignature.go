@@ -16,11 +16,7 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
-	log "github.com/sirupsen/logrus"
 )
-
-// dLogger is for DirectoryBlockSignature Messages and extends packageLogger
-var dLogger = packageLogger.WithFields(log.Fields{"message": "DirectoryBlockSignature"})
 
 type DirectoryBlockSignature struct {
 	msgbase.MessageBase
@@ -156,11 +152,6 @@ func (m *DirectoryBlockSignature) Type() byte {
 //  0   -- Cannot tell if message is Valid
 //  1   -- Message is valid
 func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
-	//vlog makes logging anything in Validate() easier
-	//		The instantiation as a function makes it almost no overhead if you do not use it
-	vlog := func(format string, args ...interface{}) {
-		dLogger.WithFields(log.Fields{"func": "Validate", "msgheight": m.DBHeight, "lheight": state.GetLeaderHeight()})
-	}
 
 	// if we already did all the checks just be valid
 	if m.IsValid() {
@@ -189,7 +180,7 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 
 	data, err := m.DirectoryBlockHeader.MarshalBinary()
 	if err != nil {
-		vlog("Unable to unmarshal Directory block header %s : %s", m.String(), err)
+		// vlog("Unable to unmarshal Directory block header %s : %s", m.String(), err)
 		if m.IsLocal() {
 			state.LogMessage("badEvents", "Invalid Local DBSIG!", m)
 		}
@@ -199,7 +190,7 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 	isVer, err := m.VerifySignature()
 	if err != nil || !isVer {
 		// get the raw binary to log if things are bad
-		vlog("[2] Verify Sig Failed %s -- RAW: %x", m.String(), data)
+		// vlog("[2] Verify Sig Failed %s -- RAW: %x", m.String(), data)
 		// state.Logf("error", "DirectoryBlockSignature: Fail to Verify Sig dbht: %v %s\n  [%s] RAW: %x", state.GetLLeaderHeight(), m.String(), m.GetMsgHash().String(), raw)
 		// if there is an error during signature verification
 		// or if the signature is invalid
@@ -211,7 +202,7 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 	}
 
 	if !m.DBSignature.Verify(data) {
-		vlog("Unable to verify signature %s -- RAW: %x", m.String(), data)
+		// vlog("Unable to verify signature %s -- RAW: %x", m.String(), data)
 		if m.IsLocal() {
 			state.LogMessage("badEvents", "Invalid Local DBSIG!", m)
 		}
@@ -227,14 +218,12 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 	authorityLevel, err := state.FastVerifyAuthoritySignature(marshalledMsg, m.Signature, m.DBHeight)
 	if err != nil || authorityLevel < 1 {
 		//This authority is not a Fed Server (it's either an Audit or not an Authority at all)
-		vlog("Fail to Verify Sig (not from a Fed Server) %s -- RAW: %x", m.String(), data)
+		//vlog("Fail to Verify Sig (not from a Fed Server) %s -- RAW: %x", m.String(), data)
 		//state.Logf("error", "DirectoryBlockSignature: Fail to Verify Sig (not from a Fed Server) dbht: %v %s\n  [%s] RAW: %x", state.GetLLeaderHeight(), m.String(), m.GetMsgHash().String(), raw)
 		// state.AddStatus(fmt.Sprintf("DirectoryBlockSignature: Fail to Verify Sig (not from a Fed Server) dbht: %v %s", state.GetLLeaderHeight(), m.String()))
 		return -1
 	}
 
-	//state.Logf("info", "DirectoryBlockSignature: VALID  dbht: %v %s. MsgHash: %s\n [%s] RAW: %x ", state.GetLLeaderHeight(), m.String(), m.GetMsgHash().String(), m.GetMsgHash().String(), raw)
-	dLogger.WithFields(m.LogFields()).WithField("node-name", state.GetFactomNodeName()).Info("DirectoryBlockSignature Valid")
 	m.SetValid()
 	return 1
 }
@@ -487,15 +476,6 @@ func (m *DirectoryBlockSignature) String() string {
 		m.GetHash().Bytes()[:3],
 		stringCompress(m.DirectoryBlockHeader.String()))
 
-}
-
-func (m *DirectoryBlockSignature) LogFields() log.Fields {
-	return log.Fields{"category": "message", "messagetype": "dbsig",
-		"dbheight":  m.DBHeight,
-		"vm":        m.VMIndex,
-		"server":    m.ServerIdentityChainID.String(),
-		"prevkeymr": m.DirectoryBlockHeader.GetPrevKeyMR().String(),
-		"hash":      m.GetHash().String()}
 }
 
 func (e *DirectoryBlockSignature) JSONByte() ([]byte, error) {
