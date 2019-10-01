@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/constants/runstate"
 	. "github.com/FactomProject/factomd/common/globals"
-	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
@@ -24,22 +23,13 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
 	"github.com/FactomProject/factomd/elections"
+	"github.com/FactomProject/factomd/fnode"
 	"github.com/FactomProject/factomd/p2p"
-	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/wsapi"
 )
 
 var _ = fmt.Print
-
-type FactomNode struct {
-	Index    int
-	State    *state.State
-	Peers    []interfaces.IPeer
-	P2PIndex int
-}
-
-var fnodes []*FactomNode
 
 var networkpattern string
 var mLog = new(MsgLog)
@@ -47,16 +37,14 @@ var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
 var logPort string
 
-func GetFnodes() []*FactomNode {
-	return fnodes
-}
+var GetFnodes = fnode.GetFnodes
 
 func init() {
 	messages.General = new(msgsupport.GeneralFactory)
 	primitives.General = messages.General
 }
 
-func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
+func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 
 	s.PortNumber = 8088
 	s.ControlPanelPort = 8090
@@ -158,7 +146,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	AddInterruptHandler(func() {
 		fmt.Print("<Break>\n")
 		fmt.Print("Gracefully shutting down the server...\n")
-		for _, fnode := range fnodes {
+		for _, fnode := range fnode.GetFnodes() {
 			fnode.State.ShutdownNode(0)
 		}
 		if p.EnableNet {
@@ -283,13 +271,15 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 
 	addFnodeName(0) // bootstrap id doesn't change
 
+	fnodes := fnode.GetFnodes()
+
 	// Modify Identities of new nodes
 	if len(fnodes) > 1 && len(s.Prefix) == 0 {
 		modifyLoadIdentities() // We clone s to make all of our servers
 	}
 
 	// Setup the Skeleton Identity & Registration
-	for i := range fnodes {
+	for i := range fnode.GetFnodes() {
 		fnodes[i].State.IntiateNetworkSkeletonIdentity()
 		fnodes[i].State.InitiateNetworkIdentityRegistration()
 	}
@@ -523,7 +513,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	// Start prometheus on port
 	launchPrometheus(9876)
 	// Start Package's prometheus
-	state.RegisterPrometheus()
+	fnode.RegisterPrometheus()
 	p2p.RegisterPrometheus()
 	leveldb.RegisterPrometheus()
 	RegisterPrometheus()
@@ -539,7 +529,7 @@ func printGraphData(filename string, period int) {
 	downscale := int64(1)
 	messages.LogPrintf(filename, "\t%9s\t%9s\t%9s\t%9s\t%9s\t%9s", "Dbh-:-min", "Node", "ProcessCnt", "ListPCnt", "UpdateState", "SleepCnt")
 	for {
-		for _, f := range fnodes {
+		for _, f := range fnode.GetFnodes() {
 			s := f.State
 			messages.LogPrintf(filename, "\t%9s\t%9s\t%9d\t%9d\t%9d\t%9d", fmt.Sprintf("%d-:-%d", s.LLeaderHeight, s.CurrentMinute), s.FactomNodeName, s.StateProcessCnt/downscale, s.ProcessListProcessCnt/downscale, s.StateUpdateState/downscale, s.ValidatorLoopSleepCnt/downscale)
 		}
@@ -551,52 +541,52 @@ func printGraphData(filename string, period int) {
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
 //**********************************************************************
-func makeServer(s *state.State) *FactomNode {
+func makeServer(s *fnode.State) *fnode.FactomNode {
 	// All other states are clones of the first state.  Which this routine
 	// gets passed to it.
 	newState := s
 
-	if len(fnodes) > 0 {
-		newState = s.Clone(len(fnodes)).(*state.State)
+	if len(fnode.GetFnodes()) > 0 {
+		newState = s.Clone(len(fnode.GetFnodes())).(*fnode.State)
 		newState.EFactory = new(electionMsgs.ElectionsFactory) // not an elegant place but before we let the messages hit the state
 		time.Sleep(10 * time.Millisecond)
 		newState.Init()
 		newState.EFactory = new(electionMsgs.ElectionsFactory)
 	}
 
-	fnode := new(FactomNode)
-	fnode.State = newState
-	fnodes = append(fnodes, fnode)
+	f:= new(fnode.FactomNode)
+	f.State = newState
+	fnode.AddFnode(f)
 
-	return fnode
+	return f
 }
 
 func startServers(load bool) {
-	for i, fnode := range fnodes {
+	for i, fnode := range fnode.GetFnodes() {
 		startServer(i, fnode, load)
 	}
 }
 
-func startServer(i int, fnode *FactomNode, load bool) {
-	fnode.State.RunState = runstate.Booting
+func startServer(i int, f *fnode.FactomNode, load bool) {
+	f.State.RunState = runstate.Booting
 	if i > 0 {
-		fnode.State.Init()
+		f.State.Init()
 	}
-	NetworkProcessorNet(fnode)
+	NetworkProcessorNet(f)
 	if load {
-		go state.LoadDatabase(fnode.State)
+		go fnode.LoadDatabase(f.State)
 	}
-	go fnode.State.GoSyncEntries()
-	go Timer(fnode.State)
-	go elections.Run(fnode.State)
-	go fnode.State.ValidatorLoop()
+	go f.State.GoSyncEntries()
+	go Timer(f.State)
+	go elections.Run(f.State)
+	go f.State.ValidatorLoop()
 
 	// moved StartMMR here to ensure Init goroutine only called once and not twice (removed from state.go)
-	go fnode.State.StartMMR()
-	go fnode.State.MissingMessageResponseHandler.Run()
+	go f.State.StartMMR()
+	go f.State.MissingMessageResponseHandler.Run()
 }
 
-func setupFirstAuthority(s *state.State) {
+func setupFirstAuthority(s *fnode.State) {
 	if len(s.IdentityControl.Authorities) > 0 {
 		//Don't initialize first authority if we are loading during fast boot
 		//And there are already authorities present

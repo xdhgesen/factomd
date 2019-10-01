@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/FactomProject/factomd/fnode"
 	"log"
 	"strconv"
 	"strings"
@@ -746,6 +747,8 @@ func modifyLoadIdentities() {
 		fmt.Println("Error when loading up identities for fnodes")
 	}
 
+	fnodes := fnode.GetFnodes()
+
 	for i := 1; i < len(fnodes); i++ {
 		if i-1 >= len(list) {
 			break
@@ -787,6 +790,7 @@ func modifyLoadIdentities() {
 
 func addFnodeName(i int) {
 	// full name
+	fnodes := fnode.GetFnodes()
 	name := fnodes[i].State.FactomNodeName
 	globals.FnodeNames[fnodes[i].State.IdentityChainID.String()] = name
 	// common short set

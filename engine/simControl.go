@@ -7,6 +7,7 @@ package engine
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/FactomProject/factomd/fnode"
 	"io"
 	"math/rand"
 	"os"
@@ -80,7 +81,8 @@ func GetLine(listenToStdin bool) string {
 	return line
 }
 
-func GetFocus() *FactomNode {
+func GetFocus() *fnode.FactomNode {
+	fnodes := fnode.GetFnodes()
 	if len(fnodes) > ListenTo && ListenTo >= 0 {
 		return fnodes[ListenTo]
 	}
@@ -103,7 +105,7 @@ func SimControl(listenTo int, listenStdin bool) {
 	ListenTo = listenTo
 
 	if loadGenerator == nil {
-		loadGenerator = NewLoadGenerator(fnodes[0].State)
+		loadGenerator = NewLoadGenerator(fnode.GetFnodes()[0].State)
 		go loadGenerator.KeepUsFunded()
 	}
 
@@ -130,6 +132,7 @@ func SimControl(listenTo int, listenStdin bool) {
 		//fmt.Printf("Parsing command, found %d elements.  The first element is: %+v / %s \n Full command: %+v\n", len(cmd), b[0], string(b), cmd)
 
 		v, err := strconv.Atoi(string(b))
+		fnodes := fnode.GetFnodes()
 		if err == nil && v >= 0 && v < len(fnodes) && fnodes[ListenTo].State != nil {
 			ListenTo = v
 			os.Stderr.WriteString(fmt.Sprintf("Switching to Node %d\n", ListenTo))
@@ -1498,22 +1501,25 @@ func returnStatString(i uint8) string {
 //
 func rotateWSAPI(rotate *int, value int, wsapiNode *int) {
 	for *rotate == value { // Only if true
+	fnodes := fnode.GetFnodes()
 		*wsapiNode = rand.Int() % len(fnodes)
-		fnode := fnodes[*wsapiNode]
-		simulation.SetState(fnode.State)
+		f:= fnodes[*wsapiNode]
+		simulation.SetState(f.State)
 		time.Sleep(3 * time.Second)
 	}
 }
 
 func printProcessList(watchPL *int, value int, listenTo *int) {
 	out := ""
+	fnodes := fnode.GetFnodes()
+
 	for *watchPL == value {
-		fnode := fnodes[*listenTo]
-		nprt := fnode.State.DBStates.String()
-		b := fnode.State.GetHighestSavedBlk()
-		fnode.State.ProcessLists.SetString = true
-		nprt = nprt + fnode.State.ProcessLists.Str
-		pl := fnode.State.ProcessLists.Get(b)
+		f := fnodes[*listenTo]
+		nprt := f.State.DBStates.String()
+		b := f.State.GetHighestSavedBlk()
+		f.State.ProcessLists.SetString = true
+		nprt = nprt + f.State.ProcessLists.Str
+		pl := f.State.ProcessLists.Get(b)
 		if pl != nil {
 			nprt = nprt + pl.PrintMap()
 			if out != nprt {

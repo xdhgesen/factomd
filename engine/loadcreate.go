@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/FactomProject/factomd/fnode"
 	"github.com/FactomProject/factomd/simulation"
 	"math/rand"
 	"time"
@@ -81,7 +82,7 @@ func (lg *LoadGenerator) Run() {
 				c = lg.NewCommitEntry(e)
 			}
 			r := lg.NewRevealEntry(e)
-			s := fnodes[wsapiNode].State
+			s := fnode.GetFnodes()[wsapiNode].State
 			s.APIQueue().Enqueue(c)
 			s.APIQueue().Enqueue(r)
 			time.Sleep(time.Duration(800/top) * time.Millisecond) // spread the load out over 800ms + overhead
@@ -129,7 +130,7 @@ var limitBuys = true // We limit buys only after one attempted purchase, so peop
 
 func (lg *LoadGenerator) KeepUsFunded() {
 
-	s := fnodes[wsapiNode].State
+	s := fnode.GetFnodes()[wsapiNode].State
 
 	var level int64
 

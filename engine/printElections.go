@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/fnode"
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -10,7 +11,7 @@ import (
 )
 
 func lookup(id interfaces.IHash) *state.State {
-	for _, fn := range fnodes {
+	for _, fn := range fnode.GetFnodes() {
 		if fn.State.IdentityChainID.Fixed() == id.Fixed() {
 			return fn.State
 		}
@@ -21,14 +22,14 @@ func lookup(id interfaces.IHash) *state.State {
 func printSimElections(elects *int, value int, listenTo *int, wsapiNode *int) {
 	out := ""
 
-	if *listenTo < 0 || *listenTo >= len(fnodes) {
+	if *listenTo < 0 || *listenTo >= len(fnode.GetFnodes()) {
 		return
 	}
 
 	for *elects == value {
 		prt := "===SimElectionsStart===\n\n"
 		prt += "-------------------------\n"
-		if len(fnodes) == 0 {
+		if len(fnode.GetFnodes()) == 0 {
 			return
 		}
 
@@ -36,7 +37,7 @@ func printSimElections(elects *int, value int, listenTo *int, wsapiNode *int) {
 		//eo := s.Elections.(*elections.Elections)
 
 		prt = prt + "\n"
-		for _, fn := range fnodes {
+		for _, fn := range fnode.GetFnodes() {
 			s := fn.State
 			e := s.Elections.(*elections.Elections)
 			if e.Adapter != nil {
@@ -64,6 +65,8 @@ func printSimElections(elects *int, value int, listenTo *int, wsapiNode *int) {
 
 func printElections(elects *int, value int, listenTo *int, wsapiNode *int) {
 	out := ""
+
+	fnodes := fnode.GetFnodes()
 
 	if *listenTo < 0 || *listenTo >= len(fnodes) {
 		return
