@@ -5,11 +5,9 @@
 package state
 
 import (
-	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -177,8 +175,6 @@ type State struct {
 	prioritizedMsgQueue chan interfaces.IMsg
 
 	ShutdownChan chan int // For gracefully halting Factom
-	JournalFile  string
-	Journaling   bool
 
 	ServerPrivKey         *primitives.PrivateKey
 	ServerPubKey          *primitives.PublicKey
@@ -335,10 +331,6 @@ type State struct {
 	// Web Services
 	Port int
 
-	// For Replay / journal
-	IsReplaying     bool
-	ReplayTimestamp interfaces.Timestamp
-
 	// State for the Entry Syncing process
 	EntrySyncState *EntrySync
 
@@ -390,9 +382,9 @@ type State struct {
 	UseLogstash bool
 	LogstashURL string
 
-	FastBoot                bool
-	FastBootLocation        string
-	FastSaveRate            int
+	FastBoot         bool
+	FastBootLocation string
+	FastSaveRate     int
 
 	// These stats are collected when we write the dbstate to the database.
 	NumNewChains   int // Number of new Chains in this block
@@ -482,8 +474,6 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.RunState = runstate.New // reset runstate since this clone will be started by sim node
 	newState.DropRate = s.DropRate
 	newState.LdbPath = s.LdbPath + "/Sim" + number
-	newState.JournalFile = s.LogPath + "/journal" + number + ".log"
-	newState.Journaling = s.Journaling
 	newState.BoltDBPath = s.BoltDBPath + "/Sim" + number
 	newState.LogLevel = s.LogLevel
 	newState.ConsoleLogLevel = s.ConsoleLogLevel
@@ -921,7 +911,6 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		s.LogPrintf("AckChange", "Default IdentityChainID %v", s.IdentityChainID.String())
 
 	}
-	s.JournalFile = s.LogPath + "/journal0" + ".log"
 
 	s.updateNetworkControllerConfig()
 }
@@ -979,9 +968,9 @@ func (s *State) Init() {
 
 	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
 
-	s.ShutdownChan = make(chan int, 1)                //Channel to gracefully shut down.
-	s.tickerQueue = make(chan int, 100)               //ticks from a clock
-	s.timerMsgQueue = make(chan interfaces.IMsg, 100) //incoming eom notifications, used by leaders
+	s.ShutdownChan = make(chan int, 1)                                      //Channel to gracefully shut down.
+	s.tickerQueue = make(chan int, 100)                                     //ticks from a clock
+	s.timerMsgQueue = make(chan interfaces.IMsg, 100)                       //incoming eom notifications, used by leaders
 	s.networkInvalidMsgQueue = make(chan interfaces.IMsg, 100)              //incoming message queue from the network messages
 	s.networkOutMsgQueue = NewNetOutMsgQueue(constants.INMSGQUEUE_MED)      //Messages to be broadcast to the network
 	s.inMsgQueue = NewInMsgQueue(constants.INMSGQUEUE_HIGH)                 //incoming message queue for Factom application messages
@@ -996,14 +985,6 @@ func (s *State) Init() {
 	s.WriteEntry = make(chan interfaces.IEBEntry, constants.INMSGQUEUE_LOW) //Entries to be written to the database
 	s.RecentMessage.NewMsgs = make(chan interfaces.IMsg, 100)
 
-	if s.Journaling {
-		f, err := os.Create(s.JournalFile)
-		if err != nil {
-			fmt.Println("Could not create the journal file:", s.JournalFile)
-			s.JournalFile = ""
-		}
-		f.Close()
-	}
 	// Set up struct to stop replay attacks
 	s.Replay = new(Replay)
 	s.Replay.s = s
@@ -1874,59 +1855,6 @@ func (s *State) DatabaseContains(hash interfaces.IHash) bool {
 	return false
 }
 
-// JournalMessage writes the message to the message journal for debugging
-func (s *State) JournalMessage(msg interfaces.IMsg) {
-	type journalentry struct {
-		Type    byte
-		Message interfaces.IMsg
-	}
-
-	if s.Journaling && len(s.JournalFile) != 0 {
-		f, err := os.OpenFile(s.JournalFile, os.O_APPEND+os.O_WRONLY, 0666)
-		if err != nil {
-			s.JournalFile = ""
-			return
-		}
-		defer f.Close()
-
-		e := new(journalentry)
-		e.Type = msg.Type()
-		e.Message = msg
-
-		p, err := json.Marshal(e)
-		if err != nil {
-			return
-		}
-		fmt.Fprintln(f, string(p))
-	}
-}
-
-// GetJournalMessages gets all messages from the message journal
-func (s *State) GetJournalMessages() [][]byte {
-	ret := make([][]byte, 0)
-	if !s.Journaling || len(s.JournalFile) == 0 {
-		return nil
-	}
-
-	f, err := os.Open(s.JournalFile)
-	if err != nil {
-		s.JournalFile = ""
-		return nil
-	}
-	defer f.Close()
-
-	r := bufio.NewReader(f)
-	for {
-		p, err := r.ReadBytes('\n')
-		if err != nil {
-			break
-		}
-		ret = append(ret, p)
-	}
-
-	return ret
-}
-
 func (s *State) GetLeaderVM() int {
 	return s.LeaderVMIndex
 }
@@ -2165,21 +2093,8 @@ func (s *State) GetAuditHeartBeats() []interfaces.IMsg {
 	return s.AuditHeartBeats
 }
 
-func (s *State) SetIsReplaying() {
-	s.IsReplaying = true
-}
-
-func (s *State) SetIsDoneReplaying() {
-	s.IsReplaying = false
-	s.ReplayTimestamp = nil
-}
-
 // Returns a millisecond timestamp
 func (s *State) GetTimestamp() interfaces.Timestamp {
-	if s.IsReplaying == true {
-		fmt.Println("^^^^^^^^ IsReplying is true")
-		return s.ReplayTimestamp
-	}
 	return primitives.NewTimestampNow()
 }
 
@@ -3043,4 +2958,3 @@ func (s *State) GetDBFinished() bool {
 func (s *State) GetRunLeader() bool {
 	return s.RunLeader
 }
-

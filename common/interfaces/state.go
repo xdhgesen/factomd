@@ -118,10 +118,6 @@ type IState interface {
 	NetworkOutMsgQueue() IQueue
 	NetworkInvalidMsgQueue() chan IMsg
 
-	// Journaling
-	JournalMessage(IMsg)
-	GetJournalMessages() [][]byte
-
 	// Consensus
 	APIQueue() IQueue    // Input Queue from the API
 	InMsgQueue() IQueue  // Read by Validate
@@ -255,8 +251,6 @@ type IState interface {
 	ValidatorLoop()
 
 	UpdateECs(IEntryCreditBlock)
-	SetIsReplaying()
-	SetIsDoneReplaying()
 
 	CrossReplayAddSalt(height uint32, salt [8]byte) error
 

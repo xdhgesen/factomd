@@ -248,9 +248,6 @@ func HandleMessages(state interfaces.IState, params interface{}) (interface{}, *
 		Messages []json.RawMessage
 	}
 	r := new(ret)
-	for _, v := range state.GetJournalMessages() {
-		r.Messages = append(r.Messages, v)
-	}
 	return r, nil
 }
 

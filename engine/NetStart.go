@@ -75,7 +75,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	s.OneLeader = p.Rotate
 	s.TimeOffset = primitives.NewTimestampFromMilliseconds(uint64(p.TimeOffset))
 	s.StartDelayLimit = p.StartDelay * 1000
-	s.Journaling = p.Journaling
 	s.FactomdVersion = FactomdVersion
 	s.EFactory = new(electionMsgs.ElectionsFactory)
 
@@ -110,20 +109,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	}
 
 	s.FaultTimeout = 9999999 //todo: Old Fault Mechanism -- remove
-
-	if p.Follower {
-		p.Leader = false
-	}
-	if p.Leader {
-		p.Follower = false
-	}
-	if !p.Follower && !p.Leader {
-		panic("Not a leader or a follower")
-	}
-
-	if p.Journal != "" {
-		p.Cnt = 1
-	}
 
 	if p.RpcUser != "" {
 		s.RpcUser = p.RpcUser
@@ -185,12 +170,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		os.Exit(0)
 	})
 
-	if p.Journal != "" {
-		if s.DBType != "Map" {
-			fmt.Println("Journal is ALWAYS a Map database")
-			s.DBType = "Map"
-		}
-	}
 	if p.Follower {
 		s.NodeMode = "FULL"
 		leadID := primitives.Sha([]byte(s.Prefix + "FNode0"))
@@ -262,7 +241,6 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "FastSaveRate", p.FastSaveRate))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "net spec", pnet))
 	os.Stderr.WriteString(fmt.Sprintf("%20s %d\n", "Msgs droped", p.DropRate))
-	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "journal", p.Journal))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "database", p.Db))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "database for clones", p.CloneDB))
 	os.Stderr.WriteString(fmt.Sprintf("%20s \"%s\"\n", "peers", p.Peers))
@@ -513,12 +491,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		fmt.Printf("Paste the network info above into http://arborjs.org/halfviz to visualize the network\n")
 	}
 
-	if p.Journal != "" {
-		go LoadJournal(s, p.Journal)
-		startServers(false)
-	} else {
-		startServers(true)
-	}
+	startServers(true)
 
 	// Anchoring related configurations
 	config := s.Cfg.(*util.FactomdConfig)
