@@ -93,8 +93,6 @@ type State struct {
 	ControlPanelPort    int
 	ControlPanelSetting int
 	// Keeping the last display state lets us know when to send over the new blocks
-	LastDisplayState        *DisplayState
-	ControlPanelChannel     chan DisplayState
 	ControlPanelDataRequest bool // If true, update Display state
 
 	// Network Configuration
@@ -998,7 +996,6 @@ func (s *State) Init() {
 	s.ShutdownChan = make(chan int, 1)                //Channel to gracefully shut down.
 	s.tickerQueue = make(chan int, 100)               //ticks from a clock
 	s.timerMsgQueue = make(chan interfaces.IMsg, 100) //incoming eom notifications, used by leaders
-	s.ControlPanelChannel = make(chan DisplayState, 20)
 	s.networkInvalidMsgQueue = make(chan interfaces.IMsg, 100)              //incoming message queue from the network messages
 	s.networkOutMsgQueue = NewNetOutMsgQueue(constants.INMSGQUEUE_MED)      //Messages to be broadcast to the network
 	s.inMsgQueue = NewInMsgQueue(constants.INMSGQUEUE_HIGH)                 //incoming message queue for Factom application messages
@@ -2007,9 +2004,6 @@ func (s *State) UpdateState() (progress bool) {
 	}
 
 	s.SetString()
-	if s.ControlPanelDataRequest {
-		s.CopyStateToControlPanel()
-	}
 
 	// Update our TPS every ~ 3 seconds at the earliest
 	if s.lasttime.Before(time.Now().Add(-3 * time.Second)) {
