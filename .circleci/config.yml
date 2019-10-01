@@ -2,10 +2,12 @@ version: 2
 
 jobs:
 
-  build:
+  test:
     working_directory: /go/src/github.com/FactomProject/factomd
     docker:
       - image: circleci/golang:1.12
+        environment:
+          GO111MODULE: "on"
 
     steps:
       - checkout
@@ -17,79 +19,24 @@ jobs:
       - run:
           name: Build and install the executable
           command: |
-              cd /go/src/github.com/FactomProject/factomd/
               ./build.sh
-
-      - persist_to_workspace:
-          root: /tmp
-          paths: go
-
-  test:
-    working_directory: /tmp
-    docker:
-      - image: circleci/golang:1.12
-
-    parallelism: 8
-
-    steps:
-      - attach_workspace:
-          at: /tmp
-
       - run:
           name: Run Tests!
           no_output_timeout: 2400
           command: |
-            export PATH="/tmp/go/bin:$PATH"
-            export GOPATH=/tmp/go
-            cd /tmp/go/src/github.com/FactomProject/factomd/
-            ./test.sh short
-
-  gofmt:
-    working_directory: /tmp
-    docker:
-      - image: circleci/golang:1.12
-
-    steps:
-      - attach_workspace:
-          at: /tmp
-
+              ./test.sh short
       - run:
           name: Gofmt test
           no_output_timeout: 60
           command: |
-            export PATH="/tmp/go/bin:$PATH"
-            export GOPATH=/tmp/go
-            cd /tmp/go/src/github.com/FactomProject/factomd/
-            ./test.sh gofmt
+              ./test.sh gofmt
 
-
-
-# The flow is
-#    build
-#      |
-#      ---------- test
-#                   |
-#                   ---------- gofmt
-#
-#
 
 workflows:
   version: 2
   commit-workflow:
     jobs:
-      - build:
-          filters:
-            tags:
-              only: /.*/
       - test:
           filters:
             tags:
               only: /.*/
-          requires:
-            - build
-      - gofmt:
-          filters:
-            tags:
-              only: /.*/
-          requires:
-            - test
