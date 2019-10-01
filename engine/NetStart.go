@@ -142,8 +142,7 @@ func NetStart(s *fnode.State, p *FactomParams, listenToStdin bool) {
 	fmt.Println(">>>>>>>>>>>>>>>> Listening to Node", p.ListenTo)
 	fmt.Println(">>>>>>>>>>>>>>>>")
 
-	// FIXME: this should be part of engine
-	simulation.AddInterruptHandler(func() {
+	fnode.AddInterruptHandler(func() {
 		fmt.Print("<Break>\n")
 		fmt.Print("Gracefully shutting down the server...\n")
 		for _, fnode := range fnode.GetFnodes() {

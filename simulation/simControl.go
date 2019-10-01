@@ -14,7 +14,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 	"unicode"
 
@@ -1055,7 +1054,7 @@ func SimControl(listenTo int, listenStdin bool) {
 				}
 			case 'C' == b[0]:
 				fmt.Println("Cleaning up")
-				interruptChannel <- syscall.SIGINT
+				fnode.SigInt()
 			case 'Q' == b[0]:
 				fmt.Println("Quiting forcefully")
 				os.Exit(0)

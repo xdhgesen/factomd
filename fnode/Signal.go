@@ -6,13 +6,19 @@
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
-package simulation
+package fnode
 
 import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
 )
+
+// send SIGINT
+func SigInt() {
+	interruptChannel <- syscall.SIGINT
+}
 
 // interruptChannel is used to receive SIGINT (Ctrl+C) signals.
 var interruptChannel chan os.Signal
