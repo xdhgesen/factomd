@@ -1,4 +1,4 @@
-package engine
+package simulation
 
 import (
 	"bytes"
@@ -20,7 +20,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/fnode"
-	"github.com/FactomProject/factomd/simulation"
 	"github.com/FactomProject/serveridentity/identity"
 )
 
@@ -73,7 +72,7 @@ func copyOver(st *fnode.State) {
 	var err error
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
-	simulation.FundWallet(st, 10)
+	FundWallet(st, 10)
 	chain, _ := primitives.HexToHash("1d1d1d1d07714fea910f9c6e42e5dc072c86491a3d80418855a2499e85b0039f")
 	ents, _ := st.DB.FetchAllEntriesByChainID(chain)
 	for i, e := range ents {
@@ -82,19 +81,19 @@ func copyOver(st *fnode.State) {
 		eNew.ChainID = e.GetChainID().String()
 		eNew.Content = e.GetContent()
 
-		paramsRev := new(simulation.EntryRequest)
-		paramsCom := new(simulation.EntryRequest)
+		paramsRev := new(EntryRequest)
+		paramsCom := new(EntryRequest)
 		com, rev := getMessageStringEntry(eNew, ec)
 		paramsCom.Entry = com
 		paramsRev.Entry = rev
 		jCommit := primitives.NewJSON2Request("commit-entry", i, paramsCom)
 		jRev := primitives.NewJSON2Request("reveal-entry", i, paramsRev)
 
-		_, err = simulation.V2Request(jCommit, st.GetPort())
+		_, err = V2Request(jCommit, st.GetPort())
 		if err != nil {
 			log.Println("Error in making identities: " + err.Error())
 		}
-		_, err = simulation.V2Request(jRev, st.GetPort())
+		_, err = V2Request(jRev, st.GetPort())
 
 		if err != nil {
 			log.Println("Error in making identities: " + err.Error())
@@ -127,19 +126,19 @@ func buildMainChain(port int) {
 	c := factom.NewChain(e)
 
 	com, rev := getMessageStringChain(c, ec)
-	paramsRev := new(simulation.EntryRequest)
-	paramsCom := new(simulation.MessageRequest)
+	paramsRev := new(EntryRequest)
+	paramsCom := new(MessageRequest)
 
 	paramsCom.Message = com
 	paramsRev.Entry = rev
 	jCommit := primitives.NewJSON2Request("commit-chain", 0, paramsCom)
 	jRev := primitives.NewJSON2Request("reveal-chain", 0, paramsRev)
 
-	_, err := simulation.V2Request(jCommit, port)
+	_, err := V2Request(jCommit, port)
 	if err != nil {
 		log.Println("Error in making identities: " + err.Error())
 	}
-	_, err = simulation.V2Request(jRev, port)
+	_, err = V2Request(jRev, port)
 	if err != nil {
 		log.Println("Error in making identities: " + err.Error())
 	}
@@ -188,8 +187,8 @@ func authorityToBlockchain(total int, st *fnode.State) ([]hardCodedAuthority, in
 			if err != nil {
 				continue
 			}
-			paramsRev := new(simulation.EntryRequest)
-			paramsCom := new(simulation.MessageRequest)
+			paramsRev := new(EntryRequest)
+			paramsCom := new(MessageRequest)
 
 			chain := factom.NewChain(entry)
 			com, rev := getMessageStringChain(chain, ec)
@@ -198,12 +197,12 @@ func authorityToBlockchain(total int, st *fnode.State) ([]hardCodedAuthority, in
 			jCommit := primitives.NewJSON2Request("commit-chain", i, paramsCom)
 			jRev := primitives.NewJSON2Request("reveal-chain", i, paramsRev)
 
-			_, err = simulation.V2Request(jCommit, st.GetPort())
+			_, err = V2Request(jCommit, st.GetPort())
 
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
-			_, err = simulation.V2Request(jRev, st.GetPort())
+			_, err = V2Request(jRev, st.GetPort())
 
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
@@ -216,8 +215,8 @@ func authorityToBlockchain(total int, st *fnode.State) ([]hardCodedAuthority, in
 			if err != nil {
 				continue
 			}
-			paramsRev := new(simulation.EntryRequest)
-			paramsCom := new(simulation.MessageRequest)
+			paramsRev := new(EntryRequest)
+			paramsCom := new(MessageRequest)
 
 			com, rev := getMessageStringEntry(entry, ec)
 			paramsCom.Message = com
@@ -225,11 +224,11 @@ func authorityToBlockchain(total int, st *fnode.State) ([]hardCodedAuthority, in
 			jCommit := primitives.NewJSON2Request("commit-entry", i, paramsCom)
 			jRev := primitives.NewJSON2Request("reveal-entry", i, paramsRev)
 
-			_, err = simulation.V2Request(jCommit, st.GetPort())
+			_, err = V2Request(jCommit, st.GetPort())
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
-			_, err = simulation.V2Request(jRev, st.GetPort())
+			_, err = V2Request(jRev, st.GetPort())
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
@@ -237,59 +236,59 @@ func authorityToBlockchain(total int, st *fnode.State) ([]hardCodedAuthority, in
 
 		com, rev, key, _ := makeBlockKey(ele, ec, false)
 		ele.NewBlockKey = key
-		mC := new(simulation.MessageRequest)
+		mC := new(MessageRequest)
 		mC.Message = com
 		j := primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
-		mR := new(simulation.EntryRequest)
+		mR := new(EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
 		com, rev, _ = makeMHash(ele, ec)
-		mC = new(simulation.MessageRequest)
+		mC = new(MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
-		mR = new(simulation.EntryRequest)
+		mR = new(EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
 		com, rev, _ = makeBTCKey(ele, ec)
-		mC = new(simulation.MessageRequest)
+		mC = new(MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
-		mR = new(simulation.EntryRequest)
+		mR = new(EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
 		com, rev, _ = makeServerCoinbaseAddress(ele, ec, primitives.RandomHash())
-		mC = new(simulation.MessageRequest)
+		mC = new(MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
-		mR = new(simulation.EntryRequest)
+		mR = new(EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
 		com, rev, _ = makeServerEfficiency(ele, ec, 1000)
-		mC = new(simulation.MessageRequest)
+		mC = new(MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
-		mR = new(simulation.EntryRequest)
+		mR = new(EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = simulation.V2Request(j, st.GetPort())
+		_, _ = V2Request(j, st.GetPort())
 
 		madeAuths = append(madeAuths, ele)
 		authKeyLibrary = append(authKeyLibrary, ele)
@@ -467,20 +466,20 @@ func changeSigningKey(auth interfaces.IHash, st *fnode.State) (*primitives.Priva
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, newKey, _ := makeBlockKey(ele, ec, true)
 			ele.NewBlockKey = newKey
-			m := new(simulation.MessageRequest)
+			m := new(MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := simulation.V2Request(j, st.GetPort())
+			_, err := V2Request(j, st.GetPort())
 
 			if err != nil {
 				return nil, err
 			}
-			mr := new(simulation.EntryRequest)
+			mr := new(EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
 
-			_, err = simulation.V2Request(j, st.GetPort())
+			_, err = V2Request(j, st.GetPort())
 			if err != nil {
 				return nil, err
 			}
@@ -500,18 +499,18 @@ func changeServerEfficiency(auth interfaces.IHash, st *fnode.State, eff uint16) 
 	for _, ele := range authKeyLibrary {
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, _ := makeServerEfficiency(ele, ec, eff)
-			m := new(simulation.MessageRequest)
+			m := new(MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := simulation.V2Request(j, st.GetPort())
+			_, err := V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
-			mr := new(simulation.EntryRequest)
+			mr := new(EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			_, err = simulation.V2Request(j, st.GetPort())
+			_, err = V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
@@ -536,19 +535,19 @@ func changeServerCoinbaseAddress(auth interfaces.IHash, st *fnode.State, add str
 	for _, ele := range authKeyLibrary {
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, _ := makeServerCoinbaseAddress(ele, ec, faddHash)
-			m := new(simulation.MessageRequest)
+			m := new(MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := simulation.V2Request(j, st.GetPort())
+			_, err := V2Request(j, st.GetPort())
 
 			if err != nil {
 				return err
 			}
-			mr := new(simulation.EntryRequest)
+			mr := new(EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			_, err = simulation.V2Request(j, st.GetPort())
+			_, err = V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
@@ -568,18 +567,18 @@ func cancelCoinbase(auth interfaces.IHash, st *fnode.State, h, i uint32) error {
 	for _, ele := range authKeyLibrary {
 		if auth.IsSameAs(ele.ChainID) {
 			com, rev, _ := makeCancelCoinbase(ele, ec, h, i)
-			m := new(simulation.MessageRequest)
+			m := new(MessageRequest)
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := simulation.V2Request(j, st.GetPort())
+			_, err := V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
-			mr := new(simulation.EntryRequest)
+			mr := new(EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			_, err = simulation.V2Request(j, st.GetPort())
+			_, err = V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}

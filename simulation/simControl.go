@@ -2,7 +2,7 @@
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
-package engine
+package simulation
 
 import (
 	"encoding/hex"
@@ -26,7 +26,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	elections2 "github.com/FactomProject/factomd/elections"
-	"github.com/FactomProject/factomd/simulation"
 )
 
 var _ = fmt.Print
@@ -177,7 +176,7 @@ func SimControl(listenTo int, listenStdin bool) {
 					break
 				}
 				wsapiNode = ListenTo
-				simulation.SetState(fnodes[wsapiNode].State)
+				SetState(fnodes[wsapiNode].State)
 
 				if nextAuthority == -1 {
 					//err, _ := FundWallet(fnodes[wsapiNode].State, 2e7)
@@ -209,7 +208,7 @@ func SimControl(listenTo int, listenStdin bool) {
 						// Perfectly fund the g command
 						idcost := 13 + 15 + 1 // Cost for 1 ID : Root + Management + Register
 						need := (idcost * count) + initchainCost
-						simulation.FundWalletTOFF(fnodes[wsapiNode].State, 0, uint64(need)*fnodes[wsapiNode].State.GetFactoshisPerEC())
+						FundWalletTOFF(fnodes[wsapiNode].State, 0, uint64(need)*fnodes[wsapiNode].State.GetFactoshisPerEC())
 
 						initchainCost = 0 // Init only happens once. We set to 0 to not count it again
 						auths, skipped, err := authorityToBlockchain(count, fnodes[wsapiNode].State)
@@ -232,7 +231,7 @@ func SimControl(listenTo int, listenStdin bool) {
 			case 'w' == b[0]:
 				if ListenTo >= 0 && ListenTo < len(fnodes) {
 					wsapiNode = ListenTo
-					simulation.SetState(fnodes[wsapiNode].State)
+					SetState(fnodes[wsapiNode].State)
 					os.Stderr.WriteString(fmt.Sprintf("--Listen to %s --\n", fnodes[wsapiNode].State.FactomNodeName))
 				}
 			case 'W' == b[0]:
@@ -345,10 +344,9 @@ func SimControl(listenTo int, listenStdin bool) {
 					go rotateWSAPI(&rotate, rotate, &wsapiNode)
 				} else {
 					os.Stderr.WriteString("--Stop Rotation of the WSAPI around the nodes.  Now --\n")
-					simulation.SetState(fnodes[wsapiNode].State)
+					SetState(fnodes[wsapiNode].State)
 				}
 			case 'a' == b[0]:
-				mLog.all = false
 				for _, fnode := range fnodes {
 					fnode.State.SetOut(false)
 				}
@@ -380,7 +378,6 @@ func SimControl(listenTo int, listenStdin bool) {
 					}
 				}
 			case 'e' == b[0]:
-				mLog.all = false
 				for _, fnode := range fnodes {
 					fnode.State.SetOut(false)
 				}
@@ -412,7 +409,6 @@ func SimControl(listenTo int, listenStdin bool) {
 					}
 				}
 			case 'f' == b[0]:
-				mLog.all = false
 				for _, fnode := range fnodes {
 					fnode.State.SetOut(false)
 				}
@@ -444,7 +440,6 @@ func SimControl(listenTo int, listenStdin bool) {
 					}
 				}
 			case 'd' == b[0]:
-				mLog.all = false
 				for _, fnode := range fnodes {
 					fnode.State.SetOut(false)
 				}
@@ -557,7 +552,6 @@ func SimControl(listenTo int, listenStdin bool) {
 				}
 
 			case 'k' == b[0]:
-				mLog.all = false
 				for _, fnode := range fnodes {
 					fnode.State.SetOut(false)
 				}
@@ -977,7 +971,7 @@ func SimControl(listenTo int, listenStdin bool) {
 						break
 					}
 					wsapiNode = ListenTo
-					simulation.SetState(fnodes[wsapiNode].State)
+					SetState(fnodes[wsapiNode].State)
 
 					//err, _ := FundWallet(fnodes[ListenTo].State, 1e8)
 					//if err != nil {
@@ -1298,7 +1292,7 @@ func SimControl(listenTo int, listenStdin bool) {
 				}
 
 				wsapiNode = ListenTo
-				simulation.SetState(fnodes[wsapiNode].State)
+				SetState(fnodes[wsapiNode].State)
 				//err = fundWallet(fnodes[ListenTo].State, 1e8)
 				//if err != nil {
 				//	os.Stderr.WriteString(fmt.Sprintf("Error in funding the wallet, %s\n", err.Error()))
@@ -1327,7 +1321,7 @@ func SimControl(listenTo int, listenStdin bool) {
 				}
 
 				wsapiNode = ListenTo
-				simulation.SetState(fnodes[wsapiNode].State)
+				SetState(fnodes[wsapiNode].State)
 				//err = fundWallet(fnodes[ListenTo].State, 1e8)
 				//if err != nil {
 				//	os.Stderr.WriteString(fmt.Sprintf("Error in funding the wallet, %s\n", err.Error()))
@@ -1501,10 +1495,10 @@ func returnStatString(i uint8) string {
 //
 func rotateWSAPI(rotate *int, value int, wsapiNode *int) {
 	for *rotate == value { // Only if true
-	fnodes := fnode.GetFnodes()
+		fnodes := fnode.GetFnodes()
 		*wsapiNode = rand.Int() % len(fnodes)
-		f:= fnodes[*wsapiNode]
-		simulation.SetState(f.State)
+		f := fnodes[*wsapiNode]
+		SetState(f.State)
 		time.Sleep(3 * time.Second)
 	}
 }
