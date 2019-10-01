@@ -1,4 +1,4 @@
-package engine
+package simulation
 
 import (
 	"encoding/hex"
@@ -60,7 +60,7 @@ func PostTransaction(st *state.State, trans *factoid.Transaction) (error, string
 	data, _ := trans.MarshalBinary()
 	t.Transaction = hex.EncodeToString(data)
 	j := primitives.NewJSON2Request("factoid-submit", 0, t)
-	_, err := v2Request(j, st.GetPort())
+	_, err := V2Request(j, st.GetPort())
 
 	if err != nil {
 		return err, ""

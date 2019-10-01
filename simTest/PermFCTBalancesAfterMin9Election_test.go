@@ -2,6 +2,7 @@ package simtest
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/simulation"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ var depositAddresses []string
 // generate addresses & private keys
 func createDepositAddresses() {
 	for i := 0; i < 1; i++ {
-		_, addr := RandomFctAddressPair()
+		_, addr := simulation.RandomFctAddressPair()
 		depositAddresses = append(depositAddresses, addr)
 	}
 }
@@ -33,7 +34,7 @@ func TestPermFCTBalancesAfterMin9Election(t *testing.T) {
 		for i := range depositAddresses {
 			fmt.Printf("TXN %v %v => %v \n", depositCount, depositAddresses[i], depositAddresses[i])
 			time.Sleep(time.Millisecond * 90)
-			SendTxn(state0, 1, bankSecret, depositAddresses[i], ecPrice)
+			simulation.SendTxn(state0, 1, bankSecret, depositAddresses[i], ecPrice)
 		}
 	}
 
@@ -61,7 +62,7 @@ func TestPermFCTBalancesAfterMin9Election(t *testing.T) {
 
 	for i, node := range GetFnodes() {
 		for _, addr := range depositAddresses {
-			bal := GetBalance(node.State, addr)
+			bal := simulation.GetBalance(node.State, addr)
 			msg := fmt.Sprintf("Node%v %v => balance: %v expected: %v \n", i, addr, bal, depositCount)
 			assert.Equal(t, depositCount, bal, msg)
 		}

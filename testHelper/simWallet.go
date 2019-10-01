@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"github.com/FactomProject/factomd/simulation"
 	"text/template"
 	"time"
 
@@ -76,19 +77,19 @@ func (d *testAccount) EcAddr() interfaces.IHash {
 // buy EC from coinbase 'bank'
 func (d *testAccount) FundEC(amt uint64) {
 	state0 := engine.GetFnodes()[0].State
-	engine.FundECWallet(state0, GetBankAccount().FctPrivHash(), d.EcAddr(), uint64(amt)*state0.GetFactoshisPerEC())
+	simulation.FundECWallet(state0, GetBankAccount().FctPrivHash(), d.EcAddr(), uint64(amt)*state0.GetFactoshisPerEC())
 }
 
 // buy EC from account
 func (d *testAccount) ConvertEC(amt uint64) {
 	state0 := engine.GetFnodes()[0].State
-	engine.FundECWallet(state0, d.FctPrivHash(), d.EcAddr(), uint64(amt)*state0.GetFactoshisPerEC())
+	simulation.FundECWallet(state0, d.FctPrivHash(), d.EcAddr(), uint64(amt)*state0.GetFactoshisPerEC())
 }
 
 // get FCT from coinbase 'bank'
 func (d *testAccount) FundFCT(amt uint64) {
 	state0 := engine.GetFnodes()[0].State
-	_, err := engine.SendTxn(state0, uint64(amt), GetBankAccount().FctPriv(), d.FctPub(), state0.GetFactoshisPerEC())
+	_, err := simulation.SendTxn(state0, uint64(amt), GetBankAccount().FctPriv(), d.FctPub(), state0.GetFactoshisPerEC())
 	if err != nil {
 		panic(err)
 	}
@@ -97,13 +98,13 @@ func (d *testAccount) FundFCT(amt uint64) {
 // transfer FCT from account
 func (d *testAccount) SendFCT(a *testAccount, amt uint64) {
 	state0 := engine.GetFnodes()[0].State
-	engine.SendTxn(state0, uint64(amt), d.FctPriv(), a.FctPub(), state0.GetFactoshisPerEC())
+	simulation.SendTxn(state0, uint64(amt), d.FctPriv(), a.FctPub(), state0.GetFactoshisPerEC())
 }
 
 // check EC balance
 func (d *testAccount) GetECBalance() int64 {
 	state0 := engine.GetFnodes()[0].State
-	return engine.GetBalanceEC(state0, d.EcPub())
+	return simulation.GetBalanceEC(state0, d.EcPub())
 }
 
 var testFormat string = `
@@ -320,7 +321,7 @@ func WaitForEcBalanceUnder(s *state.State, ecPub string, target int64) int64 {
 	s.LogPrintf(logName, "WaitForEcBalanceUnder%v:  %v", target, ecPub)
 
 	for {
-		bal := engine.GetBalanceEC(s, ecPub)
+		bal := simulation.GetBalanceEC(s, ecPub)
 		time.Sleep(balanceWaitInterval)
 
 		if bal < target {
@@ -336,7 +337,7 @@ func WaitForEcBalanceOver(s *state.State, ecPub string, target int64) int64 {
 	s.LogPrintf(logName, "WaitForEcBalanceOver%v:  %v", target, ecPub)
 
 	for {
-		bal := engine.GetBalanceEC(s, ecPub)
+		bal := simulation.GetBalanceEC(s, ecPub)
 		time.Sleep(balanceWaitInterval)
 
 		if bal > target {
@@ -352,7 +353,7 @@ func WaitForFctBalanceUnder(s *state.State, fctPub string, target int64) int64 {
 	s.LogPrintf(logName, "WaitForFctBalanceUnder%v:  %v", target, fctPub)
 
 	for {
-		bal := engine.GetBalance(s, fctPub)
+		bal := simulation.GetBalance(s, fctPub)
 		time.Sleep(balanceWaitInterval)
 
 		if bal < target {
@@ -368,7 +369,7 @@ func WaitForFctBalanceOver(s *state.State, fctPub string, target int64) int64 {
 	s.LogPrintf(logName, "WaitForFctBalanceOver%v:  %v", target, fctPub)
 
 	for {
-		bal := engine.GetBalance(s, fctPub)
+		bal := simulation.GetBalance(s, fctPub)
 		time.Sleep(balanceWaitInterval)
 
 		if bal > target {

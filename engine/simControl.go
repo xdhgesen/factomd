@@ -7,6 +7,7 @@ package engine
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/FactomProject/factomd/simulation"
 	"io"
 	"math/rand"
 	"os"
@@ -206,7 +207,7 @@ func SimControl(listenTo int, listenStdin bool) {
 						// Perfectly fund the g command
 						idcost := 13 + 15 + 1 // Cost for 1 ID : Root + Management + Register
 						need := (idcost * count) + initchainCost
-						FundWalletTOFF(fnodes[wsapiNode].State, 0, uint64(need)*fnodes[wsapiNode].State.GetFactoshisPerEC())
+						simulation.FundWalletTOFF(fnodes[wsapiNode].State, 0, uint64(need)*fnodes[wsapiNode].State.GetFactoshisPerEC())
 
 						initchainCost = 0 // Init only happens once. We set to 0 to not count it again
 						auths, skipped, err := authorityToBlockchain(count, fnodes[wsapiNode].State)

@@ -5,12 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"github.com/FactomProject/factomd/simulation"
 	"log"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -58,15 +56,7 @@ var (
 
 	entryCom []string
 	entryRev []string
-	/*
-		chainCommit string =
-		chainReveal string =
-		entryCommit string =
-		entryReveal string =
-		chainIDs    string =
-		subChainIDs string =
-		privates    string =
-	*/
+
 	// c23ae8eec2beb181a0da926bd2344e988149fbe839fbc7489f2096e7d6110243 //pubkey for a75ca, EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab
 	ecSec string = "a75ca76c169bb7776ce281a2ec3e6f5b2782938e6801f6bedc3d3e94747c32ed" //Es3hN9o1hnMPfGgrK89UhK7hKJSAGsduBuxkuKVbibVMMzWBngQN
 
@@ -84,7 +74,7 @@ func copyOver(st *state.State) {
 	var err error
 	sec, _ := hex.DecodeString(ecSec)
 	ec, _ := factom.MakeECAddress(sec[:32])
-	FundWallet(st, 10)
+	simulation.FundWallet(st, 10)
 	chain, _ := primitives.HexToHash("1d1d1d1d07714fea910f9c6e42e5dc072c86491a3d80418855a2499e85b0039f")
 	ents, _ := st.DB.FetchAllEntriesByChainID(chain)
 	for i, e := range ents {
@@ -100,16 +90,13 @@ func copyOver(st *state.State) {
 		paramsRev.Entry = rev
 		jCommit := primitives.NewJSON2Request("commit-entry", i, paramsCom)
 		jRev := primitives.NewJSON2Request("reveal-entry", i, paramsRev)
-		//fmt.Println("DEBUG:", jCommit.String())
-		//fmt.Println("DEBUG:", jRev.String())
 
-		_, err = v2Request(jCommit, st.GetPort())
-		//_, err = wsapi.HandleV2Request(st, jCommit)
+		_, err = simulation.V2Request(jCommit, st.GetPort())
 		if err != nil {
 			log.Println("Error in making identities: " + err.Error())
 		}
-		_, err = v2Request(jRev, st.GetPort())
-		//_, err = wsapi.HandleV2Request(st, jRev)
+		_, err = simulation.V2Request(jRev, st.GetPort())
+
 		if err != nil {
 			log.Println("Error in making identities: " + err.Error())
 		}
@@ -149,23 +136,14 @@ func buildMainChain(port int) {
 	jCommit := primitives.NewJSON2Request("commit-chain", 0, paramsCom)
 	jRev := primitives.NewJSON2Request("reveal-chain", 0, paramsRev)
 
-	_, err := v2Request(jCommit, port)
+	_, err := simulation.V2Request(jCommit, port)
 	if err != nil {
 		log.Println("Error in making identities: " + err.Error())
 	}
-	_, err = v2Request(jRev, port)
+	_, err = simulation.V2Request(jRev, port)
 	if err != nil {
 		log.Println("Error in making identities: " + err.Error())
 	}
-	/*mC := new(wsapi.MessageRequest)
-	mC.Message = "0001553ba74d8faa6ac2d4961882f42a345c7615f4133dde8e6d6e7c1b6b40ae4ff6ee52c393d024cbe2e7f360baad36a66b4f063f1f1b9f57f25deb35aad8fba8905cf2893eec1be40ce17636636117d9469de0f027cd74754e0e1871d249dfefac958d0f91de0b3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da299999aa8cfd722db62c61e53c7dbf9fa4de1a64b9891844f1d53b78a4cea3294fb6b88e5b53e5f132e32e1b1176335ead8ed351787457b9219f7743cc51b42803"
-	j := primitives.NewJSON2Request("commit-chain", 0, mC)
-	_, _ = v2Request(j, port)
-
-	mR := new(wsapi.EntryRequest)
-	mR.Entry = "00e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85500004d61696e204964656e74697479204c697374"
-	j = primitives.NewJSON2Request("reveal-chain", 1, mR)
-	_, _ = v2Request(j, port)*/
 }
 
 func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, int, error) {
@@ -205,16 +183,7 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 		}
 
 		nextAuthority++
-		//for _, mes := range ele.ChainCommits {
-		/*m := new(wsapi.MessageRequest)
-		m.Message = mes
-		j := primitives.NewJSON2Request("commit-chain", i, m)
-		_, err := v2Request(j, st.GetPort())
-		if err != nil {
-			log.Println("Error in making identities: " + err.Error())
-		}
-		time.Sleep(50 * time.Millisecond)*/
-		//}
+
 		for i, mes := range ele.ChainReveals {
 			entry, err := getFactomPackageEntryFromString(mes)
 			if err != nil {
@@ -230,39 +199,19 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 			jCommit := primitives.NewJSON2Request("commit-chain", i, paramsCom)
 			jRev := primitives.NewJSON2Request("reveal-chain", i, paramsRev)
 
-			_, err = v2Request(jCommit, st.GetPort())
-			//_, err = wsapi.HandleV2Request(st, jCommit)
+			_, err = simulation.V2Request(jCommit, st.GetPort())
 
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
-			_, err = v2Request(jRev, st.GetPort())
-			//_, err = wsapi.HandleV2Request(st, jRev)
-			if err != nil {
-				log.Println("Error in making identities: " + err.Error())
-			}
-			//_ = err
+			_, err = simulation.V2Request(jRev, st.GetPort())
 
-			/*m := new(wsapi.EntryRequest)
-			m.Entry = mes
-			j := primitives.NewJSON2Request("reveal-chain", i, m)
-			_, err := v2Request(j, st.GetPort())
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
-			time.Sleep(50 * time.Millisecond)*/
 		}
 		time.Sleep(100 * time.Millisecond)
 
-		//for i, mes := range ele.EntryCommits {
-		/*m := new(wsapi.EntryRequest)
-		m.Entry = mes
-		j := primitives.NewJSON2Request("commit-entry", i, m)
-		_, err := v2Request(j, st.GetPort())
-		if err != nil {
-			log.Println("Error in making identities: " + err.Error())
-		}*/
-		//}
 		for i, mes := range ele.EntryReveals {
 			entry, err := getFactomPackageEntryFromString(mes)
 			if err != nil {
@@ -277,25 +226,14 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 			jCommit := primitives.NewJSON2Request("commit-entry", i, paramsCom)
 			jRev := primitives.NewJSON2Request("reveal-entry", i, paramsRev)
 
-			_, err = v2Request(jCommit, st.GetPort())
-			//_, err = wsapi.HandleV2Request(st, jCommit)
+			_, err = simulation.V2Request(jCommit, st.GetPort())
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
-			_, err = v2Request(jRev, st.GetPort())
-			//_, err = wsapi.HandleV2Request(st, jRev)
+			_, err = simulation.V2Request(jRev, st.GetPort())
 			if err != nil {
 				log.Println("Error in making identities: " + err.Error())
 			}
-			//_ = err
-
-			/*m := new(wsapi.EntryRequest)
-			m.Entry = mes
-			j := primitives.NewJSON2Request("reveal-entry", i, m)
-			_, err := v2Request(j, st.GetPort())
-			if err != nil {
-				log.Println("Error in making identities: " + err.Error())
-			}*/
 		}
 
 		com, rev, key, _ := makeBlockKey(ele, ec, false)
@@ -303,66 +241,58 @@ func authorityToBlockchain(total int, st *state.State) ([]hardCodedAuthority, in
 		mC := new(wsapi.MessageRequest)
 		mC.Message = com
 		j := primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		mR := new(wsapi.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		com, rev, _ = makeMHash(ele, ec)
 		mC = new(wsapi.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		mR = new(wsapi.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		com, rev, _ = makeBTCKey(ele, ec)
 		mC = new(wsapi.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = v2Request(j, st.GetPort())
+		_, _ = simulation.V2Request(j, st.GetPort())
 		//_, _ = wsapi.HandleV2Request(st, j)
 
 		mR = new(wsapi.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = v2Request(j, st.GetPort())
+		_, _ = simulation.V2Request(j, st.GetPort())
 		//_, _ = wsapi.HandleV2Request(st, j)
 
 		com, rev, _ = makeServerCoinbaseAddress(ele, ec, primitives.RandomHash())
 		mC = new(wsapi.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		mR = new(wsapi.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		com, rev, _ = makeServerEfficiency(ele, ec, 1000)
 		mC = new(wsapi.MessageRequest)
 		mC.Message = com
 		j = primitives.NewJSON2Request("commit-entry", 0, mC)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		mR = new(wsapi.EntryRequest)
 		mR.Entry = rev
 		j = primitives.NewJSON2Request("reveal-entry", 0, mR)
-		_, _ = v2Request(j, st.GetPort())
-		//_, _ = wsapi.HandleV2Request(st, j)
+		_, _ = simulation.V2Request(j, st.GetPort())
 
 		madeAuths = append(madeAuths, ele)
 		authKeyLibrary = append(authKeyLibrary, ele)
@@ -544,16 +474,16 @@ func changeSigningKey(auth interfaces.IHash, st *state.State) (*primitives.Priva
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := v2Request(j, st.GetPort())
-			//wsapi.HandleV2Request(st, j)
+			_, err := simulation.V2Request(j, st.GetPort())
+
 			if err != nil {
 				return nil, err
 			}
 			mr := new(wsapi.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			//wsapi.HandleV2Request(st, j)
-			_, err = v2Request(j, st.GetPort())
+
+			_, err = simulation.V2Request(j, st.GetPort())
 			if err != nil {
 				return nil, err
 			}
@@ -577,7 +507,7 @@ func changeServerEfficiency(auth interfaces.IHash, st *state.State, eff uint16) 
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := v2Request(j, st.GetPort())
+			_, err := simulation.V2Request(j, st.GetPort())
 			//wsapi.HandleV2Request(st, j)
 			if err != nil {
 				return err
@@ -586,7 +516,7 @@ func changeServerEfficiency(auth interfaces.IHash, st *state.State, eff uint16) 
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
 			//wsapi.HandleV2Request(st, j)
-			_, err = v2Request(j, st.GetPort())
+			_, err = simulation.V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
@@ -615,16 +545,15 @@ func changeServerCoinbaseAddress(auth interfaces.IHash, st *state.State, add str
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := v2Request(j, st.GetPort())
-			//wsapi.HandleV2Request(st, j)
+			_, err := simulation.V2Request(j, st.GetPort())
+
 			if err != nil {
 				return err
 			}
 			mr := new(wsapi.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			//wsapi.HandleV2Request(st, j)
-			_, err = v2Request(j, st.GetPort())
+			_, err = simulation.V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
@@ -648,16 +577,14 @@ func cancelCoinbase(auth interfaces.IHash, st *state.State, h, i uint32) error {
 			m.Message = com
 
 			j := primitives.NewJSON2Request("commit-entry", 0, m)
-			_, err := v2Request(j, st.GetPort())
-			//wsapi.HandleV2Request(st, j)
+			_, err := simulation.V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
 			mr := new(wsapi.EntryRequest)
 			mr.Entry = rev
 			j = primitives.NewJSON2Request("reveal-entry", 0, mr)
-			//wsapi.HandleV2Request(st, j)
-			_, err = v2Request(j, st.GetPort())
+			_, err = simulation.V2Request(j, st.GetPort())
 			if err != nil {
 				return err
 			}
@@ -805,33 +732,6 @@ func getFactomPackageEntryFromString(message string) (*factom.Entry, error) {
 
 		return fEntry, nil
 	}
-}
-
-func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {
-	j, err := json.Marshal(req)
-	if err != nil {
-		return nil, err
-	}
-
-	portStr := fmt.Sprintf("%d", port)
-	resp, err := http.Post(
-		"http://localhost:"+portStr+"/v2",
-		"application/json",
-		bytes.NewBuffer(j))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	r := primitives.NewJSON2Response()
-	if err := json.Unmarshal(body, r); err != nil {
-		return nil, err
-	}
-	return nil, nil
 }
 
 func modifyLoadIdentities() {

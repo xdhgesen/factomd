@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/FactomProject/factomd/simulation"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -724,7 +725,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 
 	TimeNow(state0)
 
-	_, str := FundWallet(state0, uint64(200*5e7))
+	_, str := simulation.FundWallet(state0, uint64(200*5e7))
 
 	// a while loop to find when the transaction made FundWallet ^^Above^^ has been acknowledged
 	thisShouldNotBeUnknownAtSomePoint := "Unknown"
@@ -934,7 +935,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 
 	TimeNow(state0)
 
-	_, str := FundWallet(state0, 20000000)
+	_, str := simulation.FundWallet(state0, 20000000)
 
 	// a while loop to find when the transaction made FundWallet ^^Above^^ has been acknowledged
 	for {
@@ -1234,7 +1235,7 @@ func TestFactoidDBState(t *testing.T) {
 
 	go func() {
 		for i := 0; i <= 1000; i++ {
-			FundWallet(state0, 10000)
+			simulation.FundWallet(state0, 10000)
 			time.Sleep(time.Duration(random.RandIntBetween(250, 1250)) * time.Millisecond)
 		}
 	}()

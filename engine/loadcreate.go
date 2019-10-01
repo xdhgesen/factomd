@@ -3,6 +3,7 @@ package engine
 import (
 	"bytes"
 	"encoding/binary"
+	"github.com/FactomProject/factomd/simulation"
 	"math/rand"
 	"time"
 
@@ -173,7 +174,7 @@ func (lg *LoadGenerator) KeepUsFunded() {
 			buys++
 			need := level - ecBal + level*2
 			totalBought += int(need)
-			FundWalletTOFF(s, lg.txoffset, uint64(need)*ecPrice)
+			simulation.FundWalletTOFF(s, lg.txoffset, uint64(need)*ecPrice)
 		} else {
 			limitBuys = true
 		}

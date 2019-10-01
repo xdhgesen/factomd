@@ -2,11 +2,11 @@ package longtest
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/simulation"
 	"testing"
 	"time"
 
 	"github.com/FactomProject/factom"
-	. "github.com/FactomProject/factomd/engine"
 	. "github.com/FactomProject/factomd/testHelper"
 )
 
@@ -21,7 +21,7 @@ func TestChainedTransactions(t *testing.T) {
 	var depositAddresses []string
 
 	for i := 0; i < 120; i++ {
-		priv, addr := RandomFctAddressPair()
+		priv, addr := simulation.RandomFctAddressPair()
 		depositSecrets = append(depositSecrets, priv)
 		depositAddresses = append(depositAddresses, addr)
 	}
@@ -32,13 +32,13 @@ func TestChainedTransactions(t *testing.T) {
 	var oneFct uint64 = factom.FactoidToFactoshi("1")
 
 	waitForDeposit := func(i int, amt uint64) uint64 {
-		balance := GetBalance(state0, depositAddresses[i])
+		balance := simulation.GetBalance(state0, depositAddresses[i])
 		TimeNow(state0)
 		fmt.Printf("%v waitForDeposit %v %v - %v = diff: %v \n", i, depositAddresses[i], balance, amt, balance-int64(amt))
 		var waited bool
 		for balance != int64(amt) {
 			waited = true
-			balance = GetBalance(state0, depositAddresses[i])
+			balance = simulation.GetBalance(state0, depositAddresses[i])
 			time.Sleep(time.Millisecond * 100)
 		}
 		if waited {
@@ -65,7 +65,7 @@ func TestChainedTransactions(t *testing.T) {
 			send := bal
 
 			txn := func() {
-				SendTxn(state0, send, depositSecrets[in], depositAddresses[out], ecPrice)
+				simulation.SendTxn(state0, send, depositSecrets[in], depositAddresses[out], ecPrice)
 			}
 			transactions = append(transactions, txn)
 		}
@@ -77,7 +77,7 @@ func TestChainedTransactions(t *testing.T) {
 
 	mkTransactions := func() { // txnGenerator
 		// fund the start address
-		SendTxn(state0, initialBalance, bankSecret, depositAddresses[0], ecPrice)
+		simulation.SendTxn(state0, initialBalance, bankSecret, depositAddresses[0], ecPrice)
 		WaitMinutes(state0, 1)
 		waitForDeposit(0, initialBalance)
 		transactions, finalBalance, finalAddress := prepareTransactions(initialBalance)
@@ -103,7 +103,7 @@ func TestChainedTransactions(t *testing.T) {
 		waitForDeposit(finalAddress, finalBalance)
 
 		// empty final address returning remaining funds to bank
-		SendTxn(state0, finalBalance-fee, depositSecrets[finalAddress], bankAddress, ecPrice)
+		simulation.SendTxn(state0, finalBalance-fee, depositSecrets[finalAddress], bankAddress, ecPrice)
 		waitForDeposit(finalAddress, 0)
 	}
 
