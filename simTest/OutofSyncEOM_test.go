@@ -7,6 +7,7 @@ import (
 	. "github.com/FactomProject/factomd/engine"
 	. "github.com/FactomProject/factomd/testHelper"
 )
+
 /*
 This test is useful to exercise reboot behavior
 here we copy a db and boot up an additional follower
@@ -16,7 +17,7 @@ func TestOutOfSyncEOM(t *testing.T) {
 		return
 	}
 
-	state0 :=  SetupSim("LLL", map[string]string{"--debuglog": ".", "--blktime": "15"}, 12, 0, 0 , t)
+	state0 := SetupSim("LLL", map[string]string{"--debuglog": ".", "--blktime": "15"}, 12, 0, 0, t)
 	for i := 4; i < 10; i++ {
 		WaitMinutes(state0, i)
 		RunCmd("2")
@@ -39,4 +40,3 @@ func TestOutOfSyncEOM(t *testing.T) {
 	out := SystemCall(`grep -E "EOM-" fnode0_networkinputs.txt | grep -v Drop | grep -v Embed | grep -E "minute  0" | grep -E "DBh/VMh/h 9/" | awk '{print $21}'`)
 	t.Logf("%v", out)
 }
-

@@ -103,7 +103,7 @@ func TestSync(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LLLLF", map[string]string{"--debuglog": ".", "--blktime": "10"}, 90, 0, 0, t)
+	state0 := SetupSim("LLLLFF", map[string]string{"--debuglog": ".", "--blktime": "10"}, 90, 0, 0, t)
 	globals.Params.BlkTime = 100
 	for _, node := range GetFnodes() {
 		node.State.DirectoryBlockInSeconds = 100
@@ -112,9 +112,9 @@ func TestSync(t *testing.T) {
 	WaitMinutes(state0, 1)
 	RunCmd("s")
 	RunCmd("1")
-	for i := 0; i < 1; i++ {
-		messages.LogPrintf("fnode0_networkinputs.txt", "Start Alignment Test Sleep(%d) -- enqueue  EOM /00/", i)
-		time.Sleep(time.Duration(i+8) * time.Second)
+	for i := 0; i < 5; i++ {
+		messages.LogPrintf("fnode0_networkinputs.txt", "Start Alignment Test Sleep(%d) -- enqueue  EOM /00/", i+7)
+		time.Sleep(time.Duration(i+7) * time.Second)
 		RunCmd("x")
 		messages.LogPrintf("fnode0_networkinputs.txt", "Sleep(%d) -- enqueue  EOM /00/", 12)
 		time.Sleep(time.Second * 12)
@@ -128,7 +128,15 @@ func TestSync(t *testing.T) {
 		WaitMinutes(state0, 2)
 	}
 
-	WaitBlocks(state0, 50)
+	WaitBlocks(state0, 5)
+	RunCmd("4")
+	RunCmd("o") // make an audit
+	WaitBlocks(state0, 1)
+	RunCmd("1")
+	RunCmd("x")
+	WaitMinutes(state0, 1)
+	RunCmd("x")
+	WaitBlocks(state0, 5)
 	RunCmd("R0") // Stop load
 
 	ShutDownEverything(t)
