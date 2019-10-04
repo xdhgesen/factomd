@@ -117,7 +117,9 @@ func (s *State) ValidatorLoop() {
 			time.Sleep(10 * time.Second) // wait till database close is complete
 			return
 		case c := <-s.tickerQueue: // Look for pending messages, and get one if there is one.
+			s.LogPrintf("timer", "tick ")
 			if !s.RunLeader || !s.DBFinished { // don't generate EOM if we are not ready to execute as a leader or are loading the DBState messages
+				s.LogPrintf("timer", "drop, not running yet")
 				continue
 			}
 			currentMinute := s.CurrentMinute
@@ -144,26 +146,27 @@ func (s *State) ValidatorLoop() {
 				continue // Already generated this eom
 			}
 
-			// probably should be median vs instead of mean.
-			sum := 0
-			for _, ts := range s.EOMTimeStamps {
-				sum += int(ts.GetTimeMilli())
+			if s.EOMTimeStamps != nil { // if this is not our first EOM
+				// probably should be median vs instead of mean.
+				sum := 0
+				for _, ts := range s.EOMTimeStamps {
+					sum += int(ts.GetTimeMilli())
+				}
+
+				tenthPeriod := int(s.GetMinuteDuration() / time.Millisecond) // this is a minute in milliseconds
+				averageEOM := sum / len(s.EOMTimeStamps)                     // average issue timestamp
+
+				// Snap average EOM to the tenth period boundary
+				averageEOM = averageEOM - averageEOM%tenthPeriod
+
+				if int(s.EOMIssue.GetTimeMilli())-averageEOM < -tenthPeriod/10 {
+					// We are late issuing EOMS
+
+				}
+				if int(s.EOMIssue.GetTimeMilli())-averageEOM < tenthPeriod/2 {
+					continue // we are ahead and so we drop a ticker
+				}
 			}
-
-			tenthPeriod := int(s.GetMinuteDuration() / time.Millisecond) // this is a minute in milliseconds
-			averageEOM := sum / len(s.EOMTimeStamps)                     // average issue timestamp
-
-			// Snap average EOM to the tenth period boundary
-			averageEOM = averageEOM - averageEOM%tenthPeriod
-
-			if int(s.EOMIssue.GetTimeMilli())-averageEOM < -tenthPeriod/10 {
-				// We are late issuing EOMS
-
-			}
-			if int(s.EOMIssue.GetTimeMilli())-averageEOM < tenthPeriod/2 {
-				continue // we are ahead and so we drop a ticker
-			}
-
 			lastHeight, lastMinute, lastVM = int(s.LLeaderHeight), currentMinute, s.LeaderVMIndex
 
 			eom := new(messages.EOM)

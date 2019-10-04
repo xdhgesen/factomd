@@ -18,46 +18,22 @@ func Timer(stateI interfaces.IState) {
 	state := stateI.(*s.State)
 	time.Sleep(2 * time.Second)
 
-	tenthPeriod := state.GetMinuteDuration()
-
-	now := time.Now().UnixNano() // Time in billionths of a second
-
-	wait := tenthPeriod.Nanoseconds() - (now % tenthPeriod.Nanoseconds())
-
-	next := now + wait + tenthPeriod.Nanoseconds()
-
-	if state.GetOut() {
-		state.Print(fmt.Sprintf("Time: %v\r\n", time.Now()))
-	}
-
-	time.Sleep(time.Duration(wait))
-
 	for {
-		for i := 0; i < 10; i++ {
-			// Don't stuff messages into the system if the
-			// Leader is behind.
-			for j := 0; j < 10 && len(state.AckQueue()) > 1000; j++ {
-				time.Sleep(time.Millisecond * 10)
-			}
+		now := time.Now()
+		tenthPeriod := state.GetMinuteDuration()
+		next := now.Add(tenthPeriod) // start of next minute
+		// snap to the minute edge
+		next = next.Truncate(tenthPeriod)
+		wait := next.Sub(now)
+		// Sleep until the minute start
+		time.Sleep(time.Duration(wait))
 
-			now = time.Now().UnixNano()
-			if now > next {
-				next += tenthPeriod.Nanoseconds()
-				wait = next - now
-			} else {
-				wait = next - now
-				next += tenthPeriod.Nanoseconds()
-			}
-			time.Sleep(time.Duration(wait))
+		// Delay some number of milliseconds.
+		time.Sleep(time.Duration(state.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
 
-			// Delay some number of milliseconds.
-			time.Sleep(time.Duration(state.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
+		state.TickerQueue() <- -1 // -1 indicated this is real minute cadence
 
-			state.TickerQueue() <- -1 // -1 indicated this is real minute cadence
-
-			tenthPeriod = state.GetMinuteDuration()
-			state.LogPrintf("ticker", "Tick! %d, wait=%s, tenthPeriod=%s", i, time.Duration(wait), time.Duration(tenthPeriod))
-		}
+		state.LogPrintf("ticker", "Tick! now=%s, next=%s, wait=%s, tenthPeriod=%s", now, next, wait, tenthPeriod)
 	}
 }
 
