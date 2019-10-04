@@ -14,6 +14,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FactomProject/factomd/common/globals"
+
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/directoryBlock"
 	"github.com/FactomProject/factomd/common/messages"
@@ -92,6 +94,53 @@ func TestLoad(t *testing.T) {
 	}
 	ShutDownEverything(t)
 } // testLoad(){...}
+
+func TestSync(t *testing.T) {
+	if RanSimTest {
+		return
+	}
+
+	RanSimTest = true
+
+	// use a tree so the messages get reordered
+	state0 := SetupSim("LLLLFF", map[string]string{"--debuglog": ".", "--blktime": "10"}, 90, 0, 0, t)
+	globals.Params.BlkTime = 100
+	for _, node := range GetFnodes() {
+		node.State.DirectoryBlockInSeconds = 100
+	}
+	// "tail -n1000 -f fnode0_networkinputs.txt | grep -E \"enqueue  .*EOM\""
+	WaitMinutes(state0, 1)
+	RunCmd("s")
+	RunCmd("1")
+	for i := 0; i < 5; i++ {
+		messages.LogPrintf("fnode0_networkinputs.txt", "Start Alignment Test Sleep(%d) -- enqueue  EOM /00/", i+7)
+		time.Sleep(time.Duration(i+7) * time.Second)
+		RunCmd("x")
+		messages.LogPrintf("fnode0_networkinputs.txt", "Sleep(%d) -- enqueue  EOM /00/", 12)
+		time.Sleep(time.Second * 12)
+		RunCmd("x")
+		messages.LogPrintf("fnode0_networkinputs.txt", "Sleep(%d) -- enqueue  EOM /00/", 1)
+		time.Sleep(time.Second * 1)
+		RunCmd("x")
+		messages.LogPrintf("fnode0_networkinputs.txt", "Sleep(%d) -- enqueue  EOM /00/", 12)
+		time.Sleep(time.Second * 12)
+		RunCmd("x")
+		WaitMinutes(state0, 2)
+	}
+
+	WaitBlocks(state0, 5)
+	RunCmd("4")
+	RunCmd("o") // make an audit
+	WaitBlocks(state0, 1)
+	RunCmd("1")
+	RunCmd("x")
+	WaitMinutes(state0, 1)
+	RunCmd("x")
+	WaitBlocks(state0, 5)
+	RunCmd("R0") // Stop load
+
+	ShutDownEverything(t)
+} // testSync(){...}
 
 // Test replicates a savestate restore bug when run twice. First run must complete 10 blocks.
 func TestErr(t *testing.T) {
