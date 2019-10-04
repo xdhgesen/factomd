@@ -1520,7 +1520,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 		s.LogMessage("executeMsg", "fixed EOM", eom)
 		s.LogMessage("executeMsg", "matching ACK", ack)
 	}
-
+	s.Lasteom = eom
 	TotalAcksInputs.Inc()
 	s.Acks[eom.GetMsgHash().Fixed()] = ack
 	ack.SendOut(s, ack)

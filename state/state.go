@@ -445,6 +445,9 @@ type State struct {
 	MissingMessageResponseHandler *MissingMessageResponseCache
 	ChainCommits                  Last100
 	Reveals                       Last100
+
+	//debug stuff for EOM sync
+	Lasteom *messages.EOM
 }
 
 var _ interfaces.IState = (*State)(nil)
