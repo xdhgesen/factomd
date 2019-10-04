@@ -1498,29 +1498,26 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 	// Committed to sending an EOM now
 	vm.EomMinuteIssued = s.CurrentMinute + 1
 
-	fix := false
-
-	if eom.DBHeight != s.LLeaderHeight || eom.VMIndex != s.LeaderVMIndex || eom.Minute != byte(s.CurrentMinute) {
-		s.LogPrintf("executeMsg", "EOM has wrong data expected DBH/VM/M %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
-		fix = true
-	}
+	//if eom.DBHeight != s.LLeaderHeight || eom.VMIndex != s.LeaderVMIndex || eom.Minute != byte(s.CurrentMinute) {
+	//	s.LogPrintf("executeMsg", "EOM has wrong data expected DBH/VM/M %d/%d/%d", s.LLeaderHeight, s.LeaderVMIndex, s.CurrentMinute)
+	//	fix = true
+	//}
 
 	// make sure EOM has the right data
-	eom.DBHeight = s.LLeaderHeight
-	eom.VMIndex = s.LeaderVMIndex
-	// eom.Minute is zerobased, while LeaderMinute is 1 based.  So
-	// a simple assignment works.
-	eom.Minute = byte(s.CurrentMinute)
-	eom.Sign(s)
+	if eom.DBHeight != s.LLeaderHeight {
+		panic("bad lleaderheight")
+	}
+	if eom.VMIndex != s.LeaderVMIndex {
+		panic("bad vmindex")
+	}
+	if eom.Minute != byte(s.CurrentMinute) {
+		panic("bad minute")
+	}
+
 	eom.MsgHash = nil                       // delete any existing hash so it will be recomputed
 	eom.RepeatHash = nil                    // delete any existing hash so it will be recomputed
 	ack := s.NewAck(m, nil).(*messages.Ack) // LeaderExecuteEOM()
 	eom.SetLocal(false)
-
-	if fix {
-		s.LogMessage("executeMsg", "fixed EOM", eom)
-		s.LogMessage("executeMsg", "matching ACK", ack)
-	}
 
 	TotalAcksInputs.Inc()
 	s.Acks[eom.GetMsgHash().Fixed()] = ack
@@ -1983,6 +1980,10 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 		//fmt.Println(fmt.Sprintf("EOM PROCESS: %10s vm %2d Done! s.EOMDone(%v) && s.EOMSys(%v)", s.FactomNodeName, e.VMIndex, s.EOMDone, s.EOMSys))
 		s.EOMProcessed--
+
+		// add this messages timestamp to the list of timestamps
+		s.EOMTimeStamps[msg.GetVMIndex()] = msg.GetTimestamp() // save the time stamp
+
 		if s.EOMProcessed <= 0 { // why less than or equal?
 			s.SendHeartBeat() // Only do this once per minute
 
@@ -2081,6 +2082,8 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 		s.EOM = true       // ProcessEOM start
 		s.EOMDone = false  // ProcessEOM start
 		s.EOMProcessed = 0 // ProcessEOM start
+		// make a new map of the time stamps in the EOMs
+		s.EOMTimeStamps = make(map[int]interfaces.Timestamp, len(pl.FedServers))
 		s.EOMLimit = len(pl.FedServers)
 		for _, vm := range pl.VMs {
 			vm.Synced = false // ProcessEOM start

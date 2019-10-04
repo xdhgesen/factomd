@@ -167,6 +167,7 @@ type State struct {
 	ResendCnt int
 	ExpireCnt int
 
+	tickMutex              sync.Mutex
 	tickerQueue            chan int
 	timerMsgQueue          chan interfaces.IMsg
 	TimeOffset             interfaces.Timestamp
@@ -237,14 +238,16 @@ type State struct {
 	CurrentMinuteStartTime  int64
 	CurrentBlockStartTime   int64
 
-	EOMsyncing   bool
-	EOMSyncTime  int64
-	EOM          bool // Set to true when the first EOM is encountered
-	EOMLimit     int
-	EOMProcessed int
-	EOMDone      bool
-	EOMMinute    int
-	EOMSys       bool // At least one EOM has covered the System List
+	EOMsyncing    bool
+	EOMSyncTime   int64
+	EOM           bool // Set to true when the first EOM is encountered
+	EOMLimit      int
+	EOMProcessed  int
+	EOMTimeStamps map[int]interfaces.Timestamp
+	EOMIssue      interfaces.Timestamp
+	EOMDone       bool
+	EOMMinute     int
+	EOMSys        bool // At least one EOM has covered the System List
 
 	DBSig          bool
 	DBSigLimit     int

@@ -68,6 +68,29 @@ func (s *State) DoProcessing() {
 	fmt.Println(s.GetFactomNodeName(), "closed")
 }
 
+func (s *State) CreateTick() {
+
+	s.tickMutex.Lock()
+	defer s.tickMutex.Unlock()
+	tenthPeriod := s.GetMinuteDuration()
+
+	now := time.Now()
+
+	// Align the nextTick to the next tenthPeriod
+	nextTick := int64((now.UnixNano()/tenthPeriod.Nanoseconds())+1) * tenthPeriod.Nanoseconds()
+	wait := time.Duration(nextTick - now.UnixNano())
+
+	if wait < tenthPeriod/2 {
+		wait += tenthPeriod
+	}
+
+	go func() {
+		time.Sleep(time.Duration(wait))
+		s.TickerQueue() <- -1 // -1 indicated this is real minute cadence
+	}()
+
+}
+
 func (s *State) ValidatorLoop() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -80,6 +103,8 @@ func (s *State) ValidatorLoop() {
 
 	// We should only generate 1 EOM for each height/minute/vmindex
 	lastHeight, lastMinute, lastVM := -1, -1, -1
+
+	s.CreateTick() // kick off the first minute
 
 	go s.DoProcessing()
 	// Look for pending messages, and get one if there is one.
@@ -119,18 +144,35 @@ func (s *State) ValidatorLoop() {
 				continue // Already generated this eom
 			}
 
+			// probably should be median vs instead of mean.
+			sum := 0
+			for _, ts := range s.EOMTimeStamps {
+				sum += int(ts.GetTimeMilli())
+			}
+
+			tenthPeriod := int(s.GetMinuteDuration() / time.Millisecond) // this is a minute in milliseconds
+			averageEOM := sum / len(s.EOMTimeStamps)                     // average issue timestamp
+
+			// Snap average EOM to the tenth period boundary
+			averageEOM = averageEOM - averageEOM%tenthPeriod
+
+			if int(s.EOMIssue.GetTimeMilli())-averageEOM < -tenthPeriod/10 {
+				// We are late issuing EOMS
+
+			}
+			if int(s.EOMIssue.GetTimeMilli())-averageEOM < tenthPeriod/2 {
+				continue // we are ahead and so we drop a ticker
+			}
+
 			lastHeight, lastMinute, lastVM = int(s.LLeaderHeight), currentMinute, s.LeaderVMIndex
 
 			eom := new(messages.EOM)
 			eom.Timestamp = s.GetTimestamp()
 			eom.ChainID = s.GetIdentityChainID()
-			{
-				// best guess info... may be wrong -- just for debug
-				eom.DBHeight = s.LLeaderHeight
-				eom.VMIndex = s.LeaderVMIndex
-				eom.Minute = byte(currentMinute)
-			}
-
+			eom.DBHeight = s.LLeaderHeight
+			eom.VMIndex = s.LeaderVMIndex
+			// eom.Minute is zero based, while LeaderMinute is 1 based.  So a simple assignment works.
+			eom.Minute = byte(currentMinute)
 			eom.Sign(s)
 			eom.SetLocal(true) // local EOMs are really just timeout indicators that we need to generate an EOM
 			msg = eom
