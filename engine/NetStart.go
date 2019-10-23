@@ -495,7 +495,7 @@ func makeServer(s *state.State) *fnode.FactomNode {
 	node := new(fnode.FactomNode)
 
 	if fnode.Len() > 0 {
-		newState := s.Clone(len(fnode.GetFnodes())).(*state.State)
+		newState := state.Clone(s, len(fnode.GetFnodes())).(*state.State)
 		newState.EFactory = new(electionMsgs.ElectionsFactory)
 		node.State = newState
 		fnode.AddFnode(node)

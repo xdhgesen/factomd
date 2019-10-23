@@ -36,7 +36,6 @@ type IState interface {
 	// Server
 	GetFactomNodeName() string
 	GetSalt(Timestamp) uint32 // A secret number computed from a TS that tests if a message was issued from this server or not
-	Clone(number int) IState
 	GetCfg() IFactomConfig
 	GetConfigPath() string
 	LoadConfig(filename string, networkFlag string)
