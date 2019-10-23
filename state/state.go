@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"strings"
 	"sync"
 	"time"
 
@@ -52,17 +51,47 @@ var packageLogger = log.WithFields(log.Fields{"package": "state"})
 
 var _ = fmt.Print
 
+type StateConfig struct {
+	CheckChainHeads struct {
+		CheckChainHeads bool
+		Fix             bool
+	}
+	CloneDBType             string
+	ControlPanelPort        int
+	ControlPanelSetting     int
+	DBType                  string
+	DirectoryBlockInSeconds int
+	DropRate                int
+	FactomdLocations        string
+	FactomdTLSCertFile      string
+	FactomdTLSEnable        bool
+	FactomdTLSKeyFile       string
+	FactomNodeName          string
+	FastSaveRate            int
+	FaultTimeout            int
+	LeaderTimestamp         interfaces.Timestamp
+	OutputAllowed           bool
+	PortNumber              int
+	preBootTime             *primitives.Timestamp
+	Prefix                  string
+	RpcAuthHash             []byte
+	RpcPass                 string
+	RpcUser                 string
+	StartDelayLimit         int64
+	TimeOffset              *primitives.Timestamp
+	TimestampAtBoot         interfaces.Timestamp
+	WaitForEntries          bool
+}
+
 type State struct {
 	common.Name
+	StateConfig
 	Logger            *log.Entry
 	RunState          runstate.RunState
 	NetworkController *p2p.Controller
 	Salt              interfaces.IHash
 	Cfg               interfaces.IFactomConfig
 	ConfigFilePath    string // $HOME/.factom/m2/factomd.conf by default
-
-	Prefix          string
-	FactomNodeName  string
 	FactomdVersion  string
 	LogPath         string
 	LdbPath         string
@@ -70,12 +99,6 @@ type State struct {
 	LogLevel        string
 	ConsoleLogLevel string
 	NodeMode        string
-	DBType          string
-	CheckChainHeads struct {
-		CheckChainHeads bool
-		Fix             bool
-	}
-	CloneDBType       string
 	ExportData        bool
 	ExportDataSubpath string
 
@@ -85,16 +108,12 @@ type State struct {
 	DBStatesReceivedBase    int
 	DBStatesReceived        []*messages.DBStateMsg
 	LocalServerPrivKey      string
-	DirectoryBlockInSeconds int
 	PortNumber              int
 	Replay                  *Replay
 	FReplay                 *Replay
 	CrossReplay             *CrossReplayFilter
-	DropRate                int
 	Delay                   int64 // Simulation delays sending messages this many milliseconds
 
-	ControlPanelPort    int
-	ControlPanelSetting int
 	// Keeping the last display state lets us know when to send over the new blocks
 	LastDisplayState        *DisplayState
 	ControlPanelChannel     chan DisplayState
@@ -198,11 +217,6 @@ type State struct {
 	RpcUser     string
 	RpcPass     string
 	RpcAuthHash []byte
-
-	FactomdTLSEnable   bool
-	FactomdTLSKeyFile  string
-	FactomdTLSCertFile string
-	FactomdLocations   string
 
 	CorsDomains []string
 	// Server State
@@ -738,196 +752,6 @@ func (s *State) GetAckChange() (bool, error) {
 	flag = s.AckChange != change
 	s.AckChange = change
 	return flag, nil
-}
-
-func (s *State) LoadConfig(filename string, networkFlag string) {
-	//	s.FactomNodeName = s.Prefix + "FNode0" // Default Factom Node Name for Simulation
-
-	if len(filename) > 0 {
-		s.ConfigFilePath = filename
-		s.ReadCfg(filename)
-
-		// Get our factomd configuration information.
-		cfg := s.GetCfg().(*util.FactomdConfig)
-
-		s.Network = cfg.App.Network
-		if 0 < len(networkFlag) { // Command line overrides the config file.
-			s.Network = networkFlag
-			globals.Params.NetworkName = networkFlag // in case it did not come from there.
-		} else {
-			globals.Params.NetworkName = s.Network
-		}
-		fmt.Printf("\n\nNetwork : %s\n", s.Network)
-
-		networkName := strings.ToLower(s.Network) + "-"
-		// TODO: improve the paths after milestone 1
-		cfg.App.LdbPath = cfg.App.HomeDir + networkName + cfg.App.LdbPath
-		cfg.App.BoltDBPath = cfg.App.HomeDir + networkName + cfg.App.BoltDBPath
-		cfg.App.DataStorePath = cfg.App.HomeDir + networkName + cfg.App.DataStorePath
-		cfg.Log.LogPath = cfg.App.HomeDir + networkName + cfg.Log.LogPath
-		cfg.App.ExportDataSubpath = cfg.App.HomeDir + networkName + cfg.App.ExportDataSubpath
-		cfg.App.PeersFile = cfg.App.HomeDir + networkName + cfg.App.PeersFile
-		cfg.App.ControlPanelFilesPath = cfg.App.HomeDir + cfg.App.ControlPanelFilesPath
-
-		s.LogPath = cfg.Log.LogPath + s.Prefix
-		s.LdbPath = cfg.App.LdbPath + s.Prefix
-		s.BoltDBPath = cfg.App.BoltDBPath + s.Prefix
-		s.LogLevel = cfg.Log.LogLevel
-		s.ConsoleLogLevel = cfg.Log.ConsoleLogLevel
-		s.NodeMode = cfg.App.NodeMode
-		s.DBType = cfg.App.DBType
-		s.ExportData = cfg.App.ExportData // bool
-		s.ExportDataSubpath = cfg.App.ExportDataSubpath
-		s.MainNetworkPort = cfg.App.MainNetworkPort
-		s.PeersFile = cfg.App.PeersFile
-		s.MainSeedURL = cfg.App.MainSeedURL
-		s.MainSpecialPeers = cfg.App.MainSpecialPeers
-		s.TestNetworkPort = cfg.App.TestNetworkPort
-		s.TestSeedURL = cfg.App.TestSeedURL
-		s.TestSpecialPeers = cfg.App.TestSpecialPeers
-		s.CustomBootstrapIdentity = cfg.App.CustomBootstrapIdentity
-		s.CustomBootstrapKey = cfg.App.CustomBootstrapKey
-		s.LocalNetworkPort = cfg.App.LocalNetworkPort
-		s.LocalSeedURL = cfg.App.LocalSeedURL
-		s.LocalSpecialPeers = cfg.App.LocalSpecialPeers
-		s.LocalServerPrivKey = cfg.App.LocalServerPrivKey
-		s.CustomNetworkPort = cfg.App.CustomNetworkPort
-		s.CustomSeedURL = cfg.App.CustomSeedURL
-		s.CustomSpecialPeers = cfg.App.CustomSpecialPeers
-		s.FactoshisPerEC = cfg.App.ExchangeRate
-		s.DirectoryBlockInSeconds = cfg.App.DirectoryBlockInSeconds
-		s.PortNumber = cfg.App.PortNumber
-		s.ControlPanelPort = cfg.App.ControlPanelPort
-		s.RpcUser = cfg.App.FactomdRpcUser
-		s.RpcPass = cfg.App.FactomdRpcPass
-		// if RequestTimeout is not set by the configuration it will default to 0.
-		//		If it is 0, the loop that uses it will set it to the blocktime/20
-		//		We set it there, as blktime might change after this function (from mainnet selection)
-		s.RequestTimeout = time.Duration(cfg.App.RequestTimeout) * time.Second
-		s.RequestLimit = cfg.App.RequestLimit
-
-		s.StateSaverStruct.FastBoot = cfg.App.FastBoot
-		s.StateSaverStruct.FastBootLocation = cfg.App.FastBootLocation
-		s.FastBoot = cfg.App.FastBoot
-		s.FastBootLocation = cfg.App.FastBootLocation
-
-		// to test run curl -H "Origin: http://anotherexample.com" -H "Access-Control-Request-Method: POST" /
-		//     -H "Access-Control-Request-Headers: X-Requested-With" -X POST /
-		//     --data-binary '{"jsonrpc": "2.0", "id": 0, "method": "heights"}' -H 'content-type:text/plain;'  /
-		//     --verbose http://localhost:8088/v2
-
-		// while the config file has http://anotherexample.com in parameter CorsDomains the response should contain the string
-		// < Access-Control-Allow-Origin: http://anotherexample.com
-
-		if len(cfg.App.CorsDomains) > 0 {
-			domains := strings.Split(cfg.App.CorsDomains, ",")
-			s.CorsDomains = make([]string, len(domains))
-			for _, domain := range domains {
-				s.CorsDomains = append(s.CorsDomains, strings.Trim(domain, " "))
-			}
-		}
-		s.FactomdTLSEnable = cfg.App.FactomdTlsEnabled
-
-		FactomdTLSKeyFile := cfg.App.FactomdTlsPrivateKey
-		if cfg.App.FactomdTlsPrivateKey == "/full/path/to/factomdAPIpriv.key" {
-			FactomdTLSKeyFile = fmt.Sprint(cfg.App.HomeDir, "factomdAPIpriv.key")
-		}
-		if s.FactomdTLSKeyFile != FactomdTLSKeyFile {
-			if s.FactomdTLSEnable {
-				if _, err := os.Stat(FactomdTLSKeyFile); os.IsNotExist(err) {
-					fmt.Fprintf(os.Stderr, "Configured file does not exits: %s\n", FactomdTLSKeyFile)
-				}
-			}
-			s.FactomdTLSKeyFile = FactomdTLSKeyFile // set state
-		}
-
-		FactomdTLSCertFile := cfg.App.FactomdTlsPublicCert
-		if cfg.App.FactomdTlsPublicCert == "/full/path/to/factomdAPIpub.cert" {
-			s.FactomdTLSCertFile = fmt.Sprint(cfg.App.HomeDir, "factomdAPIpub.cert")
-		}
-		if s.FactomdTLSCertFile != FactomdTLSCertFile {
-			if s.FactomdTLSEnable {
-				if _, err := os.Stat(FactomdTLSCertFile); os.IsNotExist(err) {
-					fmt.Fprintf(os.Stderr, "Configured file does not exits: %s\n", FactomdTLSCertFile)
-				}
-			}
-			s.FactomdTLSCertFile = FactomdTLSCertFile // set state
-		}
-
-		s.FactomdTLSEnable = cfg.App.FactomdTlsEnabled
-		s.FactomdTLSKeyFile = cfg.App.FactomdTlsPrivateKey
-
-		externalIP := strings.Split(cfg.Walletd.FactomdLocation, ":")[0]
-		if externalIP != "localhost" {
-			s.FactomdLocations = externalIP
-		}
-
-		switch cfg.App.ControlPanelSetting {
-		case "disabled":
-			s.ControlPanelSetting = 0
-		case "readonly":
-			s.ControlPanelSetting = 1
-		case "readwrite":
-			s.ControlPanelSetting = 2
-		default:
-			s.ControlPanelSetting = 1
-		}
-		s.FERChainId = cfg.App.ExchangeRateChainId
-		s.ExchangeRateAuthorityPublicKey = cfg.App.ExchangeRateAuthorityPublicKey
-		identity, err := primitives.HexToHash(cfg.App.IdentityChainID)
-		if err != nil {
-			s.IdentityChainID = primitives.Sha([]byte(s.FactomNodeName))
-			s.LogPrintf("AckChange", "Bad IdentityChainID  in config \"%v\"", cfg.App.IdentityChainID)
-			s.LogPrintf("AckChange", "Default2 IdentityChainID \"%v\"", s.IdentityChainID.String())
-		} else {
-			s.IdentityChainID = identity
-			s.LogPrintf("AckChange", "Load IdentityChainID \"%v\"", s.IdentityChainID.String())
-		}
-
-		if cfg.App.P2PIncoming > 0 {
-			p2p.MaxNumberIncomingConnections = cfg.App.P2PIncoming
-		}
-		if cfg.App.P2POutgoing > 0 {
-			p2p.NumberPeersToConnect = cfg.App.P2POutgoing
-		}
-	} else {
-		s.LogPath = "database/"
-		s.LdbPath = "database/ldb"
-		s.BoltDBPath = "database/bolt"
-		s.LogLevel = "none"
-		s.ConsoleLogLevel = "standard"
-		s.NodeMode = "SERVER"
-		s.DBType = "Map"
-		s.ExportData = false
-		s.ExportDataSubpath = "data/export"
-		s.Network = "TEST"
-		s.MainNetworkPort = "8108"
-		s.PeersFile = "peers.json"
-		s.MainSeedURL = "https://raw.githubusercontent.com/FactomProject/factomproject.github.io/master/seed/mainseed.txt"
-		s.MainSpecialPeers = ""
-		s.TestNetworkPort = "8109"
-		s.TestSeedURL = "https://raw.githubusercontent.com/FactomProject/factomproject.github.io/master/seed/testseed.txt"
-		s.TestSpecialPeers = ""
-		s.LocalNetworkPort = "8110"
-		s.LocalSeedURL = "https://raw.githubusercontent.com/FactomProject/factomproject.github.io/master/seed/localseed.txt"
-		s.LocalSpecialPeers = ""
-
-		s.LocalServerPrivKey = "4c38c72fc5cdad68f13b74674d3ffb1f3d63a112710868c9b08946553448d26d"
-		s.FactoshisPerEC = 006666
-		s.FERChainId = "111111118d918a8be684e0dac725493a75862ef96d2d3f43f84b26969329bf03"
-		s.ExchangeRateAuthorityPublicKey = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
-		s.DirectoryBlockInSeconds = 6
-		s.PortNumber = 8088
-		s.ControlPanelPort = 8090
-		s.ControlPanelSetting = 1
-
-		// TODO:  Actually load the IdentityChainID from the config file
-		s.IdentityChainID = primitives.Sha([]byte(s.FactomNodeName))
-		s.LogPrintf("AckChange", "Default IdentityChainID %v", s.IdentityChainID.String())
-
-	}
-
-	s.updateNetworkControllerConfig()
 }
 
 func (s *State) GetSalt(ts interfaces.Timestamp) uint32 {

@@ -9,12 +9,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/common/messages/electionMsgs"
-	"github.com/FactomProject/factomd/database/databaseOverlay"
-	"github.com/FactomProject/factomd/fnode"
-	"github.com/FactomProject/factomd/registry"
-	"github.com/FactomProject/factomd/worker"
 	"io/ioutil"
 	"math"
 	"os"
@@ -24,20 +18,23 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/messages"
+	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/controlPanel"
+	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/elections"
+	"github.com/FactomProject/factomd/fnode"
 	"github.com/FactomProject/factomd/p2p"
+	"github.com/FactomProject/factomd/registry"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
+	"github.com/FactomProject/factomd/worker"
 	"github.com/FactomProject/factomd/wsapi"
 
 	llog "github.com/FactomProject/factomd/log"
 	log "github.com/sirupsen/logrus"
 )
-
-var _ = fmt.Print
 
 var connectionMetricsChannel = make(chan interface{}, p2p.StandardChannelSize)
 var mLog = new(MsgLog)
@@ -50,407 +47,10 @@ func init() {
 	primitives.General = messages.General
 }
 
-type StateTemplate struct {
-	preBootTime     *primitives.Timestamp
-	TimeOffset      *primitives.Timestamp
-	TimestampAtBoot interfaces.Timestamp
-	LeaderTimestamp interfaces.Timestamp
-	Prefix          string
-	FactomNodeName  string
-	PortNumber              int
-	ControlPanelPort    int
-	StartDelayLimit int64
-	FactomdVersion  string
-	WaitForEntries  bool
-	DirectoryBlockInSeconds int
-	FaultTimeout  int
-	RpcUser     string
-	RpcPass     string
-	RpcAuthHash []byte
-	FactomdTLSEnable   bool
-	FactomdTLSKeyFile  string
-	FactomdTLSCertFile string
-	FactomdLocations   string
-	FastSaveRate            int
-	CheckChainHeads struct {
-		CheckChainHeads bool
-		Fix             bool
-	}
-	DBType          string
-	CloneDBType       string
-	OutputAllowed   bool
-	DropRate                int
-
-	//Salt              interfaces.IHash
-	//Cfg               interfaces.IFactomConfig
-	//ConfigFilePath    string // $HOME/.factom/m2/factomd.conf by default
-	//Prefix          string
-	//FactomNodeName  string
-	//LogPath         string
-	//LdbPath         string
-	//BoltDBPath      string
-	//LogLevel        string
-	//ConsoleLogLevel string
-	//NodeMode        string
-	//ExportData        bool
-	//ExportDataSubpath string
-
-	//LogBits int64 // Bit zero is for logging the Directory Block on DBSig [5]
-
-	//DBStatesSent            []*interfaces.DBStateSent
-	//DBStatesReceivedBase    int
-	//DBStatesReceived        []*messages.DBStateMsg
-	//LocalServerPrivKey      string
-	//Delay                   int64 // Simulation delays sending messages this many milliseconds
-
-	//ControlPanelPort    int
-	ControlPanelSetting int
-	//// Keeping the last display state lets us know when to send over the new blocks
-	//ControlPanelDataRequest bool // If true, update Display state
-
-	//// Network Configuration
-	//Network                 string
-	//MainNetworkPort         string
-	//PeersFile               string
-	//MainSeedURL             string
-	//MainSpecialPeers        string
-	//TestNetworkPort         string
-	//TestSeedURL             string
-	//TestSpecialPeers        string
-	//LocalNetworkPort        string
-	//LocalSeedURL            string
-	//LocalSpecialPeers       string
-	//CustomNetworkPort       string
-	//CustomSeedURL           string
-	//CustomSpecialPeers      string
-	//CustomNetworkID         []byte
-	//CustomBootstrapIdentity string
-	//CustomBootstrapKey      string
-
-	//IdentityChainID interfaces.IHash // If this node has an identity, this is it
-	////Identities      []*Identity      // Identities of all servers in management chain
-	//// Authorities          []*Authority     // Identities of all servers in management chain
-	//AuthorityServerCount int // number of federated or audit servers allowed
-
-	//// Just to print (so debugging doesn't drive functionality)
-	//Status      int // Return a status (0 do nothing, 1 provide queues, 2 provide consensus data)
-	//serverPrt   string
-	//StatusMutex sync.Mutex
-	//StatusStrs  []string
-	//Starttime   time.Time
-	//transCnt    int
-	//lasttime    time.Time
-	//tps         float64
-	//ResetTryCnt int
-	//ResetCnt    int
-
-	////  pending entry/transaction api calls for the holding queue do not have proper scope
-	////  This is used to create a temporary, correctly scoped holding queue snapshot for the calls on demand
-	//HoldingMutex sync.RWMutex
-	//HoldingLast  int64
-	//HoldingMap   map[[32]byte]interfaces.IMsg
-
-	//// Elections are managed through the Elections Structure
-	//EFactory  interfaces.IElectionsFactory
-	//Elections interfaces.IElections
-	//Election0 string // Title
-	//Election1 string // Election state for display
-	//Election2 string // Election state for display
-	//Election3 string // Election leader list
-
-	////  pending entry/transaction api calls for the ack queue do not have proper scope
-	////  This is used to create a temporary, correctly scoped ackqueue snapshot for the calls on demand
-	//AcksMutex sync.RWMutex
-	//AcksLast  int64
-	//AcksMap   map[[32]byte]interfaces.IMsg
-
-	//DBStateAskCnt     int
-	//DBStateReplyCnt   int
-	//DBStateIgnoreCnt  int
-	//DBStateAppliedCnt int
-
-	//MissingRequestAskCnt      int
-	//MissingRequestReplyCnt    int
-	//MissingRequestIgnoreCnt   int
-	//MissingResponseAppliedCnt int
-
-	//ResendCnt int
-	//ExpireCnt int
-
-	//tickerQueue            chan int
-	//timerMsgQueue          chan interfaces.IMsg
-	//MaxTimeOffset          interfaces.Timestamp
-	//networkOutMsgQueue     queue.MsgQueue
-	//networkInvalidMsgQueue chan interfaces.IMsg
-	//inMsgQueue             queue.MsgQueue
-	//inMsgQueue2            queue.MsgQueue
-	//electionsQueue         queue.MsgQueue
-	//apiQueue               queue.MsgQueue
-	//ackQueue               chan interfaces.IMsg
-	//msgQueue               chan interfaces.IMsg
-	//// prioritizedMsgQueue contains messages we know we need for consensus. (missing from processlist)
-	////		Currently messages from MMR handling can be put in here to fast track
-	////		them to the front.
-	//prioritizedMsgQueue chan interfaces.IMsg
-
-	//ShutdownChan chan int // For gracefully halting Factom
-
-	//ServerPrivKey         *primitives.PrivateKey
-	//ServerPubKey          *primitives.PublicKey
-	//serverPendingPrivKeys []*primitives.PrivateKey
-	//serverPendingPubKeys  []*primitives.PublicKey
-
-	//CorsDomains []string
-	//// Server State
-	//StartDelay      int64 // Time in Milliseconds since the last DBState was applied
-	//DBFinished      bool
-	//RunLeader       bool
-	//BootTime        int64 // Time in seconds that we last booted
-
-	//// Ignore missing messages for a period to allow rebooting a network where your
-	//// own messages from the previously executing network can confuse you.
-	//IgnoreDone    bool
-	//IgnoreMissing bool
-
-	//// Timout and Limit for outstanding missing DBState requests
-	//RequestTimeout time.Duration
-	//RequestLimit   int
-
-	//LLeaderHeight   uint32
-	//Leader          bool
-	//LeaderVMIndex   int
-	//PLProcessHeight uint32
-	//// Height cutoff where no missing messages below this height
-	//DBHeightAtBoot  uint32
-	//CurrentMinute   int
-
-	//// These are the start times for blocks and minutes
-	//PreviousMinuteStartTime int64
-	//CurrentMinuteStartTime  int64
-	//CurrentBlockStartTime   int64
-
-	//EOMsyncing   bool
-	//EOMSyncTime  int64
-	//EOM          bool // Set to true when the first EOM is encountered
-	//EOMLimit     int
-	//EOMProcessed int
-	//EOMDone      bool
-	//EOMMinute    int
-	//EOMSys       bool // At least one EOM has covered the System List
-
-	//DBSig          bool
-	//DBSigLimit     int
-	//DBSigProcessed int // Number of DBSignatures received and processed.
-	//DBSigDone      bool
-	//DBSigSys       bool // At least one DBSig has covered the System List
-
-	//CreatedLastBlockFromDBState bool
-
-	//// By default, this is false, which means DBstates are discarded
-	//// when a majority of leaders disagree with the hash we have via DBSigs
-	//KeepMismatch bool
-
-	//DBSigFails int // Keep track of how many blockhash mismatches we've had to correct
-
-	//Saving  bool // True if we are in the process of saving to the database
-	//Syncing bool // Looking for messages from leaders to sync
-
-	//NetStateOff            bool // Disable if true, Enable if false
-	//DebugConsensus         bool // If true, dump consensus trace
-	//FactoidTrans           int
-	//ECCommits              int
-	//ECommits               int
-	//FCTSubmits             int
-	//NewEntryChains         int
-	//NewEntries             int
-	//messageFilterTimestamp interfaces.Timestamp
-	//// Maps
-	//// ====
-	//// For Follower
-	//ResendHolding interfaces.Timestamp         // Timestamp to gate resending holding to neighbors
-	//HoldingList   chan [32]byte                // Queue to process Holding in order
-	//HoldingVM     int                          // VM used to build current holding list
-	//Holding       map[[32]byte]interfaces.IMsg // Hold Messages
-	//XReview       []interfaces.IMsg            // After the EOM, we must review the messages in Holding
-	//Acks          map[[32]byte]interfaces.IMsg // Hold Acknowledgements
-
-	//InvalidMessages      map[[32]byte]interfaces.IMsg
-	//InvalidMessagesMutex sync.RWMutex
-
-	//AuditHeartBeats []interfaces.IMsg // The checklist of HeartBeats for this period
-
-	//FaultWait     int
-	//EOMfaultIndex int
-	//LastTiebreak  int64
-
-	//AuthoritySetString string
-	//// Network MAIN = 0, TEST = 1, LOCAL = 2, CUSTOM = 3
-	//NetworkNumber int // Encoded into Directory Blocks(s.Cfg.(*util.FactomdConfig)).String()
-
-	//// Database
-	//DB     interfaces.DBOverlaySimple
-	//Anchor interfaces.IAnchor
-
-	//ResetRequest    bool // Set to true to trigger a reset
-	//highestKnown    uint32
-	//highestAck      uint32
-	//AuthorityDeltas string
-
-	//// Factom State
-	//FactoidState    interfaces.IFactoidState
-	//NumTransactions int
-
-	//// Permanent balances from processing blocks.
-	//RestoreFCT            map[[32]byte]int64
-	//RestoreEC             map[[32]byte]int64
-	//FactoidBalancesPapi   map[[32]byte]int64
-	//FactoidBalancesP      map[[32]byte]int64
-	//FactoidBalancesPMutex sync.Mutex
-	//ECBalancesPapi        map[[32]byte]int64
-	//ECBalancesP           map[[32]byte]int64
-	//ECBalancesPMutex      sync.Mutex
-	//TempBalanceHash       interfaces.IHash
-	//Balancehash           interfaces.IHash
-
-	//// Web Services
-	//Port int
-
-	//MissingEntryBlockRepeat interfaces.Timestamp
-	//// DBlock Height at which node has a complete set of eblocks+entries
-	//EntryBlockDBHeightComplete uint32
-	//// DBlock Height at which we have started asking for entry blocks
-	//EntryBlockDBHeightProcessing uint32
-	//// Entry Blocks we don't have that we are asking our neighbors for
-
-	//MissingEntryRepeat interfaces.Timestamp
-	//// DBlock Height at which node has a complete set of eblocks+entries
-	//EntryDBHeightComplete uint32
-	//// DBlock Height at which we have started asking for or have all entries
-	//EntryDBHeightProcessing uint32
-
-	//// Holds leaders and followers up until all missing entries are processed, if true
-	//WriteEntry      chan interfaces.IEBEntry
-	//// MessageTally causes the node to keep track of (and display) running totals of each
-	//// type of message received during the tally interval
-	//MessageTally           bool
-	//MessageTalliesReceived [constants.NUM_MESSAGES]int
-	//MessageTalliesSent     [constants.NUM_MESSAGES]int
-
-	//LastPrint    string
-	//LastPrintCnt int
-
-	//// FER section
-	//FactoshisPerEC                 uint64
-	//FERChainId                     string
-	//ExchangeRateAuthorityPublicKey string
-
-	//FERChangeHeight      uint32
-	//FERChangePrice       uint64
-	//FERPriority          uint32
-	//FERPrioritySetHeight uint32
-
-	//AckChange uint32
-
-	//// These stats are collected when we write the dbstate to the database.
-	//NumNewChains   int // Number of new Chains in this block
-	//NumNewEntries  int // Number of new Entries, not counting the first entry in a chain
-	//NumEntries     int // Number of entries in this block (including the entries that create chains)
-	//NumEntryBlocks int // Number of Entry Blocks
-	//NumFCTTrans    int // Number of Factoid Transactions in this block
-
-	//// debug message about state status rolling queue for ControlPanel
-	//pstate              string
-	//SyncingState        [256]string
-	//SyncingStateCurrent int
-
-	//ProcessListProcessCnt int64 // count of attempts to process .. so we can see if the thread is running
-	//StateProcessCnt       int64
-	//StateUpdateState      int64
-	//ValidatorLoopSleepCnt int64
-	//processCnt            int64 // count of attempts to process .. so we can see if the thread is running
-
-	//reportedActivations       [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
-	//validatorLoopThreadID     string
-	//OutputRegEx               *regexp.Regexp
-	//OutputRegExString         string
-	//InputRegEx                *regexp.Regexp
-	//InputRegExString          string
-	//executeRecursionDetection map[[32]byte]interfaces.IMsg
-}
-
-func (t StateTemplate) NewState() (s *state.State) {
-	//s := new(state.State)
-	return s
-}
-
 func NewState(p *FactomParams) *state.State {
-	t := NewStateTemplate
-	_ = t
-	return _NewState(p)
-}
-
-func NewStateTemplate(p *FactomParams) *StateTemplate {
-	s := new(StateTemplate)
-	s.TimestampAtBoot = primitives.NewTimestampNow()
-	s.preBootTime = new(primitives.Timestamp)
-	s.preBootTime.SetTimeMilli(s.TimestampAtBoot.GetTimeMilli() - 20*60*1000)
-	s.LeaderTimestamp = s.TimestampAtBoot
-	s.Prefix = p.Prefix
-	s.FactomNodeName = s.Prefix + "FNode0"
-	s.PortNumber = 8088
-	s.ControlPanelPort = 8090
-	// FIXME
-	//FactomConfigFilename := util.GetConfigFilename("m2")
-	//s.LoadConfig(FactomConfigFilename, p.NetworkName)
-	s.TimeOffset = primitives.NewTimestampFromMilliseconds(uint64(p.TimeOffset))
-	s.StartDelayLimit = p.StartDelay * 1000
-	s.FactomdVersion = FactomdVersion
-	s.WaitForEntries = p.WaitEntries
-	s.PortNumber = p.PortOverride
-	s.ControlPanelPort = p.ControlPanelPortOverride
-	s.DirectoryBlockInSeconds = p.BlkTime
-	s.FaultTimeout = 9999999 //todo: Old Fault Mechanism -- remove
-	s.RpcUser = p.RpcUser
-	s.RpcPass = p.RpcPassword
-	s.FactomdTLSEnable = p.FactomdTLS
-	// s.StateSaverStruct.FastBoot = false
-	// s.StateSaverStruct.FastBootLocation = p.FastLocation
-	s.FastSaveRate = p.FastSaveRate
-	s.CheckChainHeads.CheckChainHeads = p.CheckChainHeads
-	s.CheckChainHeads.Fix = p.FixChainHeads
-
-	//p2p.MaxNumberIncomingConnections = p.P2PIncoming
-	//p2p.NumberPeersToConnect = p.P2POutgoing
-
-	// Command line override if provided
-	switch p.ControlPanelSetting {
-	case "disabled":
-		s.ControlPanelSetting = 0
-	case "readonly":
-		s.ControlPanelSetting = 1
-	case "readwrite":
-		s.ControlPanelSetting = 2
-	}
-
-	// FIXME
-	//s.KeepMismatch = p.KeepMismatch
-
-	if len(p.Db) > 0 {
-		s.DBType = p.Db
-	} else {
-		p.Db = s.DBType
-	}
-
-	if len(p.CloneDB) > 0 {
-		s.CloneDBType = p.CloneDB
-	} else {
-		s.CloneDBType = p.Db
-	}
-
-	s.OutputAllowed = false
-	s.DropRate = p.DropRate
-	//s.EFactory = new(electionMsgs.ElectionsFactory)
-	// TODO: exposes all fields used during State Factory
+	logPort = p.LogPort
+	s := state.NewState(p, FactomdVersion)
+	s.EFactory = new(electionMsgs.ElectionsFactory)
 	return s
 }
 
@@ -592,7 +192,7 @@ func makeNode0(w *worker.Thread, p *FactomParams) *fnode.FactomNode {
 		height, err := s.DB.FetchDatabaseEntryHeight()
 		if err != nil {
 			s.LogPrintf("EntrySync", "Error reading EntryDBHeightComplete NetStart EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
-			os.Stderr.WriteString(fmt.Sprintf("ERROR reading Entry DBHeight Complete: %v\n", err))
+			_, _ = os.Stderr.WriteString(fmt.Sprintf("ERROR reading Entry DBHeight Complete: %v\n", err))
 		} else {
 			s.EntryDBHeightComplete = height
 			s.LogPrintf("EntrySync", "NetStart EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
@@ -671,7 +271,7 @@ func buildNetTopology(p *FactomParams) {
 		for scanner.Scan() {
 			var a, b int
 			var s string
-			fmt.Sscanf(scanner.Text(), "%d %s %d", &a, &s, &b)
+			_, _ = fmt.Sscanf(scanner.Text(), "%d %s %d", &a, &s, &b)
 			if s == "--" {
 				AddSimPeer(nodes, a, b)
 			}
@@ -766,7 +366,7 @@ func buildNetTopology(p *FactomParams) {
 
 	}
 
-	var colors []string = []string{"95cde5", "b01700", "db8e3c", "ffe35f"}
+	var colors = []string{"95cde5", "b01700", "db8e3c", "ffe35f"}
 
 	if len(nodes) > 2 {
 		for i, s := range nodes {
@@ -915,22 +515,22 @@ func startFnodes(w *worker.Thread) {
 			if i > 0 {
 				node.State.Initialize(w)
 			}
-			startServer(w, i, node)
+			startServer(w, node)
 		}
 	}, "StartServers")
 }
 
-func startServer(w *worker.Thread, i int, fnode *fnode.FactomNode) {
+func startServer(w *worker.Thread, node *fnode.FactomNode) {
 
-	NetworkProcessorNet(w, fnode)
-	fnode.State.ValidatorLoop(w)
-	elections.Run(w, fnode.State)
-	fnode.State.StartMMR(w)
+	NetworkProcessorNet(w, node)
+	node.State.ValidatorLoop(w)
+	elections.Run(w, node.State)
+	node.State.StartMMR(w)
 
-	w.Run(func() { state.LoadDatabase(fnode.State) }, "LoadDatabase")
-	w.Run(fnode.State.GoSyncEntries, "SyncEntries")
-	w.Run(func() { Timer(fnode.State) }, "Timer")
-	w.Run(fnode.State.MissingMessageResponseHandler.Run, "MMRHandler")
+	w.Run(func() { state.LoadDatabase(node.State) }, "LoadDatabase")
+	w.Run(node.State.GoSyncEntries, "SyncEntries")
+	w.Run(func() { Timer(node.State) }, "Timer")
+	w.Run(node.State.MissingMessageResponseHandler.Run, "MMRHandler")
 }
 
 func setupFirstAuthority(s *state.State) {
@@ -940,7 +540,7 @@ func setupFirstAuthority(s *state.State) {
 		return
 	}
 
-	s.IdentityControl.SetBootstrapIdentity(s.GetNetworkBootStrapIdentity(), s.GetNetworkBootStrapKey())
+	_ = s.IdentityControl.SetBootstrapIdentity(s.GetNetworkBootStrapIdentity(), s.GetNetworkBootStrapKey())
 }
 
 func AddNode() {
@@ -952,12 +552,12 @@ func AddNode() {
 	modifyLoadIdentities()
 
 	fnodes = fnode.GetFnodes()
-	fnodes[i].State.IntiateNetworkSkeletonIdentity()
-	fnodes[i].State.InitiateNetworkIdentityRegistration()
+	_ = fnodes[i].State.IntiateNetworkSkeletonIdentity()
+	_ = fnodes[i].State.InitiateNetworkIdentityRegistration()
 	AddSimPeer(fnodes, i, i-1) // KLUDGE peer w/ only last node
 	p := registry.New()
 	p.Register(func(w *worker.Thread) {
-		startServer(w, i, fnodes[i])
+		startServer(w, fnodes[i])
 	}, "AddNode")
 	go p.Run() // kick off independent process
 }
