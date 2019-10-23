@@ -229,7 +229,6 @@ type State struct {
 	// Height cutoff where no missing messages below this height
 	DBHeightAtBoot  uint32
 	TimestampAtBoot interfaces.Timestamp
-	OneLeader       bool
 	OutputAllowed   bool
 	CurrentMinute   int
 
@@ -555,9 +554,6 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 	newState.FactoshisPerEC = s.FactoshisPerEC
 
 	newState.Port = s.Port
-
-	newState.OneLeader = s.OneLeader
-	newState.OneLeader = s.OneLeader
 
 	newState.RpcUser = s.RpcUser
 	newState.RpcPass = s.RpcPass
