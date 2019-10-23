@@ -51,6 +51,7 @@ var packageLogger = log.WithFields(log.Fields{"package": "state"})
 
 var _ = fmt.Print
 
+// loaded directly from factomParams
 type StateConfig struct {
 	CheckChainHeads struct {
 		CheckChainHeads bool
@@ -381,6 +382,7 @@ type State struct {
 	WaitForEntries  bool
 	UpdateEntryHash chan *EntryUpdate // Channel for updating entry Hashes tracking (repeats and such)
 	WriteEntry      chan interfaces.IEBEntry
+
 	// MessageTally causes the node to keep track of (and display) running totals of each
 	// type of message received during the tally interval
 	MessageTally           bool
@@ -426,7 +428,6 @@ type State struct {
 	NumFCTTrans    int // Number of Factoid Transactions in this block
 
 	// debug message about state status rolling queue for ControlPanel
-	pstate              string
 	SyncingState        [256]string
 	SyncingStateCurrent int
 
