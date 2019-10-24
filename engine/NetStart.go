@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
-	. "github.com/FactomProject/factomd/common/globals"
+	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
@@ -51,7 +51,7 @@ func echo(s string, more ...interface{}) {
 	_, _ = os.Stderr.WriteString(fmt.Sprintf(s, more...))
 }
 
-func echoConfig(s *state.State, p *FactomParams) {
+func echoConfig(s *state.State, p *globals.FactomParams) {
 
 	fmt.Println(">>>>>>>>>>>>>>>>")
 	fmt.Println(">>>>>>>>>>>>>>>> Net Sim Start!")
@@ -112,7 +112,7 @@ func echoConfig(s *state.State, p *FactomParams) {
 }
 
 // init mlog & set log levels
-func SetLogLevel(p *FactomParams) {
+func SetLogLevel(p *globals.FactomParams) {
 	mLog.Init(p.RuntimeLog, p.Cnt)
 
 	log.SetOutput(os.Stdout)
@@ -166,18 +166,16 @@ func initEntryHeight(s *state.State, target int) {
 	}
 }
 
-func NetStart(w *worker.Thread, p *FactomParams, listenToStdin bool) {
-	w.Spawn(func(w *worker.Thread) {
-		messages.AckBalanceHash = p.AckbalanceHash
-		w.RegisterInterruptHandler(interruptHandler)
-		for i := 0; i < p.Cnt; i++ {
-			makeServer(w, p)
-		}
-		startNetwork(w, p)
-		startFnodes(w)
-		startWebserver(w)
-		startSimControl(w, p.ListenTo, listenToStdin)
-	})
+func NetStart(w *worker.Thread, p *globals.FactomParams, listenToStdin bool) {
+	messages.AckBalanceHash = p.AckbalanceHash
+	w.RegisterInterruptHandler(interruptHandler)
+	for i := 0; i < p.Cnt; i++ {
+		makeServer(w, p)
+	}
+	startNetwork(w, p)
+	startFnodes(w)
+	startWebserver(w)
+	startSimControl(w, p.ListenTo, listenToStdin)
 }
 
 // Anchoring related configurations
@@ -205,7 +203,7 @@ func initAnchors(s *state.State, reparse bool) {
 }
 
 // construct a simulated network
-func buildNetTopology(p *FactomParams) {
+func buildNetTopology(p *globals.FactomParams) {
 	nodes := fnode.GetFnodes()
 
 	switch p.Net {
@@ -340,7 +338,7 @@ func startWebserver(w *worker.Thread) {
 	})
 }
 
-func startNetwork(w *worker.Thread, p *FactomParams) {
+func startNetwork(w *worker.Thread, p *globals.FactomParams) {
 	s := fnode.Get(0).State
 	// Modify Identities of new nodes
 	if fnode.Len() > 1 && len(s.Prefix) == 0 {
@@ -415,10 +413,13 @@ func startNetwork(w *worker.Thread, p *FactomParams) {
 		ConnectionMetricsChannel: connectionMetricsChannel,
 	}
 
-	p2pNetwork = new(p2p.Controller).Init(ci)
+	p2pNetwork = new(p2p.Controller).Initialize(ci)
 	s.NetworkController = p2pNetwork
+	p2pNetwork.Init(s, "p2pNetwork")
+
 	p2pNetwork.StartNetwork(w)
-	p2pProxy = new(P2PProxy).Init(s.FactomNodeName, "P2P Network").(*P2PProxy)
+	p2pProxy = new(P2PProxy).Initialize(s.FactomNodeName, "P2P Network").(*P2PProxy)
+	p2pProxy.Init(s, "p2pProxy")
 	p2pProxy.FromNetwork = p2pNetwork.FromNetwork
 	p2pProxy.ToNetwork = p2pNetwork.ToNetwork
 	p2pProxy.StartProxy(w)
@@ -442,7 +443,7 @@ var state0Init sync.Once // we do some extra init for the first state
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
 //**********************************************************************
-func makeServer(w *worker.Thread, p * FactomParams) (node *fnode.FactomNode) {
+func makeServer(w *worker.Thread, p * globals.FactomParams) (node *fnode.FactomNode) {
 	i := fnode.Len()
 
 	if i == 0 {
