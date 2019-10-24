@@ -8,7 +8,7 @@ import (
 
 func TestSimulation(t *testing.T) {
 	// Just load simulator
-	assert.NotPanics(t, func(){
+	assert.NotPanics(t, func() {
 		testHelper.SetupSim("LFF", map[string]string{}, 10, 0, 0, t)
 	})
 }

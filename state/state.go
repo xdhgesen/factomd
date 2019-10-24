@@ -82,43 +82,10 @@ type StateConfig struct {
 	TimeOffset              interfaces.Timestamp
 	TimestampAtBoot         interfaces.Timestamp
 	WaitForEntries          bool
-}
-
-type State struct {
-	common.Name
-	StateConfig
-	Logger            *log.Entry
-	RunState          runstate.RunState
-	NetworkController *p2p.Controller
-	Salt              interfaces.IHash
-	Cfg               interfaces.IFactomConfig
-	ConfigFilePath    string // $HOME/.factom/m2/factomd.conf by default
-	FactomdVersion  string
-	LogPath         string
-	LdbPath         string
-	BoltDBPath      string
-	LogLevel        string
-	ConsoleLogLevel string
-	NodeMode        string
-	ExportData        bool
-	ExportDataSubpath string
-
-	LogBits int64 // Bit zero is for logging the Directory Block on DBSig [5]
-
-	DBStatesSent            []*interfaces.DBStateSent
-	DBStatesReceivedBase    int
-	DBStatesReceived        []*messages.DBStateMsg
-	LocalServerPrivKey      string
-	Replay                  *Replay
-	FReplay                 *Replay
-	CrossReplay             *CrossReplayFilter
-	Delay                   int64 // Simulation delays sending messages this many milliseconds
-
-	// Keeping the last display state lets us know when to send over the new blocks
-	LastDisplayState        *DisplayState
-	ControlPanelChannel     chan DisplayState
-	ControlPanelDataRequest bool // If true, update Display state
-
+	FactomdVersion          string
+	LogLevel                string
+	ConsoleLogLevel         string
+	ExportData              bool
 	// Network Configuration
 	Network                 string
 	MainNetworkPort         string
@@ -137,6 +104,45 @@ type State struct {
 	CustomNetworkID         []byte
 	CustomBootstrapIdentity string
 	CustomBootstrapKey      string
+	FaultWait               int
+	EOMfaultIndex           int
+	FactoshisPerEC          uint64
+	Port                    int
+	RequestTimeout          time.Duration
+	RequestLimit            int
+	CorsDomains             []string
+	NodeMode                string
+}
+
+type State struct {
+	common.Name
+	StateConfig
+	Logger            *log.Entry
+	RunState          runstate.RunState
+	NetworkController *p2p.Controller
+	Salt              interfaces.IHash
+	Cfg               interfaces.IFactomConfig
+	ConfigFilePath    string // $HOME/.factom/m2/factomd.conf by default
+	LogPath           string
+	LdbPath           string
+	BoltDBPath        string
+	ExportDataSubpath string
+
+	LogBits int64 // Bit zero is for logging the Directory Block on DBSig [5]
+
+	DBStatesSent         []*interfaces.DBStateSent
+	DBStatesReceivedBase int
+	DBStatesReceived     []*messages.DBStateMsg
+	LocalServerPrivKey   string
+	Replay               *Replay
+	FReplay              *Replay
+	CrossReplay          *CrossReplayFilter
+	Delay                int64 // Simulation delays sending messages this many milliseconds
+
+	// Keeping the last display state lets us know when to send over the new blocks
+	LastDisplayState        *DisplayState
+	ControlPanelChannel     chan DisplayState
+	ControlPanelDataRequest bool // If true, update Display state
 
 	IdentityChainID interfaces.IHash // If this node has an identity, this is it
 	//Identities      []*Identity      // Identities of all servers in management chain
@@ -213,23 +219,17 @@ type State struct {
 	serverPendingPubKeys  []*primitives.PublicKey
 
 	// RPC connection config
-	RpcAuthHash []byte
-	CorsDomains []string
 
 	// Server State
-	StartDelay      int64 // Time in Milliseconds since the last DBState was applied
-	DBFinished      bool
-	RunLeader       bool
-	BootTime        int64 // Time in seconds that we last booted
+	StartDelay int64 // Time in Milliseconds since the last DBState was applied
+	DBFinished bool
+	RunLeader  bool
+	BootTime   int64 // Time in seconds that we last booted
 
 	// Ignore missing messages for a period to allow rebooting a network where your
 	// own messages from the previously executing network can confuse you.
 	IgnoreDone    bool
 	IgnoreMissing bool
-
-	// Timout and Limit for outstanding missing DBState requests
-	RequestTimeout time.Duration
-	RequestLimit   int
 
 	LLeaderHeight   uint32
 	Leader          bool
@@ -237,8 +237,8 @@ type State struct {
 	LeaderPL        *ProcessList
 	PLProcessHeight uint32
 	// Height cutoff where no missing messages below this height
-	DBHeightAtBoot  uint32
-	CurrentMinute   int
+	DBHeightAtBoot uint32
+	CurrentMinute  int
 
 	// These are the start times for blocks and minutes
 	PreviousMinuteStartTime int64
@@ -296,9 +296,7 @@ type State struct {
 
 	AuditHeartBeats []interfaces.IMsg // The checklist of HeartBeats for this period
 
-	FaultWait     int
-	EOMfaultIndex int
-	LastTiebreak  int64
+	LastTiebreak int64
 
 	AuthoritySetString string
 	// Network MAIN = 0, TEST = 1, LOCAL = 2, CUSTOM = 3
@@ -346,9 +344,6 @@ type State struct {
 	TempBalanceHash       interfaces.IHash
 	Balancehash           interfaces.IHash
 
-	// Web Services
-	Port int
-
 	// State for the Entry Syncing process
 	EntrySyncState *EntrySync
 
@@ -383,7 +378,6 @@ type State struct {
 	LastPrintCnt int
 
 	// FER section
-	FactoshisPerEC                 uint64
 	FERChainId                     string
 	ExchangeRateAuthorityPublicKey string
 
@@ -1872,7 +1866,9 @@ func (s *State) SetPort(port int) {
 	s.PortNumber = port
 }
 
-func (s *State) GetPort() int { return s.PortNumber }
+func (s *State) GetPort() int {
+	return s.PortNumber
+}
 
 func (s *State) TickerQueue() chan int {
 	return s.tickerQueue

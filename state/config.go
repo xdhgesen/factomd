@@ -15,8 +15,6 @@ import (
 	"github.com/FactomProject/factomd/util"
 )
 
-
-
 func (s *State) LoadConfigFromFile(filename string, networkFlag string) {
 	s.ConfigFilePath = filename
 	s.ReadCfg(filename)
@@ -337,6 +335,8 @@ func NewState(p *globals.FactomParams, FactomdVersion string) *State {
 // FIXME: turn into proper factory
 func Clone(s *State, cloneNumber int) interfaces.IState {
 	newState := new(State)
+	newState.StateConfig = s.StateConfig
+
 	number := fmt.Sprintf("%02d", cloneNumber)
 
 	simConfigPath := util.GetHomeDir() + "/.factom/m2/simConfig/"
@@ -364,49 +364,12 @@ func Clone(s *State, cloneNumber int) interfaces.IState {
 		newState.LogPath = s.LogPath + "/Sim" + number
 	}
 
+	newState.NodeMode = "FULL"
 	newState.FactomNodeName = s.Prefix + "FNode" + number
-	newState.FactomdVersion = s.FactomdVersion
 	newState.RunState = runstate.New // reset runstate since this clone will be started by sim node
-	newState.DropRate = s.DropRate
 	newState.LdbPath = s.LdbPath + "/Sim" + number
 	newState.BoltDBPath = s.BoltDBPath + "/Sim" + number
-	newState.LogLevel = s.LogLevel
-	newState.ConsoleLogLevel = s.ConsoleLogLevel
-	newState.NodeMode = "FULL"
-	newState.CloneDBType = s.CloneDBType
-	newState.DBType = s.CloneDBType
-	newState.CheckChainHeads = s.CheckChainHeads
-	newState.ExportData = s.ExportData
 	newState.ExportDataSubpath = s.ExportDataSubpath + "sim-" + number
-	newState.Network = s.Network
-	newState.MainNetworkPort = s.MainNetworkPort
-	newState.PeersFile = s.PeersFile
-	newState.MainSeedURL = s.MainSeedURL
-	newState.MainSpecialPeers = s.MainSpecialPeers
-	newState.TestNetworkPort = s.TestNetworkPort
-	newState.TestSeedURL = s.TestSeedURL
-	newState.TestSpecialPeers = s.TestSpecialPeers
-	newState.LocalNetworkPort = s.LocalNetworkPort
-	newState.LocalSeedURL = s.LocalSeedURL
-	newState.LocalSpecialPeers = s.LocalSpecialPeers
-	newState.CustomNetworkPort = s.CustomNetworkPort
-	newState.CustomSeedURL = s.CustomSeedURL
-	newState.CustomSpecialPeers = s.CustomSpecialPeers
-	newState.StartDelayLimit = s.StartDelayLimit
-	newState.CustomNetworkID = s.CustomNetworkID
-	newState.CustomBootstrapIdentity = s.CustomBootstrapIdentity
-	newState.CustomBootstrapKey = s.CustomBootstrapKey
-
-	newState.DirectoryBlockInSeconds = s.DirectoryBlockInSeconds
-	newState.PortNumber = s.PortNumber
-
-	newState.ControlPanelPort = s.ControlPanelPort
-	newState.ControlPanelSetting = s.ControlPanelSetting
-
-	//newState.Identities = s.Identities
-	//newState.Authorities = s.Authorities
-	newState.AuthorityServerCount = s.AuthorityServerCount
-
 	newState.IdentityControl = s.IdentityControl.Clone()
 
 	newState.FaultTimeout = s.FaultTimeout
@@ -427,24 +390,6 @@ func Clone(s *State, cloneNumber int) interfaces.IState {
 	newState.TimestampAtBoot = primitives.NewTimestampFromMilliseconds(s.TimestampAtBoot.GetTimeMilliUInt64())
 	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
 	newState.SetMessageFilterTimestamp(s.GetMessageFilterTimestamp())
-
-	newState.FactoshisPerEC = s.FactoshisPerEC
-
-	newState.Port = s.Port
-
-	newState.RpcUser = s.RpcUser
-	newState.RpcPass = s.RpcPass
-	newState.RpcAuthHash = s.RpcAuthHash
-
-	newState.RequestTimeout = s.RequestTimeout
-	newState.RequestLimit = s.RequestLimit
-	newState.FactomdTLSEnable = s.FactomdTLSEnable
-	newState.FactomdTLSKeyFile = s.FactomdTLSKeyFile
-	newState.FactomdTLSCertFile = s.FactomdTLSCertFile
-	newState.FactomdLocations = s.FactomdLocations
-
-	newState.FastSaveRate = s.FastSaveRate
-	newState.CorsDomains = s.CorsDomains
 	switch newState.DBType {
 	case "LDB":
 		newState.StateSaverStruct.FastBoot = s.StateSaverStruct.FastBoot
