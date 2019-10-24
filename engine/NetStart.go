@@ -450,20 +450,16 @@ func makeServer(w *worker.Thread, p * FactomParams) (node *fnode.FactomNode) {
 	} else {
 		node = fnode.New(state.Clone(fnode.Get(0).State, i).(*state.State))
 	}
+	node.State.Initialize(w)
 
 	state0Init.Do(func(){
 		logPort = p.LogPort
 		SetLogLevel(p)
-		node.State.Initialize(w)
 		setupFirstAuthority(node.State)
 		initEntryHeight(node.State, p.Sync2)
 		initAnchors(node.State, p.ReparseAnchorChains)
 		echoConfig(node.State, p) // print the config only once
 	})
-
-	if i > 0 {
-		node.State.Initialize(w)
-	}
 
 	node.State.EFactory = new(electionMsgs.ElectionsFactory)
 	time.Sleep(10 * time.Millisecond)

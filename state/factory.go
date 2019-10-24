@@ -1,18 +1,27 @@
 package state
 
 import (
+	"crypto/rand"
 	"fmt"
-	"github.com/FactomProject/factomd/common/interfaces"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/FactomProject/factomd/common/identity"
+
+	"github.com/FactomProject/factomd/Utilities/CorrectChainHeads/correctChainHeads"
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/constants/runstate"
 	"github.com/FactomProject/factomd/common/globals"
+	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/util"
+	"github.com/FactomProject/factomd/worker"
+	"github.com/FactomProject/factomd/wsapi"
+	log "github.com/sirupsen/logrus"
 )
 
 func (s *State) LoadConfigFromFile(filename string, networkFlag string) {
@@ -397,4 +406,259 @@ func Clone(s *State, cloneNumber int) interfaces.IState {
 		os.MkdirAll(path, 0775)
 	}
 	return newState
+}
+
+func (s *State) Initialize(w *worker.Thread) {
+	if s.Salt == nil {
+		b := make([]byte, 32)
+		_, err := rand.Read(b)
+		if err != nil {
+			panic("Random Number Failure")
+		}
+		s.Salt = primitives.Sha(b)
+	}
+
+	salt := fmt.Sprintf("The Instance ID of this node is %s\n", s.Salt.String()[:16])
+	fmt.Print(salt)
+
+	s.StartDelay = s.GetTimestamp().GetTimeMilli() // We can't start as a leader until we know we are upto date
+	s.RunLeader = false
+	s.IgnoreMissing = true
+	s.BootTime = s.GetTimestamp().GetTimeSeconds()
+	s.TimestampAtBoot = primitives.NewTimestampNow()
+
+	if s.LogPath == "stdout" {
+		wsapi.InitLogs(s.LogPath, s.LogLevel)
+	} else {
+		er := os.MkdirAll(s.LogPath, 0775)
+		if er != nil {
+			panic("Could not create " + s.LogPath + "\n error: " + er.Error())
+		}
+		wsapi.InitLogs(s.LogPath+s.FactomNodeName+".log", s.LogLevel)
+	}
+
+	s.Hold = NewHoldingList(w, s) // setup the dependent holding map
+
+	s.TimeOffset = new(primitives.Timestamp) //interfaces.Timestamp(int64(rand.Int63() % int64(time.Microsecond*10)))
+
+	s.InvalidMessages = make(map[[32]byte]interfaces.IMsg, 0)
+
+	s.ShutdownChan = make(chan int, 1)                //Channel to gracefully shut down.
+	s.tickerQueue = make(chan int, 100)               //ticks from a clock
+	s.timerMsgQueue = make(chan interfaces.IMsg, 100) //incoming eom notifications, used by leaders
+	s.ControlPanelChannel = make(chan DisplayState, 20)
+	s.networkInvalidMsgQueue = make(chan interfaces.IMsg, 100)              //incoming message queue from the network messages
+	s.networkOutMsgQueue = NewNetOutMsgQueue(w, constants.INMSGQUEUE_MED)   //Messages to be broadcast to the network
+	s.inMsgQueue = NewInMsgQueue(w, constants.INMSGQUEUE_HIGH)              //incoming message queue for Factom application messages
+	s.inMsgQueue2 = NewInMsgQueue2(w, constants.INMSGQUEUE_HIGH)            //incoming message queue for Factom application messages
+	s.electionsQueue = NewElectionQueue(w, constants.INMSGQUEUE_HIGH)       //incoming message queue for Factom application messages
+	s.apiQueue = NewAPIQueue(w, constants.INMSGQUEUE_HIGH)                  //incoming message queue from the API
+	s.ackQueue = make(chan interfaces.IMsg, 50)                             //queue of Leadership messages
+	s.msgQueue = make(chan interfaces.IMsg, 50)                             //queue of Follower messages
+	s.prioritizedMsgQueue = make(chan interfaces.IMsg, 50)                  //a prioritized queue of Follower messages (from mmr.go)
+	s.MissingEntries = make(chan *MissingEntry, constants.INMSGQUEUE_HIGH)  //Entries I discover are missing from the database
+	s.UpdateEntryHash = make(chan *EntryUpdate, constants.INMSGQUEUE_HIGH)  //Handles entry hashes and updating Commit maps.
+	s.WriteEntry = make(chan interfaces.IEBEntry, constants.INMSGQUEUE_LOW) //Entries to be written to the database
+	s.RecentMessage.NewMsgs = make(chan interfaces.IMsg, 100)
+
+	// Set up struct to stop replay attacks
+	s.Replay = new(Replay)
+	s.Replay.s = s
+	s.Replay.name = "Replay"
+
+	s.FReplay = new(Replay)
+	s.FReplay.s = s
+	s.FReplay.name = "FReplay"
+
+	// Set up maps for the followers
+	s.Holding = make(map[[32]byte]interfaces.IMsg)
+	s.HoldingList = make(chan [32]byte, 4000)
+	s.Acks = make(map[[32]byte]interfaces.IMsg)
+	s.Commits = NewSafeMsgMap("commits", s) //make(map[[32]byte]interfaces.IMsg)
+
+	// Setup the FactoidState and Validation Service that holds factoid and entry credit balances
+	s.FactoidBalancesP = map[[32]byte]int64{}
+	s.ECBalancesP = map[[32]byte]int64{}
+
+	fs := new(FactoidState)
+	fs.State = s
+	s.FactoidState = fs
+
+	// Allocate the original set of Process Lists
+	s.ProcessLists = NewProcessLists(s)
+	s.FaultWait = 3
+	s.LastTiebreak = 0
+	s.EOMfaultIndex = 0
+
+	s.DBStates = new(DBStateList)
+	s.DBStates.State = s
+	s.DBStates.DBStates = make([]*DBState, 0)
+	w.Run(s.DBStates.Catchup, "Catchup")
+
+	s.StatesMissing = NewStatesMissing()
+	s.StatesWaiting = NewStatesWaiting()
+	s.StatesReceived = NewStatesReceived()
+
+	switch s.NodeMode {
+	case "FULL":
+		s.Leader = false
+		s.Println("\n   +---------------------------+")
+		s.Println("   +------ Follower Only ------+")
+		s.Print("   +---------------------------+\n\n")
+	case "SERVER":
+		s.Println("\n   +-------------------------+")
+		s.Println("   |       Leader Node       |")
+		s.Print("   +-------------------------+\n\n")
+	default:
+		panic("Bad Node Mode (must be FULL or SERVER)")
+	}
+
+	//Database
+	switch s.DBType {
+	case "LDB":
+		if err := s.InitLevelDB(); err != nil {
+			panic(fmt.Sprintf("Error initializing the database: %v", err))
+		}
+	case "Bolt":
+		if err := s.InitBoltDB(); err != nil {
+			panic(fmt.Sprintf("Error initializing the database: %v", err))
+		}
+	case "Map":
+		if err := s.InitMapDB(); err != nil {
+			panic(fmt.Sprintf("Error initializing the database: %v", err))
+		}
+	default:
+		panic("No Database type specified")
+	}
+
+	if s.CheckChainHeads.CheckChainHeads {
+		if s.CheckChainHeads.Fix {
+			// Set dblock head to 184 if 184 is present and head is not 184
+			d, err := s.DB.FetchDBlockHead()
+			if err != nil {
+				// We should have a dblock head...
+				panic(fmt.Errorf("Error loading dblock head: %s\n", err.Error()))
+			}
+
+			if d != nil {
+				if d.GetDatabaseHeight() == 160183 {
+					// Our head is less than 160184, do we have 160184?
+					if d2, err := s.DB.FetchDBlockByHeight(160184); d2 != nil && err == nil {
+						err := s.DB.(*databaseOverlay.Overlay).SaveDirectoryBlockHead(d2)
+						if err != nil {
+							panic(err)
+						}
+					}
+				}
+			}
+		}
+		correctChainHeads.FindHeads(s.DB.(*databaseOverlay.Overlay), correctChainHeads.CorrectChainHeadConfig{
+			PrintFreq: 5000,
+			Fix:       s.CheckChainHeads.Fix,
+		})
+	}
+	if s.ExportData {
+		s.DB.SetExportData(s.ExportDataSubpath)
+	}
+
+	// Cross Boot Replay
+	switch s.DBType {
+	case "Map":
+		s.SetupCrossBootReplay("Map")
+	default:
+		s.SetupCrossBootReplay("Bolt")
+	}
+
+	//Network
+	switch s.Network {
+	case "MAIN":
+		s.NetworkNumber = constants.NETWORK_MAIN
+		s.DirectoryBlockInSeconds = 600
+	case "TEST":
+		s.NetworkNumber = constants.NETWORK_TEST
+	case "LOCAL":
+		s.NetworkNumber = constants.NETWORK_LOCAL
+	case "CUSTOM":
+		s.NetworkNumber = constants.NETWORK_CUSTOM
+	default:
+		panic("Bad value for Network in factomd.conf")
+	}
+
+	s.Println("\nRunning on the ", s.Network, "Network")
+	s.Println("\nExchange rate chain id set to ", s.FERChainId)
+	s.Println("\nExchange rate Authority Public Key set to ", s.ExchangeRateAuthorityPublicKey)
+
+	s.AuditHeartBeats = make([]interfaces.IMsg, 0)
+
+	// If we cloned the Identity control of another node, don't reset!
+	if s.IdentityControl == nil {
+		s.IdentityControl = identity.NewIdentityManager()
+	}
+	s.initServerKeys()
+	s.AuthorityServerCount = 0
+
+	//LoadIdentityCache(s)
+	//StubIdentityCache(s)
+	//needed for multiple nodes with FER.  remove for singe node launch
+	if s.FERChainId == "" {
+		s.FERChainId = "111111118d918a8be684e0dac725493a75862ef96d2d3f43f84b26969329bf03"
+	}
+	if s.ExchangeRateAuthorityPublicKey == "" {
+		s.ExchangeRateAuthorityPublicKey = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
+	}
+	// end of FER removal
+	s.Starttime = time.Now()
+	// Allocate the MMR queues
+	s.asks = make(chan askRef, 50) // Should be > than the number of VMs so each VM can have at least one outstanding ask.
+	s.adds = make(chan plRef, 50)  // No good rule of thumb on the size of this
+	s.dbheights = make(chan int, 1)
+	s.rejects = make(chan MsgPair, 1) // Messages rejected from process list
+
+	// Allocate the missing message handler
+	s.MissingMessageResponseHandler = NewMissingMessageReponseCache(s)
+
+	if s.StateSaverStruct.FastBoot {
+		d, err := s.DB.FetchDBlockHead()
+		if err != nil {
+			panic(err)
+		}
+
+		if d == nil || int(d.GetDatabaseHeight()) < s.FastSaveRate {
+			//If we have less than whatever our block rate is, we wipe SaveState
+			//This is to ensure we don't accidentally keep SaveState while deleting a database
+			s.StateSaverStruct.DeleteSaveState(s.Network)
+		} else {
+			err = s.StateSaverStruct.LoadDBStateList(s, s.DBStates, s.Network)
+			if err != nil {
+				s.StateSaverStruct.DeleteSaveState(s.Network)
+				s.LogPrintf("faulting", "Database load failed %v", err)
+			}
+			if err == nil {
+				for _, dbstate := range s.DBStates.DBStates {
+					if dbstate != nil {
+						dbstate.SaveStruct.Commits.s = s
+					}
+				}
+			}
+		}
+	}
+
+	s.Logger = log.WithFields(log.Fields{"node-name": s.GetFactomNodeName(), "identity": s.GetIdentityChainID().String()})
+
+	// Set up Logstash Hook for Logrus (if enabled)
+	if s.UseLogstash {
+		err := s.HookLogstash()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	if globals.Params.WriteProcessedDBStates {
+		path := filepath.Join(s.LdbPath, s.Network, "dbstates")
+		os.MkdirAll(path, 0775)
+	}
+
+	// Setup the Skeleton Identity & Registration
+	s.IntiateNetworkSkeletonIdentity()
+	s.InitiateNetworkIdentityRegistration()
 }
