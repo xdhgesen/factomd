@@ -199,20 +199,6 @@ func makeNode0(w *worker.Thread, p *FactomParams) *fnode.FactomNode {
 		}
 	}
 
-	// Initiate dbstate plugin if enabled. Only does so for first node,
-	// any more nodes on sim control will use default method
-	s.SetTorrentUploader(p.TorUpload)
-	if p.TorManage {
-		s.SetUseTorrent(true)
-		manager, err := LaunchDBStateManagePlugin(w, p.PluginPath, s.InMsgQueue(), s, s.GetServerPrivateKey(), p.MemProfileRate)
-		if err != nil {
-			panic("Encountered an error while trying to use torrent DBState manager: " + err.Error())
-		}
-		s.DBStateManager = manager
-	} else {
-		s.SetUseTorrent(false)
-	}
-
 	initAnchors(s, p.ReparseAnchorChains)
 	return node
 }
@@ -495,7 +481,7 @@ func makeServer(s *state.State) *fnode.FactomNode {
 	node := new(fnode.FactomNode)
 
 	if fnode.Len() > 0 {
-		newState := state.Clone(s, len(fnode.GetFnodes())).(*state.State)
+		newState := state.Clone(s, fnode.Len()).(*state.State)
 		newState.EFactory = new(electionMsgs.ElectionsFactory)
 		node.State = newState
 		fnode.AddFnode(node)

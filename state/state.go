@@ -395,13 +395,8 @@ type State struct {
 	LogstashURL string
 
 	// Plugins
-	useTorrents             bool
-	torrentUploader         bool
-	Uploader                *UploadController // Controls the uploads of torrents. Prevents backups
-	DBStateManager          interfaces.IManagerController
-	HighestCompletedTorrent uint32
-	FastBoot                bool
-	FastBootLocation        string
+	FastBoot         bool
+	FastBootLocation string
 
 	// These stats are collected when we write the dbstate to the database.
 	NumNewChains   int // Number of new Chains in this block
