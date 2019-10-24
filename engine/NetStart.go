@@ -161,6 +161,7 @@ func interruptHandler() {
 func nodeFactory(w *worker.Thread, p *FactomParams) func() *fnode.FactomNode {
 	return func() (n *fnode.FactomNode) {
 		if fnode.Len() == 0 {
+			// TODO: Refactor so state0 init is not special
 			n = makeNode0(w, p)
 			echoConfig(n.State, p)
 		} else {

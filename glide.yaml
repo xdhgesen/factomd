@@ -27,7 +27,6 @@ import:
   subpackages:
   - base58
 - package: github.com/dustin/go-humanize
-- package: github.com/hashicorp/go-plugin
 - package: github.com/prometheus/client_golang
   subpackages:
   - prometheus
