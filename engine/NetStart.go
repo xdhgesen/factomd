@@ -177,7 +177,7 @@ func NetStart(w *worker.Thread, p *FactomParams, listenToStdin bool) {
 		startFnodes(w)
 		startWebserver(w)
 		startSimControl(w, p.ListenTo, listenToStdin)
-	}, "NetStart")
+	})
 }
 
 // Anchoring related configurations
@@ -337,7 +337,7 @@ func startWebserver(w *worker.Thread) {
 
 	w.Run(func() {
 		controlPanel.ServeControlPanel(state0.ControlPanelChannel, state0, connectionMetricsChannel, p2pNetwork, Build, state0.FactomNodeName)
-	}, "ControlPanel")
+	})
 }
 
 func startNetwork(w *worker.Thread, p *FactomParams) {
@@ -479,10 +479,10 @@ func startServer(w *worker.Thread, node *fnode.FactomNode) {
 	elections.Run(w, node.State)
 	node.State.StartMMR(w)
 
-	w.Run(func() { state.LoadDatabase(node.State) }, "LoadDatabase")
-	w.Run(node.State.GoSyncEntries, "SyncEntries")
-	w.Run(func() { Timer(node.State) }, "Timer")
-	w.Run(node.State.MissingMessageResponseHandler.Run, "MMRHandler")
+	w.Run(func() { state.LoadDatabase(node.State) })
+	w.Run(node.State.GoSyncEntries)
+	w.Run(func() { Timer(node.State) })
+	w.Run(node.State.MissingMessageResponseHandler.Run)
 }
 
 func setupFirstAuthority(s *state.State) {

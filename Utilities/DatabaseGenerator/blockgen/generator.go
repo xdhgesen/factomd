@@ -2,6 +2,7 @@ package blockgen
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/worker"
 	"strings"
 	"time"
 
@@ -93,7 +94,7 @@ func NewGeneratorState(conf *DBGeneratorConfig, starttime interfaces.Timestamp) 
 	s.LoadConfig(conf.FactomdConfigPath, "CUSTOM")
 	s.StateSaverStruct.FastBoot = false
 	s.EFactory = new(electionMsgs.ElectionsFactory)
-	s.Initialize()
+	s.Initialize(worker.New())
 	s.NetworkNumber = constants.NETWORK_CUSTOM
 
 	customnetname := conf.CustomNetID

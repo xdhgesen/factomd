@@ -201,7 +201,7 @@ func (c *Controller) StartNetwork(w *worker.Thread) {
 	// Dial all the gathered special peers
 	c.dialSpecialPeers()
 	// Start the runloop
-	w.Run(c.runloop, "runloop")
+	w.Run(c.runloop)
 }
 
 func (c *Controller) DialPeer(peer Peer, persistent bool) {

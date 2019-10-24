@@ -213,9 +213,9 @@ func (p *P2PProxy) StartProxy(w *worker.Thread) {
 	}
 
 	p.logger.Info("Starting P2PProxy")
-	w.Run(p.ManageOutChannel, "OutChannel") // Bridges between network format Parcels and factomd messages (incl. addressing to peers)
-	w.Run(p.ManageInChannel, "InChannel")
-	w.Run(networkHousekeeping, "NetworkHousekeeping") // This goroutine executes once a second to keep the proxy apprised of the network status.
+	w.Run(p.ManageOutChannel) // Bridges between network format Parcels and factomd messages (incl. addressing to peers)
+	w.Run(p.ManageInChannel)
+	w.Run(networkHousekeeping) // This goroutine executes once a second to keep the proxy apprised of the network status.
 }
 
 func (p *P2PProxy) StopProxy() {

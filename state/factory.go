@@ -493,7 +493,7 @@ func (s *State) Initialize(w *worker.Thread) {
 	s.DBStates = new(DBStateList)
 	s.DBStates.State = s
 	s.DBStates.DBStates = make([]*DBState, 0)
-	w.Run(s.DBStates.Catchup, "Catchup")
+	w.Run(s.DBStates.Catchup)
 
 	s.StatesMissing = NewStatesMissing()
 	s.StatesWaiting = NewStatesWaiting()
