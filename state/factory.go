@@ -332,17 +332,14 @@ func NewState(p *globals.FactomParams, FactomdVersion string) *State {
 	return s
 }
 
-// FIXME: turn into proper factory
 func Clone(s *State, cloneNumber int) interfaces.IState {
 	newState := new(State)
 	newState.StateConfig = s.StateConfig
-
 	number := fmt.Sprintf("%02d", cloneNumber)
-
 	simConfigPath := util.GetHomeDir() + "/.factom/m2/simConfig/"
 	configfile := fmt.Sprintf("%sfactomd%03d.conf", simConfigPath, cloneNumber)
 
-	if cloneNumber == 1 {
+	if cloneNumber >= 1 {
 		os.Stderr.WriteString(fmt.Sprintf("Looking for Config File %s\n", configfile))
 	}
 	if _, err := os.Stat(simConfigPath); os.IsNotExist(err) {
@@ -364,7 +361,6 @@ func Clone(s *State, cloneNumber int) interfaces.IState {
 		newState.LogPath = s.LogPath + "/Sim" + number
 	}
 
-	newState.NodeMode = "FULL"
 	newState.FactomNodeName = s.Prefix + "FNode" + number
 	newState.RunState = runstate.New // reset runstate since this clone will be started by sim node
 	newState.LdbPath = s.LdbPath + "/Sim" + number

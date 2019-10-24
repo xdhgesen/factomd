@@ -19,7 +19,6 @@ import (
 	ed "github.com/FactomProject/ed25519"
 	"github.com/FactomProject/factom"
 	"github.com/FactomProject/factomd/common/entryBlock"
-	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/identityEntries"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -872,7 +871,6 @@ func modifyLoadIdentities() {
 
 			fnodes[i].State.IdentityChainID = list[index]
 			// Build table of identities to names
-			addFnodeName(i)
 
 			buf := new(bytes.Buffer)
 			buf.WriteString(list[index].String())
@@ -890,17 +888,6 @@ func modifyLoadIdentities() {
 			fnodes[i].State.SimSetNewKeys(privkey)
 		}
 	}
-}
-
-func addFnodeName(i int) {
-	// full name
-	name := fnode.Get(i).State.FactomNodeName
-	globals.FnodeNames[fnode.Get(i).State.IdentityChainID.String()] = name
-	// common short set
-	globals.FnodeNames[fmt.Sprintf("%x", fnode.Get(i).State.IdentityChainID.Bytes()[3:6])] = name
-	globals.FnodeNames[fmt.Sprintf("%x", fnode.Get(i).State.IdentityChainID.Bytes()[:5])] = name
-	globals.FnodeNames[fmt.Sprintf("%x", fnode.Get(i).State.IdentityChainID.Bytes()[:])] = name
-	globals.FnodeNames[fmt.Sprintf("%x", fnode.Get(i).State.IdentityChainID.Bytes()[:8])] = name
 }
 
 func shad(data []byte) []byte {

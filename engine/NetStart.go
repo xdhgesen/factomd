@@ -13,6 +13,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -26,7 +27,6 @@ import (
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/fnode"
 	"github.com/FactomProject/factomd/p2p"
-	"github.com/FactomProject/factomd/registry"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/worker"
@@ -45,13 +45,6 @@ var logPort string
 func init() {
 	messages.General = new(msgsupport.GeneralFactory)
 	primitives.General = messages.General
-}
-
-func NewState(p *FactomParams) *state.State {
-	logPort = p.LogPort
-	s := state.NewState(p, FactomdVersion)
-	s.EFactory = new(electionMsgs.ElectionsFactory)
-	return s
 }
 
 func echo(s string, more ...interface{}) {
@@ -157,37 +150,9 @@ func interruptHandler() {
 	os.Exit(0)
 }
 
-// return a factory method for creating new FactomNodes
-func nodeFactory(w *worker.Thread, p *FactomParams) func() *fnode.FactomNode {
-	return func() (n *fnode.FactomNode) {
-		if fnode.Len() == 0 {
-			// TODO: Refactor so state0 init is not special
-			n = makeNode0(w, p)
-			echoConfig(n.State, p)
-		} else {
-			n = makeServer(fnode.Get(0).State)
-		}
-		return n
-	}
-}
-
-// creates a new state an initializes state0 params
-// state0 is the only state object used when connecting to mainnet
-// during simulation state0 is used to spawn other simulated nodes
-func makeNode0(w *worker.Thread, p *FactomParams) *fnode.FactomNode {
-	if fnode.Len() != 0 {
-		panic("only allowed for first initialized state")
-	}
-
-	s := NewState(p)
-	node := makeServer(s) // add state0 to fnodes
-	s.Init(node, s.FactomNodeName)
-	s.Initialize(w)
-	addFnodeName(0) // bootstrap id doesn't change
-	setupFirstAuthority(s)
-
-	if p.Sync2 >= 0 {
-		s.EntryDBHeightComplete = uint32(p.Sync2)
+func initEntryHeight(s *state.State, target int) {
+	if target >= 0 {
+		s.EntryDBHeightComplete = uint32(target)
 		s.LogPrintf("EntrySync", "Force with Sync2 NetStart EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
 	} else {
 		height, err := s.DB.FetchDatabaseEntryHeight()
@@ -199,23 +164,20 @@ func makeNode0(w *worker.Thread, p *FactomParams) *fnode.FactomNode {
 			s.LogPrintf("EntrySync", "NetStart EntryDBHeightComplete = %d", s.EntryDBHeightComplete)
 		}
 	}
-
-	initAnchors(s, p.ReparseAnchorChains)
-	return node
 }
 
 func NetStart(w *worker.Thread, p *FactomParams, listenToStdin bool) {
-	messages.AckBalanceHash = p.AckbalanceHash
-	w.RegisterInterruptHandler(interruptHandler)
-	SetLogLevel(p)
-	factory := nodeFactory(w, p)
-	for i := 0; i < p.Cnt; i++ {
-		factory()
-	}
-	startNetwork(w, p)
-	startFnodes(w)
-	startWebserver(w)
-	startSimControl(w, p.ListenTo, listenToStdin)
+	w.Spawn(func(w *worker.Thread) {
+		messages.AckBalanceHash = p.AckbalanceHash
+		w.RegisterInterruptHandler(interruptHandler)
+		for i := 0; i < p.Cnt; i++ {
+			makeServer(w, p)
+		}
+		startNetwork(w, p)
+		startFnodes(w)
+		startWebserver(w)
+		startSimControl(w, p.ListenTo, listenToStdin)
+	}, "NetStart")
 }
 
 // Anchoring related configurations
@@ -474,41 +436,48 @@ func printGraphData(filename string, period int) {
 	} // for ever ...
 }
 
+var state0Init sync.Once // we do some extra init for the first state
+
 //**********************************************************************
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
 //**********************************************************************
-func makeServer(s *state.State) *fnode.FactomNode {
-	node := new(fnode.FactomNode)
+func makeServer(w *worker.Thread, p * FactomParams) (node *fnode.FactomNode) {
+	i := fnode.Len()
 
-	if fnode.Len() > 0 {
-		newState := state.Clone(s, fnode.Len()).(*state.State)
-		newState.EFactory = new(electionMsgs.ElectionsFactory)
-		node.State = newState
-		fnode.AddFnode(node)
-		newState.Init(node, newState.FactomNodeName)
-		time.Sleep(10 * time.Millisecond)
+	if i == 0 {
+		node = fnode.New(state.NewState(p, FactomdVersion))
 	} else {
-		node.State = s
-		fnode.AddFnode(node)
+		node = fnode.New(state.Clone(fnode.Get(0).State, i).(*state.State))
 	}
+
+	state0Init.Do(func(){
+		logPort = p.LogPort
+		SetLogLevel(p)
+		node.State.Initialize(w)
+		setupFirstAuthority(node.State)
+		initEntryHeight(node.State, p.Sync2)
+		initAnchors(node.State, p.ReparseAnchorChains)
+		echoConfig(node.State, p) // print the config only once
+	})
+
+	if i > 0 {
+		node.State.Initialize(w)
+	}
+
+	node.State.EFactory = new(electionMsgs.ElectionsFactory)
+	time.Sleep(10 * time.Millisecond)
 
 	return node
 }
 
 func startFnodes(w *worker.Thread) {
-	w.Spawn(func(w *worker.Thread) {
-		for i, node := range fnode.GetFnodes() {
-			if i > 0 {
-				node.State.Initialize(w)
-			}
-			startServer(w, node)
-		}
-	}, "StartServers")
+	for _, node := range fnode.GetFnodes() {
+		startServer(w, node)
+	}
 }
 
 func startServer(w *worker.Thread, node *fnode.FactomNode) {
-
 	NetworkProcessorNet(w, node)
 	node.State.ValidatorLoop(w)
 	elections.Run(w, node.State)
@@ -531,6 +500,7 @@ func setupFirstAuthority(s *state.State) {
 }
 
 func AddNode() {
+	/* FIXME broken by refactor
 	fnodes := fnode.GetFnodes()
 	s := fnodes[0].State
 	i := len(fnodes)
@@ -547,4 +517,6 @@ func AddNode() {
 		startServer(w, fnodes[i])
 	}, "AddNode")
 	go p.Run() // kick off independent process
+
+	 */
 }
