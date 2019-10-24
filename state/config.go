@@ -372,10 +372,6 @@ func Clone(s *State, cloneNumber int) interfaces.IState {
 	newState.ExportDataSubpath = s.ExportDataSubpath + "sim-" + number
 	newState.IdentityControl = s.IdentityControl.Clone()
 
-	newState.FaultTimeout = s.FaultTimeout
-	newState.FaultWait = s.FaultWait
-	newState.EOMfaultIndex = s.EOMfaultIndex
-
 	if !config {
 		newState.IdentityChainID = primitives.Sha([]byte(newState.FactomNodeName))
 		s.LogPrintf("AckChange", "Default3 IdentityChainID %v", s.IdentityChainID.String())
