@@ -79,7 +79,7 @@ type StateConfig struct {
 	RpcPass                 string
 	RpcUser                 string
 	StartDelayLimit         int64
-	TimeOffset              *primitives.Timestamp
+	TimeOffset              interfaces.Timestamp
 	TimestampAtBoot         interfaces.Timestamp
 	WaitForEntries          bool
 }
@@ -109,7 +109,6 @@ type State struct {
 	DBStatesReceivedBase    int
 	DBStatesReceived        []*messages.DBStateMsg
 	LocalServerPrivKey      string
-	PortNumber              int
 	Replay                  *Replay
 	FReplay                 *Replay
 	CrossReplay             *CrossReplayFilter
@@ -192,7 +191,6 @@ type State struct {
 
 	tickerQueue            chan int
 	timerMsgQueue          chan interfaces.IMsg
-	TimeOffset             interfaces.Timestamp
 	MaxTimeOffset          interfaces.Timestamp
 	networkOutMsgQueue     queue.MsgQueue
 	networkInvalidMsgQueue chan interfaces.IMsg
@@ -215,14 +213,11 @@ type State struct {
 	serverPendingPubKeys  []*primitives.PublicKey
 
 	// RPC connection config
-	RpcUser     string
-	RpcPass     string
 	RpcAuthHash []byte
-
 	CorsDomains []string
+
 	// Server State
 	StartDelay      int64 // Time in Milliseconds since the last DBState was applied
-	StartDelayLimit int64
 	DBFinished      bool
 	RunLeader       bool
 	BootTime        int64 // Time in seconds that we last booted
@@ -243,8 +238,6 @@ type State struct {
 	PLProcessHeight uint32
 	// Height cutoff where no missing messages below this height
 	DBHeightAtBoot  uint32
-	TimestampAtBoot interfaces.Timestamp
-	OutputAllowed   bool
 	CurrentMinute   int
 
 	// These are the start times for blocks and minutes
@@ -286,7 +279,6 @@ type State struct {
 	FCTSubmits             int
 	NewEntryChains         int
 	NewEntries             int
-	LeaderTimestamp        interfaces.Timestamp
 	messageFilterTimestamp interfaces.Timestamp
 	// Maps
 	// ====
@@ -304,7 +296,6 @@ type State struct {
 
 	AuditHeartBeats []interfaces.IMsg // The checklist of HeartBeats for this period
 
-	FaultTimeout  int
 	FaultWait     int
 	EOMfaultIndex int
 	LastTiebreak  int64
@@ -379,7 +370,6 @@ type State struct {
 	MissingEntries chan *MissingEntry
 
 	// Holds leaders and followers up until all missing entries are processed, if true
-	WaitForEntries  bool
 	UpdateEntryHash chan *EntryUpdate // Channel for updating entry Hashes tracking (repeats and such)
 	WriteEntry      chan interfaces.IEBEntry
 
@@ -418,7 +408,6 @@ type State struct {
 	HighestCompletedTorrent uint32
 	FastBoot                bool
 	FastBootLocation        string
-	FastSaveRate            int
 
 	// These stats are collected when we write the dbstate to the database.
 	NumNewChains   int // Number of new Chains in this block
