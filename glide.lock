@@ -1,5 +1,5 @@
-hash: 40c678b4e38054570d19aa40e10122c1af28227db7207ba8437734d26f1fdeb0
-updated: 2019-10-24T07:10:27.427064565-05:00
+hash: 59a5bf8832d158b87de4858e2c7f8231c0dcb5b866278c5b889197e18e96b1af
+updated: 2019-10-24T08:24:51.498335798-05:00
 imports:
 - name: github.com/beorn7/perks
   version: 3a771d992973f24aa725d07868b467d1ddfceafb
@@ -31,7 +31,7 @@ imports:
   subpackages:
   - edwards25519
 - name: github.com/FactomProject/factom
-  version: 19812f14250bc801573d0103d334264256bbf066
+  version: e7717c4ab0726249c9fb9be4c9a07f62611d8b2e
 - name: github.com/FactomProject/go-bip32
   version: 3b593af1c415abc1017648e4eb24a88c32fee0f3
 - name: github.com/FactomProject/go-bip39
