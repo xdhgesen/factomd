@@ -39,24 +39,24 @@ func (*Thread) RegisterInterruptHandler(handler func()) {
 }
 
 type IRegister interface {
-	Thread(*Thread, Handle)          // RegistryCallback for sub-threads
+	Thread(*Thread, Handle)  // RegistryCallback for sub-threads
 	Process(*Thread, Handle) // callback to fork a new process
 }
 
 // worker process with structured callbacks
 // parent relation helps trace worker dependencies
 type Thread struct {
-	common.Name                                // support hierarchical naming
-	log.ICaller                                // interface to for some fields used by logger
-	Log               interfaces.Log           // threaded logger
-	Register          IRegister                // callbacks to register threads
-	PID               int                      // process ID that this thread belongs to
-	ID                int                      // thread id
-	ParentID          int                      // parent thread
-	Caller            string                   // runtime location where thread starts
-	onRun             func()                   // execute during 'run' state
-	onComplete        func()                   // execute after all run functions complete
-	onExit            func()                   // executes during SIGINT or after shutdown of run state
+	common.Name                // support hierarchical naming
+	log.ICaller                // interface to for some fields used by logger
+	Log         interfaces.Log // threaded logger
+	Register    IRegister      // callbacks to register threads
+	PID         int            // process ID that this thread belongs to
+	ID          int            // thread id
+	ParentID    int            // parent thread
+	Caller      string         // runtime location where thread starts
+	onRun       func()         // execute during 'run' state
+	onComplete  func()         // execute after all run functions complete
+	onExit      func()         // executes during SIGINT or after shutdown of run state
 }
 
 // indicates a specific thread callback

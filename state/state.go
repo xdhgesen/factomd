@@ -615,7 +615,6 @@ func (s *State) GetSalt(ts interfaces.Timestamp) uint32 {
 	return binary.BigEndian.Uint32(c.Bytes())
 }
 
-
 func (s *State) HookLogstash() error {
 	hook, err := logrustash.NewAsyncHook("tcp", s.LogstashURL, "factomdLogs")
 	if err != nil {

@@ -6,11 +6,15 @@ import (
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/worker"
 )
 
 type root struct {
 	common.Name
 }
+
+// factory method to spawn new nodes
+var Factory func(w *worker.Thread)
 
 // root of object hierarchy
 var Root = &root{}

@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/FactomProject/factomd/registry"
 	"io/ioutil"
 	"math"
 	"os"
@@ -138,6 +139,7 @@ func SetLogLevel(p *globals.FactomParams) {
 	}
 }
 
+// shutdown factomd
 func interruptHandler() {
 	fmt.Print("<Break>\n")
 	fmt.Print("Gracefully shutting down the server...\n")
@@ -167,15 +169,25 @@ func initEntryHeight(s *state.State, target int) {
 }
 
 func NetStart(w *worker.Thread, p *globals.FactomParams, listenToStdin bool) {
-	messages.AckBalanceHash = p.AckbalanceHash
-	w.RegisterInterruptHandler(interruptHandler)
+	initEngine(w, p)
 	for i := 0; i < p.Cnt; i++ {
-		makeServer(w, p)
+		fnode.Factory(w)
 	}
 	startNetwork(w, p)
 	startFnodes(w)
 	startWebserver(w)
 	startSimControl(w, p.ListenTo, listenToStdin)
+}
+
+// initialize package-level vars
+func initEngine(w *worker.Thread, p *globals.FactomParams) {
+	messages.AckBalanceHash = p.AckbalanceHash
+	w.RegisterInterruptHandler(interruptHandler)
+
+	// nodes can spawn with a different thread lifecycle
+	fnode.Factory =  func(w *worker.Thread) {
+		makeServer(w, p)
+	}
 }
 
 // Anchoring related configurations
@@ -342,7 +354,7 @@ func startNetwork(w *worker.Thread, p *globals.FactomParams) {
 	s := fnode.Get(0).State
 	// Modify Identities of new nodes
 	if fnode.Len() > 1 && len(s.Prefix) == 0 {
-		modifyLoadIdentities() // We clone s to make all of our servers
+		modifySimulatorIdentities() // set proper chain id & keys
 	}
 
 	// Start the P2P network
@@ -416,8 +428,8 @@ func startNetwork(w *worker.Thread, p *globals.FactomParams) {
 	p2pNetwork = new(p2p.Controller).Initialize(ci)
 	s.NetworkController = p2pNetwork
 	p2pNetwork.Init(s, "p2pNetwork")
-
 	p2pNetwork.StartNetwork(w)
+
 	p2pProxy = new(P2PProxy).Initialize(s.FactomNodeName, "P2P Network").(*P2PProxy)
 	p2pProxy.Init(s, "p2pProxy")
 	p2pProxy.FromNetwork = p2pNetwork.FromNetwork
@@ -443,7 +455,7 @@ var state0Init sync.Once // we do some extra init for the first state
 // Functions that access variables in this method to set up Factom Nodes
 // and start the servers.
 //**********************************************************************
-func makeServer(w *worker.Thread, p * globals.FactomParams) (node *fnode.FactomNode) {
+func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNode) {
 	i := fnode.Len()
 
 	if i == 0 {
@@ -453,7 +465,7 @@ func makeServer(w *worker.Thread, p * globals.FactomParams) (node *fnode.FactomN
 	}
 	node.State.Initialize(w)
 
-	state0Init.Do(func(){
+	state0Init.Do(func() {
 		logPort = p.LogPort
 		SetLogLevel(p)
 		setupFirstAuthority(node.State)
@@ -497,23 +509,15 @@ func setupFirstAuthority(s *state.State) {
 }
 
 func AddNode() {
-	/* FIXME broken by refactor
-	fnodes := fnode.GetFnodes()
-	s := fnodes[0].State
-	i := len(fnodes)
-
-	makeServer(s)
-	modifyLoadIdentities()
-
-	fnodes = fnode.GetFnodes()
-	_ = fnodes[i].State.IntiateNetworkSkeletonIdentity()
-	_ = fnodes[i].State.InitiateNetworkIdentityRegistration()
-	AddSimPeer(fnodes, i, i-1) // KLUDGE peer w/ only last node
 	p := registry.New()
-	p.Register(func(w *worker.Thread) {
-		startServer(w, fnodes[i])
-	}, "AddNode")
-	go p.Run() // kick off independent process
-
-	 */
+	p.Register(func(w *worker.Thread){
+		i := fnode.Len()
+		fnode.Factory(w)
+		modifySimulatorIdentity(i)
+		AddSimPeer(fnode.GetFnodes(), i, i-1) // KLUDGE peer w/ only last node
+		n := fnode.Get(i)
+		startServer(w, n)
+	})
+	go p.Run()
+	p.WaitForRunning()
 }
