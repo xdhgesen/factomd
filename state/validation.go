@@ -20,7 +20,7 @@ import (
 var ValidationDebug bool = false
 
 // This is the tread with access to state. It does process and update state
-func (s *State) DoProcessing() {
+func (s *State) DoProcessing(w *worker.Thread) {
 	s.validatorLoopThreadID = atomic.Goid()
 	s.RunState = runstate.Running
 
@@ -28,6 +28,12 @@ func (s *State) DoProcessing() {
 	i3 := 0
 
 	for s.GetRunState() == runstate.Running {
+
+		select {
+		case <-w.Exit:
+			return
+		default:
+		}
 
 		p1 := true
 		p2 := true
@@ -77,7 +83,7 @@ func (s *State) ValidatorLoop(w *worker.Thread) {
 	// We should only generate 1 EOM for each height/minute/vmindex
 	lastHeight, lastMinute, lastVM := -1, -1, -1
 
-	w.Run(s.DoProcessing)
+	w.Spawn(s.DoProcessing)
 
 	w.Run(func() {
 		defer func() {

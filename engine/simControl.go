@@ -78,10 +78,11 @@ func GetLine(listenToStdin bool) string {
 		}()
 	}
 	//fmt.Println("globals.InputChan ", <-InputChan)
-	line := <-globals.InputChan
+	_ = <-globals.InputChan
 
 	//fmt.Println("line ", line)
-	return line
+	//return line
+	return ""  // KLUDGE: disable input for sim lib
 }
 
 func GetFocus() *fnode.FactomNode {

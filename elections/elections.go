@@ -458,6 +458,12 @@ func Run(w *worker.Thread, s *state.State) {
 	// Actually run the elections
 	w.Run(func() {
 		for {
+			select {
+			case <-w.Exit:
+				return
+			default:
+			}
+
 			msg := e.Input.BlockingDequeue().(interfaces.IElectionMsg)
 			e.LogMessage("election", fmt.Sprintf("exec %d", e.Electing), msg.(interfaces.IMsg))
 

@@ -7,6 +7,9 @@ import (
 	"sync"
 )
 
+// exit hook
+var Exit = make(chan interface{})
+
 // Index of all top-level threads
 type process struct {
 	Mutex     sync.Mutex
@@ -92,6 +95,7 @@ func (p *process) Register(initFunction worker.Handle) {
 	_, file, line, _ := runtime.Caller(1)
 	caller := fmt.Sprintf("%s:%v", file[worker.Prefix:], line)
 	r := p.addThread()
+	r.Exit = Exit // channel closed on exit
 	r.Caller = caller
 	r.ParentID = r.ID // root threads are their own parent
 	r.PID = p.ID

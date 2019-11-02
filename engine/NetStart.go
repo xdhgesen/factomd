@@ -147,9 +147,12 @@ func interruptHandler() {
 		node.State.ShutdownNode(0)
 	}
 	p2pNetwork.NetworkStop()
-	fmt.Print("Waiting...\r\n")
-	time.Sleep(3 * time.Second)
-	os.Exit(0)
+	close(registry.Exit)
+
+	//fmt.Print("Waiting...\r\n")
+	//time.Sleep(3 * time.Second)
+	// TODO: refactor to shut down all threads
+	//os.Exit(0)
 }
 
 func initEntryHeight(s *state.State, target int) {
