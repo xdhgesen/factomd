@@ -7,7 +7,7 @@ import (
 
 func TestLeaderModule(t *testing.T) {
 	// Just load simulator
-	params := map[string]string{"--debuglog": "."}
+	params := map[string]string{"--debuglog": "leader"}
 	//params := map[string]string{}
 	state0 := SetupSim("LF", params, 7, 0, 0, t)
 
