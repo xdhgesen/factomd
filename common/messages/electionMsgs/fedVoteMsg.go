@@ -215,6 +215,11 @@ func (m *FedVoteMsg) ValidateVolunteer(v FedVoteVolunteerMsg, is interfaces.ISta
 	return 1
 }
 
+func (m *FedVoteMsg) WellFormed() bool {
+	// TODO: Flush this out
+	return true
+}
+
 func (m *FedVoteMsg) Validate(is interfaces.IState) int {
 	s := is.(*state.State)
 	if m.DBHeight < s.GetLeaderHeight() {
@@ -281,7 +286,7 @@ func (m *FedVoteMsg) UnmarshalBinaryData(data []byte) (newData []byte, err error
 
 	buf := primitives.NewBuffer(data)
 	if t, e := buf.PopByte(); e != nil || t != m.Type() {
-		return nil, errors.New("Not a Fed Vote Base")
+		return nil, errors.New("Not a Fed Vote SubBase")
 	}
 	if m.TS, err = buf.PopTimestamp(); err != nil {
 		return nil, err
