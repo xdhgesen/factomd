@@ -328,11 +328,6 @@ func (m *Heartbeat) Validate(is interfaces.IState) int {
 func (m *Heartbeat) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-func (m *Heartbeat) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *Heartbeat) FollowerExecute(is interfaces.IState) {
 	for _, auditServer := range is.GetAuditServers(is.GetLeaderHeight()) {
 		if auditServer.GetChainID().IsSameAs(m.IdentityChainID) {

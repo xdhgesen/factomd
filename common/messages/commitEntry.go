@@ -276,14 +276,6 @@ func (m *CommitEntryMsg) ComputeVMIndex(state interfaces.IState) {
 	m.VMIndex = state.ComputeVMIndex(constants.EC_CHAINID)
 }
 
-// Execute the leader functions of the given message
-func (m *CommitEntryMsg) LeaderExecute(state interfaces.IState) {
-	// Check if we have yet to see an entry.  If we have seen one (NoEntryYet == false) then
-	// this commit is invalid.
-	state.LeaderExecuteCommitEntry(m)
-
-}
-
 func (m *CommitEntryMsg) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteCommitEntry(m)
 }

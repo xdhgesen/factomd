@@ -1,8 +1,6 @@
 package servertype
 
-import (
-	"github.com/FactomProject/factomd/state"
-)
+import "github.com/FactomProject/factomd/state"
 
 type ServerType string
 

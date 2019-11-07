@@ -151,11 +151,6 @@ func (m *ChangeServerKeyMsg) ComputeVMIndex(state interfaces.IState) {
 	m.VMIndex = state.ComputeVMIndex(constants.ADMIN_CHAINID)
 }
 
-// Execute the leader functions of the given message
-func (m *ChangeServerKeyMsg) LeaderExecute(state interfaces.IState) {
-	state.LeaderExecute(m)
-}
-
 func (m *ChangeServerKeyMsg) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteMsg(m)
 }

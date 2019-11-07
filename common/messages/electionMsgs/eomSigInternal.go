@@ -289,12 +289,6 @@ func (m *EomSigInternal) ElectionValidate(ie interfaces.IElections) int {
 func (m *EomSigInternal) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *EomSigInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *EomSigInternal) FollowerExecute(state interfaces.IState) {
 
 }

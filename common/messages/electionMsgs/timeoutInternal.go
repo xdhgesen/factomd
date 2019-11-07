@@ -298,12 +298,6 @@ func (m *TimeoutInternal) ElectionValidate(ie interfaces.IElections) int {
 func (m *TimeoutInternal) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *TimeoutInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *TimeoutInternal) FollowerExecute(state interfaces.IState) {
 
 }

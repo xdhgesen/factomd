@@ -85,9 +85,6 @@ type IMsg interface {
 	//Set the VMIndex for a message
 	ComputeVMIndex(IState)
 
-	// Call here if the server is a leader
-	LeaderExecute(IState)
-
 	// Debugging thing to track the leader responsible for a message ack.
 	GetLeaderChainID() IHash
 	SetLeaderChainID(IHash)

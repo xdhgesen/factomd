@@ -164,11 +164,6 @@ func (m *FactoidTransaction) ComputeVMIndex(state interfaces.IState) {
 	m.VMIndex = state.ComputeVMIndex(constants.FACTOID_CHAINID)
 }
 
-// Execute the leader functions of the given message
-func (m *FactoidTransaction) LeaderExecute(state interfaces.IState) {
-	state.LeaderExecute(m)
-}
-
 func (m *FactoidTransaction) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteMsg(m)
 }

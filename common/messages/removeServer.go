@@ -124,11 +124,6 @@ func (m *RemoveServerMsg) ComputeVMIndex(state interfaces.IState) {
 	m.VMIndex = state.ComputeVMIndex(constants.ADMIN_CHAINID)
 }
 
-// Execute the leader functions of the given message
-func (m *RemoveServerMsg) LeaderExecute(state interfaces.IState) {
-	state.LeaderExecute(m)
-}
-
 func (m *RemoveServerMsg) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteMsg(m)
 }

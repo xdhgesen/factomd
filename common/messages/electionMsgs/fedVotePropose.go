@@ -181,12 +181,6 @@ func (m *FedVoteProposalMsg) Validate(is interfaces.IState) int {
 func (m *FedVoteProposalMsg) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *FedVoteProposalMsg) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *FedVoteProposalMsg) FollowerExecute(is interfaces.IState) {
 	s := is.(*state.State)
 	if s.Elections.(*elections.Elections).Adapter == nil {

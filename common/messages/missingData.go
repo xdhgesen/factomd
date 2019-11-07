@@ -186,10 +186,6 @@ func (m *MissingData) Validate(state interfaces.IState) int {
 func (m *MissingData) ComputeVMIndex(state interfaces.IState) {
 }
 
-func (m *MissingData) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *MissingData) FollowerExecute(state interfaces.IState) {
 	var dataObject interfaces.BinaryMarshallable
 	//var dataHash interfaces.IHash

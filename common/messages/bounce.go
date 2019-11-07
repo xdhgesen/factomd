@@ -134,12 +134,6 @@ func (m *Bounce) Validate(state interfaces.IState) int {
 func (m *Bounce) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *Bounce) LeaderExecute(state interfaces.IState) {
-	m.processed = true
-}
-
 func (m *Bounce) FollowerExecute(state interfaces.IState) {
 	m.processed = true
 }

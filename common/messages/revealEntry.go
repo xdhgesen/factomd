@@ -229,11 +229,6 @@ func (m *RevealEntryMsg) ComputeVMIndex(state interfaces.IState) {
 	m.VMIndex = state.ComputeVMIndex(m.Entry.GetChainID().Bytes())
 }
 
-// Execute the leader functions of the given message
-func (m *RevealEntryMsg) LeaderExecute(state interfaces.IState) {
-	state.LeaderExecuteRevealEntry(m)
-}
-
 func (m *RevealEntryMsg) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteRevealEntry(m)
 }

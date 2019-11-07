@@ -252,12 +252,6 @@ func (m *FedVoteMsg) Validate(is interfaces.IState) int {
 func (m *FedVoteMsg) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *FedVoteMsg) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *FedVoteMsg) FollowerExecute(state interfaces.IState) {
 	state.ElectionsQueue().Enqueue(m)
 }

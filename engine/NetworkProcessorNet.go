@@ -646,6 +646,7 @@ func sortMsg(msg interfaces.IMsg, fnode *fnode.FactomNode, source string) {
 	if constants.NeedsAck(msg.Type()) {
 		// send msg to MMRequest processing to suppress requests for messages we already have
 		fnode.State.RecentMessage.NewMsgs <- msg
+		// TODO: install leader scription
 	}
 }
 

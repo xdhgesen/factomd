@@ -160,15 +160,6 @@ func (m *CommitChainMsg) ComputeVMIndex(state interfaces.IState) {
 	m.VMIndex = state.ComputeVMIndex(constants.EC_CHAINID)
 }
 
-// Execute the leader functions of the given message
-func (m *CommitChainMsg) LeaderExecute(state interfaces.IState) {
-	// Check if we have yet to see an entry.  If we have seen one (NoEntryYet == false) then
-	// we can record it.
-
-	state.LeaderExecuteCommitChain(m)
-
-}
-
 func (m *CommitChainMsg) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteCommitChain(m)
 }

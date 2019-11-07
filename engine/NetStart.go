@@ -8,13 +8,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/FactomProject/factomd/leader"
+	"github.com/FactomProject/factomd/simulation"
 	"os"
 	"sync"
 	"time"
-
-	"github.com/FactomProject/factomd/modules/debugsettings"
-
-	"github.com/FactomProject/factomd/simulation"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
@@ -185,6 +183,7 @@ func initAnchors(s *state.State, reparse bool) {
 	}
 }
 
+
 func startWebserver(w *worker.Thread) {
 	state0 := fnode.Get(0).State
 	wsapi.Start(w, state0)
@@ -196,10 +195,10 @@ func startWebserver(w *worker.Thread) {
 	launchPrometheus(9876)
 
 	/*
-		w.Run(func() {
-			controlPanel.ServeControlPanel(state0.ControlPanelChannel, state0, connectionMetricsChannel, p2pNetwork, Build, state0.FactomNodeName)
-		})
-	*/
+	w.Run(func() {
+		controlPanel.ServeControlPanel(state0.ControlPanelChannel, state0, connectionMetricsChannel, p2pNetwork, Build, state0.FactomNodeName)
+	})
+	 */
 }
 
 func startNetwork(w *worker.Thread, p *globals.FactomParams) {
@@ -316,9 +315,7 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 	} else {
 		node = fnode.New(state.Clone(fnode.Get(0).State, i).(*state.State))
 	}
-
-	// Election factory was created and passed int to avoid import loop
-	node.State.Initialize(w, new(electionMsgs.ElectionsFactory))
+	node.State.Initialize(w)
 
 	state0Init.Do(func() {
 		logPort = p.LogPort
@@ -326,12 +323,24 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 		initEntryHeight(node.State, p.Sync2)
 		initAnchors(node.State, p.ReparseAnchorChains)
 		echoConfig(node.State, p) // print the config only once
-		// Init settings
 	})
 
-	// TODO: Init any settings from the config
+// TODO: Init any settings from the config
 	debugsettings.NewNode(node.State.GetFactomNodeName())
 
+	{ // KLUDGE: refactor to use proper pub/sub
+		l := new(leader.Leader)
+		l.State = node.State
+		node.State.LeaderProxy = l
+
+		w.Spawn(func(w *worker.Thread){
+			l.Run(w) // KLUDGE: only fnode 1 runs a leader thread
+		})
+
+	}
+
+	// REVIEW: may need to refactor to init this factory in another place
+	node.State.EFactory = new(electionMsgs.ElectionsFactory)
 	time.Sleep(10 * time.Millisecond)
 
 	return node

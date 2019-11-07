@@ -152,12 +152,6 @@ func (m *RemoveAuditInternal) ElectionValidate(ie interfaces.IElections) int {
 func (m *RemoveAuditInternal) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *RemoveAuditInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *RemoveAuditInternal) FollowerExecute(state interfaces.IState) {
 
 }

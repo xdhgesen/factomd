@@ -118,11 +118,6 @@ func (m *DBStateMissing) Validate(state interfaces.IState) int {
 func (m *DBStateMissing) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-func (m *DBStateMissing) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 // Only send the same block again after 15 seconds.
 func (m *DBStateMissing) send(dbheight uint32, state interfaces.IState) (msglen int) {
 	send := true

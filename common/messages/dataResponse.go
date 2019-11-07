@@ -190,11 +190,6 @@ func (m *DataResponse) Validate(state interfaces.IState) int {
 
 func (m *DataResponse) ComputeVMIndex(state interfaces.IState) {}
 
-// Execute the leader functions of the given message
-func (m *DataResponse) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *DataResponse) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteDataResponse(m)
 }

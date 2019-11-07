@@ -190,12 +190,6 @@ func (m *Ack) Validate(s interfaces.IState) int {
 func (m *Ack) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *Ack) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *Ack) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteAck(m)
 }

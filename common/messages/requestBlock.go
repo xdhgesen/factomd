@@ -192,9 +192,6 @@ func (m *RequestBlock) Validate(state interfaces.IState) int {
 func (m *RequestBlock) ComputeVMIndex(state interfaces.IState) {
 }
 
-func (m *RequestBlock) LeaderExecute(state interfaces.IState) {
-}
-
 func (m *RequestBlock) FollowerExecute(interfaces.IState) {
 }
 
