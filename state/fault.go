@@ -7,11 +7,9 @@ package state
 import (
 	"encoding/binary"
 	"fmt"
-	"reflect"
-	"time"
-
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"reflect"
 
 	llog "github.com/FactomProject/factomd/log"
 	log "github.com/sirupsen/logrus"
@@ -81,38 +79,6 @@ func (fc *FaultCore) MarshalCore() (data []byte, err error) {
 	return buf.DeepCopyBytes(), nil
 }
 
-func markFault(pl *ProcessList, vmIndex int, faultReason int) {
-	// We can use the "IgnoreMissing" boolean to track if enough time has elapsed
-	// since bootup to start faulting servers on the network
-	if pl.State.IgnoreMissing {
-		return
-	}
-
-	if pl.State.Leader && pl.State.LeaderVMIndex == vmIndex {
-		return
-	}
-
-	now := time.Now().Unix()
-	vm := pl.VMs[vmIndex]
-
-	if vm.WhenFaulted == 0 {
-		// if we did not previously consider this VM faulted
-		// we simply mark it as faulted (by assigning it a nonzero WhenFaulted time)
-		// and keep track of the ProcessList height it has faulted at
-		vm.WhenFaulted = now
-		vm.FaultFlag = faultReason
-	}
-
-	c := pl.State.CurrentMinute
-	if c > 9 {
-		c = 9
-	}
-	index := pl.ServerMap[c][vmIndex]
-	if index < len(pl.FedServers) {
-		pl.FedServers[index].SetOnline(false)
-	}
-}
-
 func markNoFault(pl *ProcessList, vmIndex int) {
 	vm := pl.VMs[vmIndex]
 
@@ -134,22 +100,6 @@ func markNoFault(pl *ProcessList, vmIndex int) {
 	}
 }
 
-func FaultCheck(pl *ProcessList) {
-	now := time.Now().Unix()
-
-	for i := 0; i < len(pl.FedServers); i++ {
-		if i == pl.State.LeaderVMIndex {
-			continue
-		}
-		vm := pl.VMs[i]
-		if vm.WhenFaulted > 0 && int(now-vm.WhenFaulted) > pl.State.FaultTimeout*2 {
-			newVMI := (i + 1) % len(pl.FedServers)
-			markFault(pl, newVMI, 1)
-		}
-
-	}
-	return
-}
 
 func (s *State) FollowerExecuteSFault(m interfaces.IMsg) {
 }

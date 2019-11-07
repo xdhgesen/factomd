@@ -85,9 +85,11 @@ func faultTest(faulting *bool) {
 			if f.State.GetNetStateOff() {
 				continue
 			}
+			/* KLUDGE: extract leader behavior
 			if !f.State.Leader {
 				continue
 			}
+			 */
 			if int(f.State.LLeaderHeight) < currentdbht {
 				continue
 			}

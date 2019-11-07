@@ -10,10 +10,8 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/state"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -174,54 +172,9 @@ func (m *SyncMsg) ElectionValidate(ie interfaces.IElections) int {
 func (m *SyncMsg) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *SyncMsg) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *SyncMsg) FollowerExecute(is interfaces.IState) {
-	s := is.(*state.State)
-
-	var msg interfaces.IMsg
-	var ack interfaces.IMsg
-	if m.SigType {
-		msg = messages.General.CreateMsg(constants.EOM_MSG)
-		msg, ack = s.CreateEOM(true, msg, m.VMIndex)
-	} else {
-		msg, ack = s.CreateDBSig(m.DBHeight, m.VMIndex)
-	}
-
-	if msg == nil { // TODO: What does this mean? -- clay
-		//s.Holding[m.GetMsgHash().Fixed()] = m
-		s.AddToHolding(m.GetMsgHash().Fixed(), m) // SyncMsg.FollowerExecute
-		return                                    // Maybe we are not yet prepared to create an SigType...
-	}
-
-	va := new(FedVoteVolunteerMsg)
-	va.Missing = msg
-	va.Ack = ack
-	va.SetFullBroadcast(true)
-	va.FedIdx = m.FedIdx
-	va.FedID = m.FedID
-
-	va.ServerIdx = uint32(m.ServerIdx)
-	va.ServerID = m.ServerID
-	va.ServerName = m.ServerName
-
-	va.VMIndex = m.VMIndex
-	va.TS = primitives.NewTimestampNow()
-	va.Name = m.Name
-	va.Weight = m.Weight
-	va.DBHeight = m.DBHeight
-	va.Minute = m.Minute
-	va.Round = m.Round
-	va.SigType = m.SigType
-
-	va.Sign(is)
-
-	va.SendOut(is, va)
-	va.FollowerExecute(is)
+	// FIXME: isolate leader behavior
+	is.GetLeader().Enqueue(m)
 }
 
 // Acknowledgements do not go into the process list.

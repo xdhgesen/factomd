@@ -57,12 +57,6 @@ func (m *StartElectionInternal) ElectionProcess(s interfaces.IState, elect inter
 	go Fault(e, e.DBHeight, e.Minute, e.FaultId.Load(), &e.FaultId, m.SigType, e.RoundTimeout)
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *StartElectionInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *StartElectionInternal) FollowerExecute(is interfaces.IState) {
 	s := is.(*state.State)
 	m.IsLeader = is.IsLeader()

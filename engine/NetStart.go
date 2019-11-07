@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/FactomProject/factomd/leader"
 	"github.com/FactomProject/factomd/simulation"
 	"os"
 	"sync"
@@ -314,19 +315,29 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 	} else {
 		node = fnode.New(state.Clone(fnode.Get(0).State, i).(*state.State))
 	}
-
-	// Election factory was created and passed int to avoid import loop
 	node.State.Initialize(w)
 
 	state0Init.Do(func() {
 		logPort = p.LogPort
+
 		setupFirstAuthority(node.State)
 		initEntryHeight(node.State, p.Sync2)
 		initAnchors(node.State, p.ReparseAnchorChains)
 		echoConfig(node.State, p) // print the config only once
 	})
 
-	// REVIEW: may need to refactor this
+	{ // KLUDGE: refactor to use proper pub/sub
+		l := new(leader.Leader)
+		l.State = node.State
+		node.State.LeaderProxy = l
+
+		w.Spawn(func(w *worker.Thread){
+			l.Run(w) // KLUDGE: only fnode 1 runs a leader thread
+		})
+
+	}
+
+	// REVIEW: may need to refactor to init this factory in another place
 	node.State.EFactory = new(electionMsgs.ElectionsFactory)
 	time.Sleep(10 * time.Millisecond)
 

@@ -251,11 +251,6 @@ func (m *DirectoryBlockSignature) Validate(state interfaces.IState) int {
 func (m *DirectoryBlockSignature) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-func (m *DirectoryBlockSignature) LeaderExecute(state interfaces.IState) {
-	state.LeaderExecuteDBSig(m)
-}
-
 func (m *DirectoryBlockSignature) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteMsg(m)
 }

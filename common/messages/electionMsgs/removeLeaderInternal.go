@@ -153,12 +153,6 @@ func (m *RemoveLeaderInternal) Validate(state interfaces.IState) int {
 func (m *RemoveLeaderInternal) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *RemoveLeaderInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *RemoveLeaderInternal) FollowerExecute(state interfaces.IState) {
 
 }

@@ -270,10 +270,6 @@ func (m *MissingMsg) Validate(state interfaces.IState) int {
 func (m *MissingMsg) ComputeVMIndex(state interfaces.IState) {
 }
 
-func (m *MissingMsg) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *MissingMsg) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteMissingMsg(m)
 }

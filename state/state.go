@@ -10,13 +10,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/FactomProject/factomd/common"
 	"os"
 	"reflect"
 	"regexp"
 	"sync"
 	"time"
 
-	"github.com/FactomProject/factomd/common"
 	"github.com/FactomProject/factomd/common/constants/runstate"
 	"github.com/FactomProject/factomd/queue"
 
@@ -108,13 +108,13 @@ type StateConfig struct {
 type State struct {
 	common.Name
 	StateConfig
+	LeaderProxy       interfaces.ILeader
 	Logger            *log.Entry
 	RunState          runstate.RunState
 	NetworkController *p2p.Controller
 	Salt              interfaces.IHash
 	Cfg               interfaces.IFactomConfig
 	ConfigFilePath    string // $HOME/.factom/m2/factomd.conf by default
-
 	LogPath           string
 	LdbPath           string
 	BoltDBPath        string
@@ -356,6 +356,7 @@ type State struct {
 	// Holds leaders and followers up until all missing entries are processed, if true
 	UpdateEntryHash chan *EntryUpdate // Channel for updating entry Hashes tracking (repeats and such)
 	WriteEntry      chan interfaces.IEBEntry
+
 	// MessageTally causes the node to keep track of (and display) running totals of each
 	// type of message received during the tally interval
 	MessageTally           bool
@@ -1338,8 +1339,11 @@ func (s *State) UpdateState() (progress bool) {
 		ProcessLists.Str = ProcessLists.String()
 	}
 
-	if plbase <= dbheight { // TODO: This is where we have to fix the fact that syncing with dbstates can fail to transition to messages
-		if !s.Leader || s.RunLeader {
+	// TODO: This is where we have to fix the fact that syncing with dbstates can fail to transition to messages
+	if plbase <= dbheight {
+		// REVIEW: this seems to be important to bootstrap simulation
+		//if !s.Leader || s.RunLeader {
+		if s.RunLeader {
 			progress = ProcessLists.UpdateState(dbheight)
 		}
 	}
@@ -1440,7 +1444,8 @@ func (s *State) GetOnlineAuditServers(dbheight uint32) []interfaces.IServer {
 }
 
 func (s *State) IsLeader() bool {
-	return s.Leader
+	//return s.Leader
+	return false // KLUDGE hacking up to remove leader behavior
 }
 
 func (s *State) GetVirtualServers(dbheight uint32, minute int, identityChainID interfaces.IHash) (bool, int) {
@@ -2426,4 +2431,8 @@ func (s *State) GetDBFinished() bool {
 
 func (s *State) GetRunLeader() bool {
 	return s.RunLeader
+}
+
+func (s *State) GetLeader() interfaces.ILeader {
+	return s.LeaderProxy
 }

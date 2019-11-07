@@ -26,12 +26,19 @@ type IQueue interface {
 	BlockingDequeue() IMsg
 }
 
+type ILeader interface {
+	Enqueue(msg IMsg)
+	ExecAsLeader(IMsg) bool
+	SendDBSig(dbheight uint32, vmIndex int) // If a Leader, we have to send a DBSig out for the previous block
+}
+
 // Holds the state information for factomd.  This does imply that we will be
 // using accessors to access state information in the consensus algorithm.
 // This is a bit tedious, but does provide single choke points where information
 // can be logged about the execution of Factom.  Also ensures that we do not
 // accidentally
 type IState interface {
+	GetLeader() ILeader
 	GetRunState() runstate.RunState
 	GetRunLeader() bool
 	// Server
@@ -206,7 +213,6 @@ type IState interface {
 
 	Reset()                                    // Trim back the state to the last saved block
 	GetSystemMsg(dbheight, height uint32) IMsg // Return the system message at the given height.
-	SendDBSig(dbheight uint32, vmIndex int)    // If a Leader, we have to send a DBSig out for the previous block
 
 	FollowerExecuteMsg(IMsg)          // Messages that go into the process list
 	FollowerExecuteEOM(IMsg)          // Messages that go into the process list
@@ -229,13 +235,6 @@ type IState interface {
 	ProcessDBSig(dbheight uint32, commitChain IMsg) bool
 	ProcessEOM(dbheight uint32, eom IMsg) bool
 	ProcessRevealEntry(dbheight uint32, m IMsg) bool
-	// For messages that go into the Process List
-	LeaderExecute(IMsg)
-	LeaderExecuteEOM(IMsg)
-	LeaderExecuteDBSig(IMsg)
-	LeaderExecuteRevealEntry(IMsg)
-	LeaderExecuteCommitChain(IMsg)
-	LeaderExecuteCommitEntry(IMsg)
 
 	GetNetStateOff() bool //	If true, all network communications are disabled
 	SetNetStateOff(bool)

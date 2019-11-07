@@ -117,12 +117,6 @@ func (m *AuthorityListInternal) Validate(state interfaces.IState) int {
 func (m *AuthorityListInternal) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *AuthorityListInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *AuthorityListInternal) FollowerExecute(state interfaces.IState) {
 	state.ElectionsQueue().Enqueue(m)
 }

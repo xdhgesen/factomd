@@ -94,12 +94,6 @@ func (m *FedVoteVolunteerMsg) ElectionProcess(is interfaces.IState, elect interf
 
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *FedVoteVolunteerMsg) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *FedVoteVolunteerMsg) FollowerExecute(is interfaces.IState) {
 	s := is.(*state.State)
 	e := s.Elections.(*elections.Elections)

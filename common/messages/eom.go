@@ -198,11 +198,6 @@ func (m *EOM) Validate(state interfaces.IState) int {
 func (m *EOM) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-func (m *EOM) LeaderExecute(state interfaces.IState) {
-	state.LeaderExecuteEOM(m)
-}
-
 func (m *EOM) FollowerExecute(state interfaces.IState) {
 	state.FollowerExecuteEOM(m)
 }

@@ -139,12 +139,6 @@ func (m *AddAuditInternal) Validate(state interfaces.IState) int {
 func (m *AddAuditInternal) ComputeVMIndex(state interfaces.IState) {
 }
 
-// Execute the leader functions of the given message
-// Leader, follower, do the same thing.
-func (m *AddAuditInternal) LeaderExecute(state interfaces.IState) {
-	m.FollowerExecute(state)
-}
-
 func (m *AddAuditInternal) FollowerExecute(state interfaces.IState) {
 
 }

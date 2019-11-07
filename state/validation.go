@@ -12,7 +12,6 @@ import (
 	"github.com/FactomProject/factomd/common/constants/runstate"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
-	llog "github.com/FactomProject/factomd/log"
 	"github.com/FactomProject/factomd/util/atomic"
 	"github.com/FactomProject/factomd/worker"
 )
@@ -80,13 +79,13 @@ func (s *State) ValidatorLoop(w *worker.Thread) {
 	w.Run(s.DoProcessing)
 
 	w.Run(func() {
-		defer func() {
-			if r := recover(); r != nil {
-				fmt.Println("A panic state occurred in ValidatorLoop.", r)
-				llog.LogPrintf("recovery", "A panic state occurred in ValidatorLoop. %v", r)
-				shutdown(s)
-			}
-		}()
+		//defer func() {
+		//	if r := recover(); r != nil {
+		//		fmt.Println("A panic state occurred in ValidatorLoop.", r)
+		//		llog.LogPrintf("recovery", "A panic state occurred in ValidatorLoop. %v", r)
+		//		shutdown(s)
+		//	}
+		//}()
 
 		// Look for pending messages, and get one if there is one.
 		for { // this is the message sort
