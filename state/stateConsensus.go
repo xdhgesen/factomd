@@ -321,7 +321,7 @@ func (s *State) Process() (progress bool) {
 	s.StateProcessCnt++
 	if s.ResetRequest {
 		s.ResetRequest = false
-		s.DoReset()
+		//s.DoReset()
 		return false
 	}
 
@@ -771,10 +771,10 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		authlistMsg := s.EFactory.NewAuthorityListInternal(s.LeaderPL.FedServers, s.LeaderPL.AuditServers, s.LLeaderHeight)
 		s.ElectionsQueue().Enqueue(authlistMsg)
 
+		// FIXME: isolate leader behavior
 		// Do not send out dbsigs while loading from disk
 		if s.Leader && !s.LeaderPL.DBSigAlreadySent && s.LLeaderHeight > s.DBHeightAtBoot {
-			// FIXME: isolate leader behavior
-			s.GetLeader().SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
+			s.LeaderProxy.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
 		}
 		s.DBStates.UpdateState() // go process the DBSigs
 

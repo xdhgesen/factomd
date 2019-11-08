@@ -111,12 +111,3 @@ func (s *State) FollowerExecuteFullFault(m interfaces.IMsg) {
 
 }
 
-func (s *State) Reset() {
-	// We are no longer using Reset
-	// s.ResetRequest = true
-}
-
-// Set to reprocess all inMessages and states
-func (s *State) DoReset() {
-	return
-}

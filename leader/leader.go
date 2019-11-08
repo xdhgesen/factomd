@@ -40,6 +40,10 @@ func (l *Leader) Run(w *worker.Thread) {
 
 	l.Init(l.State, "Leader")
 	l.subscription = queue.NewMsgQueue(l, "Leader", constants.INMSGQUEUE_HIGH)
+
+	// Start EOM timer
+	w.Run(func() { Timer(l.State) })
+
 	w.OnRun(l.subscribe)
 
 	// assuming that pub/sub framework will close channel

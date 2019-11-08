@@ -1,6 +1,7 @@
 package leader
 
 import (
+	"errors"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -21,13 +22,20 @@ func (l *Leader) Repost(m interfaces.IMsg, delay int) {
 	}()
 }
 
-func (l *Leader) getVM()  (vm *state.VM, err error) {
-	//defer func() {
-	//	recover()
-	//	err = errors.New("VM not initialized")
-	//}()
+var noVMErr = errors.New("VM not initialized")
 
-	vm = l.LeaderPL.VMs[l.LeaderVMIndex]
+func (l *Leader) getVM()  (vm *state.VM, err error) {
+	return l.getIndexedVM(l.LeaderVMIndex)
+}
+
+func (l *Leader) getIndexedVM(idx int)  (vm *state.VM, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = noVMErr
+		}
+	}()
+
+	vm = l.LeaderPL.VMs[idx]
 	return vm, err
 }
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by the MIT
 // license that can be found in the LICENSE file.
 
-package engine
+package leader
 
 import (
 	"time"
@@ -28,20 +28,19 @@ func Timer(stateI interfaces.IState) {
 		// Leaders running with slightly different minutes in test environments.
 		time.Sleep(time.Duration(s.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
 
-		if s.Leader {
-			now = time.Now().UnixNano()
-			issueTime := last
-			if s.EOMSyncEnd > s.EOMIssueTime {
-				issueTime = s.EOMIssueTime
-			}
-			last = s.EOMIssueTime
-
-			if s.EOMIssueTime-issueTime > tenthPeriod*8/100 {
-				s.EOMIssueTime = 0 // Don't skip more than one ticker
-				s.LogPrintf("ticker", "10%s Skip ticker Sleep %4.2f", s.FactomNodeName, float64(sleep)/1000000000)
-				continue
-			}
+		now = time.Now().UnixNano()
+		issueTime := last
+		if s.EOMSyncEnd > s.EOMIssueTime {
+			issueTime = s.EOMIssueTime
 		}
+		last = s.EOMIssueTime
+
+		if s.EOMIssueTime-issueTime > tenthPeriod*8/100 {
+			s.EOMIssueTime = 0 // Don't skip more than one ticker
+			s.LogPrintf("ticker", "10%s Skip ticker Sleep %4.2f", s.FactomNodeName, float64(sleep)/1000000000)
+			continue
+		}
+
 		s.LogPrintf("ticker", "10%s send ticker Sleep %4.2f", s.FactomNodeName, float64(sleep)/1000000000)
 		s.EOMSyncEnd = 0
 

@@ -150,7 +150,7 @@ func StartSimControl(w *worker.Thread, listenTo int, listenStdin bool) {
 					}
 					s := fnode.Get(ListenTo).State
 					os.Stderr.WriteString("Reset Node: " + s.FactomNodeName + "\n")
-					s.Reset()
+					//s.Reset()
 
 				case 'b' == b[0]:
 					if len(b) == 1 {
@@ -521,9 +521,11 @@ func StartSimControl(w *worker.Thread, listenTo int, listenStdin bool) {
 					// Reset Everything
 					if b[1] == 'r' {
 						os.Stderr.WriteString("Reset all nodes in the simulation!\n")
+						/*
 						for _, f := range fnode.GetFnodes() {
-							f.State.Reset()
+							//f.State.Reset()
 						}
+						 */
 						break
 					}
 
