@@ -173,8 +173,7 @@ func (m *SyncMsg) ComputeVMIndex(state interfaces.IState) {
 }
 
 func (m *SyncMsg) FollowerExecute(is interfaces.IState) {
-	// FIXME: isolate leader behavior
-	is.GetLeader().Enqueue(m)
+	panic("deprecated")
 }
 
 // Acknowledgements do not go into the process list.
