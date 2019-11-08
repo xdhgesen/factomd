@@ -25,12 +25,15 @@ func (l *Leader) NewAck(msg interfaces.IMsg, balanceHash interfaces.IHash) inter
 	ack.MessageHash = msg.GetMsgHash()
 	ack.LeaderChainID = l.IdentityChainID
 	ack.BalanceHash = balanceHash
-	listlen := l.LeaderPL.VMs[vmIndex].Height
-	if listlen == 0 {
+	vm, err := l.getIndexedVM(vmIndex)
+	if err != nil {
+		panic("failed to get VM")
+	}
+	if vm.Height == 0 {
 		ack.Height = 0
 		ack.SerialHash = ack.MessageHash
 	} else {
-		last := l.LeaderPL.GetAckAt(vmIndex, listlen-1)
+		last := l.LeaderPL.GetAckAt(vmIndex, vm.Height-1)
 		ack.Height = last.Height + 1
 		ack.SerialHash, _ = primitives.CreateHash(last.MessageHash, ack.MessageHash)
 	}
