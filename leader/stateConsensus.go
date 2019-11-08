@@ -9,11 +9,7 @@ import (
 
 func (l *Leader) preExec(msg interfaces.IMsg) (bool, bool) {
 	s := l.State
-	var vm *state.VM = nil
-	if s.Leader && s.RunLeader {
-		vm = s.LeaderPL.VMs[s.LeaderVMIndex]
-	}
-
+	vm, _ := l.getVM()
 	var vml int = 0
 	var vmh int = 0
 	var vms bool = false
