@@ -352,7 +352,7 @@ func (s *State) Process() (progress bool) {
 		}
 	}
 	// gotta set them here for the first initialization, maybe ought to call movetoheight()? but not here...
-	s.Leader = Leader // FIXME: isloate leader behavior
+	s.Leader = Leader // FIXME: isolate leader behavior
 	s.LeaderVMIndex = LeaderVMIndex
 
 	if !s.RunLeader {
@@ -673,19 +673,20 @@ processholdinglist:
 				s.DeleteFromHolding(k, v, "BLOCK_REPLAY")
 				continue processholdinglist
 			}
-		default:
-		}
-		// If a Reveal Entry has a commit available, then process the Reveal Entry and send it out.
-		if re, ok := v.(*messages.RevealEntryMsg); ok {
+		case constants.REVEAL_ENTRY_MSG:
+			re := v.(*messages.RevealEntryMsg)
 			if !s.NoEntryYet(re.GetHash(), s.GetLeaderTimestamp()) {
 				s.DeleteFromHolding(re.GetMsgHash().Fixed(), re, "already committed reveal")
 				s.Commits.Delete(re.GetHash().Fixed())
 				continue processholdinglist
 			}
-			// Needs to be our VMIndex as well, or ignore.
+			// REVIEW: should this be dispatched to Leader thread?
+			/*
 			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
-				continue processholdinglist // If we are a leader, but it isn't ours, and it isn't a new minute, ignore.
+				continue processholdinglist
 			}
+			 */
+		default:
 		}
 
 		TotalXReviewQueueInputs.Inc()
@@ -936,17 +937,15 @@ func (s *State) FactomSecond() time.Duration {
 // Returns true if it finds a match, puts the message in holding, or invalidates the message
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
-	if m.IsLocal() && !s.Leader {
-		return // This is an internal EOM message.  We are not a leader so ignore.
-	} else if m.IsLocal() {
-		s.Repost(m, 1) // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
-		return
+	if m.IsLocal() {
+	  if s.Leader {
+		  // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
+		  s.Repost(m, 1)
+	  }
+	  return // Follower doesn't deal w/ local messages
 	}
 
-	eom, ok := m.(*messages.EOM)
-	if !ok {
-		return
-	}
+	eom := m.(*messages.EOM)
 
 	if eom.DBHeight == s.ProcessLists.Lists[0].DBHeight && int(eom.Minute) < s.CurrentMinute {
 		s.LogMessage("executeMsg", "FollowerExecuteEOM drop, wrong minute", m)
@@ -1642,16 +1641,13 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			for _, vm := range pl.VMs {
 				vm.Synced = false // ProcessEOM (EOM complete)
 			}
-			if !s.Leader {
-				if s.CurrentMinute != int(e.Minute) {
-					s.LogPrintf("dbsig-eom", "Follower jump to minute %d from %d", s.CurrentMinute, int(e.Minute))
-				}
-				s.MoveStateToHeight(e.DBHeight, int(e.Minute+1))
 
-			} else {
-				// FIXME isolate leader behavior
-				s.MoveStateToHeight(s.LLeaderHeight, s.CurrentMinute+1)
+			if s.CurrentMinute != int(e.Minute) {
+				panic("minute mismatch")
+				//s.LogPrintf("dbsig-eom", "Follower jump to minute %d from %d", s.CurrentMinute, int(e.Minute))
 			}
+
+			s.MoveStateToHeight(s.LLeaderHeight, s.CurrentMinute+1)
 
 			switch {
 			case s.CurrentMinute < 10:
