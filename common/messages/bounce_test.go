@@ -101,11 +101,6 @@ func TestBounceMisc(t *testing.T) {
 	if !b.IsSameAs(b2) {
 		t.Error("Bounces should always be considered the same")
 	}
-
-	b2.LeaderExecute(nil)
-	if !b2.Processed() {
-		t.Error("Processed should be true")
-	}
 }
 
 func TestMarshalUnmarshalBounce(t *testing.T) {

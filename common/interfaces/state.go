@@ -26,10 +26,12 @@ type IQueue interface {
 	BlockingDequeue() IMsg
 }
 
+// methods that are still called from consensus thread
 type ILeader interface {
 	Enqueue(msg IMsg)
 	ExecAsLeader(IMsg) bool
 	SendDBSig(dbheight uint32, vmIndex int) // If a Leader, we have to send a DBSig out for the previous block
+	Review() bool
 }
 
 // Holds the state information for factomd.  This does imply that we will be
