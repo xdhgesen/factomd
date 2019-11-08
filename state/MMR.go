@@ -109,7 +109,6 @@ func (s *State) Ask(DBHeight int, vmIndex int, height int, when int64) bool {
 	if DBHeight < int(s.LLeaderHeight) || DBHeight > int(s.LLeaderHeight)+1 || DBHeight < int(s.DBHeightAtBoot) {
 		return false
 	}
-	vm := s.LeaderPL.VMs[vmIndex]
 
 	//	Currently if the asks are full, we'd rather just skip
 	//	than block the thread. We report missing multiple times, so if
@@ -117,8 +116,8 @@ func (s *State) Ask(DBHeight int, vmIndex int, height int, when int64) bool {
 	// We have to do this because MMR can provide messages from inmsgqueue by pushing them into msg queue
 	// if msgqueue is full then the two threads can deadlock
 
-	if len(vm.p.State.asks) == cap(vm.p.State.asks) {
-		vm.p.State.LogPrintf("missing_messages", "drop, asks full %d/%d/%d", vm.p.DBHeight, vm.VmIndex, height)
+	if len(s.asks) == cap(s.asks) {
+		//s.LogPrintf("missing_messages", "drop, asks full %d/%d/%d", vm.p.DBHeight, vm.VmIndex, height)
 		return false
 	}
 

@@ -11,7 +11,7 @@ const (
 )
 
 func GetServerType(list *state.ProcessList, state *state.State) ServerType {
-	if state.Leader {
+	if state.LeaderProxy != nil {
 		return FederatedServer
 	}
 

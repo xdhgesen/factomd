@@ -40,7 +40,6 @@ type ILeader interface {
 // can be logged about the execution of Factom.  Also ensures that we do not
 // accidentally
 type IState interface {
-	GetLeader() ILeader
 	GetRunState() runstate.RunState
 	GetRunLeader() bool
 	// Server
@@ -213,7 +212,6 @@ type IState interface {
 	// MISC
 	// ====
 
-	Reset()                                    // Trim back the state to the last saved block
 	GetSystemMsg(dbheight, height uint32) IMsg // Return the system message at the given height.
 
 	FollowerExecuteMsg(IMsg)          // Messages that go into the process list

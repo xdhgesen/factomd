@@ -119,7 +119,7 @@ func PrintState(state *State) {
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "StartDelayLimit", state.StartDelayLimit)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "RunLeader", state.RunLeader)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "LLeaderHeight", state.LLeaderHeight)
-	str = fmt.Sprintf("%s %35s = %+v\n", str, "Leader", state.Leader)
+	//str = fmt.Sprintf("%s %35s = %+v\n", str, "Leader", state.Leader)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "LeaderVMIndex", state.LeaderVMIndex)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "LeaderPL", state.LeaderPL)
 	str = fmt.Sprintf("%s %35s = %+v\n", str, "PLProcessHeight", state.PLProcessHeight)

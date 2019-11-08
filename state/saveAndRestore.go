@@ -370,7 +370,7 @@ func SaveFactomdState(state *State, d *DBState) (ss *SaveState) {
 	ss.AuthorityServerCount = state.AuthorityServerCount
 
 	ss.LLeaderHeight = state.LLeaderHeight
-	ss.Leader = state.Leader
+	//ss.Leader = state.Leader
 	ss.LeaderVMIndex = state.LeaderVMIndex
 	ss.LeaderPL = state.LeaderPL
 	ss.CurrentMinute = state.CurrentMinute
@@ -668,9 +668,11 @@ func (ss *SaveState) RestoreFactomdState(s *State) { //, d *DBState) {
 
 	s.MoveStateToHeight(ss.LLeaderHeight+1, ss.CurrentMinute) // RestoreFactomdState
 
+	/*
 	if ss.Leader != s.Leader {
 		s.LogPrintf("executeMsg", "unexpected ss.Leader=%v %s", ss.Leader, atomic.WhereAmIString(0))
 	}
+	 */
 
 	if ss.LeaderVMIndex != s.LeaderVMIndex {
 		s.LogPrintf("executeMsg", "unexpected  ss.LeaderVMIndex=%v %s", ss.LeaderVMIndex, atomic.WhereAmIString(0))

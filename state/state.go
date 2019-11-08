@@ -2046,7 +2046,7 @@ func (s *State) CalculateTransactionRate() (totalTPS float64, instantTPS float64
 
 func (s *State) SetStringQueues() {
 	vmi := -1
-	if s.Leader && s.LeaderVMIndex >= 0 {
+	if s.LeaderProxy != nil && s.LeaderVMIndex >= 0 {
 		vmi = s.LeaderVMIndex
 	}
 	vmt0 := s.ProcessLists.Get(s.LLeaderHeight)
@@ -2431,8 +2431,4 @@ func (s *State) GetDBFinished() bool {
 
 func (s *State) GetRunLeader() bool {
 	return s.RunLeader
-}
-
-func (s *State) GetLeader() interfaces.ILeader {
-	return s.LeaderProxy
 }
