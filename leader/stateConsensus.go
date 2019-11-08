@@ -2,6 +2,7 @@ package leader
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/state"
 )
@@ -62,4 +63,55 @@ func (l *Leader) ExecAsLeader(msg interfaces.IMsg) bool {
 		}
 	}
 	return runAsLeader
+}
+
+
+func (l *Leader) Review() bool {
+	progress := false
+	//preProcessXReviewTime := time.Now()
+	process := []interfaces.IMsg{}
+	// only review holding if I am a leader
+	//if l.RunLeader && l.Leader {
+	if l.RunLeader {
+		l.ReviewHolding()
+		for _, msg := range l.XReview {
+			if msg == nil {
+				continue
+			}
+			// copy the messages we are responsible for and all msg that don't need ack
+			// messages that need ack will get processed when thier ack arrives
+			if msg.GetVMIndex() == l.LeaderVMIndex || !constants.NeedsAck(msg.Type()) {
+				process = append(process, msg)
+			}
+		}
+		// toss everything else
+		l.XReview = l.XReview[:0]
+	}
+	//if ValidationDebug {
+	//	s.LogPrintf("executeMsg", "end reviewHolding %d", len(s.XReview))
+	//}
+	//processXReviewTime := time.Since(preProcessXReviewTime)
+	//TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
+	//preProcessProcChanTime := time.Now()
+	if len(process) != 0 {
+		//if ValidationDebug {
+		//	l.LogPrintf("executeMsg", "Start processloop %d", len(process))
+		//}
+		for _, msg := range process {
+			newProgress := l.ExecuteMsgFromLeader(msg)
+			//if ValidationDebug && newProgress {
+			//	l.LogMessage("executeMsg", "progress set by ", msg)
+			//}
+			progress = newProgress || progress //
+			l.LogMessage("executeMsg", "From process", msg)
+			l.UpdateState()
+		} // processLoop for{...}
+
+		//if ValidationDebug {
+		//	l.LogPrintf("executeMsg", "end processloop")
+		//}
+	}
+	//processProcChanTime := time.Since(preProcessProcChanTime)
+	//TotalProcessProcChanTime.Add(float64(processProcChanTime.Nanoseconds()))
+	return progress
 }

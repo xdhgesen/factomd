@@ -197,7 +197,7 @@ func (s *State) AckForAnotherVM(msg interfaces.IMsg) (int, int) {
 	msg.ComputeVMIndex(s)
 	vmIndex := msg.GetVMIndex()
 	// If we are not the leader, or this isn't the VM we are responsible for ...
-	if !s.Leader || (s.LeaderVMIndex != vmIndex) {
+	if s.LeaderProxy == nil || (s.LeaderVMIndex != vmIndex) {
 		if constants.NeedsAck(msg.Type()) {
 			// don't need to check for a matching ack for ACKs or local messages
 			// for messages that get ACK make sure we can expect to process them
@@ -218,6 +218,10 @@ func (s *State) AckForAnotherVM(msg interfaces.IMsg) (int, int) {
 	return 1, 1
 }
 
+// KLUDGE: export b/c leader depends on this behavior
+func (s *State) ExecuteMsgFromLeader(msg interfaces.IMsg) (ret bool) {
+	return s.executeMsg(msg)
+}
 
 func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 	// track how long we spend in executeMsg
@@ -373,8 +377,6 @@ func (s *State) Process() (progress bool) {
 		}
 	}
 
-	process := []interfaces.IMsg{}
-
 	hsb := s.GetHighestSavedBlk()
 
 	// trim any received DBStatesReceived messages that are fully processed
@@ -443,10 +445,18 @@ emptyLoop:
 	emptyLoopTime := time.Since(preEmptyLoopTime)
 	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
 
-	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
 	// Process last first
 
+	s.ReviewAcksInHolding()
+	if s.LeaderProxy != nil {
+		progress = progress || s.LeaderProxy.Review()
+	}
+
+	return
+}
+
+func (s *State) ReviewAcksInHolding() {
 	// Check for Ack'd items in holding
 	func() {
 		count := 0
@@ -461,53 +471,6 @@ emptyLoop:
 			}
 		}
 	}()
-
-	// only review holding if I am a leader
-	if s.RunLeader && s.Leader {
-		s.ReviewHolding()
-		for _, msg := range s.XReview {
-			if msg == nil {
-				continue
-			}
-			// copy the messages we are responsible for and all msg that don't need ack
-			// messages that need ack will get processed when thier ack arrives
-			if msg.GetVMIndex() == s.LeaderVMIndex || !constants.NeedsAck(msg.Type()) {
-				process = append(process, msg)
-			}
-		}
-		// toss everything else
-		s.XReview = s.XReview[:0]
-	}
-	if ValidationDebug {
-		s.LogPrintf("executeMsg", "end reviewHolding %d", len(s.XReview))
-	}
-
-	processXReviewTime := time.Since(preProcessXReviewTime)
-	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
-
-	if len(process) != 0 {
-		preProcessProcChanTime := time.Now()
-		if ValidationDebug {
-			s.LogPrintf("executeMsg", "Start processloop %d", len(process))
-		}
-		for _, msg := range process {
-			newProgress := s.executeMsg(msg)
-			if ValidationDebug && newProgress {
-				s.LogMessage("executeMsg", "progress set by ", msg)
-			}
-			progress = newProgress || progress //
-			s.LogMessage("executeMsg", "From process", msg)
-			s.UpdateState()
-		} // processLoop for{...}
-
-		if ValidationDebug {
-			s.LogPrintf("executeMsg", "end processloop")
-		}
-		processProcChanTime := time.Since(preProcessProcChanTime)
-		TotalProcessProcChanTime.Add(float64(processProcChanTime.Nanoseconds()))
-	}
-
-	return
 }
 
 //***************************************************************
