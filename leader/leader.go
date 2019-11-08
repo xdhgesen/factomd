@@ -113,14 +113,13 @@ func (l *Leader) subscribe() {
 	for {
 		select {
 		case m, ok := <-l.subscription.Channel:
-			//panic("KLUDGE: not in use")
+			panic("KLUDGE: not in use")
 
 			if ! ok {
 				return
 			}
 			_ = m
 			//l.LogMessage("leader_sub", "exec", m)
-			l.CreateAck(m)
 		}
 	}
 }

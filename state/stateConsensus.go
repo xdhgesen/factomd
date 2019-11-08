@@ -283,15 +283,9 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 			s.AddToHolding(msg.GetMsgHash().Fixed(), msg) // add valid commit/reveal to holding in case it fails to get added
 		}
 
-		if s.LeaderProxy == nil || ! s.LeaderProxy.ExecAsLeader(msg) {
+		// FIXME: isolate leader behavior
+		if s.LeaderProxy == nil || !s.LeaderProxy.ExecAsLeader(msg) {
 			s.LogMessage("executeMsg", fmt.Sprintf("FollowerExecute[%d]", s.LeaderVMIndex), msg)
-			//if s.Leader {
-			//	s.LogPrintf("executeMsg", "cause:"+
-			//		" s.RunLeader(%v) && s.Leader(%v) && !s.Saving(%v) &&	vm(%p) != nil && vmh(%v) == vml(%v) && "+
-			//		"(!s.Syncing(%v) || !vms(%v)) && (local(%v) || vmi(%v) == s.LeaderVMIndex(%v)) && "+
-			//		"s.LeaderPL.DBHeight(%v)+1 >= hkb(%v)",
-			//		s.RunLeader, s.Leader, s.Saving, vm, vmh, vml, s.Syncing, vms, local, vmi, s.LeaderVMIndex, s.LeaderPL.DBHeight, hkb)
-			//}
 			msg.FollowerExecute(s)
 		}
 		return true
@@ -553,6 +547,7 @@ func (s *State) ReviewHolding() {
 	if s.ResendHolding == nil {
 		s.ResendHolding = now
 	}
+
 	if now.GetTimeMilli()-s.ResendHolding.GetTimeMilli() < 100 {
 		return
 	}
@@ -602,11 +597,17 @@ func (s *State) ReviewHolding() {
 		}
 	}
 
+	s.processHoldingList(now, highest, saved)
+	s.ResendHolding = s.GetTimestamp()
+	reviewHoldingTime := time.Since(preReviewHoldingTime)
+	TotalReviewHoldingTime.Add(float64(reviewHoldingTime.Nanoseconds()))
+}
+
+func (s *State) processHoldingList(now interfaces.Timestamp, highest uint32, saved uint32) {
 	cnt := 1
 processholdinglist:
 	for {
 		if cnt&0x1F == 0 && s.GetTimestamp().GetTimeMilli()-now.GetTimeMilli() > 200 {
-
 			break processholdinglist
 		}
 		cnt++
@@ -691,9 +692,6 @@ processholdinglist:
 		s.XReview = append(s.XReview, v)
 		TotalHoldingQueueOutputs.Inc()
 	}
-	s.ResendHolding = s.GetTimestamp()
-	reviewHoldingTime := time.Since(preReviewHoldingTime)
-	TotalReviewHoldingTime.Add(float64(reviewHoldingTime.Nanoseconds()))
 }
 
 func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {

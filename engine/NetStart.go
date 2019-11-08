@@ -34,7 +34,7 @@ import (
 )
 
 var connectionMetricsChannel = make(chan interface{}, p2p.StandardChannelSize)
-var mLog = new(MsgLog)
+//var mLog = new(MsgLog)
 var p2pProxy *P2PProxy
 var p2pNetwork *p2p.Controller
 var logPort string
