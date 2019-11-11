@@ -646,7 +646,10 @@ func sortMsg(msg interfaces.IMsg, fnode *fnode.FactomNode, source string) {
 	if constants.NeedsAck(msg.Type()) {
 		// send msg to MMRequest processing to suppress requests for messages we already have
 		fnode.State.RecentMessage.NewMsgs <- msg
-		// TODO: install leader scription
+		// TODO: install leader pubsub
+		if fnode.State.LeaderProxy != nil {
+			fnode.State.LeaderProxy.Enqueue(msg)
+		}
 	}
 }
 
@@ -712,19 +715,6 @@ func NetworkOutputs(fnode *fnode.FactomNode) {
 				continue
 			}
 		}
-
-		//_, ok := msg.(*messages.Ack)
-		//if ok {
-		//// We don't care about the result, but we do want to log that we have
-		//// seen this message before, because we might have generated the message
-		//// ourselves.
-		//	// Add the ack to our replay filter
-		//	fnode.State.Replay.IsTSValidAndUpdateState(
-		//		constants.NETWORK_REPLAY,
-		//		msg.GetRepeatHash().Fixed(),
-		//		msg.GetTimestamp(),
-		//		fnode.State.GetTimestamp())
-		//}
 
 		p := msg.GetOrigin() - 1 // Origin is one based but peer list is zero based.
 
