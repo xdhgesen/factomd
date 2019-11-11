@@ -30,7 +30,7 @@ type IQueue interface {
 type ILeader interface {
 	Enqueue(msg IMsg)
 	ExecAsLeader(IMsg) bool
-	SendDBSig(dbheight uint32, vmIndex int) // If a Leader, we have to send a DBSig out for the previous block
+	MoveStateToHeightPub() chan uint32
 	Review() bool
 }
 

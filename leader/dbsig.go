@@ -35,7 +35,9 @@ func (l *Leader) CreateDBSig(dbheight uint32, vmIndex int) (interfaces.IMsg, int
 // dbheight is the height of the process list, and vmIndex is the vm
 // that is missing the DBSig.  If the DBSig isn't our responsibility, then
 // this call will do nothing.  Assumes the state for the leader is set properly
-func (l *Leader) SendDBSig(dbheight uint32, vmIndex int) {
+func (l *Leader) SendDBSig(dbheight uint32) {
+	vmIndex := l.LeaderVMIndex
+
 	l.LogPrintf("executeMsg", "SendDBSig(dbht=%d,vm=%d)", dbheight, vmIndex)
 	//dbslog := consenLogger.WithFields(log.Fields{"func": "SendDBSig"})
 

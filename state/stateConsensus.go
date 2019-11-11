@@ -682,10 +682,10 @@ processholdinglist:
 			}
 			// REVIEW: should this be dispatched to Leader thread?
 			/*
-			if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
-				continue processholdinglist
-			}
-			 */
+				if re.GetVMIndex() != s.LeaderVMIndex || !s.Leader {
+					continue processholdinglist
+				}
+			*/
 		default:
 		}
 
@@ -775,7 +775,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		// FIXME: isolate leader behavior
 		// Do not send out dbsigs while loading from disk
 		if s.Leader && !s.LeaderPL.DBSigAlreadySent && s.LLeaderHeight > s.DBHeightAtBoot {
-			s.LeaderProxy.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // MoveStateToHeight()
+			s.LeaderProxy.MoveStateToHeightPub() <- s.LLeaderHeight
 		}
 		s.DBStates.UpdateState() // go process the DBSigs
 
@@ -938,11 +938,11 @@ func (s *State) FactomSecond() time.Duration {
 func (s *State) FollowerExecuteEOM(m interfaces.IMsg) {
 
 	if m.IsLocal() {
-	  if s.Leader {
-		  // Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
-		  s.Repost(m, 1)
-	  }
-	  return // Follower doesn't deal w/ local messages
+		if s.Leader {
+			// Goes in the "do this really fast" queue so we are prompt about EOM's while syncing
+			s.Repost(m, 1)
+		}
+		return // Follower doesn't deal w/ local messages
 	}
 
 	eom := m.(*messages.EOM)
@@ -1667,18 +1667,18 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 
 				_, _ = s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
 				/*
-				Leader, LeaderVMIndex := s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
-				{ // debug
-					if s.Leader != Leader {
-						s.LogPrintf("executeMsg", "State.ProcessEOM() unexpectedly setting s.Leader to %v", Leader)
-						s.Leader = Leader
+					Leader, LeaderVMIndex := s.LeaderPL.GetVirtualServers(s.CurrentMinute, s.IdentityChainID)
+					{ // debug
+						if s.Leader != Leader {
+							s.LogPrintf("executeMsg", "State.ProcessEOM() unexpectedly setting s.Leader to %v", Leader)
+							s.Leader = Leader
+						}
+						if s.LeaderVMIndex != LeaderVMIndex {
+							s.LogPrintf("executeMsg", "State.ProcessEOM()  unexpectedly setting s.LeaderVMIndex to %v", LeaderVMIndex)
+							s.LeaderVMIndex = LeaderVMIndex
+						}
 					}
-					if s.LeaderVMIndex != LeaderVMIndex {
-						s.LogPrintf("executeMsg", "State.ProcessEOM()  unexpectedly setting s.LeaderVMIndex to %v", LeaderVMIndex)
-						s.LeaderVMIndex = LeaderVMIndex
-					}
-				}
-				 */
+				*/
 
 			case s.CurrentMinute == 10:
 				s.LogPrintf("dbsig-eom", "Start new block")

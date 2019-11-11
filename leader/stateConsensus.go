@@ -51,8 +51,7 @@ func (l *Leader) ExecAsLeader(msg interfaces.IMsg) bool {
 	}
 
 	if initDBSig { // if we have not generated a DBSig ...
-		// FIXME: this is invoked directly instead of behind subscriber
-		l.SendDBSig(s.LLeaderHeight, s.LeaderVMIndex) // ExecuteMsg()
+		l.MoveStateToHeightPub() <- s.LLeaderHeight // FIXME replace w/ pubsub
 		state.TotalXReviewQueueInputs.Inc()
 		s.XReview = append(s.XReview, msg)
 		s.LogMessage("executeMsg", "Missing DBSig use XReview", msg)

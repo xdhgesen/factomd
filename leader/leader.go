@@ -16,6 +16,7 @@ type Leader struct {
 	common.Name
 	*state.State
 	subscription *queue.MsgQueue
+	MoveStateToHeightEvent chan uint32
 }
 
 // KLUDGE: pretend to use pub/sub
@@ -29,6 +30,10 @@ func (l *Leader) GetState() interfaces.IState {
 	return l.State
 }
 
+func (l *Leader) MoveStateToHeightPub() chan uint32 {
+	return l.MoveStateToHeightEvent
+}
+
 // REVIEW: why is part of NamedObject interface
 // and is this correct?
 func (l *Leader) String() string {
@@ -40,6 +45,7 @@ func (l *Leader) Run(w *worker.Thread) {
 
 	l.Init(l.State, "Leader")
 	l.subscription = queue.NewMsgQueue(l, "Leader", constants.INMSGQUEUE_HIGH)
+	l.MoveStateToHeightEvent = make(chan uint32)
 
 	// Start EOM timer
 	w.Run(func() { Timer(l.State) })
@@ -116,6 +122,8 @@ func (l *Leader) subscribe() {
 
 	for {
 		select {
+		case ht := <- l.MoveStateToHeightEvent:
+			l.SendDBSig(ht)
 		case m, ok := <-l.subscription.Channel:
 			panic("KLUDGE: not in use")
 
