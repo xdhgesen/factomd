@@ -284,10 +284,12 @@ func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 		}
 
 		// FIXME: isolate leader behavior
-		if s.LeaderProxy == nil || !s.LeaderProxy.ExecAsLeader(msg) {
-			s.LogMessage("executeMsg", fmt.Sprintf("FollowerExecute[%d]", s.LeaderVMIndex), msg)
-			msg.FollowerExecute(s)
+		if s.LeaderProxy != nil {
+			_ = s.LeaderProxy.ExecAsLeader(msg)
 		}
+
+		s.LogMessage("executeMsg", fmt.Sprintf("FollowerExecute[%d]", s.LeaderVMIndex), msg)
+		msg.FollowerExecute(s)
 		return true
 
 	case 0:
