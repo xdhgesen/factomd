@@ -65,6 +65,8 @@ func (l *Leader) Init(parent common.NamedObject, name string) {
 
 // still called from state consensus thread
 func (l *Leader) execute(m interfaces.IMsg) {
+	l.LogMessage("leader_sub", "exec", m)
+
 	switch m.Type() {
 	case constants.DBSTATE_MISSING_MSG:
 		m.FollowerExecute(l.State)
@@ -74,7 +76,7 @@ func (l *Leader) execute(m interfaces.IMsg) {
 	// TODO: eventually need everything that needs ack to pass through here
 	//case EOM_MSG, COMMIT_CHAIN_MSG, COMMIT_ENTRY_MSG, REVEAL_ENTRY_MSG, DIRECTORY_BLOCK_SIGNATURE_MSG, FACTOID_TRANSACTION_MSG, ADDSERVER_MSG, CHANGESERVER_KEY_MSG, REMOVESERVER_MSG:
 	case constants.EOM_MSG, constants.DIRECTORY_BLOCK_SIGNATURE_MSG, constants.FACTOID_TRANSACTION_MSG, constants.COMMIT_CHAIN_MSG, constants.REVEAL_ENTRY_MSG:
-		l.CreateAck(m) // KLUDGE: don'e publish
+		l.CreateAck(m) // KLUDGE: don't publish
 		//l.subscription.Channel <- m
 	default:
 		//panic(fmt.Sprintf("leader.execute() doesn't handle %v yet ", m.Type()))
@@ -125,13 +127,11 @@ func (l *Leader) subscribe() {
 		case ht := <- l.MoveStateToHeightEvent:
 			l.SendDBSig(ht)
 		case m, ok := <-l.subscription.Channel:
-			panic("KLUDGE: not in use")
 
 			if ! ok {
 				return
 			}
-			_ = m
-			//l.LogMessage("leader_sub", "exec", m)
+			l.execute(m)
 		}
 	}
 }
