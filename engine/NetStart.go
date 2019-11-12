@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"github.com/FactomProject/factomd/leader"
+	"github.com/FactomProject/factomd/modules/debugsettings"
 	"github.com/FactomProject/factomd/simulation"
 	"os"
 	"sync"
@@ -315,7 +316,7 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 	} else {
 		node = fnode.New(state.Clone(fnode.Get(0).State, i).(*state.State))
 	}
-	node.State.Initialize(w)
+	node.State.Initialize(w, new(electionMsgs.ElectionsFactory))
 
 	state0Init.Do(func() {
 		logPort = p.LogPort
@@ -325,7 +326,7 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 		echoConfig(node.State, p) // print the config only once
 	})
 
-// TODO: Init any settings from the config
+	// TODO: Init any settings from the config
 	debugsettings.NewNode(node.State.GetFactomNodeName())
 
 	{ // KLUDGE: refactor to use proper pub/sub
@@ -340,7 +341,6 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 	}
 
 	// REVIEW: may need to refactor to init this factory in another place
-	node.State.EFactory = new(electionMsgs.ElectionsFactory)
 	time.Sleep(10 * time.Millisecond)
 
 	return node

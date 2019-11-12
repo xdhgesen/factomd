@@ -72,6 +72,7 @@ type StateConfig struct {
 	StartDelayLimit         int64
 	TimeOffset              interfaces.Timestamp
 	TimestampAtBoot         interfaces.Timestamp
+	ProcessTime             interfaces.Timestamp
 	WaitForEntries          bool
 	FactomdVersion          string
 	LogLevel                string
@@ -108,6 +109,7 @@ type StateConfig struct {
 type State struct {
 	common.Name
 	StateConfig
+	LeaderProxy	 interfaces.ILeader
 	Logger            *log.Entry
 	RunState          runstate.RunState
 	NetworkController *p2p.Controller

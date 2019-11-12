@@ -67,7 +67,8 @@ func (l *Leader) LeaderExecute(m interfaces.IMsg) {
 
 func (l *Leader) LeaderExecuteEOM(m interfaces.IMsg) {
 	if !m.IsLocal() {
-		panic("leader got an EOM from network")
+		//panic("leader got an EOM from network")
+		return
 	}
 
 	pl := l.ProcessLists.Get(l.LLeaderHeight)
