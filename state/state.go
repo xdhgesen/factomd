@@ -12,7 +12,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/FactomProject/factomd/events/eventmessages/generated/eventmessages"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,10 +20,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/FactomProject/factomd/common/constants/runstate"
+
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
-	"github.com/FactomProject/factomd/common/constants/runstate"
 	"github.com/FactomProject/factomd/common/globals"
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -34,7 +34,6 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
 	"github.com/FactomProject/factomd/database/mapdb"
-	"github.com/FactomProject/factomd/events/eventservices"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -273,12 +272,13 @@ type State struct {
 	NewEntryChains         int
 	NewEntries             int
 	LeaderTimestamp        interfaces.Timestamp
-	MessageFilterTimestamp interfaces.Timestamp
+	messageFilterTimestamp interfaces.Timestamp
 	// Maps
 	// ====
 	// For Follower
 	ResendHolding interfaces.Timestamp         // Timestamp to gate resending holding to neighbors
 	HoldingList   chan [32]byte                // Queue to process Holding in order
+	HoldingVM     int                          // VM used to build current holding list
 	Holding       map[[32]byte]interfaces.IMsg // Hold Messages
 	XReview       []interfaces.IMsg            // After the EOM, we must review the messages in Holding
 	Acks          map[[32]byte]interfaces.IMsg // Hold Acknowledgements
@@ -320,8 +320,8 @@ type State struct {
 
 	ResetRequest    bool // Set to true to trigger a reset
 	ProcessLists    *ProcessLists
-	HighestKnown    uint32
-	HighestAck      uint32
+	highestKnown    uint32
+	highestAck      uint32
 	AuthorityDeltas string
 
 	// Factom State
@@ -425,7 +425,8 @@ type State struct {
 	StateUpdateState      int64
 	ValidatorLoopSleepCnt int64
 	processCnt            int64 // count of attempts to process .. so we can see if the thread is running
-	MMRInfo                     // fields for MMR processing
+	ProcessTime           interfaces.Timestamp
+	MMRInfo               // fields for MMR processing
 
 	reportedActivations       [activations.ACTIVATION_TYPE_COUNT + 1]bool // flags about which activations we have reported (+1 because we don't use 0)
 	validatorLoopThreadID     string
@@ -557,7 +558,7 @@ func (s *State) Clone(cloneNumber int) interfaces.IState {
 
 	newState.TimestampAtBoot = primitives.NewTimestampFromMilliseconds(s.TimestampAtBoot.GetTimeMilliUInt64())
 	newState.LeaderTimestamp = primitives.NewTimestampFromMilliseconds(s.LeaderTimestamp.GetTimeMilliUInt64())
-	newState.SetMessageFilterTimestamp(s.MessageFilterTimestamp)
+	newState.SetMessageFilterTimestamp(s.GetMessageFilterTimestamp())
 
 	newState.FactoshisPerEC = s.FactoshisPerEC
 
@@ -902,7 +903,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		if s.FactomdTLSKeyFile != FactomdTLSKeyFile {
 			if s.FactomdTLSEnable {
 				if _, err := os.Stat(FactomdTLSKeyFile); os.IsNotExist(err) {
-					fmt.Fprint(os.Stderr, "Configured file does not exits: %s\n", FactomdTLSKeyFile)
+					fmt.Fprintf(os.Stderr, "Configured file does not exits: %s\n", FactomdTLSKeyFile)
 				}
 			}
 			s.FactomdTLSKeyFile = FactomdTLSKeyFile // set state
@@ -915,7 +916,7 @@ func (s *State) LoadConfig(filename string, networkFlag string) {
 		if s.FactomdTLSCertFile != FactomdTLSCertFile {
 			if s.FactomdTLSEnable {
 				if _, err := os.Stat(FactomdTLSCertFile); os.IsNotExist(err) {
-					fmt.Fprint(os.Stderr, "Configured file does not exits: %s\n", FactomdTLSCertFile)
+					fmt.Fprintf(os.Stderr, "Configured file does not exits: %s\n", FactomdTLSCertFile)
 				}
 			}
 			s.FactomdTLSCertFile = FactomdTLSCertFile // set state
@@ -1035,6 +1036,7 @@ func (s *State) Init() {
 	s.IgnoreMissing = true
 	s.BootTime = s.GetTimestamp().GetTimeSeconds()
 	s.TimestampAtBoot = primitives.NewTimestampNow()
+	s.ProcessTime = s.TimestampAtBoot
 
 	if s.LogPath == "stdout" {
 		wsapi.InitLogs(s.LogPath, s.LogLevel)
@@ -1067,6 +1069,7 @@ func (s *State) Init() {
 	s.msgQueue = make(chan interfaces.IMsg, 50)                             //queue of Follower messages
 	s.prioritizedMsgQueue = make(chan interfaces.IMsg, 50)                  //a prioritized queue of Follower messages (from mmr.go)
 	s.MissingEntries = make(chan *MissingEntry, constants.INMSGQUEUE_HIGH)  //Entries I discover are missing from the database
+	s.dataQueue = NewInMsgQueue(constants.INMSGQUEUE_HIGH)                  //incoming requests for missing data
 	s.UpdateEntryHash = make(chan *EntryUpdate, constants.INMSGQUEUE_HIGH)  //Handles entry hashes and updating Commit maps.
 	s.WriteEntry = make(chan interfaces.IEBEntry, constants.INMSGQUEUE_LOW) //Entries to be written to the database
 	s.RecentMessage.NewMsgs = make(chan interfaces.IMsg, 100)
@@ -1229,8 +1232,8 @@ func (s *State) Init() {
 	// end of FER removal
 	s.Starttime = time.Now()
 	// Allocate the MMR queues
-	s.asks = make(chan askRef, 5)
-	s.adds = make(chan plRef, 5)
+	s.asks = make(chan askRef, 50) // Should be > than the number of VMs so each VM can have at least one outstanding ask.
+	s.adds = make(chan plRef, 50)  // No good rule of thumb on the size of this
 	s.dbheights = make(chan int, 1)
 	s.rejects = make(chan MsgPair, 1) // Messages rejected from process list
 
@@ -3121,8 +3124,4 @@ func (s *State) ShutdownNode(exitCode int) {
 	fmt.Println(fmt.Sprintf("Initiating a graceful shutdown of node %s. The exit code is %v.", s.FactomNodeName, exitCode))
 	s.RunState = runstate.Stopping
 	s.ShutdownChan <- exitCode
-}
-
-func (s *State) IsRunLeader() bool {
-	return s.RunLeader
 }
