@@ -199,7 +199,7 @@ func ExecuteAllBlocksFromDatabases(s *state.State) {
 	}
 }
 
-func CreateTestBlockCommitList() []interfaces.IMsg {
+func CreateTestDBStateList() []interfaces.IMsg {
 	answer := make([]interfaces.IMsg, BlockCount)
 	var prev *BlockSet = nil
 

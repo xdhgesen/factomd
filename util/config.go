@@ -8,7 +8,8 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/log"
+
+	llog "github.com/FactomProject/factomd/log"
 	gcfg "gopkg.in/gcfg.v1"
 )
 
