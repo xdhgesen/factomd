@@ -68,10 +68,6 @@ func (s *State) MMRDummy() {
 // Ask VM for an MMR for this height with delay ms before asking the network
 // called from validation thread to notify MMR that we are missing a message
 func (vm *VM) ReportMissing(height int, delay int64) {
-	if height <= vm.HighestAsk { // Don't report the same height twice
-		return
-	}
-
 	vm.p.State.LogPrintf("missing_messages", "ReportMissing %d/%d/%d, delay %d", vm.p.DBHeight, vm.VmIndex, height, delay)
 
 	now := vm.p.State.GetTimestamp().GetTimeMilli()
@@ -112,7 +108,6 @@ func (s *State) Ask(DBHeight int, vmIndex int, height int, when int64) bool {
 		return false
 	}
 	vm := s.LeaderPL.VMs[vmIndex]
-
 
 	//	Currently if the asks are full, we'd rather just skip
 	//	than block the thread. We report missing multiple times, so if
