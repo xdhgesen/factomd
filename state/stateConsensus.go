@@ -93,6 +93,7 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 
 var FilterTimeLimit = int64(Range * 60 * 2 * 1000000000) // Filter hold two hours of messages, one in the past one in the future
 
+
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
 // for the replay filter.
 func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int) {
@@ -1262,21 +1263,6 @@ func (s *State) FollowerExecuteMMR(m interfaces.IMsg) {
 		return
 	}
 
-	// Only new acks are valid. Of course, the VMIndex has to be valid too.
-	msgslot, err := s.GetMsg(ack.VMIndex, int(ack.DBHeight), int(ack.Height))
-	if err != nil {
-		panic(err)
-	}
-	if msgslot != nil {
-		if !msg.GetMsgHash().IsSameAs(msgslot.GetHash()) {
-			s.LogMessage("executeMsg", "MMR Ack slot taken", m)
-			s.LogMessage("executeMsg", "MMR found:", msg)
-		} else {
-			s.LogPrintf("executeMsg", "MMR of duplicate at %d/%d/%d", int(ack.DBHeight), ack.VMIndex, int(ack.Height))
-		}
-		return
-	}
-
 	_, validToExecute := s.Validate(ack)
 	if validToExecute == -1 {
 		s.LogMessage("executeMsg", "drop MMR ack invalid", ack)
@@ -1932,7 +1918,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 	vm := pl.VMs[vmIndex]
 
 	s.LogPrintf("dbsig-eom", "ProcessEOM@%d/%d/%d minute %d, Syncing %v , EOM %v, EOMDone %v, EOMProcessed %v, EOMLimit %v DBSigDone %v",
-		dbheight, msg.GetVMIndex(), vm.Height, s.CurrentMinute, s.Syncing, s.EOM, s.EOMDone, s.EOMProcessed, s.EOMLimit, s.DBSigDone)
+		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.EOM, s.EOMDone, s.EOMProcessed, s.EOMLimit, s.DBSigDone)
 
 	// debug
 	if s.DebugExec() {
@@ -2234,7 +2220,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 
 	// debug
 	s.LogPrintf("dbsig-eom", "ProcessDBSig@%d/%d/%d minute %d, Syncing %v , DBSig %v, DBSigDone %v, DBSigProcessed %v, DBSigLimit %v DBSigDone %v",
-		dbheight, msg.GetVMIndex(), vm.Height, s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
+		dbheight, msg.GetVMIndex(), len(vm.List), s.CurrentMinute, s.Syncing, s.DBSig, s.DBSigDone, s.DBSigProcessed, s.DBSigLimit, s.DBSigDone)
 
 	// debug
 	if s.DebugExec() {
@@ -2365,6 +2351,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LogMessage("processList", "drop from pl", vm.ListAck[0])
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
+			vm.HighestAsk = -1
 			vm.HighestNil = 0
 			return false
 		}
@@ -2381,6 +2368,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LogMessage("processList", "drop from pl", vm.ListAck[0])
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
+			vm.HighestAsk = -1
 			vm.HighestNil = 0
 			return false
 		}
@@ -2394,6 +2382,7 @@ func (s *State) ProcessDBSig(dbheight uint32, msg interfaces.IMsg) bool {
 			s.LogMessage("processList", "drop from pl", vm.ListAck[0])
 			vm.ListAck[0] = nil
 			vm.List[0] = nil
+			vm.HighestAsk = -1
 			vm.HighestNil = 0
 			return false
 		}
@@ -2460,7 +2449,7 @@ func (s *State) GetMsg(vmIndex int, dbheight int, height int) (interfaces.IMsg, 
 		return nil, errors.New("No Process List")
 	}
 	vms := pl.VMs
-	if len(vms) < vmIndex {
+	if len(vms) <= vmIndex {
 		return nil, errors.New("Bad VM Index")
 	}
 	vm := vms[vmIndex]
