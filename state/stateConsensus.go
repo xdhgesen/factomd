@@ -113,7 +113,7 @@ func init() {
 			count := len(msgs_list)
 			if count > 0 {
 				for i, p := range msgs_list {
-					if p.h < int(p.s.GetLLeaderHeight()+1) {
+					if p.h > int(p.s.GetLLeaderHeight()+2) {
 						delete(msgs_list, i)
 						continue
 					}
