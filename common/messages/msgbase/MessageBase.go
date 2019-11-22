@@ -183,12 +183,13 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	// debug code end ............
 	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 
-	{ // ugly hack
+	{ // ugly hack talk talk talk
 		h := s.GetLLeaderHeight()
 		go func() {
 			time.Sleep(1 * time.Minute)
 			for s.GetLLeaderHeight() <= h+2 {
 				time.Sleep(10 * time.Second)
+				m.ResendCnt = 0
 				msg.SendOut(s, msg)
 			}
 		}()
