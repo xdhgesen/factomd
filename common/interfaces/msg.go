@@ -95,6 +95,7 @@ type IMsg interface {
 	GetNoResend() bool
 	SetNoResend(bool)
 	GetResendCnt() int
+	SetResendCnt(int)
 
 	// Process.  When we get a sequence of acknowledgements that we trust, we process.
 	// A message will only be processed once, and in order, guaranteed.

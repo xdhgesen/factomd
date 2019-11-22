@@ -11,6 +11,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -93,6 +94,36 @@ func (s *State) DeleteFromHolding(hash [32]byte, msg interfaces.IMsg, reason str
 
 var FilterTimeLimit = int64(Range * 60 * 2 * 1000000000) // Filter hold two hours of messages, one in the past one in the future
 
+var sent map[[32]byte]interfaces.IMsg = make(map[[32]byte]interfaces.IMsg)
+
+var lock sync.Mutex
+
+type pending struct {
+	msg interfaces.IMsg
+	h   int
+	s   *State
+}
+
+var msgs_list []pending
+
+func init() {
+	for {
+		lock.Lock()
+		count := len(msgs_list)
+		if count > 0 {
+			for _, msg := range msgs_list {
+				msg.msg.SetResendCnt(0)
+				msg.msg.SendOut(msg.s, msg.msg)
+				lock.Unlock()
+				time.Sleep(10 * time.Second / time.Duration(count))
+				lock.Lock()
+			}
+		}
+		lock.Unlock()
+		time.Sleep(1 * time.Second)
+	}
+}
+
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
 // for the replay filter.
 func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int) {
@@ -102,6 +133,16 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 	defer func() {
 		s.LogMessage("msgvalidation", fmt.Sprintf("send=%d execute=%d local=%v %s", *(&validToSend), *(&validToExec), msg.IsLocal(), atomic.WhereAmIString(1)), msg)
 	}()
+
+	{ // ugly hack talk talk talk
+		_, ok := sent[msg.GetHash().Fixed()]
+		if !ok && validToSend != -1 && validToExec != -1 {
+			sent[msg.GetHash().Fixed()] = msg
+			lock.Lock()
+			msgs_list = append(msgs_list, pending{msg, int(s.GetLLeaderHeight()), s})
+			lock.Unlock()
+		}
+	}
 
 	// During boot ignore messages that are more than 15 minutes old...
 	if s.IgnoreMissing && msg.Type() != constants.DBSTATE_MSG {

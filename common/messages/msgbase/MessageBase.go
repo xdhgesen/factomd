@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -183,18 +182,6 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 	// debug code end ............
 	s.LogMessage("NetworkOutputs", "Enqueue", msg)
 
-	{ // ugly hack talk talk talk
-		h := s.GetLLeaderHeight()
-		go func() {
-			time.Sleep(1 * time.Minute)
-			for s.GetLLeaderHeight() <= h+2 {
-				time.Sleep(10 * time.Second)
-				m.ResendCnt = 0
-				msg.SendOut(s, msg)
-			}
-		}()
-	}
-
 	if s.GetRunLeader() { // true means - we are not in wait period
 		s.NetworkOutMsgQueue().Enqueue(msg)
 	} else {
@@ -214,6 +201,10 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 
 func (m *MessageBase) GetResendCnt() int {
 	return m.ResendCnt
+}
+
+func (m *MessageBase) SetResendCnt(x int) {
+	m.ResendCnt = x
 }
 
 func (m *MessageBase) GetNoResend() bool {
