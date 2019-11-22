@@ -115,6 +115,7 @@ func init() {
 				for i, p := range msgs_list {
 					if p.h < int(p.s.GetLLeaderHeight()+1) {
 						delete(msgs_list, i)
+						continue
 					}
 					p.msg.SetResendCnt(0)
 					p.msg.SendOut(p.s, p.msg)
