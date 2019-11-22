@@ -104,23 +104,28 @@ type pending struct {
 	s   *State
 }
 
-var msgs_list []pending
+var msgs_list map[[32]byte]pending
 
 func init() {
-	for {
-		lock.Lock()
-		count := len(msgs_list)
-		if count > 0 {
-			for _, msg := range msgs_list {
-				msg.msg.SetResendCnt(0)
-				msg.msg.SendOut(msg.s, msg.msg)
-				lock.Unlock()
-				time.Sleep(10 * time.Second / time.Duration(count))
-				lock.Lock()
+	go func() {
+		for {
+			lock.Lock()
+			count := len(msgs_list)
+			if count > 0 {
+				for i, p := range msgs_list {
+					if p.h < int(p.s.GetLLeaderHeight()+1) {
+						delete( msgs_list, i)
+					}
+					p.msg.SetResendCnt(0)
+					p.msg.SendOut(p.s, p.msg)
+					lock.Unlock()
+					time.Sleep(10 * time.Second / time.Duration(count))
+					lock.Lock()
+				}
 			}
+			lock.Unlock()
+			time.Sleep(1 * time.Second)
 		}
-		lock.Unlock()
-		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -139,7 +144,7 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 		if !ok && validToSend != -1 && validToExec != -1 {
 			sent[msg.GetHash().Fixed()] = msg
 			lock.Lock()
-			msgs_list = append(msgs_list, pending{msg, int(s.GetLLeaderHeight()), s})
+			msgs_list[msg.GetHash().Fixed()] = pending{msg, int(s.GetLLeaderHeight()), s}
 			lock.Unlock()
 		}
 	}
