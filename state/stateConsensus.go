@@ -104,7 +104,7 @@ type pending struct {
 	s   *State
 }
 
-var msgs_list map[[32]byte]pending
+var msgs_list map[[32]byte]pending = make(map[[32]byte]pending)
 
 func init() {
 	go func() {
@@ -114,7 +114,7 @@ func init() {
 			if count > 0 {
 				for i, p := range msgs_list {
 					if p.h < int(p.s.GetLLeaderHeight()+1) {
-						delete( msgs_list, i)
+						delete(msgs_list, i)
 					}
 					p.msg.SetResendCnt(0)
 					p.msg.SendOut(p.s, p.msg)
@@ -126,7 +126,7 @@ func init() {
 			lock.Unlock()
 			time.Sleep(1 * time.Second)
 		}
-	}
+	}()
 }
 
 // this is the common validation to all messages. they must not be a reply, they must not be out size the time window
