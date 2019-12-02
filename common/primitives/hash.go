@@ -16,12 +16,12 @@ import (
 	"os"
 	"reflect"
 	"runtime/debug"
-	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/util/atomic"
 )
 
@@ -310,7 +310,7 @@ func Loghashfixed(h [32]byte) {
 	if globals.Hashlog == nil {
 		f, err := os.Create("fullhashes.txt")
 		globals.Hashlog = bufio.NewWriter(f)
-		f.WriteString(time.Now().String() + "\n")
+		f.WriteString(mytime.Timenow().String() + "\n")
 		if err != nil {
 			panic(err)
 		}

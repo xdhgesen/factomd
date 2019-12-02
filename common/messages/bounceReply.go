@@ -11,11 +11,11 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mytime"
 
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	log "github.com/sirupsen/logrus"
@@ -221,7 +221,7 @@ func (m *BounceReply) MarshalBinary() (data []byte, err error) {
 
 func (m *BounceReply) String() string {
 	// bbbb Origin: 2016-09-05 12:26:20.426954586 -0500 CDT left BounceReply Start:             2016-09-05 12:26:05 Hops:     1 Size:    43 Last Hop Took 14.955 Average Hop: 14.955
-	now := time.Now()
+	now := mytime.Timenow()
 	t := fmt.Sprintf("%2d:%2d:%2d.%03d", now.Hour(), now.Minute(), now.Second(), now.Nanosecond()/1000000)
 	mill := m.Timestamp.GetTimeMilli()
 	mills := mill % 1000

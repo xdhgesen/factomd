@@ -13,6 +13,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgsupport"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 var _ = fmt.Print
@@ -89,7 +90,7 @@ func (f *SimPeer) Init(fromName, toName string) interfaces.IPeer {
 	f.ToName = toName
 	f.FromName = fromName
 	f.BroadcastOut = make(chan *SimPacket, 10000)
-	f.Last = time.Now().UnixNano()
+	f.Last = mytime.Timenow().UnixNano()
 	return f
 }
 
@@ -101,7 +102,7 @@ func (f *SimPeer) GetNameTo() string {
 }
 
 func (f *SimPeer) computeBandwidth() {
-	now := time.Now().UnixNano()
+	now := mytime.Timenow().UnixNano()
 	delta := (now - f.Last) / 1000000000 // Make delta seconds
 	if delta < 5 {
 		// Wait atleast 5 seconds.
@@ -128,7 +129,7 @@ func (f *SimPeer) Send(msg interfaces.IMsg) error {
 			// Sleep some random number of milliseconds, then send the packet
 			time.Sleep(time.Duration(rand.Intn(int(f.Delay))) * time.Millisecond)
 		}
-		packet := SimPacket{data: data, sent: time.Now().UnixNano() / 1000000}
+		packet := SimPacket{data: data, sent: mytime.Timenow().UnixNano() / 1000000}
 		f.BroadcastOut <- &packet
 	}()
 

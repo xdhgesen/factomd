@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants/runstate"
+	"github.com/FactomProject/factomd/mytime"
 
 	"github.com/FactomProject/factomd/activations"
 	"github.com/FactomProject/factomd/common/adminBlock"
@@ -706,7 +707,7 @@ func (s *State) GetPreviousMinuteStartTime() int64 {
 }
 
 func (s *State) GetCurrentTime() int64 {
-	return time.Now().UnixNano()
+	return mytime.Timenow().UnixNano()
 }
 
 func (s *State) IsSyncing() bool {
@@ -1170,7 +1171,7 @@ func (s *State) Init() {
 		s.ExchangeRateAuthorityPublicKey = "3b6a27bcceb6a42d62a3a8d02a6f0d73653215771de243a63ac048a18b59da29"
 	}
 	// end of FER removal
-	s.Starttime = time.Now()
+	s.Starttime = mytime.Timenow()
 	// Allocate the MMR queues
 	s.asks = make(chan askRef, 50) // Should be > than the number of VMs so each VM can have at least one outstanding ask.
 	s.adds = make(chan plRef, 50)  // No good rule of thumb on the size of this
@@ -1538,13 +1539,13 @@ func (s *State) LoadHoldingMap() map[[32]byte]interfaces.IMsg {
 func (s *State) fillHoldingMap() {
 	// once a second is often enough to rebuild the Ack list exposed to api
 
-	if s.HoldingLast < time.Now().Unix() {
+	if s.HoldingLast < mytime.Timenow().Unix() {
 
 		localMap := make(map[[32]byte]interfaces.IMsg)
 		for i, msg := range s.Holding {
 			localMap[i] = msg
 		}
-		s.HoldingLast = time.Now().Unix()
+		s.HoldingLast = mytime.Timenow().Unix()
 		s.HoldingMutex.Lock()
 		defer s.HoldingMutex.Unlock()
 		s.HoldingMap = localMap
@@ -1567,12 +1568,12 @@ func (s *State) LoadAcksMap() map[[32]byte]interfaces.IMsg {
 //  This is what fills the AcksMap requested in LoadAcksMap
 func (s *State) fillAcksMap() {
 	// once a second is often enough to rebuild the Ack list exposed to api
-	if s.AcksLast < time.Now().Unix() {
+	if s.AcksLast < mytime.Timenow().Unix() {
 		localMap := make(map[[32]byte]interfaces.IMsg)
 		for i, msg := range s.Acks {
 			localMap[i] = msg
 		}
-		s.AcksLast = time.Now().Unix()
+		s.AcksLast = mytime.Timenow().Unix()
 		s.AcksMutex.Lock()
 		defer s.AcksMutex.Unlock()
 		s.AcksMap = localMap
@@ -1897,9 +1898,9 @@ func (s *State) IsStalled() bool {
 
 	stalltime = float64(int64(s.GetDirectoryBlockInSeconds())) / 10
 	stalltime = stalltime * 1.5 * 1e9
-	//fmt.Println("STALL 2", s.CurrentMinuteStartTime/1e9, time.Now().UnixNano()/1e9, stalltime/1e9, (float64(time.Now().UnixNano())-stalltime)/1e9)
+	//fmt.Println("STALL 2", s.CurrentMinuteStartTime/1e9, mytime.Timenow().UnixNano()/1e9, stalltime/1e9, (float64(mytime.Timenow().UnixNano())-stalltime)/1e9)
 
-	if float64(s.CurrentMinuteStartTime) < float64(time.Now().UnixNano())-stalltime { //-90 seconds was arbitrary
+	if float64(s.CurrentMinuteStartTime) < float64(mytime.Timenow().UnixNano())-stalltime { //-90 seconds was arbitrary
 		return true
 	}
 
@@ -2013,7 +2014,7 @@ func (s *State) UpdateState() (progress bool) {
 	}
 
 	// Update our TPS every ~ 3 seconds at the earliest
-	if s.lasttime.Before(time.Now().Add(-3 * time.Second)) {
+	if s.lasttime.Before(mytime.Timenow().Add(-3 * time.Second)) {
 		s.CalculateTransactionRate()
 	}
 
@@ -2714,7 +2715,7 @@ func (s *State) CalculateTransactionRate() (totalTPS float64, instantTPS float64
 		delta := (s.FactoidTrans + s.NewEntryChains + s.NewEntries) - s.transCnt
 		s.tps = ((float64(delta) / float64(shorttime.Seconds())) + 2*s.tps) / 3
 		s.longTps = ((float64(delta) / float64(shorttime.Seconds())) + 31*s.longTps) / 32
-		s.lasttime = time.Now()
+		s.lasttime = mytime.Timenow()
 		s.transCnt = total                     // transactions accounted for
 		InstantTransactionPerSecond.Set(s.tps) // Prometheus
 	}

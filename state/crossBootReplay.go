@@ -11,6 +11,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/database/boltdb"
 	"github.com/FactomProject/factomd/database/mapdb"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 var _ = fmt.Println
@@ -74,7 +75,7 @@ func NewCrossReplayFilter(path string) *CrossReplayFilter {
 	c.oldSaltCache = make(map[[8]byte]bool)
 	// Load the old salts into the map
 	c.loadOldSalts()
-	c.endTime = time.Now().Add(constants.CROSSBOOT_SALT_REPLAY_DURATION)
+	c.endTime = mytime.Timenow().Add(constants.CROSSBOOT_SALT_REPLAY_DURATION)
 
 	var m MarshalableUint32
 	c.db.Get(heightBucket, lowest, &m)
@@ -134,7 +135,7 @@ func (c *CrossReplayFilter) ExistSalt(salt [8]byte) (bool, error) {
 func (c *CrossReplayFilter) Run() {
 	for {
 		time.Sleep(time.Second * 5)
-		if c.endTime.Before(time.Now()) {
+		if c.endTime.Before(mytime.Timenow()) {
 			// We no longer need to add salts
 			c.stopAddingSalts = true
 			return

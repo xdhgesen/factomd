@@ -751,34 +751,17 @@ func (p *ProcessList) decodeState(Syncing bool, DBSig bool, EOM bool, DBSigDone 
 
 var extraDebug bool = false
 
-func (p *ProcessList) processVM(vm *VM) (progress bool) {
+func (p *ProcessList) processVM(vm *VM, now interfaces.Timestamp) (progress bool) {
 
 	i := vm.VmIndex
 	s := p.State
-	now := s.GetTimestamp()
-
-	if vm.Height == len(vm.List) {
-		// if we are syncing EOMs ...
-		if s.EOM || s.DBSig {
-			// means that we are missing an EOM or DBSig
-			vm.ReportMissing(vm.Height, 0) // ask for it now
-		}
-		// If we haven't heard anything from a VM in 2 seconds, ask for a message at the last-known height
-		if now.GetTimeMilli()-vm.ProcessTime.GetTimeMilli() > int64(s.FactomSecond()/time.Millisecond) {
-			vm.ReportMissing(vm.Height, int64(2*s.FactomSecond()/time.Millisecond)) // Ask for one past the end of the list
-		}
-		return false
-	}
 
 	if ValidationDebug {
 		s.LogPrintf("process", "start process for VM %d/%d/%d", vm.p.DBHeight, vm.VmIndex, vm.Height)
 		defer s.LogPrintf("process", "stop  process for VM %d/%d/%d", vm.p.DBHeight, vm.VmIndex, vm.Height)
 	}
 
-	defer p.UpdateStatus(s) // update the status after each VM
-
 	progress = false // assume we will not process any messages
-
 	for j := vm.Height; j < len(vm.List); j++ {
 
 		s.ProcessListProcessCnt++
@@ -825,7 +808,6 @@ func (p *ProcessList) processVM(vm *VM) (progress bool) {
 		}
 
 		// Try an process this message
-		now = p.State.GetTimestamp()
 		vm.ProcessTime = now
 
 		msgRepeatHashFixed := msg.GetRepeatHash().Fixed()
@@ -870,16 +852,16 @@ func (p *ProcessList) processVM(vm *VM) (progress bool) {
 	return progress
 } // processVM(){...}
 
-func (p *ProcessList) RemoveFromPL(vm *VM, j int, reason string) {
-	p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, %s", p.DBHeight, vm.VmIndex, j, reason), vm.List[j]) //todo: revisit message
+func (p *ProcessList) RemoveFromPL(vm *VM, height int, reason string) {
+	p.State.LogMessage("process", fmt.Sprintf("nil out message %v/%v/%v, %s", p.DBHeight, vm.VmIndex, height, reason), vm.List[height]) //todo: revisit message
 
-	p.State.rejects <- MsgPair{vm.ListAck[j], vm.List[j]} // Notify MMR framework that we rejected this message
+	p.State.rejects <- MsgPair{vm.ListAck[height], vm.List[height]} // Notify MMR framework that we rejected this message
 
-	vm.List[j] = nil
-	if vm.HighestNil > j {
-		vm.HighestNil = j // Drag report limit back
+	vm.List[height] = nil
+	if vm.HighestNil > height {
+		vm.HighestNil = height // Drag report limit back
 	}
-	vm.ReportMissing(j, 0)
+	vm.ReportMissing(height, 0)
 }
 
 func (p *ProcessList) UpdateStatus(s *State) {
@@ -933,12 +915,26 @@ func (p *ProcessList) Process(s *State) (progress bool) {
 	progress = false // assume  we will not get any work done.
 	s.PLProcessHeight = p.DBHeight
 
+	now := s.GetTimestamp()
 	// Loop thru the VM processing as much as we can
 	for i := 0; i < len(p.FedServers); i++ {
 		vm := p.VMs[i]
-		p := p.processVM(vm)
-		progress = p || progress
+		if vm.Height == len(vm.List) { // if there are no messages to process
+			if s.EOM || s.DBSig { // if we are syncing EOMs ...
+				vm.ReportMissing(vm.Height, 0) // missing an EOM or DBSig, ask for it now
+			}
+			// If we haven't heard anything from a VM in 2 seconds, ask for a message at the last-known height
+			if now.GetTimeMilli()-vm.ProcessTime.GetTimeMilli() > int64(s.FactomSecond()/time.Millisecond) {
+				vm.ReportMissing(vm.Height, int64(2*s.FactomSecond()/time.Millisecond)) // Ask for one past the end of the list
+			}
+		} else {
+			p := p.processVM(vm, now)
+			progress = p || progress
+		}
 	}
+
+	//	p.UpdateStatus(s) // update the status after each process
+
 	return progress
 }
 

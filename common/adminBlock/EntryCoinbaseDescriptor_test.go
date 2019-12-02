@@ -4,17 +4,17 @@ import (
 	"testing"
 
 	"math/rand"
-	"time"
 
 	. "github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/testHelper"
 )
 
 func TestCoinbaseDescriptorMarshal(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(mytime.Timenow().UnixNano())
 	for i := 0; i < 100; i++ {
 		outputs := make([]interfaces.ITransAddress, 0)
 		for c := 0; c < rand.Intn(64); c++ {

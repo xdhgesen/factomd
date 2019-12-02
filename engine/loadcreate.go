@@ -15,6 +15,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -83,7 +84,7 @@ func (lg *LoadGenerator) Run() {
 			s := fnodes[wsapiNode].State
 			s.APIQueue().Enqueue(c)
 			s.APIQueue().Enqueue(r)
-			time.Sleep(time.Duration(800/top) * time.Millisecond) // spread the load out over 800ms + overhead
+			//			time.Sleep(time.Duration(800/top) * time.Millisecond) // spread the load out over 800ms + overhead
 		}
 	}
 }
@@ -243,7 +244,7 @@ func (lg *LoadGenerator) NewCommitEntry(entry *entryBlock.Entry) *messages.Commi
 // milliTime returns a 6 byte slice representing the unix time in milliseconds
 func milliTime(offset int64) (r []byte) {
 	buf := new(bytes.Buffer)
-	t := time.Now().UnixNano()
+	t := mytime.Timenow().UnixNano()
 	m := t/1e6 + offset
 	binary.Write(buf, binary.BigEndian, m)
 	return buf.Bytes()[2:]

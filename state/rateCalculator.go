@@ -3,6 +3,8 @@ package state
 import (
 	"sync/atomic"
 	"time"
+
+	"github.com/FactomProject/factomd/mytime"
 )
 
 // IPrometheusRateMethods indicated which prometheus counters/gauges to set
@@ -56,7 +58,7 @@ func NewRateCalculator(p IPrometheusRateMethods) *RateCalculator {
 
 // Start begins instrumentation
 func (r *RateCalculator) Start() {
-	r.StartTime(time.Now())
+	r.StartTime(mytime.Timenow())
 }
 
 // StartTime is good for unit tests

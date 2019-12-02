@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/primitives/random"
+	"github.com/FactomProject/factomd/mytime"
 	. "github.com/FactomProject/factomd/state"
 )
 
@@ -121,7 +122,7 @@ func testRateCalculator(t *testing.T) {
 
 	fa := random.RandIntBetween(0, 100)
 	ac(fa)
-	start := time.Now()
+	start := mytime.Timenow()
 	go rc.StartTime(start)
 	ticker := time.NewTicker(td - 1*time.Millisecond)
 	i := 0

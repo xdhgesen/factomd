@@ -19,6 +19,7 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 var _ = fmt.Print
@@ -45,7 +46,7 @@ func LoadDatabase(s *State) {
 	s.DBHeightAtBoot = blkCnt
 	fmt.Fprintf(os.Stderr, "%20s Loading blocks from disk. Database load going from %d (savestate) to %d (disk)\n", s.GetFactomNodeName(), s.GetDBHeightComplete(), s.DBHeightAtBoot)
 
-	first := time.Now()
+	first := mytime.Timenow()
 	last := first
 	time.Sleep(time.Second)
 
@@ -71,7 +72,7 @@ func LoadDatabase(s *State) {
 
 			fmt.Fprintf(os.Stderr, "%20s Loading Block %7d / %v. Blocks per second %8.2f average bps %8.2f Progress %v remaining %v Estimated Total Time: %v \n", s.FactomNodeName, i, blkCnt, bps, abps,
 				humanizeDuration(timeUsed), humanizeDuration(timeRemaining), humanizeDuration(timeUsed+timeRemaining))
-			last = time.Now()
+			last = mytime.Timenow()
 			// height := s.GetLLeaderHeight()
 			// fmt.Fprintf(os.Stderr, "%20s Federated: DBH: %8d, Feds %d, audits: %d \n", s.FactomNodeName, height, len(s.GetFedServers(height)), len(s.GetAuditServers(height)))
 		}

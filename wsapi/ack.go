@@ -15,10 +15,11 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 func HandleV2FactoidACK(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
-	n := time.Now()
+	n := mytime.Timenow()
 	defer HandleV2APICallFctAck.Observe(float64(time.Since(n).Nanoseconds()))
 
 	ackReq := new(AckRequest)
@@ -82,7 +83,7 @@ func HandleV2FactoidACK(state interfaces.IState, params interface{}) (interface{
 // HandleV2ACKWithChain is the ack call with a given chainID. The chainID serves as a directive on what type
 // of hash we are given, and we can act appropriately.
 func HandleV2ACKWithChain(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
-	n := time.Now()
+	n := mytime.Timenow()
 	defer HandleV2APICallEntryAck.Observe(float64(time.Since(n).Nanoseconds()))
 
 	ackReq := new(EntryAckWithChainRequest)
@@ -240,7 +241,7 @@ func handleAckByEntryHash(hash interfaces.IHash, state interfaces.IState) (inter
 //					- Linear search
 //
 // func handleV2EntryACK(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
-// 	n := time.Now()
+// 	n := mytime.Timenow()
 // 	defer HandleV2APICallEntryAck.Observe(float64(time.Since(n).Nanoseconds()))
 
 // 	ackReq := new(AckRequest)
@@ -259,7 +260,7 @@ func handleAckByEntryHash(hash interfaces.IHash, state interfaces.IState) (inter
 // }
 
 func HandleV2EntryACK(state interfaces.IState, params interface{}) (interface{}, *primitives.JSONError) {
-	n := time.Now()
+	n := mytime.Timenow()
 	defer HandleV2APICallEntryAck.Observe(float64(time.Since(n).Nanoseconds()))
 
 	ackReq := new(AckRequest)

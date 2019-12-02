@@ -10,6 +10,7 @@ import (
 
 	"github.com/FactomProject/factomd/Utilities/tools"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 var CheckFloating bool
@@ -97,7 +98,7 @@ func FindHeads(f tools.Fetcher) {
 	for i := 0; i < allowedSimulataneous; i++ {
 		permission <- true
 	}
-	start := time.Now()
+	start := mytime.Timenow()
 
 	doPrint := CheckFloating
 	go func() {

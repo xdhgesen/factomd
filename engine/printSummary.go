@@ -7,6 +7,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/globals"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 func printSummary(summary *int, value int, listenTo *int, wsapiNode *int) {
@@ -31,7 +32,7 @@ func GetSystemStatus(listenTo int, wsapiNode int) string {
 	f := fnodes[listenTo]
 	s := f.State
 	prt := "===SummaryStart===\n\n"
-	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, time.Now().Unix(), time.Now().Format("2006-01-02 15:04:05"), time.Since(globals.StartTime).String())
+	prt = fmt.Sprintf("%sTime: %d %s Elapsed time:%s\n", prt, mytime.Timenow().Unix(), mytime.Timenow().Format("2006-01-02 15:04:05"), time.Since(globals.StartTime).String())
 
 	var stateProcessCnt, processListProcessCnt, stateUpdateState, validatorLoopSleepCnt int64
 

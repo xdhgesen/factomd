@@ -17,6 +17,7 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/engine"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/p2p"
 )
 
@@ -126,7 +127,7 @@ var lastTime *time.Time
 func SetMsg(msg interfaces.IMsg) {
 	oldsync.Lock()
 	defer oldsync.Unlock()
-	now := time.Now()
+	now := mytime.Timenow()
 	if len(old) == 0 || now.After(lastTime.Add(10*time.Second)) {
 		var nmap []map[[32]byte]int
 		nmap = append(nmap, make(map[[32]byte]int))

@@ -11,11 +11,11 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 const (
-	pendingRequests    = 10000 // Lower bound on pending requests while syncing entries
-	purgeEveryXEntries = 1000  // Every 1000 entries or so, go through the written map and purge old entries
+	pendingRequests = 10000 // Lower bound on pending requests while syncing entries
 )
 
 type ReCheck struct {
@@ -87,32 +87,30 @@ func (s *State) SendManager() {
 	var EntriesRequested map[[32]byte]time.Time     // Time we last sent a request for this entry
 	EntriesRequested = make(map[[32]byte]time.Time) // Make our map
 
-	purge := purgeEveryXEntries
+	ticker := time.NewTicker(s.FactomSecond())
 
+	now := mytime.Timenow()
+	tenSeconds := s.FactomSecond() * 10
 	for {
-		missingData := <-es.SendRequest
-		now := time.Now()
-		tenSeconds := s.FactomSecond() * 10
-
-		// Every 1000 messages or so, purge our hash map.
-		if purge <= 0 {
+		select {
+		case missingData := <-es.SendRequest:
+			lastCall, ok := EntriesRequested[missingData.RequestHash.Fixed()]
+			if !ok || now.Sub(lastCall) > tenSeconds {
+				if !has(s, missingData.RequestHash) {
+					EntriesRequested[missingData.RequestHash.Fixed()] = now
+					missingData.SendOut(s, missingData)
+					s.EntrySyncState.EntryRequests++
+				}
+			}
+		case <-ticker.C:
+			now = mytime.Timenow()
+			tenSeconds = s.FactomSecond() * 10 // in case sim block time changes
+			// Every second, purge our hash map.
 			for k, v := range EntriesRequested {
 				delay := now.Sub(v)
 				if delay >= tenSeconds {
 					delete(EntriesRequested, k)
 				}
-			}
-			purge = purgeEveryXEntries
-		}
-		purge--
-
-		lastCall, ok := EntriesRequested[missingData.RequestHash.Fixed()]
-		if !ok || now.Sub(lastCall) > tenSeconds {
-			if !has(s, missingData.RequestHash) {
-				EntriesRequested[missingData.RequestHash.Fixed()] = now
-				missingData.SendOut(s, missingData)
-				s.EntrySyncState.EntryRequests++
-				continue
 			}
 		}
 	} // forever ...

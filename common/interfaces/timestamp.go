@@ -11,7 +11,7 @@ import (
 //A structure for handling timestamps for messages
 type Timestamp interface {
 	SetTimestamp(b Timestamp)
-	SetTimeNow()
+	SetTimenow()
 	SetTime(miliseconds uint64)
 	SetTimeSeconds(seconds int64)
 	GetTime() time.Time

@@ -10,11 +10,13 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/FactomProject/factomd/elections"
+	"github.com/FactomProject/factomd/mytime"
 
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -130,8 +132,8 @@ func StartSim(nodeCount int, UserAddedOptions map[string]string) *state.State {
 
 func setTestTimeouts(state0 *state.State, calcTime time.Duration) {
 	// init package vars
-	startTime = time.Now()
-	endTime = time.Now().Add(calcTime)
+	startTime = mytime.Timenow()
+	endTime = mytime.Timenow().Add(calcTime)
 
 	fmt.Println("endTime: ", endTime.String(), "duration:", calcTime.String())
 
@@ -145,7 +147,7 @@ func setTestTimeouts(state0 *state.State, calcTime time.Duration) {
 					fmt.Printf("Test Timeout: Expected %d blocks (%s)\n", ExpectedHeight, calcTime.String())
 					panic(fmt.Sprintf("Test Timeout: Expected %d blocks (%s)\n", ExpectedHeight, calcTime.String()))
 				}
-				if time.Now().After(endTime) {
+				if mytime.Timenow().After(endTime) {
 					fmt.Printf("Test Timeout: Expected it to take %s (%d blocks)\n", calcTime.String(), ExpectedHeight)
 					panic(fmt.Sprintf("Test Timeout: Expected it to take %s (%d blocks)\n", calcTime.String(), ExpectedHeight))
 				}
@@ -174,6 +176,10 @@ func isDefaultSim(givenNodes string) bool {
 
 //EX. state0 := SetupSim("LLLLLLLLLLLLLLLAAAAAAAAAA",  map[string]string {"--controlpanelsetting" : "readwrite"}, t)
 func SetupSim(givenNodes string, userAddedOptions map[string]string, height int, electionsCnt int, roundsCnt int, t *testing.T) *state.State {
+
+	//  Go Optimizations...
+	runtime.GOMAXPROCS(runtime.NumCPU()) // TODO: should be *2 to use hyperthreadding? -- clay
+
 	if userAddedOptions == nil {
 		userAddedOptions = make(map[string]string)
 	}
@@ -316,8 +322,8 @@ func WaitForAllNodes(state *state.State) {
 	fmt.Printf("Wait for all nodes done\n%s", height)
 }
 
-func TimeNow(s *state.State) {
-	now := time.Now()
+func Timenow(s *state.State) {
+	now := mytime.Timenow()
 	fmt.Printf("%s:%d-:-%d Now %s of %s (remaining %s)\n", s.FactomNodeName, int(s.LLeaderHeight), s.CurrentMinute, now.Sub(startTime).String(), endTime.Sub(startTime).String(), endTime.Sub(now).String())
 }
 
@@ -375,7 +381,7 @@ func WaitForQuiet(s *state.State, newBlock int, newMinute int) {
 			time.Sleep(sleepTime * time.Millisecond) // wake up and about 4 times per minute
 		}
 		if int(s.LLeaderHeight) < newBlock {
-			TimeNow(s)
+			Timenow(s)
 		}
 	}
 
@@ -391,7 +397,7 @@ func WaitMinutes(s *state.State, min int) {
 	newBlock := newTime / 10
 	newMinute := newTime % 10
 	WaitForQuiet(s, newBlock, newMinute)
-	TimeNow(s)
+	Timenow(s)
 }
 
 // Wait so many blocks
@@ -399,14 +405,14 @@ func WaitBlocks(s *state.State, blks int) {
 	fmt.Printf("%s: %d-:-%d WaitBlocks(%d)\n", s.FactomNodeName, s.LLeaderHeight, s.CurrentMinute, blks)
 	newBlock := int(s.LLeaderHeight) + blks
 	WaitForQuiet(s, newBlock, 0)
-	TimeNow(s)
+	Timenow(s)
 }
 
 // Wait for a specific blocks
 func WaitForBlock(s *state.State, newBlock int) {
 	fmt.Printf("%s: %d-:-%d WaitForBlock(%d)\n", s.FactomNodeName, s.LLeaderHeight, s.CurrentMinute, newBlock)
 	WaitForQuiet(s, newBlock, 0)
-	TimeNow(s)
+	Timenow(s)
 }
 
 // Wait to a given minute.
@@ -420,7 +426,7 @@ func WaitForMinute(s *state.State, newMinute int) {
 		newBlock++
 	}
 	WaitForQuiet(s, newBlock, newMinute)
-	TimeNow(s)
+	Timenow(s)
 }
 
 func CountAuthoritySet() (int, int, int) {
@@ -550,7 +556,7 @@ func ShutDownEverything(t *testing.T) {
 	}
 
 	engine.PrintOneStatus(0, 0) // Print a final status
-	fmt.Printf("Test took %d blocks and %s time\n", engine.GetFnodes()[0].State.LLeaderHeight, time.Now().Sub(startTime))
+	fmt.Printf("Test took %d blocks and %s time\n", engine.GetFnodes()[0].State.LLeaderHeight, mytime.Timenow().Sub(startTime))
 }
 
 func v2Request(req *primitives.JSON2Request, port int) (*primitives.JSON2Response, error) {

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"math/rand"
 	"testing"
-	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
 	. "github.com/FactomProject/factomd/common/identity"
 	"github.com/FactomProject/factomd/common/identityEntries"
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 func TestCancelTally(t *testing.T) {
@@ -200,7 +200,7 @@ func TestAdminBlockRecorded(t *testing.T) {
 
 func TestAddProposalRadom(t *testing.T) {
 	c := NewCoinbaseCancelManager(nil)
-	rand.Seed(time.Now().UnixNano())
+	rand.Seed(mytime.Timenow().UnixNano())
 	for i := 0; i < 1000; i++ {
 		c.AddNewProposalHeight(rand.Uint32())
 		err := checkList(c.ProposalsList, i+1)

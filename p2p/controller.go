@@ -19,6 +19,7 @@ import (
 	"unicode"
 
 	"github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/mytime"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -165,7 +166,7 @@ func (c *Controller) Init(ci ControllerInit) *Controller {
 		"port":    ci.Port,
 		"network": fmt.Sprintf("%#x", ci.Network)})
 	c.logger.WithField("controller_init", ci).Debugf("Initializing network controller")
-	RandomGenerator = rand.New(rand.NewSource(time.Now().UnixNano()))
+	RandomGenerator = rand.New(rand.NewSource(mytime.Timenow().UnixNano()))
 	NodeID = uint64(RandomGenerator.Int63()) // This is a global used by all connections
 	c.keepRunning = true
 	c.commandChannel = make(chan interface{}, StandardChannelSize) // Commands from App
@@ -178,13 +179,13 @@ func (c *Controller) Init(ci ControllerInit) *Controller {
 	NetworkListenPort = ci.Port
 	// Set this to the past so we will do peer management almost right away after starting up.
 	c.lastPeerManagement = time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC)
-	c.lastPeerRequest = time.Now()
+	c.lastPeerRequest = mytime.Timenow()
 	CurrentNetwork = ci.Network
 	OnlySpecialPeers = ci.Exclusive || ci.ExclusiveIn
 	AllowUnknownIncomingPeers = !ci.ExclusiveIn
 	c.initSpecialPeers(ci)
-	c.lastDiscoveryRequest = time.Now() // Discovery does its own on startup.
-	c.lastConnectionMetricsUpdate = time.Now()
+	c.lastDiscoveryRequest = mytime.Timenow() // Discovery does its own on startup.
+	c.lastConnectionMetricsUpdate = mytime.Timenow()
 	c.partsAssembler = new(PartsAssembler).Init()
 	discovery := new(Discovery).Init(ci.PeersFile, ci.SeedURL)
 	c.discovery = *discovery
@@ -194,7 +195,7 @@ func (c *Controller) Init(ci ControllerInit) *Controller {
 // StartNetwork configures the network, starts the runloop
 func (c *Controller) StartNetwork() {
 	c.logger.Info("Starting network")
-	c.lastStatusReport = time.Now()
+	c.lastStatusReport = mytime.Timenow()
 	// start listening on port given
 	c.listen()
 	// Dial all the gathered special peers
@@ -380,7 +381,7 @@ func (c *Controller) parseSpecialPeers(peersString string, peerType uint8) []*Pe
 			c.logger.Errorf("%s is not a valid peer (%v), use format: 127.0.0.1:8999", peersString, err)
 		} else {
 			peer := new(Peer).Init(address, port, 0, peerType, 0)
-			peer.Source["Local-Configuration"] = time.Now()
+			peer.Source["Local-Configuration"] = mytime.Timenow()
 			peers = append(peers, peer)
 		}
 	}
@@ -529,7 +530,7 @@ func (c *Controller) handleCommand(command interface{}) {
 		addPort := strings.Split(conn.RemoteAddr().String(), ":")
 		// Port initially stored will be the connection port (not the listen port), but peer will update it on first message.
 		peer := new(Peer).Init(addPort[0], addPort[1], 0, RegularPeer, 0)
-		peer.Source["Accept()"] = time.Now()
+		peer.Source["Accept()"] = mytime.Timenow()
 		connection := new(Connection).InitWithConn(conn, *peer)
 		c.handleNewConnection(connection)
 	case CommandShutdown:
@@ -579,7 +580,7 @@ func (c *Controller) applicationPeerUpdate(qualityDelta int32, peerHash string) 
 func (c *Controller) managePeers() {
 	managementDuration := time.Since(c.lastPeerManagement)
 	if PeerSaveInterval < managementDuration {
-		c.lastPeerManagement = time.Now()
+		c.lastPeerManagement = mytime.Timenow()
 		c.logger.Debugf("managePeers() time since last peer management: %s", managementDuration.String())
 		// If it's been awhile, update peers from the DNS seed.
 		discoveryDuration := time.Since(c.lastDiscoveryRequest)
@@ -602,7 +603,7 @@ func (c *Controller) managePeers() {
 		}
 		duration = time.Since(c.lastPeerRequest)
 		if PeerRequestInterval < duration {
-			c.lastPeerRequest = time.Now()
+			c.lastPeerRequest = mytime.Timenow()
 			parcelp := NewParcel(CurrentNetwork, []byte("Peer Request"))
 			parcel := *parcelp
 			parcel.Header.Type = TypePeerRequest
@@ -627,7 +628,7 @@ func (c *Controller) fillOutgoingSlots(openSlots int) {
 
 func (c *Controller) updateMetrics() {
 	if time.Second < time.Since(c.lastConnectionMetricsUpdate) {
-		c.lastConnectionMetricsUpdate = time.Now()
+		c.lastConnectionMetricsUpdate = mytime.Timenow()
 		// Apparently golang doesn't make a deep copy when sending structs over channels. Bad golang.
 		newMetrics := make(map[string]ConnectionMetrics)
 		for key, value := range c.connections.All() {

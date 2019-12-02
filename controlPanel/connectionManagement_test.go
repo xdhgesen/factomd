@@ -7,43 +7,44 @@ import (
 	"time"
 
 	. "github.com/FactomProject/factomd/controlPanel"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/p2p"
 )
 
 var _ = fmt.Sprintf("")
 
 func TestFormatDuration(t *testing.T) {
-	initial := time.Now().Add(-49 * time.Hour)
+	initial := mytime.Timenow().Add(-49 * time.Hour)
 	if FormatDuration(initial) != "2 days" {
 		t.Errorf("Time display incorrect : days")
 	}
 
-	initial = time.Now().Add(-25 * time.Hour)
+	initial = mytime.Timenow().Add(-25 * time.Hour)
 	if FormatDuration(initial) != "1 day" {
 		t.Errorf("Time display incorrect : days")
 	}
 
-	initial = time.Now().Add(-23 * time.Hour)
+	initial = mytime.Timenow().Add(-23 * time.Hour)
 	if FormatDuration(initial) != "23 hrs" {
 		t.Errorf("Time display incorrect : hrs")
 	}
 
-	initial = time.Now().Add(-1 * time.Hour)
+	initial = mytime.Timenow().Add(-1 * time.Hour)
 	if FormatDuration(initial) != "1 hr" {
 		t.Errorf("Time display incorrect : hr")
 	}
 
-	initial = time.Now().Add(-59 * time.Minute)
+	initial = mytime.Timenow().Add(-59 * time.Minute)
 	if FormatDuration(initial) != "59 mins" {
 		t.Errorf("Time display incorrect : mins")
 	}
 
-	initial = time.Now().Add(-1 * time.Minute)
+	initial = mytime.Timenow().Add(-1 * time.Minute)
 	if FormatDuration(initial) != "1 min" {
 		t.Errorf("Time display incorrect : min")
 	}
 
-	initial = time.Now().Add(-30 * time.Second)
+	initial = mytime.Timenow().Add(-30 * time.Second)
 	if FormatDuration(initial) != "30 secs" {
 		t.Errorf("Time display incorrect : secs")
 	}
@@ -114,9 +115,9 @@ func PopulateConnectionChan(total uint32, connections chan interface{}) {
 	for i = 0; i < total; i++ {
 		peer := NewSeededP2PConnection(i)
 		if i%2 == 0 {
-			peer.MomentConnected = time.Now().Add(-(time.Duration(i)) * time.Hour)
+			peer.MomentConnected = mytime.Timenow().Add(-(time.Duration(i)) * time.Hour)
 		} else {
-			peer.MomentConnected = time.Now().Add(-(time.Duration(i)) * time.Minute)
+			peer.MomentConnected = mytime.Timenow().Add(-(time.Duration(i)) * time.Minute)
 		}
 		temp["{"+peer.PeerAddress+"}"] = *peer
 	}
@@ -297,7 +298,7 @@ func NewSeededP2PConnection(seed uint32) *p2p.ConnectionMetrics {
 
 func NewP2PConnection(bs uint32, br uint32, ms uint32, mr uint32, addr string, pq uint32) *p2p.ConnectionMetrics {
 	pc := new(p2p.ConnectionMetrics)
-	pc.MomentConnected = time.Now()
+	pc.MomentConnected = mytime.Timenow()
 	pc.BytesSent = bs
 	pc.BytesReceived = br
 	pc.MessagesSent = ms

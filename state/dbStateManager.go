@@ -10,10 +10,10 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/globals"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/util/atomic"
 
 	// "github.com/FactomProject/factomd/common/constants"
@@ -31,7 +31,7 @@ import (
 
 var _ = hex.EncodeToString
 var _ = fmt.Print
-var _ = time.Now()
+var _ = mytime.Timenow()
 var _ = log.Print
 
 type DBState struct {

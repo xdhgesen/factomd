@@ -15,6 +15,7 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
 	"github.com/FactomProject/factomd/database/mapdb"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 	log "github.com/sirupsen/logrus"
 )
@@ -35,7 +36,7 @@ func NewDBGenerator(c *DBGeneratorConfig) (*DBGenerator, error) {
 	var err error
 	db := new(DBGenerator)
 	db.config = c
-	starttime := primitives.NewTimestampFromSeconds(uint32(time.Now().Add(-1 * 364 * 24 * time.Hour).Unix()))
+	starttime := primitives.NewTimestampFromSeconds(uint32(mytime.Timenow().Add(-1 * 364 * 24 * time.Hour).Unix()))
 
 	if c.StartTime != "" {
 		starttimeT, err := time.Parse(c.TimeFormat(), c.StartTime)
@@ -211,15 +212,15 @@ func NewDefaultDBGeneratorConfig() *DBGeneratorConfig {
 	c.DBPath = "factoid_level.db"
 	c.FactomdConfigPath = "gen.conf"
 	c.EntryGenConfig = *NewDefaultEntryGeneratorConfig()
-	c.StartTime = time.Now().Add(-1 * 364 * 24 * time.Hour).Format(c.TimeFormat())
+	c.StartTime = mytime.Timenow().Add(-1 * 364 * 24 * time.Hour).Format(c.TimeFormat())
 	c.LoopsPerPrint = 10
 	return c
 }
 
 // CreateBlocks actually creates the blocks and saves them to disk
 func (g *DBGenerator) CreateBlocks(amt int) error {
-	start := time.Now()
-	loop := time.Now()
+	start := mytime.Timenow()
+	loop := mytime.Timenow()
 	loopper := g.config.LoopsPerPrint
 	totalEntries := 0
 	loopEntries := 0 // Entries per loop
@@ -243,7 +244,7 @@ func (g *DBGenerator) CreateBlocks(amt int) error {
 				totalEntries,
 			)
 			loopEntries = 0
-			loop = time.Now()
+			loop = mytime.Timenow()
 		}
 
 		dbstate, err := g.BlockGenerator.NewBlock(g.last, g.FactomdState.GetNetworkID(), g.FactomdState.GetLeaderTimestamp())

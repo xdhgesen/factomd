@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"math/rand"
-	"time"
 
 	"bytes"
 
 	. "github.com/FactomProject/factomd/common/identityEntries"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 func TestRegisterFactomIdentityStructure(t *testing.T) {
@@ -49,7 +49,7 @@ func TestRegisterFactomIdentityStructure(t *testing.T) {
 
 func TestRegisterFactomIdentityStructureMarshal(t *testing.T) {
 	for i := 0; i < 100; i++ {
-		rand.Seed(time.Now().UnixNano())
+		rand.Seed(mytime.Timenow().UnixNano())
 		r := RandomRegisterFactomIdentityStructure()
 		data, err := r.MarshalBinary()
 		if err != nil {

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/messages"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 type GenericListItem interface {
@@ -116,7 +117,7 @@ func (list *DBStateList) Catchup() {
 		list.State.LogPrintf("dbstatecatchup", "Start with hs = %d hk = %d", hs, hk)
 
 		for {
-			start := time.Now()
+			start := mytime.Timenow()
 			// get the height of the saved blocks
 			hs = hsf()
 			hk = hkf()
@@ -432,7 +433,7 @@ type WaitingState struct {
 func NewWaitingState(height uint32) *WaitingState {
 	s := new(WaitingState)
 	s.height = height
-	s.requestedTime = time.Now()
+	s.requestedTime = mytime.Timenow()
 	return s
 }
 
@@ -445,7 +446,7 @@ func (s *WaitingState) RequestAge() time.Duration {
 }
 
 func (s *WaitingState) ResetRequestAge() {
-	s.requestedTime = time.Now()
+	s.requestedTime = mytime.Timenow()
 }
 
 type StatesWaiting struct {

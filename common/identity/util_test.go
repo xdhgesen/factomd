@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"testing"
-	"time"
 
 	. "github.com/FactomProject/factomd/common/identity"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 func TestCheckTimestamp(t *testing.T) {
 	var out bytes.Buffer
-	now := time.Now()
+	now := mytime.Timenow()
 	binary.Write(&out, binary.BigEndian, uint64(now.Unix()))
 	hex := out.Bytes()
 

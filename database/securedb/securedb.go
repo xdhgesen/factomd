@@ -16,6 +16,7 @@ import (
 	"github.com/FactomProject/factomd/database/boltdb"
 	"github.com/FactomProject/factomd/database/leveldb"
 	"github.com/FactomProject/factomd/database/mapdb"
+	"github.com/FactomProject/factomd/mytime"
 )
 
 var (
@@ -132,7 +133,7 @@ func (db *EncryptedDB) initNewMetaData() {
 // Lock locks the database such that further access calls will fail until it is
 // unlocked
 func (db *EncryptedDB) Lock() {
-	db.UnlockedUntil = time.Now().Add(-1 * time.Minute)
+	db.UnlockedUntil = mytime.Timenow().Add(-1 * time.Minute)
 }
 
 func (db *EncryptedDB) UnlockFor(password string, duration time.Duration) error {
@@ -144,7 +145,7 @@ func (db *EncryptedDB) UnlockFor(password string, duration time.Duration) error 
 		return fmt.Errorf("incorrect password")
 	}
 
-	db.UnlockedUntil = time.Now().Add(duration)
+	db.UnlockedUntil = mytime.Timenow().Add(duration)
 	return nil
 }
 
@@ -155,7 +156,7 @@ func (db *EncryptedDB) isLocked() bool {
 	}
 
 	// All times after the unlock time set, are invalid
-	if time.Now().Before(db.UnlockedUntil) {
+	if mytime.Timenow().Before(db.UnlockedUntil) {
 		return false
 	}
 	return true

@@ -158,14 +158,14 @@ func (m *MessageBase) SendOut(s interfaces.IState, msg interfaces.IMsg) {
 		return
 	}
 
-	// Dont resend until its time.  If resend==0 send immediately (this is the first time), or if it has been long enough.
-	now := s.GetTimestamp()
-	if m.resend != 0 && m.resend > now.GetTimeMilli() {
+	// We only send at a slow rate, but keep doing it because in slow networks, we are pushing the message to the leader
+	if m.ResendCnt > 3 { // If the first send fails, we need to try again.  Give up eventually.
 		return
 	}
 
-	// We only send at a slow rate, but keep doing it because in slow networks, we are pushing the message to the leader
-	if m.ResendCnt > 3 { // If the first send fails, we need to try again.  Give up eventually.
+	// Don't resend until its time.  If resend==0 send immediately (this is the first time), or if it has been long enough.
+	now := s.GetTimestamp()
+	if m.resend != 0 && m.resend > now.GetTimeMilli() {
 		return
 	}
 

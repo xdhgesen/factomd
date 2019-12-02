@@ -8,6 +8,7 @@ import (
 
 	"github.com/FactomProject/factomd/Utilities/tools"
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/mytime"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -71,7 +72,7 @@ func FindHeads(f tools.Fetcher, conf CorrectChainHeadConfig) {
 	for i := 0; i < allowedSimulataneous; i++ {
 		permission <- true
 	}
-	start := time.Now()
+	start := mytime.Timenow()
 
 	doPrint := checkFloating
 	go func() {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
+	"github.com/FactomProject/factomd/mytime"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 )
@@ -89,7 +90,7 @@ func (server *Server) Stop() {
 func APILogger() Middleware {
 	return func(f http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
+			start := mytime.Timenow()
 			wsLog.Debugf("%s\t%s\t%s\n", r.Method, r.RequestURI, time.Since(start))
 
 			// Call the next middleware/handler in chain

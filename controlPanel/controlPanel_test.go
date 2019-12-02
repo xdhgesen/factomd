@@ -13,13 +13,14 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	. "github.com/FactomProject/factomd/controlPanel"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
+	"github.com/FactomProject/factomd/mytime"
 	//"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/state"
 	//"github.com/FactomProject/factomd/common/primitives/random"
 	. "github.com/FactomProject/factomd/testHelper"
 )
 
-var _ = time.Now()
+var _ = mytime.Timenow()
 
 var _ = fmt.Sprintf("")
 

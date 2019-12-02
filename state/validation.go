@@ -25,6 +25,9 @@ func (s *State) DoProcessing() {
 	slp := false
 	i3 := 0
 
+	// make sure we process at least every second
+	ticker := time.NewTicker(1000 * time.Millisecond)
+
 	for s.GetRunState() == runstate.Running {
 
 		p1 := true
@@ -49,12 +52,16 @@ func (s *State) DoProcessing() {
 		// Call process at least every second to insure MMR runs.
 		now := s.GetTimestamp()
 		p3 := false
-		// If we haven't process messages in over a seconds go process them now
-		if now.GetTimeMilli()-s.ProcessTime.GetTimeMilli() > int64(s.FactomSecond()/time.Millisecond) {
+
+		// If we haven't process messages in over a second go process them now
+		select {
+		case <-ticker.C:
 			for s.LeaderPL.Process(s) {
 				p3 = true
 			}
 			s.ProcessTime = now
+
+		default:
 		}
 
 		// if we were unable to accomplish any work sleep a bit.
