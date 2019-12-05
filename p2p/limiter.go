@@ -5,8 +5,6 @@ import (
 	"net"
 	"strings"
 	"time"
-
-	"github.com/FactomProject/factomd/mytime"
 )
 
 // limitListenerSources will limit the number of connections allowed to 1
@@ -34,7 +32,7 @@ func (l *limitListenerSources) Accept() (net.Conn, error) {
 	// Grab the address, check for last connection
 	addr := strings.Split(c.RemoteAddr().String(), ":")
 	if v, ok := l.accepted[addr[0]]; !ok || time.Since(v) > time.Second {
-		l.accepted[addr[0]] = mytime.Timenow()
+		l.accepted[addr[0]] = time.Now()
 		return c, nil
 	}
 	c.Close()
@@ -67,7 +65,7 @@ func (l *limitListenerAll) Accept() (net.Conn, error) {
 		return nil, err
 	}
 
-	l.last = mytime.Timenow()
+	l.last = time.Now()
 	return c, nil
 }
 

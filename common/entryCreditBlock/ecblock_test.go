@@ -12,7 +12,6 @@ import (
 	ed "github.com/FactomProject/ed25519"
 	. "github.com/FactomProject/factomd/common/entryCreditBlock"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/go-spew/spew"
 )
 
@@ -44,7 +43,7 @@ func TestUnmarshalLarge(t *testing.T) {
 			t.Errorf("Panic caught during the test - %v", r)
 		}
 	}()
-	start := mytime.Timenow()
+	start := time.Now()
 
 	ecb := createECBlockWithNum(10000)
 	data, err := ecb.MarshalBinary()

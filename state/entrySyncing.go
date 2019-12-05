@@ -11,7 +11,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
-	"github.com/FactomProject/factomd/mytime"
 )
 
 const (
@@ -89,7 +88,7 @@ func (s *State) SendManager() {
 
 	ticker := time.NewTicker(s.FactomSecond())
 
-	now := mytime.Timenow()
+	now := time.Now()
 	tenSeconds := s.FactomSecond() * 10
 	for {
 		select {
@@ -103,7 +102,7 @@ func (s *State) SendManager() {
 				}
 			}
 		case <-ticker.C:
-			now = mytime.Timenow()
+			now = time.Now()
 			tenSeconds = s.FactomSecond() * 10 // in case sim block time changes
 			// Every second, purge our hash map.
 			for k, v := range EntriesRequested {

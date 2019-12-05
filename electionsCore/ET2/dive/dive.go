@@ -7,7 +7,6 @@ import (
 
 	"github.com/FactomProject/factomd/electionsCore/controller"
 	"github.com/FactomProject/factomd/electionsCore/election"
-	"github.com/FactomProject/factomd/mytime"
 
 	"crypto/sha256"
 
@@ -185,7 +184,7 @@ func Dive(mList []*DirectedMessage, leaders []*election.Election, depth int, lim
 	depths = incCounter(depths, depth)
 	depth++
 
-	now := mytime.Timenow()
+	now := time.Now()
 
 	globalRunNumber++
 	if globalRunNumber%global == 0 {

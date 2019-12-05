@@ -12,8 +12,6 @@ import (
 	"io"
 	"os"
 	"time"
-
-	"github.com/FactomProject/factomd/mytime"
 )
 
 // Level specifies a level of verbosity. The available levels are the eight
@@ -195,7 +193,7 @@ func (logger *FLogger) write(level Level, args ...interface{}) {
 	if level == DebugLvl {
 		fmt.Fprintf(logger.out, "%s [%s] %s: %s\n", debugPrefix(), levelPrefix[level], logger.prefix, l)
 	} else {
-		fmt.Fprintf(logger.out, "%s [%s] %s: %s\n", mytime.Timenow().Format(time.RFC3339), levelPrefix[level], logger.prefix, l)
+		fmt.Fprintf(logger.out, "%s [%s] %s: %s\n", time.Now().Format(time.RFC3339), levelPrefix[level], logger.prefix, l)
 	}
 
 	if level <= CriticalLvl {

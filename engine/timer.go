@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 )
 
@@ -21,7 +20,7 @@ func Timer(stateI interfaces.IState) {
 	var last int64
 	for {
 		tenthPeriod := s.GetMinuteDuration().Nanoseconds() // The length of the minute can change, so do this each time
-		now := mytime.Timenow().UnixNano()                 // Get the current time
+		now := time.Now().UnixNano()                       // Get the current time
 		sleep := tenthPeriod - now%tenthPeriod
 		time.Sleep(time.Duration(sleep)) // Sleep the length of time from now to the next minute
 
@@ -30,7 +29,7 @@ func Timer(stateI interfaces.IState) {
 		time.Sleep(time.Duration(s.GetTimeOffset().GetTimeMilli()) * time.Millisecond)
 
 		if s.Leader {
-			now = mytime.Timenow().UnixNano()
+			now = time.Now().UnixNano()
 			issueTime := last
 			if s.EOMSyncEnd > s.EOMIssueTime {
 				issueTime = s.EOMIssueTime

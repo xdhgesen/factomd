@@ -4,17 +4,17 @@ import (
 	"encoding/hex"
 	"math/rand"
 	"testing"
+	"time"
 
 	. "github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/factoid"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/testHelper"
 )
 
 func TestNewForwardCompatibleEntry(t *testing.T) {
-	rand.Seed(mytime.Timenow().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	// Coinbase Descriptor
 	for i := 0; i < 100; i++ {
 		var outputs []interfaces.ITransAddress

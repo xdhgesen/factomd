@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/FactomProject/factom"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
 )
@@ -108,10 +107,10 @@ func GenerateCommitsAndRevealsInBatches(t *testing.T, state0 *state.State) {
 		}
 
 		{ // measure time it takes to process all messages by observing entry credit spend
-			tstart := mytime.Timenow()
+			tstart := time.Now()
 			a.FundEC(uint64(numEntries + 1))
 			WaitForEcBalanceUnder(state0, a.EcPub(), int64(BatchID+2))
-			tend := mytime.Timenow()
+			tend := time.Now()
 			batchTimes[BatchID] = tend.Sub(tstart)
 			state0.LogPrintf(logName, "BATCH %v RUNTIME %v", BatchID, batchTimes[BatchID])
 		}

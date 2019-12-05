@@ -27,7 +27,6 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/leveldb"
 	"github.com/FactomProject/factomd/elections"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/util"
@@ -222,7 +221,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		s.NodeMode = "FULL"
 		leadID := primitives.Sha([]byte(s.Prefix + "FNode0"))
 		if s.IdentityChainID.IsSameAs(leadID) {
-			s.SetIdentityChainID(primitives.Sha([]byte(mytime.Timenow().String()))) // Make sure this node is NOT a leader
+			s.SetIdentityChainID(primitives.Sha([]byte(time.Now().String()))) // Make sure this node is NOT a leader
 		}
 	}
 

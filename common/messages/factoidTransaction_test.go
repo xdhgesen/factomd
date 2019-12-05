@@ -118,7 +118,7 @@ type zeroReader struct{}
 var r *rand.Rand
 
 func (zeroReader) Read(buf []byte) (int, error) {
-	//if r==nil { r = rand.New(rand.NewSource(mytime.Timenow().Unix())) }
+	//if r==nil { r = rand.New(rand.NewSource(time.Now().Unix())) }
 	if r == nil {
 		r = rand.New(rand.NewSource(1))
 	}

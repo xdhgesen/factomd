@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/FactomProject/factomd/mytime"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,7 +47,7 @@ func (d *Discovery) Init(peersFile string, seed string) *Discovery {
 	UpdateKnownPeers.Lock()
 	d.knownPeers = map[string]Peer{}
 	UpdateKnownPeers.Unlock()
-	d.rng = rand.New(rand.NewSource(mytime.Timenow().UnixNano()))
+	d.rng = rand.New(rand.NewSource(time.Now().UnixNano()))
 	d.peersFilePath = peersFile
 	d.seedURL = seed
 	//d.LoadPeers()
@@ -115,7 +114,7 @@ func (d *Discovery) LoadPeers() {
 // SavePeers just saves our known peers out to disk. Called periodically.
 func (d *Discovery) SavePeers() {
 	// save known peers to peers.json
-	d.lastPeerSave = mytime.Timenow()
+	d.lastPeerSave = time.Now()
 	file, err := os.Create(d.peersFilePath)
 	if nil != err {
 		d.logger.Errorf("Discover.SavePeers() File write error on file: %s, Error: %+v", d.peersFilePath, err)
@@ -167,7 +166,7 @@ func (d *Discovery) LearnPeers(parcel Parcel) {
 			alreadyKnownPeer := d.getPeer(value.Address)
 			d.updatePeer(d.updatePeerSource(alreadyKnownPeer, parcel.Header.PeerAddress))
 		default:
-			value.Source = map[string]time.Time{parcel.Header.PeerAddress: mytime.Timenow()}
+			value.Source = map[string]time.Time{parcel.Header.PeerAddress: time.Now()}
 			d.updatePeer(value)
 			d.logger.Debugf("Discovery.LearnPeers !!!!!!!!!!!!! Discovered new PEER!   %+v ", value)
 		}
@@ -175,14 +174,14 @@ func (d *Discovery) LearnPeers(parcel Parcel) {
 	d.SavePeers()
 }
 
-// updatePeerSource checks to see if source is in peer's sources, and if not puts it in there with a value equal to mytime.Timenow()
+// updatePeerSource checks to see if source is in peer's sources, and if not puts it in there with a value equal to time.Now()
 func (d *Discovery) updatePeerSource(peer Peer, source string) Peer {
 	if nil == peer.Source {
 		peer.Source = map[string]time.Time{}
 	}
 	_, sp := peer.Source[source]
 	if !sp {
-		peer.Source[source] = mytime.Timenow()
+		peer.Source[source] = time.Now()
 	}
 	return peer
 }
@@ -341,7 +340,7 @@ func (d *Discovery) DiscoverPeersFromSeed() {
 		if err == nil {
 			peerp := new(Peer).Init(address, port, 0, RegularPeer, 0)
 			peer := *peerp
-			peer.LastContact = mytime.Timenow()
+			peer.LastContact = time.Now()
 			d.updatePeer(d.updatePeerSource(peer, "DNS-Seed"))
 		} else {
 			bad++

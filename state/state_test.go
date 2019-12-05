@@ -13,7 +13,6 @@ import (
 
 	//"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/testHelper"
@@ -277,7 +276,7 @@ func TestIsStalled(t *testing.T) {
 	s := testHelper.CreateEmptyTestState()
 	s.Syncing = false
 	s.ProcessLists.DBHeightBase = 20
-	s.CurrentMinuteStartTime = mytime.Timenow().UnixNano()
+	s.CurrentMinuteStartTime = time.Now().UnixNano()
 	if !s.IsStalled() {
 		t.Error("Should be stalled as we are behind: Stalled:", s.IsStalled())
 	}
@@ -289,7 +288,7 @@ func TestIsStalled(t *testing.T) {
 		t.Error("When current minute start is 0, should not say stalled")
 	}
 
-	n := mytime.Timenow()
+	n := time.Now()
 	then := n.Add(-1600 * time.Millisecond)
 	s.CurrentMinuteStartTime = then.UnixNano()
 	s.DirectoryBlockInSeconds = 10
@@ -298,7 +297,7 @@ func TestIsStalled(t *testing.T) {
 		t.Error("Should be stalled as 1.6x blktime behind")
 	}
 
-	then = mytime.Timenow().Add(-1200 * time.Millisecond)
+	then = time.Now().Add(-1200 * time.Millisecond)
 	s.CurrentMinuteStartTime = then.UnixNano()
 	if s.IsStalled() {
 		t.Error("Should not be stalled as 1.2x blktime behind")

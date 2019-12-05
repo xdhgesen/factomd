@@ -15,7 +15,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/log"
-	"github.com/FactomProject/factomd/mytime"
 )
 
 var _ = log.Printf
@@ -157,7 +156,7 @@ func Peers(fnode *FactomNode) {
 				var msg interfaces.IMsg
 				var err error
 
-				preReceiveTime := mytime.Timenow()
+				preReceiveTime := time.Now()
 
 				msg, err = peer.Receive()
 				if msg == nil {
@@ -429,7 +428,7 @@ func NetworkOutputs(fnode *FactomNode) {
 
 						fnode.State.LogMessage("NetworkOutputs", "Drop, simCtrl", msg)
 					} else {
-						preSendTime := mytime.Timenow()
+						preSendTime := time.Now()
 						fnode.State.LogMessage("NetworkOutputs", "Send P2P "+peer.GetNameTo(), msg)
 						peer.Send(msg)
 						sendTime := time.Since(preSendTime)
@@ -462,7 +461,7 @@ func NetworkOutputs(fnode *FactomNode) {
 
 							fnode.State.LogMessage("NetworkOutputs", "Drop, simCtrl", msg)
 						} else {
-							preSendTime := mytime.Timenow()
+							preSendTime := time.Now()
 							peer.Send(msg)
 							sendTime := time.Since(preSendTime)
 							TotalSendTime.Add(float64(sendTime.Nanoseconds()))

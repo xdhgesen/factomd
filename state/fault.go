@@ -8,10 +8,10 @@ import (
 	"encoding/binary"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -90,7 +90,7 @@ func markFault(pl *ProcessList, vmIndex int, faultReason int) {
 		return
 	}
 
-	now := mytime.Timenow().Unix()
+	now := time.Now().Unix()
 	vm := pl.VMs[vmIndex]
 
 	if vm.WhenFaulted == 0 {
@@ -133,7 +133,7 @@ func markNoFault(pl *ProcessList, vmIndex int) {
 }
 
 func FaultCheck(pl *ProcessList) {
-	now := mytime.Timenow().Unix()
+	now := time.Now().Unix()
 
 	for i := 0; i < len(pl.FedServers); i++ {
 		if i == pl.State.LeaderVMIndex {

@@ -32,7 +32,7 @@ func TestUnmarshalNilTimestamp(t *testing.T) {
 
 func TestTimestamp(t *testing.T) {
 	ts := new(Timestamp)
-	ts.SetTimenow()
+	ts.SetTimeNow()
 	fmt.Printf("ts: %d, milli: %d seconds %d", *ts, ts.GetTimeMilli(), ts.GetTimeSeconds())
 	hex, err := ts.MarshalBinary()
 	if err != nil {

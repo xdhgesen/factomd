@@ -12,15 +12,14 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/interfaces"
-	"github.com/FactomProject/factomd/mytime"
 )
 
 func GetTimeMilli() uint64 {
-	return uint64(mytime.Timenow().UnixNano()) / 1000000 // 10^-9 >> 10^-3
+	return uint64(time.Now().UnixNano()) / 1000000 // 10^-9 >> 10^-3
 }
 
 func GetTime() uint64 {
-	return uint64(mytime.Timenow().Unix())
+	return uint64(time.Now().Unix())
 }
 
 //A structure for handling timestamps for messages
@@ -34,7 +33,7 @@ func (a *Timestamp) IsSameAs(b interfaces.Timestamp) bool {
 
 func NewTimestampNow() *Timestamp {
 	t := new(Timestamp)
-	t.SetTimenow()
+	t.SetTimeNow()
 	return t
 }
 
@@ -63,7 +62,7 @@ func (t *Timestamp) SetTimestamp(b interfaces.Timestamp) {
 	t.SetTimeMilli(b.GetTimeMilli())
 }
 
-func (t *Timestamp) SetTimenow() {
+func (t *Timestamp) SetTimeNow() {
 	*t = Timestamp(GetTimeMilli())
 }
 

@@ -33,7 +33,7 @@ func TestChainedTransactions(t *testing.T) {
 
 	waitForDeposit := func(i int, amt uint64) uint64 {
 		balance := GetBalance(state0, depositAddresses[i])
-		Timenow(state0)
+		TimeNow(state0)
 		fmt.Printf("%v waitForDeposit %v %v - %v = diff: %v \n", i, depositAddresses[i], balance, amt, balance-int64(amt))
 		var waited bool
 		for balance != int64(amt) {
@@ -43,7 +43,7 @@ func TestChainedTransactions(t *testing.T) {
 		}
 		if waited {
 			fmt.Printf("%v waitForDeposit %v %v - %v = diff: %v \n", i, depositAddresses[i], balance, amt, balance-int64(amt))
-			Timenow(state0)
+			TimeNow(state0)
 		}
 		return uint64(balance)
 	}

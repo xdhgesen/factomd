@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FactomProject/factomd/mytime"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -55,7 +54,7 @@ func (assembler *PartsAssembler) handlePart(parcel Parcel) *Parcel {
 	}
 
 	partial.parts[parcel.Header.PartNo] = &parcel
-	partial.mostRecentPartReceived = mytime.Timenow()
+	partial.mostRecentPartReceived = time.Now()
 
 	// get an assembled parcel or nil if not yet ready
 	fullParcel := tryReassemblingMessage(partial)
@@ -121,7 +120,7 @@ func (assembler *PartsAssembler) cleanupOldPartialMessages() {
 func createNewPartialMessage(parcel Parcel) *PartialMessage {
 	partial := new(PartialMessage)
 	partial.parts = make([]*Parcel, parcel.Header.PartsTotal)
-	partial.firstPartReceived = mytime.Timenow()
+	partial.firstPartReceived = time.Now()
 	return partial
 }
 

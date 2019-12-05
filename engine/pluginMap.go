@@ -12,7 +12,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 	"github.com/hashicorp/go-plugin"
 )
@@ -180,7 +179,7 @@ func (c *CompletedHeightsManager) CompleteHeight(height int) bool {
 		c.Completed = append(c.Completed, make([]int64, needed)...)
 	}
 
-	now := mytime.Timenow().Unix()
+	now := time.Now().Unix()
 	last := c.Completed[height-c.Base]
 	if last == 0 {
 		c.Completed[height-c.Base] = now

@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -207,10 +206,10 @@ func (c *Connection) commonInit(peer Peer) {
 	c.SendChannel = make(chan interface{}, StandardChannelSize)
 	c.ReceiveChannel = make(chan interface{}, StandardChannelSize)
 	c.ReceiveParcel = make(chan *Parcel, StandardChannelSize)
-	c.metrics = ConnectionMetrics{MomentConnected: mytime.Timenow()}
-	c.timeLastMetrics = mytime.Timenow()
-	c.timeLastAttempt = mytime.Timenow()
-	c.timeLastStatus = mytime.Timenow()
+	c.metrics = ConnectionMetrics{MomentConnected: time.Now()}
+	c.timeLastMetrics = time.Now()
+	c.timeLastAttempt = time.Now()
+	c.timeLastStatus = time.Now()
 }
 
 func (c *Connection) Start() {
@@ -246,7 +245,7 @@ func (c *Connection) runLoop() {
 		for {
 			select {
 			case m := <-c.ReceiveParcel:
-				c.TimeLastpacket = mytime.Timenow()
+				c.TimeLastpacket = time.Now()
 				c.handleParcel(*m)
 
 			default:
@@ -305,7 +304,7 @@ func (c *Connection) dialLoop() {
 	defer p2pConnectionDialLoop.Dec()
 
 	for {
-		c.timeLastAttempt = mytime.Timenow()
+		c.timeLastAttempt = time.Now()
 		if c.dial() {
 			c.goOnline()
 			return
@@ -344,7 +343,7 @@ func (c *Connection) dial() bool {
 func (c *Connection) goOnline() {
 	c.logger.Info("Connected to a remote peer")
 	p2pConnectionOnlineCall.Inc()
-	now := mytime.Timenow()
+	now := time.Now()
 	c.encoder = gob.NewEncoder(c.conn)
 	c.decoder = gob.NewDecoder(c.conn)
 	c.attempts = 0
@@ -466,12 +465,12 @@ func (c *Connection) handleCommand() {
 func (c *Connection) sendParcel(parcel Parcel) {
 
 	parcel.Header.NodeID = NodeID // Send it out with our ID for loopback.
-	c.conn.SetWriteDeadline(mytime.Timenow().Add(NetworkDeadline * 500))
+	c.conn.SetWriteDeadline(time.Now().Add(NetworkDeadline * 500))
 
-	//deadline := mytime.Timenow().Add(NetworkDeadline)
+	//deadline := time.Now().Add(NetworkDeadline)
 	//if len(parcel.Payload) > 1000*10 {
 	//	ms := (len(parcel.Payload) * NetworkDeadline.Seconds())/1000
-	//	deadline = mytime.Timenow().Add(time.Duration(ms)*time.Millisecond)
+	//	deadline = time.Now().Add(time.Duration(ms)*time.Millisecond)
 	//}
 	//c.conn.SetWriteDeadline(deadline)
 	encode := c.encoder
@@ -518,7 +517,7 @@ func (c *Connection) processReceives() {
 				c.metrics.MessagesReceived += 1
 				message.Header.PeerAddress = c.peer.Address
 				c.ReceiveParcel <- &message
-				c.TimeLastpacket = mytime.Timenow()
+				c.TimeLastpacket = time.Now()
 			default: // error
 				c.Errors <- result
 			}
@@ -583,9 +582,9 @@ func (c *Connection) handleParcel(parcel Parcel) {
 		return
 	case ParcelValid:
 		parcel.LogEntry().Debug("Connection.handleParcel()-ParcelValid")
-		c.peer.LastContact = mytime.Timenow() // We only update for valid messages (incluidng pings and heartbeats)
-		c.attempts = 0                        // reset since we are clearly in touch now.
-		c.peer.merit()                        // Increase peer quality score.
+		c.peer.LastContact = time.Now() // We only update for valid messages (incluidng pings and heartbeats)
+		c.attempts = 0                  // reset since we are clearly in touch now.
+		c.peer.merit()                  // Increase peer quality score.
 		c.logger.Debugf("Connection.handleParcel() got ParcelValid %s", parcel.MessageType())
 		c.handleParcelTypes(parcel) // handles both network commands and application messages
 		return
@@ -675,7 +674,7 @@ func (c *Connection) pingPeer() {
 		} else {
 			parcel := NewParcel(CurrentNetwork, []byte("Ping"))
 			parcel.Header.Type = TypePing
-			c.timeLastPing = mytime.Timenow()
+			c.timeLastPing = time.Now()
 			c.attempts++
 			BlockFreeChannelSend(c.SendChannel, ConnectionParcel{Parcel: *parcel})
 		}
@@ -683,13 +682,13 @@ func (c *Connection) pingPeer() {
 }
 
 func (c *Connection) updatePeer() {
-	c.timeLastUpdate = mytime.Timenow()
+	c.timeLastUpdate = time.Now()
 	BlockFreeChannelSend(c.ReceiveChannel, ConnectionCommand{Command: ConnectionUpdatingPeer, Peer: c.peer})
 }
 
 func (c *Connection) updateStats() {
 	if time.Second < time.Since(c.timeLastMetrics) {
-		c.timeLastMetrics = mytime.Timenow()
+		c.timeLastMetrics = time.Now()
 		c.metrics.PeerAddress = c.peer.Address
 		c.metrics.PeerQuality = c.peer.QualityScore
 		c.metrics.PeerType = c.peer.PeerTypeString()

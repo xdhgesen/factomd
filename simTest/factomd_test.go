@@ -20,7 +20,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
 	. "github.com/FactomProject/factomd/engine"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 	. "github.com/FactomProject/factomd/testHelper"
 	"github.com/FactomProject/factomd/util/atomic"
@@ -80,22 +79,17 @@ func TestLoad(t *testing.T) {
 	RanSimTest = true
 
 	// use a tree so the messages get reordered
-	state0 := SetupSim("LF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 15, 0, 0, t)
+	state0 := SetupSim("LLLLFFFF", map[string]string{"--debuglog": ".", "--blktime": "30"}, 15, 0, 0, t)
 
-	RunCmd("1")    // select a follower
+	RunCmd("2")    // select 2
 	RunCmd("w")    // feed load into follower
 	RunCmd("F200") // delay messages
-
-	for i := 5; i < 15; i += 5 {
-		RunCmd(fmt.Sprintf("R%d", i)) // Feed load
-		WaitBlocks(state0, 1)
-	}
+	RunCmd("R25")  // Feed load
+	WaitBlocks(state0, 3)
 	RunCmd("R0") // Stop load
-	WaitBlocks(state0, 1)
 	for state0.Hold.GetSize() > 10 || len(state0.Holding) > 10 {
 		WaitBlocks(state0, 1)
 	}
-	mytime.Report()
 	ShutDownEverything(t)
 } // testLoad(){...}
 
@@ -714,7 +708,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 			t.Fatalf("Expected perm[%d] but got X[%d]<%f>", PermBalance, int64(x["saved"].(float64)), x["saved"].(float64))
 		}
 	}
-	Timenow(state0)
+	TimeNow(state0)
 	ToTestPermAndTempBetweenBlocks := []string{"FA3EPZYqodgyEGXNMbiZKE5TS2x2J9wF8J9MvPZb52iGR78xMgCb", "FA2jK2HcLnRdS94dEcU27rF3meoJfpUcZPSinpb7AwQvPRY6RL1Q"}
 	resp3 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok := resp3.Result.Balances[1].(map[string]interface{})
@@ -728,7 +722,7 @@ func TestMultipleFTAccountsAPI(t *testing.T) {
 		t.Fatalf("Expected  temp[%d] to match perm[%d]", int64(x["ack"].(float64)), int64(x["saved"].(float64)))
 	}
 
-	Timenow(state0)
+	TimeNow(state0)
 
 	_, str := FundWallet(state0, uint64(200*5e7))
 
@@ -926,7 +920,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 			t.Fatalf("Expected perm[%d] but got X[%d]<%f>", PermBalance, int64(x["saved"].(float64)), x["saved"].(float64))
 		}
 	}
-	Timenow(state0)
+	TimeNow(state0)
 	ToTestPermAndTempBetweenBlocks := []string{"EC1zGzM78psHhs5xVdv6jgVGmswvUaN6R3VgmTquGsdyx9W67Cqy", "EC3Eh7yQKShgjkUSFrPbnQpboykCzf4kw9QHxi47GGz5P2k3dbab"}
 	resp3 := apiCall(state0, ToTestPermAndTempBetweenBlocks)
 	x, ok := resp3.Result.Balances[1].(map[string]interface{})
@@ -938,7 +932,7 @@ func TestMultipleECAccountsAPI(t *testing.T) {
 		t.Fatalf("Expected  temp[%d] to match perm[%d]", int64(x["ack"].(float64)), int64(x["saved"].(float64)))
 	}
 
-	Timenow(state0)
+	TimeNow(state0)
 
 	_, str := FundWallet(state0, 20000000)
 

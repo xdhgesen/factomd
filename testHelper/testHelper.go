@@ -19,7 +19,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/database/mapdb"
-	"github.com/FactomProject/factomd/mytime"
 
 	"time"
 
@@ -92,7 +91,7 @@ func CreateAndPopulateStaleHolding() *state.State {
 	// create stale MilliTime
 	mockTime := func() (r []byte) {
 		buf := new(bytes.Buffer)
-		t := mytime.Timenow().UnixNano()
+		t := time.Now().UnixNano()
 		m := t/1e6 - state.FilterTimeLimit // make msg too old
 		binary.Write(buf, binary.BigEndian, m)
 		return buf.Bytes()[2:]

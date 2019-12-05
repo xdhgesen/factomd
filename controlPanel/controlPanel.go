@@ -19,7 +19,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/controlPanel/files"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/state"
 )
@@ -343,7 +342,7 @@ func RequestData() {
 		requestMutex = false
 		return
 	}
-	LastRequest = mytime.Timenow()
+	LastRequest = time.Now()
 	StatePointer.ControlPanelDataRequest = true
 	requestMutex = false
 }

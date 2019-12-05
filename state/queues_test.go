@@ -7,7 +7,6 @@ import (
 
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
-	"github.com/FactomProject/factomd/mytime"
 	. "github.com/FactomProject/factomd/state"
 )
 
@@ -24,7 +23,7 @@ func TestTimeSinceNegative(t *testing.T) {
 	}()
 
 	for i := 0; i < 100000; i++ {
-		n := mytime.Timenow()
+		n := time.Now()
 		p = time.Since(n)
 
 		TotalExecuteMsgTime.Add(float64(p.Nanoseconds()))
@@ -97,19 +96,19 @@ func TestQueues(t *testing.T) {
 		netOut.Enqueue(nil)
 	}()
 
-	b := mytime.Timenow().Unix()
+	b := time.Now().Unix()
 	general.BlockingDequeue()
-	if mytime.Timenow().Unix()-b < 1 {
+	if time.Now().Unix()-b < 1 {
 		t.Error("Did not properly block")
 	}
 
 	inmsg.BlockingDequeue()
-	if mytime.Timenow().Unix()-b < 1 {
+	if time.Now().Unix()-b < 1 {
 		t.Error("Did not properly block")
 	}
 
 	netOut.BlockingDequeue()
-	if mytime.Timenow().Unix()-b < 1 {
+	if time.Now().Unix()-b < 1 {
 		t.Error("Did not properly block")
 	}
 

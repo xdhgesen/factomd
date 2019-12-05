@@ -13,7 +13,6 @@ import (
 	. "github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 
 	"bufio"
@@ -44,7 +43,7 @@ func Factomd(params *FactomParams, listenToStdin bool) interfaces.IState {
 	fmt.Printf("Go compiler version: %s\n", runtime.Version())
 	fmt.Printf("Using build: %s\n", Build)
 	fmt.Printf("Version: %s\n", FactomdVersion)
-	StartTime = mytime.Timenow()
+	StartTime = time.Now()
 	fmt.Printf("Start time: %s\n", StartTime.String())
 
 	state0 := new(state.State)

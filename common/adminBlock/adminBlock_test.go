@@ -7,13 +7,13 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	. "github.com/FactomProject/factomd/common/adminBlock"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/common/primitives/random"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/testHelper"
 )
 
@@ -920,7 +920,7 @@ func TestABlockVec(t *testing.T) {
 }
 
 func TestSortOrder(t *testing.T) {
-	rand.Seed(mytime.Timenow().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	a := NewAdminBlock(nil)
 	b := NewAdminBlock(nil)
 

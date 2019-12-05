@@ -10,14 +10,13 @@ import (
 	"math/rand"
 
 	"github.com/FactomProject/factomd/Utilities/DatabaseGenerator/blockgen"
-	"github.com/FactomProject/factomd/mytime"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
 )
 
 func main() {
 	// Seed rand incase any entrygen uses math/rand
-	rand.Seed(mytime.Timenow().UnixNano())
+	rand.Seed(time.Now().UnixNano())
 	var blockcount int
 	var (
 		loglvl     = flag.String("loglvl", "info", "Sets log level to 'debug', 'info', 'warning', or 'error'")
@@ -82,8 +81,8 @@ func main() {
 		start, _ := time.Parse(config.TimeFormat(), config.StartTime)
 
 		// Need to check if the amount of blocks goes over the current timestamp
-		end := mytime.Timenow().Add(time.Minute * 10 * time.Duration(blockcount))
-		if !mytime.Timenow().Before(end) {
+		end := time.Now().Add(time.Minute * 10 * time.Duration(blockcount))
+		if !time.Now().Before(end) {
 			usage(fmt.Sprintf("Too many blocks. The start time is %s, with %d blocks the end time is after the current time. The end block would be at %s", start, blockcount, end))
 			return
 		}

@@ -18,7 +18,6 @@ import (
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/engine"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/state"
 )
 
@@ -152,7 +151,7 @@ func GetRandomAccount() *testAccount {
 // TODO: refactor factom package to export these functions
 func milliTime() (r []byte) {
 	buf := new(bytes.Buffer)
-	t := mytime.Timenow().UnixNano()
+	t := time.Now().UnixNano()
 	m := t / 1e6
 	binary.Write(buf, binary.BigEndian, m)
 	return buf.Bytes()[2:]

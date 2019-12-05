@@ -21,7 +21,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/mytime"
 	"github.com/FactomProject/factomd/util"
 	"github.com/FactomProject/factomd/util/atomic"
 
@@ -210,7 +209,7 @@ func (s *State) Validate(msg interfaces.IMsg) (validToSend int, validToExec int)
 
 func (s *State) executeMsg(msg interfaces.IMsg) (ret bool) {
 	// track how long we spend in executeMsg
-	preExecuteMsgTime := mytime.Timenow()
+	preExecuteMsgTime := time.Now()
 	defer func() {
 		executeMsgTime := time.Since(preExecuteMsgTime)
 		TotalExecuteMsgTime.Add(float64(executeMsgTime.Nanoseconds()))
@@ -442,7 +441,7 @@ func (s *State) Process() (progress bool) {
 	}
 
 	// Process inbound messages
-	preEmptyLoopTime := mytime.Timenow()
+	preEmptyLoopTime := time.Now()
 emptyLoop:
 	for i := 0; i < 100; i++ {
 		var msg interfaces.IMsg
@@ -469,7 +468,7 @@ emptyLoop:
 	emptyLoopTime := time.Since(preEmptyLoopTime)
 	TotalEmptyLoopTime.Add(float64(emptyLoopTime.Nanoseconds()))
 
-	preProcessXReviewTime := mytime.Timenow()
+	preProcessXReviewTime := time.Now()
 	// Reprocess any stalled messages, but not so much compared inbound messages
 	// Process last first
 
@@ -512,7 +511,7 @@ emptyLoop:
 	TotalProcessXReviewTime.Add(float64(processXReviewTime.Nanoseconds()))
 
 	if len(process) != 0 {
-		preProcessProcChanTime := mytime.Timenow()
+		preProcessProcChanTime := time.Now()
 		if ValidationDebug {
 			s.LogPrintf("executeMsg", "Start processloop %d", len(process))
 		}
@@ -615,7 +614,7 @@ func (s *State) ReviewHolding() {
 		return
 	}
 
-	preReviewHoldingTime := mytime.Timenow()
+	preReviewHoldingTime := time.Now()
 
 	now := primitives.NewTimestampFromMilliseconds(uint64(preReviewHoldingTime.UnixNano()) / uint64(time.Millisecond))
 	if s.ResendHolding == nil {
@@ -816,7 +815,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		// update cached values that change with height
 		s.dbheights <- int(dbheight) // Notify MMR process we have moved on...
 
-		s.CurrentMinuteStartTime = mytime.Timenow().UnixNano()
+		s.CurrentMinuteStartTime = time.Now().UnixNano()
 		s.CurrentBlockStartTime = s.CurrentMinuteStartTime
 
 		// If an we added or removed servers or elections tool place in minute 9, our lists will be unsorted. Fix that
@@ -859,7 +858,7 @@ func (s *State) MoveStateToHeight(dbheight uint32, newMinute int) {
 		// there might be a circumstance where we get here in a weird state
 		// so make it the normal starting state
 
-		s.CurrentMinuteStartTime = mytime.Timenow().UnixNano()
+		s.CurrentMinuteStartTime = time.Now().UnixNano()
 		// If an election took place, our lists will be unsorted. Fix that
 		s.LeaderPL.SortAuditServers()
 		s.LeaderPL.SortFedServers()
@@ -1495,7 +1494,7 @@ func (s *State) LeaderExecuteEOM(m interfaces.IMsg) {
 		fix = true
 	}
 
-	s.EOMIssueTime = mytime.Timenow().UnixNano() // Time we issue the EOM
+	s.EOMIssueTime = time.Now().UnixNano() // Time we issue the EOM
 
 	// make sure EOM has the right data
 	eom.DBHeight = s.LLeaderHeight
@@ -1985,7 +1984,7 @@ func (s *State) ProcessEOM(dbheight uint32, msg interfaces.IMsg) bool {
 			s.EOMDone = false  // ProcessEOM (EOM complete)
 			s.EOMProcessed = 0 // ProcessEOM (EOM complete)
 
-			s.EOMSyncEnd = mytime.Timenow().UnixNano()
+			s.EOMSyncEnd = time.Now().UnixNano()
 
 			for _, vm := range pl.VMs {
 				vm.Synced = false // ProcessEOM (EOM complete)
