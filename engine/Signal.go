@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"syscall"
 )
 
 // interruptChannel is used to receive SIGINT (Ctrl+C) signals.
@@ -77,4 +78,9 @@ func AddInterruptHandler(handler func()) {
 	}
 
 	addHandlerChannel <- handler
+}
+
+// send SIGINT
+func SendSigInt() {
+	interruptChannel <- syscall.SIGINT
 }

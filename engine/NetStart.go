@@ -208,7 +208,7 @@ func NetStart(s *state.State, p *FactomParams, listenToStdin bool) {
 		}
 		fmt.Print("Waiting...\r\n")
 		time.Sleep(3 * time.Second)
-		os.Exit(0)
+		//os.Exit(0)
 	})
 
 	if p.Journal != "" {
