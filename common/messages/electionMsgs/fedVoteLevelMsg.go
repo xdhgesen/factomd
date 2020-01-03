@@ -85,7 +85,7 @@ func NewFedVoteLevelMessage(signer interfaces.IHash, vol FedVoteVolunteerMsg) *F
 func (m *FedVoteLevelMsg) ElectionProcess(is interfaces.IState, elect interfaces.IElections) {
 	e := elect.(*elections.Elections)
 
-	elections.CheckAuthSetsMatch("FedVoteLevelMsg.ElectionProcess()", e, e.State.(*state.State))
+	elections.CheckAuthSetsMatch("FedVoteLevelMsg.ElectionProcess()", e, e.State.GetState())
 
 	/******  Election Adapter Control   ******/
 	/**	Controlling the inner election state**/
@@ -114,7 +114,7 @@ func (m *FedVoteLevelMsg) processIfCommitted(is interfaces.IState, elect interfa
 	}
 	e := elect.(*elections.Elections)
 
-	elections.CheckAuthSetsMatch("processIfCommitted()", e, e.State.(*state.State))
+	elections.CheckAuthSetsMatch("processIfCommitted()", e, e.State.GetState())
 
 	// This block of code is only called ONCE per election
 	if !e.Adapter.IsElectionProcessed() {

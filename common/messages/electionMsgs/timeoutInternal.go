@@ -176,7 +176,7 @@ func (m *TimeoutInternal) ElectionProcess(is interfaces.IState, elect interfaces
 
 	// Operate in existing election
 	//		Mainly increment rounds and check if we should send out our audit volunteer (if we are an aud)
-	e.State.(*state.State).Election2 = e.FeedBackStr("E", true, e.Electing)
+	e.State.GetState().Election2 = e.FeedBackStr("E", true, e.Electing)
 
 	for len(e.Round) <= e.Electing {
 		e.Round = append(e.Round, 0)

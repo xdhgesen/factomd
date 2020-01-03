@@ -29,41 +29,31 @@ type FaultId struct {
 
 type Elections struct {
 	common.Name
+	Pub
+	Sub
+	Events
 
 	FedID interfaces.IHash
 	//	Name      string
-	Sync      []bool // List of servers that have Synced
-	Federated []interfaces.IServer
-	Audit     []interfaces.IServer
-	FPriority []interfaces.IHash
-	APriority []interfaces.IHash
-	DBHeight  int               // Height of this election
-	SigType   bool              // False for dbsig, true for EOM
-	Minute    int               // Minute of this election (-1 for a DBSig)
-	VMIndex   int               // VMIndex of this election
-	Msgs      []interfaces.IMsg // Messages we are collecting in this election.  Look here for what's missing.
-	Input     interfaces.IQueue
-	Round     []int
-	Electing  int // This is the federated Server index that we are looking to replace
-	State     interfaces.IState
-	feedback  []string
-	VName     string
-	Msg       interfaces.IMsg // The missing message as supplied by the volunteer
-	Ack       interfaces.IMsg // The missing ack for the message as supplied by the volunteer
-
-	Sigs [][]interfaces.IHash // Signatures from the Federated Servers for a given round.
-
-	Adapter interfaces.IElectionAdapter
-
-	// Timeout period before we start the election
-	Timeout time.Duration
-	// Timeout for the next audit to volunteer
-	RoundTimeout time.Duration
-
-	FaultId atomic.AtomicInt // Incremented every time we launch a new timeout
-
-	// Messages that are not valid. They can be processed when an election finishes
-	Waiting chan interfaces.IElectionMsg
+	Sync         []bool                      // List of servers that have Synced
+	Federated    []interfaces.IServer        //
+	Audit        []interfaces.IServer        //
+	FPriority    []interfaces.IHash          //
+	APriority    []interfaces.IHash          //
+	DBHeight     int                         // Height of this election
+	SigType      bool                        // False for dbsig, true for EOM
+	Minute       int                         // Minute of this election (-1 for a DBSig)
+	VMIndex      int                         // VMIndex of this election
+	Round        []int                       //
+	Electing     int                         // This is the federated Server index that we are looking to replace
+	feedback     []string                    //
+	VName        string                      //
+	Msg          interfaces.IMsg             // The missing message as supplied by the volunteer
+	Ack          interfaces.IMsg             // The missing ack for the message as supplied by the volunteer
+	Adapter      interfaces.IElectionAdapter //
+	Timeout      time.Duration               // Timeout period before we start the election
+	RoundTimeout time.Duration               // Timeout for the next audit to volunteer
+	FaultId      atomic.AtomicInt            // Incremented every time we launch a new timeout
 }
 
 func (e *Elections) GetFedID() interfaces.IHash {
@@ -235,7 +225,7 @@ func (e *Elections) String() string {
 }
 
 func (e *Elections) SetElections3() {
-	e.State.(*state.State).Election3 = fmt.Sprintf("%3s %15s %15s\n", "#", "Federated", "Audit")
+	e.State.GetState().Election3 = fmt.Sprintf("%3s %15s %15s\n", "#", "Federated", "Audit")
 	for i := 0; i < len(e.Federated)+len(e.Audit); i++ {
 		fed := ""
 		aud := ""
@@ -250,7 +240,7 @@ func (e *Elections) SetElections3() {
 		if fed == "" && aud == "" {
 			break
 		}
-		e.State.(*state.State).Election3 += fmt.Sprintf("%3d %15s %15s\n", i, fed, aud)
+		e.State.GetState().Election3 += fmt.Sprintf("%3d %15s %15s\n", i, fed, aud)
 	}
 
 }
@@ -327,14 +317,14 @@ func (e *Elections) LogPrintLeaders(log string) {
 }
 
 func (e *Elections) LogPrintf(logName string, format string, more ...interface{}) {
-	s := e.State.(*state.State)
+	s := e.State.GetState()
 	if e.debugExec() {
 		s.LogPrintf(logName, format, more...)
 	}
 }
 
 func (e *Elections) LogMessage(logName string, comment string, msg interfaces.IMsg) {
-	s := e.State.(*state.State)
+	s := e.State.GetState()
 	if e.debugExec() {
 		s.LogMessage(logName, comment, msg)
 	}
@@ -435,7 +425,7 @@ func Run(w *worker.Thread, s *state.State) {
 	e := new(Elections)
 	e.NameInit(s, s.FactomNodeName+"Election", reflect.TypeOf(e).String())
 	s.Elections = e
-	e.State = s
+	e.State = newStateWrapper(s)
 	e.Input = s.ElectionsQueue()
 	e.Electing = -1
 

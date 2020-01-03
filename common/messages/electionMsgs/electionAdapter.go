@@ -9,8 +9,6 @@ import (
 	"github.com/FactomProject/factomd/electionsCore/election"
 	"github.com/FactomProject/factomd/electionsCore/imessage"
 	"github.com/FactomProject/factomd/electionsCore/primitives"
-	"github.com/FactomProject/factomd/state"
-
 	// "github.com/FactomProject/factomd/common/messages/electionMsgs"
 	"github.com/FactomProject/factomd/elections"
 
@@ -127,7 +125,7 @@ func NewElectionAdapter(e *elections.Elections, dbHash interfaces.IHash) *Electi
 	// TODO: Check the order!
 
 	e.LogPrintf("election", "NewElectionAdapter")
-	elections.CheckAuthSetsMatch("NewElectionAdapter", e, e.State.(*state.State))
+	elections.CheckAuthSetsMatch("NewElectionAdapter", e, e.State.GetState())
 
 	authset := primitives.NewAuthSet()
 	for _, f := range ea.Election.Federated {

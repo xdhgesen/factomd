@@ -90,7 +90,7 @@ func (m *EomSigInternal) GetMsgHash() (rval interfaces.IHash) {
 }
 func Fault(e *elections.Elections, dbheight int, minute int, timeOutId int, currentTimeoutId *atomic.AtomicInt, sigtype bool, timeoutDuration time.Duration) {
 	//	e.LogPrintf("election", "Start Timeout %d", timeOutId)
-	for !e.State.(*state.State).DBFinished || e.State.(*state.State).IgnoreMissing {
+	for !e.State.GetState().DBFinished || e.State.GetState().IgnoreMissing {
 		time.Sleep(timeoutDuration)
 	}
 	time.Sleep(timeoutDuration)
