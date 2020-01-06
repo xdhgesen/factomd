@@ -85,7 +85,7 @@ func NewFedVoteLevelMessage(signer interfaces.IHash, vol FedVoteVolunteerMsg) *F
 func (m *FedVoteLevelMsg) ElectionProcess(is interfaces.IState, elect interfaces.IElections) {
 	e := elect.(*elections.Elections)
 
-	elections.CheckAuthSetsMatch("FedVoteLevelMsg.ElectionProcess()", e, e.State.GetState())
+	e.CheckAuthSetsMatch("FedVoteLevelMsg.ElectionProcess()")
 
 	/******  Election Adapter Control   ******/
 	/**	Controlling the inner election state**/
@@ -114,7 +114,7 @@ func (m *FedVoteLevelMsg) processIfCommitted(is interfaces.IState, elect interfa
 	}
 	e := elect.(*elections.Elections)
 
-	elections.CheckAuthSetsMatch("processIfCommitted()", e, e.State.GetState())
+	e.CheckAuthSetsMatch("processIfCommitted()")
 
 	// This block of code is only called ONCE per election
 	if !e.Adapter.IsElectionProcessed() {
@@ -207,8 +207,9 @@ func (m *FedVoteLevelMsg) FollowerExecute(is interfaces.IState) {
 	// Committed should only be processed once.
 	//		ProcessInState is not marshalled, so only we can pass this to ourselves
 	//		allowing the election adapter to ensure only once behavior
-	if m.ProcessInState {
-		elections.CheckAuthSetsMatch("FedVoteLevelMsg.FollowerExecute", e, s)
+	if m.ProcessInState { // REVIEW: should there be an event related to this?
+		// REVIEW: should this happen on the Election subscriber side?
+		e.CheckAuthSetsMatch("FedVoteLevelMsg.FollowerExecute")
 
 		fmt.Println("LeaderSwapState", s.GetFactomNodeName(), m.DBHeight, m.Minute)
 

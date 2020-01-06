@@ -81,8 +81,9 @@ func (m *TimeoutInternal) InitiateElectionAdapter(st interfaces.IState) bool {
 	msg.VMIndex = m.VMIndex
 	msg.Minute = m.Minute
 	msg.SigType = m.SigType
-	e.State.LogMessage("MsgQueue", "enqueue_InitiateElectionAdapter", msg)
-	e.State.MsgQueue() <- msg
+	//e.State.LogMessage("MsgQueue", "enqueue_InitiateElectionAdapter", msg)
+	// FIXME use pubsub
+	st.MsgQueue() <- msg
 
 	// When we start a new election, we can process all messages that were being held
 	go e.ProcessWaiting()
@@ -150,7 +151,7 @@ func (m *TimeoutInternal) ElectionProcess(is interfaces.IState, elect interfaces
 
 		e.Electing = state.MakeMap(nfeds, uint32(m.DBHeight))[e.Minute][e.VMIndex]
 
-		elections.CheckAuthSetsMatch("TimeoutInternal.ElectionProcess", e, s)
+		e.CheckAuthSetsMatch("TimeoutInternal.ElectionProcess")
 
 		e.FedID = e.Federated[e.Electing].GetChainID()
 
@@ -176,7 +177,8 @@ func (m *TimeoutInternal) ElectionProcess(is interfaces.IState, elect interfaces
 
 	// Operate in existing election
 	//		Mainly increment rounds and check if we should send out our audit volunteer (if we are an aud)
-	e.State.GetState().Election2 = e.FeedBackStr("E", true, e.Electing)
+	// KLUDGE: replace election state lines
+	//e.State.GetState().Election2 = e.FeedBackStr("E", true, e.Electing)
 
 	for len(e.Round) <= e.Electing {
 		e.Round = append(e.Round, 0)

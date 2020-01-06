@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/FactomProject/factomd/common"
-	"github.com/FactomProject/factomd/worker"
-
 	"github.com/FactomProject/factomd/common/globals"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/primitives"
@@ -29,10 +27,9 @@ type FaultId struct {
 
 type Elections struct {
 	common.Name
-	Pub
-	Sub
-	Events
+	Manager
 
+	state interfaces.IState
 	FedID interfaces.IHash
 	//	Name      string
 	Sync         []bool                      // List of servers that have Synced
@@ -44,16 +41,37 @@ type Elections struct {
 	SigType      bool                        // False for dbsig, true for EOM
 	Minute       int                         // Minute of this election (-1 for a DBSig)
 	VMIndex      int                         // VMIndex of this election
+	Msgs         []interfaces.IMsg           // Messages we are collecting in this election.  Look here for what's missing.
 	Round        []int                       //
 	Electing     int                         // This is the federated Server index that we are looking to replace
 	feedback     []string                    //
 	VName        string                      //
 	Msg          interfaces.IMsg             // The missing message as supplied by the volunteer
 	Ack          interfaces.IMsg             // The missing ack for the message as supplied by the volunteer
+	Sigs         [][]interfaces.IHash        // Signatures from the Federated Servers for a given round.
 	Adapter      interfaces.IElectionAdapter //
 	Timeout      time.Duration               // Timeout period before we start the election
 	RoundTimeout time.Duration               // Timeout for the next audit to volunteer
 	FaultId      atomic.AtomicInt            // Incremented every time we launch a new timeout
+}
+
+func New(is interfaces.IState) *Elections {
+	e := new(Elections)
+	s := is.(*state.State)
+	e.NameInit(s, s.GetFactomNodeName()+"Election", reflect.TypeOf(e).String())
+	e.state = s
+	e.Electing = -1
+	e.Timeout = time.Duration(FaultTimeout) * time.Second
+	e.RoundTimeout = time.Duration(RoundTimeout) * time.Second
+	e.Waiting = make(chan interfaces.IElectionMsg, 500)
+	e.Input = s.ElectionsQueue()
+	//mgr.Enqueue = func(msg interfaces.IMsg) { mgr.Input.Enqueue(msg) }
+	//mgr.Elections.ProcessWaiting = mgr.ProcessWaiting
+
+	// inject reference from state
+	s.Elections = e
+
+	return e
 }
 
 func (e *Elections) GetFedID() interfaces.IHash {
@@ -97,8 +115,8 @@ func (e *Elections) AddFederatedServer(server interfaces.IServer) int {
 	e.RemoveAuditServer(server)
 
 	e.Federated = append(e.Federated, server)
-	s := e.State
-	s.LogPrintf("elections", "Election Sort FedServers AddFederatedServer")
+	//s := e.State
+	//s.LogPrintf("elections", "Election Sort FedServers AddFederatedServer")
 	changed := e.Sort(e.Federated)
 	if changed {
 		e.LogPrintf("election", "Sort changed e.Federated in Elections.AddFederatedServer")
@@ -212,6 +230,7 @@ func (e *Elections) FeedBackStr(v string, fed bool, index int) string {
 }
 
 func (e *Elections) String() string {
+	/* FIXME replace state Usage
 	str := fmt.Sprintf("eee %10s %s  dbht %d\n", e.State.GetFactomNodeName(), e.Name, e.DBHeight)
 	str += fmt.Sprintf("eee %10s  %s\n", e.State.GetFactomNodeName(), "Federated Servers")
 	for _, s := range e.Federated {
@@ -222,9 +241,12 @@ func (e *Elections) String() string {
 		str += fmt.Sprintf("eee %10s     %x\n", e.State.GetFactomNodeName(), s.GetChainID().Bytes())
 	}
 	return str
+	*/
+	return ""
 }
 
 func (e *Elections) SetElections3() {
+	/* FIXME replace state Usage
 	e.State.GetState().Election3 = fmt.Sprintf("%3s %15s %15s\n", "#", "Federated", "Audit")
 	for i := 0; i < len(e.Federated)+len(e.Audit); i++ {
 		fed := ""
@@ -242,6 +264,7 @@ func (e *Elections) SetElections3() {
 		}
 		e.State.GetState().Election3 += fmt.Sprintf("%3d %15s %15s\n", i, fed, aud)
 	}
+	*/
 
 }
 
@@ -317,23 +340,27 @@ func (e *Elections) LogPrintLeaders(log string) {
 }
 
 func (e *Elections) LogPrintf(logName string, format string, more ...interface{}) {
+	/* FIXME get rid of state
 	s := e.State.GetState()
 	if e.debugExec() {
 		s.LogPrintf(logName, format, more...)
 	}
+	*/
 }
 
 func (e *Elections) LogMessage(logName string, comment string, msg interfaces.IMsg) {
+	/* FIXME get rid of state
 	s := e.State.GetState()
 	if e.debugExec() {
 		s.LogMessage(logName, comment, msg)
 	}
+	*/
 }
 
 // Check that the process list and Election Authority Sets match
-func CheckAuthSetsMatch(caller string, e *Elections, s *state.State) {
+func (e *Elections) CheckAuthSetsMatch(caller string) {
 
-	pl := s.ProcessLists.Get(uint32(e.DBHeight))
+	pl := e.state.(*state.State).ProcessLists.Get(uint32(e.DBHeight))
 	var s_fservers, s_aservers []interfaces.IServer
 	if pl == nil {
 		s_fservers = make([]interfaces.IServer, 0)
@@ -347,9 +374,9 @@ func CheckAuthSetsMatch(caller string, e *Elections, s *state.State) {
 	e_aservers := e.Audit
 
 	printAll := func(format string, more ...interface{}) {
-		fmt.Printf(s.FactomNodeName+":"+caller+":"+format+"\n", more...)
+		fmt.Printf(e.state.GetFactomNodeName()+":"+caller+":"+format+"\n", more...)
 		e.LogPrintf("election", caller+":"+format, more...)
-		s.LogPrintf("executeMsg", caller+":"+format, more...)
+		e.state.LogPrintf("executeMsg", caller+":"+format, more...)
 	}
 
 	var dummy state.Server = state.Server{primitives.ZeroHash, "dummy", false, primitives.ZeroHash}
@@ -408,56 +435,26 @@ func CheckAuthSetsMatch(caller string, e *Elections, s *state.State) {
 	//}
 }
 
-// ProcessWaiting drains all waiting messages into the input
-func (e *Elections) ProcessWaiting() {
-	for {
-		select {
-		case msg := <-e.Waiting:
-			e.Input.Enqueue(msg)
-		default:
-			return
-		}
-	}
+func (e *Elections) GetIgnoreMissing() bool {
+	return e.state.(*state.State).IgnoreMissing
 }
 
-// Runs the main loop for elections for this instance of factomd
-func Run(w *worker.Thread, s *state.State) {
-	e := new(Elections)
-	e.NameInit(s, s.FactomNodeName+"Election", reflect.TypeOf(e).String())
-	s.Elections = e
-	e.State = newStateWrapper(s)
-	e.Input = s.ElectionsQueue()
-	e.Electing = -1
+func (e *Elections) GetDBFinished() bool {
+	return e.state.(*state.State).GetDBFinished()
+}
 
-	e.Timeout = time.Duration(FaultTimeout) * time.Second
-	e.RoundTimeout = time.Duration(RoundTimeout) * time.Second
-	e.Waiting = make(chan interfaces.IElectionMsg, 500)
+func (e *Elections) GetIdentityChainID() interfaces.IHash {
+	return e.state.(*state.State).GetIdentityChainID()
+}
 
-	// Actually run the elections
-	w.Run("Elections", func() {
-		for {
-			msg := e.Input.Dequeue().(interfaces.IElectionMsg)
-			e.LogMessage("election", fmt.Sprintf("exec %d", e.Electing), msg.(interfaces.IMsg))
+func (e *Elections) Sign(b []byte) interfaces.IFullSignature {
+	return e.state.(*state.State).ServerPrivKey.Sign(b)
+}
 
-			valid := msg.ElectionValidate(e)
-			switch valid {
-			case -1:
-				// Do not process
-				continue
-			case 0:
-				// Drop the oldest message if at capacity
-				if len(e.Waiting) > 9*cap(e.Waiting)/10 {
-					<-e.Waiting
-				}
-				// Waiting will get drained when a new election begins, or we move forward
-				e.Waiting <- msg
-				continue
-			}
-			msg.ElectionProcess(s, e)
+func (e *Elections) GetState() *state.State {
+	return e.state.(*state.State)
+}
 
-			//if msg.(interfaces.IMsg).Type() != constants.INTERNALEOMSIG { // If it's not an EOM check the authority set
-			//	CheckAuthSetsMatch("election.Run", e, s)
-			//}
-		}
-	})
+func (e *Elections) Enqueue(msg interfaces.IMsg) {
+	e.Input.Enqueue(msg)
 }

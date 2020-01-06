@@ -1,10 +1,20 @@
 package elections
 
 import (
+	"fmt"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/modules/event"
 	"github.com/FactomProject/factomd/state"
+	"github.com/FactomProject/factomd/worker"
 )
+
+// REVIEW: should other code in elections module be relocated here?
+
+type Manager struct {
+	Pub
+	Sub
+	Events
+}
 
 type Pub struct {
 	Input interfaces.IQueue //REVIEW: replace with MsgOut pubsub.IPublisher
@@ -21,44 +31,45 @@ type Sub struct {
 
 // aggregate event data
 type Events struct {
-	State  StateWrapper
-	Config *event.LeaderConfig  //
-	Msgs   []interfaces.IMsg    // Messages we are collecting in this election.  Look here for what's missing.
-	Sigs   [][]interfaces.IHash // Signatures from the Federated Servers for a given round.
+	Config *event.LeaderConfig //
 }
 
-// KLUDGE: shim to abstract state dependencies
-// TODO: replace w/ referenced to aggregated event data
-
-type StateWrapper struct {
-	state              interfaces.IState
-	GetIdentityChainID func() interfaces.IHash
-	LogPrintf          func(logName string, format string, more ...interface{})
-	GetFactomNodeName  func() string
-	GetDBFinished      func() bool
-	GetIgnoreMissing   func() bool
-	MsgQueue           func() chan interfaces.IMsg
-	LogMessage         func(logName string, comment string, msg interfaces.IMsg)
-}
-
-// TODO: refactor to use cached event data & config
-func newStateWrapper(s *state.State) StateWrapper {
-	return StateWrapper{
-		state:              s,
-		GetIdentityChainID: s.GetIdentityChainID,
-		LogPrintf:          s.LogPrintf,
-		GetFactomNodeName:  s.GetFactomNodeName,
-		GetDBFinished:      s.GetDBFinished,
-		GetIgnoreMissing:   func() bool { return s.IgnoreMissing },
-		MsgQueue:           s.MsgQueue,
-		LogMessage:         s.LogMessage,
+func (m Manager) ProcessWaiting() {
+	for {
+		select {
+		case msg := <-m.Waiting:
+			m.Input.Enqueue(msg)
+		default:
+			return
+		}
 	}
 }
 
-func (sw StateWrapper) Sign(b []byte) interfaces.IFullSignature {
-	return sw.state.(*state.State).ServerPrivKey.Sign(b)
-}
+// Runs the main loop for elections for this instance of factomd
+func Run(w *worker.Thread, s *state.State) {
+	mgr := New(s)
+	// Actually run the elections
+	w.Run("Elections", func() {
+		for {
+			msg := mgr.Input.Dequeue().(interfaces.IElectionMsg)
+			s.LogMessage("election", fmt.Sprintf("exec %d", mgr.Electing), msg.(interfaces.IMsg))
 
-func (sw StateWrapper) GetState() *state.State {
-	return sw.state.(*state.State)
+			valid := msg.ElectionValidate(mgr)
+			switch valid {
+			case -1:
+				// Do not process
+				continue
+			case 0:
+				// Drop the oldest message if at capacity
+				if len(mgr.Waiting) > 9*cap(mgr.Waiting)/10 {
+					<-mgr.Waiting
+				}
+				// Waiting will get drained when a new election begins, or we move forward
+				mgr.Waiting <- msg
+				continue
+			}
+			msg.ElectionProcess(s, mgr)
+		}
+	})
+
 }

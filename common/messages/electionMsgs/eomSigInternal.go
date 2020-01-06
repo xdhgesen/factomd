@@ -90,9 +90,12 @@ func (m *EomSigInternal) GetMsgHash() (rval interfaces.IHash) {
 }
 func Fault(e *elections.Elections, dbheight int, minute int, timeOutId int, currentTimeoutId *atomic.AtomicInt, sigtype bool, timeoutDuration time.Duration) {
 	//	e.LogPrintf("election", "Start Timeout %d", timeOutId)
-	for !e.State.GetState().DBFinished || e.State.GetState().IgnoreMissing {
-		time.Sleep(timeoutDuration)
-	}
+	// FIXME relocate to authoritySet Manager
+	/*
+		for !e.State.GetState().DBFinished || e.State.GetState().IgnoreMissing {
+			time.Sleep(timeoutDuration)
+		}
+	*/
 	time.Sleep(timeoutDuration)
 
 	if currentTimeoutId.Load() == timeOutId {
@@ -102,7 +105,7 @@ func Fault(e *elections.Elections, dbheight int, minute int, timeOutId int, curr
 		timeout.DBHeight = dbheight
 		timeout.Minute = byte(minute)
 		timeout.SigType = sigtype
-		e.Input.Enqueue(timeout)
+		e.Enqueue(timeout)
 	} else {
 		//		e.LogPrintf("election", "Cancel Timeout %d", timeOutId)
 

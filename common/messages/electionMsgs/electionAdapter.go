@@ -125,7 +125,8 @@ func NewElectionAdapter(e *elections.Elections, dbHash interfaces.IHash) *Electi
 	// TODO: Check the order!
 
 	e.LogPrintf("election", "NewElectionAdapter")
-	elections.CheckAuthSetsMatch("NewElectionAdapter", e, e.State.GetState())
+	// FIXME relocate to authoritySet/manager
+	//elections.CheckAuthSetsMatch("NewElectionAdapter", e, e.State.GetState())
 
 	authset := primitives.NewAuthSet()
 	for _, f := range ea.Election.Federated {
@@ -138,7 +139,7 @@ func NewElectionAdapter(e *elections.Elections, dbHash interfaces.IHash) *Electi
 		ea.AuditServerList = append(ea.AuditServerList, idhash)
 	}
 
-	ea.SimulatedElection = election.NewElection(primitives.Identity(e.State.GetIdentityChainID().Fixed()), *authset)
+	ea.SimulatedElection = election.NewElection(primitives.Identity(e.GetIdentityChainID().Fixed()), *authset)
 	ea.SimulatedElection.AddDisplay(nil)
 
 	return ea
@@ -184,7 +185,7 @@ func (ea *ElectionAdapter) Execute(msg interfaces.IMsg) interfaces.IMsg {
 		// fmt.Printf("SimExecute Out :: %s -> %s BY %x\n", ea.Election.State.GetFactomNodeName(), ea.SimulatedElection.Display.FormatMessage(resp), ea.Election.State.GetIdentityChainID().Fixed())
 		expandedResp := ea.expandMyMessage(resp).(interfaces.Signable)
 		// Sign it!
-		err := expandedResp.Sign(ea.Election.State)
+		err := expandedResp.Sign(ea.Election)
 		if err != nil {
 			// TODO: Panic?
 			panic(err)
@@ -207,7 +208,7 @@ func (ea *ElectionAdapter) expandMyMessage(msg imessage.IMessage) interfaces.IMs
 
 		p := NewFedProposalMsg(ea.Election.FedID, *vol)
 		p.InitFields(ea.Election)
-		p.Signer = ea.Election.State.GetIdentityChainID()
+		p.Signer = ea.Election.GetIdentityChainID()
 
 		// TODO: Set Message type
 		p.TypeMsg = 0x00
@@ -221,7 +222,7 @@ func (ea *ElectionAdapter) expandMyMessage(msg imessage.IMessage) interfaces.IMs
 		}
 
 		l := NewFedVoteLevelMessage(ea.Election.FedID, *vol)
-		l.Signer = ea.Election.State.GetIdentityChainID()
+		l.Signer = ea.Election.GetIdentityChainID()
 		l.Level = uint32(sim.Level)
 		l.Rank = uint32(sim.Rank)
 		l.Committed = sim.Committed

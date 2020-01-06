@@ -109,7 +109,7 @@ func (m *FedVoteVolunteerMsg) FollowerExecute(is interfaces.IState) {
 		return
 	}
 
-	elections.CheckAuthSetsMatch("FedVoteVolunteerMsg.FollowerExecute", e, s)
+	e.CheckAuthSetsMatch("FedVoteVolunteerMsg.FollowerExecute")
 
 	// Add the authority set this election involves from the process list
 	// may this should live in the election adapter? It's life mirrors the election ...
