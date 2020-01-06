@@ -1,4 +1,4 @@
-package state_test
+package bank_test
 
 import (
 	"crypto/rand"
@@ -7,7 +7,7 @@ import (
 
 	"github.com/FactomProject/factomd/common/primitives/random"
 
-	. "github.com/FactomProject/factomd/state"
+	. "github.com/FactomProject/factomd/modules/bank"
 )
 
 func TestBalanceMap(t *testing.T) {
