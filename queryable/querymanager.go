@@ -54,7 +54,7 @@ func (q *QueryManager) Assign(o interface{}, jsontag string, opts ...interface{}
 			f := qt.Field(i).Type.Field(j)
 			v, ok := f.Tag.Lookup("json")
 			// Based on jsontag or type if tag is blank
-			if ok && v == jsontag || (jsontag == "" && t == oi) {
+			if ok && v == jsontag || (jsontag == "" && matches(oi, t)) {
 				if f.Type.Kind() == reflect.Map {
 					if len(opts) == 0 {
 						return fmt.Errorf("expected a map key for the assign")
@@ -67,6 +67,18 @@ func (q *QueryManager) Assign(o interface{}, jsontag string, opts ...interface{}
 		}
 	}
 	return fmt.Errorf("object not assigned")
+}
+
+func matches(a reflect.Type, b reflect.Type) bool {
+	if a == b {
+		return true
+	}
+	if b.Kind() == reflect.Array || b.Kind() == reflect.Map {
+		if a == b.Elem() {
+			return true
+		}
+	}
+	return false
 }
 
 func (q *QueryManager) assign(i, j int, o interface{}) error {

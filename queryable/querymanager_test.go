@@ -34,7 +34,7 @@ func TestQueryManagerExists(t *testing.T) {
 	defer r.Close()
 	defer w.Close()
 
-	if err := q.Assign(r, "rands", "test"); err != nil {
+	if err := q.Assign(r, "", "test"); err != nil {
 		t.Error(err)
 		t.FailNow()
 	}
