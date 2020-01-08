@@ -2,6 +2,7 @@ package elections
 
 import (
 	"fmt"
+	"github.com/FactomProject/factomd/modules/query"
 	"reflect"
 	"time"
 
@@ -32,33 +33,33 @@ type Elections struct {
 	state interfaces.IState
 	FedID interfaces.IHash
 	//	Name      string
-	Sync         []bool                      // List of servers that have Synced
-	Federated    []interfaces.IServer        //
-	Audit        []interfaces.IServer        //
-	FPriority    []interfaces.IHash          //
-	APriority    []interfaces.IHash          //
-	DBHeight     int                         // Height of this election
-	SigType      bool                        // False for dbsig, true for EOM
-	Minute       int                         // Minute of this election (-1 for a DBSig)
-	VMIndex      int                         // VMIndex of this election
-	Msgs         []interfaces.IMsg           // Messages we are collecting in this election.  Look here for what's missing.
-	Round        []int                       //
-	Electing     int                         // This is the federated Server index that we are looking to replace
-	feedback     []string                    //
-	VName        string                      //
-	Msg          interfaces.IMsg             // The missing message as supplied by the volunteer
-	Ack          interfaces.IMsg             // The missing ack for the message as supplied by the volunteer
-	Sigs         [][]interfaces.IHash        // Signatures from the Federated Servers for a given round.
-	Adapter      interfaces.IElectionAdapter //
-	Timeout      time.Duration               // Timeout period before we start the election
-	RoundTimeout time.Duration               // Timeout for the next audit to volunteer
-	FaultId      atomic.AtomicInt            // Incremented every time we launch a new timeout
+	Sync         []bool               // List of servers that have Synced
+	Federated    []interfaces.IServer //
+	Audit        []interfaces.IServer //
+	FPriority    []interfaces.IHash   //
+	APriority    []interfaces.IHash   //
+	DBHeight     int                  // Height of this election
+	SigType      bool                 // False for dbsig, true for EOM
+	Minute       int                  // Minute of this election (-1 for a DBSig)
+	VMIndex      int                  // VMIndex of this election
+	Msgs         []interfaces.IMsg    // Messages we are collecting in this election.  Look here for what's missing.
+	Round        []int                //
+	Electing     int                  // This is the federated Server index that we are looking to replace
+	feedback     []string             //
+	VName        string               //
+	Msg          interfaces.IMsg      // The missing message as supplied by the volunteer
+	Ack          interfaces.IMsg      // The missing ack for the message as supplied by the volunteer
+	Sigs         [][]interfaces.IHash // Signatures from the Federated Servers for a given round.
+	Timeout      time.Duration        // Timeout period before we start the election
+	RoundTimeout time.Duration        // Timeout for the next audit to volunteer
+	FaultId      atomic.AtomicInt     // Incremented every time we launch a new timeout
 }
 
 func New(is interfaces.IState) *Elections {
 	e := new(Elections)
 	s := is.(*state.State)
 	e.NameInit(s, s.GetFactomNodeName()+"Election", reflect.TypeOf(e).String())
+	query.Module(s.GetFactomNodeName()).Election = e
 	e.state = s
 	e.Electing = -1
 	e.Timeout = time.Duration(FaultTimeout) * time.Second
@@ -455,6 +456,67 @@ func (e *Elections) GetState() *state.State {
 	return e.state.(*state.State)
 }
 
+// add an input
 func (e *Elections) Enqueue(msg interfaces.IMsg) {
 	e.Input.Enqueue(msg)
+}
+
+func (e *Elections) GetDBHeight() uint32 {
+	return uint32(e.DBHeight)
+}
+
+func (e *Elections) GetMinute() byte {
+	return byte(e.Minute)
+}
+
+func (e *Elections) AddAudit(server interfaces.IServer) (changed bool) {
+	if e.AuditIndex(server.GetChainID()) < 0 {
+		e.Audit = append(e.Audit, server)
+		changed = e.Sort(e.Audit)
+		if changed {
+			e.LogPrintf("election", "Sort changed e.Audit leaders in AddAuditInternal.ElectionProcess")
+			e.LogPrintLeaders("election")
+		}
+	}
+	return changed
+}
+
+func (e *Elections) AddLeader(server interfaces.IServer) (changed bool) {
+	if e.LeaderIndex(server.GetChainID()) < 0 {
+		e.Federated = append(e.Federated, server)
+		e.Round = append(e.Round, 0)
+		// TODO: If we reorder Federated[] do we need to reorder Round[]?
+		//s := e.State
+		//s.LogPrintf("elections", "Election Sort FedServers AddLeaderInternal")
+		changed := e.Sort(e.Federated)
+		if changed {
+			e.LogPrintf("election", "Sort changed e.Federated in AddLeaderInternal.ElectionProcess()")
+			e.LogPrintLeaders("election")
+		}
+	}
+	return changed
+}
+
+func (e *Elections) SetFederated(servers []interfaces.IServer) {
+	e.Federated = servers
+}
+
+func (e *Elections) SetAudit(servers []interfaces.IServer) {
+	e.Audit = servers
+}
+
+func (e *Elections) ResetElectionAdapter(prevDBHash interfaces.IHash) {
+	e.Adapter = Hooks.NewElectionAdapter(e, prevDBHash)
+}
+
+func (e *Elections) IsElecting() bool {
+	return e.Electing != -1
+}
+
+func (e *Elections) GetFaultID() *atomic.AtomicInt {
+	return &e.FaultId
+}
+
+func (e *Elections) GetRoundTimeout() time.Duration {
+	return e.RoundTimeout
 }

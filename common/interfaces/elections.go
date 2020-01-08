@@ -1,5 +1,10 @@
 package interfaces
 
+import (
+	"github.com/FactomProject/factomd/util/atomic"
+	"time"
+)
+
 type IElections interface {
 	GetFedID() IHash
 	GetElecting() int
@@ -9,6 +14,20 @@ type IElections interface {
 	GetAuditServers() []IServer
 	GetAdapter() IElectionAdapter
 	String() string
+	GetDBHeight() uint32
+	GetMinute() byte
+	AddAudit(IServer) bool
+	AddLeader(IServer) bool
+	SetFederated([]IServer)
+	SetAudit([]IServer)
+	ResetElectionAdapter(IHash)
+	IsElecting() bool
+	Enqueue(IMsg)
+	GetDBFinished() bool
+	GetIgnoreMissing() bool
+	LeaderIndex(IHash) int
+	GetFaultID() *atomic.AtomicInt
+	GetRoundTimeout() time.Duration
 }
 
 type IElectionAdapter interface {

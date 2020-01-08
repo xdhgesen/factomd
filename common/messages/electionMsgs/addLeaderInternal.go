@@ -12,7 +12,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
 
 	llog "github.com/FactomProject/factomd/log"
@@ -72,24 +71,8 @@ func (m *AddLeaderInternal) GetMsgHash() (rval interfaces.IHash) {
 	return m.MsgHash
 }
 
-func (m *AddLeaderInternal) ElectionProcess(s interfaces.IState, elect interfaces.IElections) {
-	e, ok := elect.(*elections.Elections)
-	if !ok {
-		panic("Invalid elections object")
-	}
-	if e.LeaderIndex(m.ServerID) < 0 {
-		e.Federated = append(e.Federated, &state.Server{ChainID: m.ServerID, Online: true})
-		e.Round = append(e.Round, 0)
-		// TODO: If we reorder Federated[] do we need to reorder Round[]?
-		//s := e.State
-		//s.LogPrintf("elections", "Election Sort FedServers AddLeaderInternal")
-		changed := e.Sort(e.Federated)
-		if changed {
-			e.LogPrintf("election", "Sort changed e.Federated in AddLeaderInternal.ElectionProcess()")
-			e.LogPrintLeaders("election")
-		}
-
-	}
+func (m *AddLeaderInternal) ElectionProcess(s interfaces.IState, e interfaces.IElections) {
+	e.AddLeader(&state.Server{ChainID: m.ServerID, Online: true})
 }
 
 func (m *AddLeaderInternal) GetServerID() (rval interfaces.IHash) {

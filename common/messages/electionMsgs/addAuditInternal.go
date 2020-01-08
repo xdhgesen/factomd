@@ -12,7 +12,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
 
 	llog "github.com/FactomProject/factomd/log"
@@ -71,19 +70,8 @@ func (m *AddAuditInternal) GetMsgHash() (rval interfaces.IHash) {
 	return m.MsgHash
 }
 
-func (m *AddAuditInternal) ElectionProcess(is interfaces.IState, elect interfaces.IElections) {
-	e, ok := elect.(*elections.Elections)
-	if !ok {
-		panic("Invalid elections object")
-	}
-	if e.AuditIndex(m.ServerID) < 0 {
-		e.Audit = append(e.Audit, &state.Server{ChainID: m.ServerID, Online: true})
-		changed := e.Sort(e.Audit)
-		if changed {
-			e.LogPrintf("election", "Sort changed e.Audit leaders in AddAuditInternal.ElectionProcess")
-			e.LogPrintLeaders("election")
-		}
-	}
+func (m *AddAuditInternal) ElectionProcess(is interfaces.IState, e interfaces.IElections) {
+	e.AddAudit(&state.Server{ChainID: m.ServerID, Online: true})
 }
 
 func (m *AddAuditInternal) LogFields() log.Fields {

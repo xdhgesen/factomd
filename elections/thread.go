@@ -10,10 +10,17 @@ import (
 
 // REVIEW: should other code in elections module be relocated here?
 
+type hooks struct {
+	NewElectionAdapter func(*Elections, interfaces.IHash) interfaces.IElectionAdapter
+}
+
+var Hooks = hooks{}
+
 type Manager struct {
 	Pub
 	Sub
 	Events
+	Adapter interfaces.IElectionAdapter
 }
 
 type Pub struct {
@@ -21,7 +28,6 @@ type Pub struct {
 }
 
 type Sub struct {
-
 	// Messages that are not valid. They can be processed when an election finishes
 	Waiting chan interfaces.IElectionMsg // REVIEW: replace w/ pubsub.SubChannel
 
@@ -48,6 +54,7 @@ func (m Manager) ProcessWaiting() {
 // Runs the main loop for elections for this instance of factomd
 func Run(w *worker.Thread, s *state.State) {
 	mgr := New(s)
+
 	// Actually run the elections
 	w.Run("Elections", func() {
 		for {

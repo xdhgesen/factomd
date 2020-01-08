@@ -39,10 +39,10 @@ func (m *StartElectionInternal) ElectionProcess(s interfaces.IState, elect inter
 	// If the electing is set to -1, that election has ended before we got to start it.
 	// Still trigger the Fault loop, it will self terminate if we've moved forward
 	if e.Electing == -1 {
-		go Fault(e, e.DBHeight, e.Minute, e.FaultId.Load(), &e.FaultId, m.SigType, e.RoundTimeout)
+		Fault(e, m.SigType)
 		return
 	}
-	e.Adapter = NewElectionAdapter(e, m.PreviousDBHash)
+	e.ResetElectionAdapter(m.PreviousDBHash)
 	s.LogPrintf("election", "Create Election Adapter")
 	// An election that finishes may make us a leader. We need to know that for the next election that
 	// takes place. So use the election's list of fed servers to determine if we are a leader
@@ -54,7 +54,7 @@ func (m *StartElectionInternal) ElectionProcess(s interfaces.IState, elect inter
 		e.Adapter.SetObserver(true)
 	}
 
-	go Fault(e, e.DBHeight, e.Minute, e.FaultId.Load(), &e.FaultId, m.SigType, e.RoundTimeout)
+	Fault(e, m.SigType)
 }
 
 // Execute the leader functions of the given message

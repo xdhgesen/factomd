@@ -3,21 +3,21 @@ package electionMsgs
 import (
 	"crypto/sha256"
 	"fmt"
-
 	"github.com/FactomProject/factomd/common/interfaces"
 	primitives2 "github.com/FactomProject/factomd/common/primitives"
+	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/electionsCore/election"
 	"github.com/FactomProject/factomd/electionsCore/imessage"
-	"github.com/FactomProject/factomd/electionsCore/primitives"
-	// "github.com/FactomProject/factomd/common/messages/electionMsgs"
-	"github.com/FactomProject/factomd/elections"
-
-	//"github.com/FactomProject/factomd/state"
-
 	"github.com/FactomProject/factomd/electionsCore/messages"
-
+	"github.com/FactomProject/factomd/electionsCore/primitives"
 	llog "github.com/FactomProject/factomd/log"
 )
+
+func init() {
+	elections.Hooks.NewElectionAdapter = func(e *elections.Elections, dbHash interfaces.IHash) interfaces.IElectionAdapter {
+		return NewElectionAdapter(e, dbHash)
+	}
+}
 
 // ElectionAdapter is used to drive the election package, abstracting away factomd
 // logic and messages

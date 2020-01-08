@@ -16,7 +16,6 @@ import (
 	"github.com/FactomProject/factomd/common/primitives"
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/state"
-	"github.com/FactomProject/factomd/util/atomic"
 
 	llog "github.com/FactomProject/factomd/log"
 	log "github.com/sirupsen/logrus"
@@ -88,28 +87,32 @@ func (m *EomSigInternal) GetMsgHash() (rval interfaces.IHash) {
 	}
 	return m.MsgHash
 }
-func Fault(e *elections.Elections, dbheight int, minute int, timeOutId int, currentTimeoutId *atomic.AtomicInt, sigtype bool, timeoutDuration time.Duration) {
-	//	e.LogPrintf("election", "Start Timeout %d", timeOutId)
-	// FIXME relocate to authoritySet Manager
-	/*
-		for !e.State.GetState().DBFinished || e.State.GetState().IgnoreMissing {
+func Fault(e interfaces.IElections, sigtype bool) {
+	dbheight := e.GetDBHeight()
+	minute := e.GetMinute()
+	timeOutId := e.GetFaultID().Load()
+	currentTimeoutId := e.GetFaultID()
+	timeoutDuration := e.GetRoundTimeout()
+
+	go func() {
+		//	e.LogPrintf("election", "Start Timeout %d", timeOutId)
+		for !e.GetDBFinished() || e.GetIgnoreMissing() {
 			time.Sleep(timeoutDuration)
 		}
-	*/
-	time.Sleep(timeoutDuration)
+		time.Sleep(timeoutDuration)
 
-	if currentTimeoutId.Load() == timeOutId {
-		//		e.LogPrintf("election", "Timeout %d", timeOutId)
-		/* we have NOT moved on so no timeout */
-		timeout := new(TimeoutInternal)
-		timeout.DBHeight = dbheight
-		timeout.Minute = byte(minute)
-		timeout.SigType = sigtype
-		e.Enqueue(timeout)
-	} else {
-		//		e.LogPrintf("election", "Cancel Timeout %d", timeOutId)
-
-	}
+		if currentTimeoutId.Load() == timeOutId {
+			//		e.LogPrintf("election", "Timeout %d", timeOutId)
+			/* we have NOT moved on so no timeout */
+			timeout := new(TimeoutInternal)
+			timeout.DBHeight = int(dbheight)
+			timeout.Minute = byte(minute)
+			timeout.SigType = sigtype
+			e.Enqueue(timeout)
+		} else {
+			//		e.LogPrintf("election", "Cancel Timeout %d", timeOutId)
+		}
+	}()
 }
 func (m *EomSigInternal) ComparisonMinute() int {
 	if !m.SigType {
@@ -185,7 +188,7 @@ func (m *EomSigInternal) ElectionProcess(is interfaces.IState, elect interfaces.
 		s.Election0 = Title()
 
 		e.FaultId.Store(e.FaultId.Load() + 1) // increment the timeout counter
-		go Fault(e, e.DBHeight, e.Minute, e.FaultId.Load(), &e.FaultId, m.SigType, e.Timeout)
+		Fault(e, m.SigType)
 
 		// Drain all waiting messages as we have advanced, they can now be processed again
 		// as moving forward in mins/blocks may invalidate/validate some messages

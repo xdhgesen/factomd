@@ -41,14 +41,13 @@ type FedVoteMsg struct {
 }
 
 func (m *FedVoteMsg) InitFields(elect interfaces.IElections) {
-	election := elect.(*elections.Elections)
 	m.TS = primitives.NewTimestampNow()
-	m.DBHeight = uint32(election.DBHeight)
-	m.Minute = byte(election.Minute)
+	m.DBHeight = elect.GetDBHeight()
+	m.Minute = elect.GetMinute()
 	// You need to init the type
 }
 
-func (m *FedVoteMsg) ElectionProcess(is interfaces.IState, elect interfaces.IElections) {
+func (m *FedVoteMsg) ElectionProcess(interfaces.IState, interfaces.IElections) {
 }
 
 var _ interfaces.IMsg = (*FedVoteMsg)(nil)

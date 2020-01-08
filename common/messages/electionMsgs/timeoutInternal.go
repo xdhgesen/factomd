@@ -86,6 +86,7 @@ func (m *TimeoutInternal) InitiateElectionAdapter(st interfaces.IState) bool {
 	st.MsgQueue() <- msg
 
 	// When we start a new election, we can process all messages that were being held
+	// FIXME make this an event
 	go e.ProcessWaiting()
 	return true
 }
@@ -191,7 +192,7 @@ func (m *TimeoutInternal) ElectionProcess(is interfaces.IState, elect interfaces
 	// Start our timer to timeout this sync
 
 	e.FaultId.Store(e.FaultId.Load() + 1) // increment the timeout counter
-	go Fault(e, e.DBHeight, e.Minute, e.FaultId.Load(), &e.FaultId, m.SigType, e.RoundTimeout)
+	Fault(e, m.SigType)
 
 	auditIdx := 0
 	if len(e.Audit) > 0 {

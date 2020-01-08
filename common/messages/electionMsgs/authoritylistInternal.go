@@ -12,8 +12,6 @@ import (
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages/msgbase"
 	"github.com/FactomProject/factomd/common/primitives"
-	"github.com/FactomProject/factomd/elections"
-
 	llog "github.com/FactomProject/factomd/log"
 	log "github.com/sirupsen/logrus"
 )
@@ -54,11 +52,10 @@ func (m *AuthorityListInternal) GetMsgHash() (rval interfaces.IHash) {
 	return m.MsgHash
 }
 
-func (m *AuthorityListInternal) ElectionProcess(s interfaces.IState, elect interfaces.IElections) {
-	e := elect.(*elections.Elections)
-	e.Federated = m.Federated
-	e.Audit = m.Audit
-	e.SetElections3()
+func (m *AuthorityListInternal) ElectionProcess(s interfaces.IState, e interfaces.IElections) {
+	e.SetFederated(m.Federated)
+	e.SetAudit(m.Audit)
+	//e.SetElections3()
 }
 
 func (m *AuthorityListInternal) LogFields() log.Fields {
@@ -97,7 +94,7 @@ func (m *AuthorityListInternal) Type() byte {
 }
 
 func (m *AuthorityListInternal) ElectionValidate(ie interfaces.IElections) int {
-	if int(m.DBHeight) < ie.(*elections.Elections).DBHeight {
+	if m.DBHeight < ie.GetDBHeight() {
 		return -1
 	}
 	return 1
