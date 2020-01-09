@@ -6,23 +6,29 @@ import (
 )
 
 type pubSubPaths struct {
-	EOM          string
-	Seq          string
-	Directory    string
-	Bank         string
-	LeaderConfig string
-	LeaderMsgIn  string
-	LeaderMsgOut string
+	EOM             string
+	Seq             string
+	Directory       string
+	Bank            string
+	LeaderConfig    string
+	LeaderMsgIn     string
+	LeaderMsgOut    string
+	AuthoritySet    string
+	Elections       string
+	ElectionWaiting string
 }
 
 var Path = pubSubPaths{
-	EOM:          "EOM",
-	Seq:          "seq",
-	Directory:    "directory",
-	Bank:         "bank",
-	LeaderConfig: "leader-config",
-	LeaderMsgIn:  "leader-msg-in",
-	LeaderMsgOut: "leader-msg-out",
+	EOM:             "EOM",
+	Seq:             "seq",
+	Directory:       "directory",
+	Bank:            "bank",
+	LeaderConfig:    "leader-config",
+	LeaderMsgIn:     "leader-msg-in",
+	LeaderMsgOut:    "leader-msg-out",
+	AuthoritySet:    "authority-set",
+	Elections:       "election-input",
+	ElectionWaiting: "election-waiting",
 }
 
 type Balance struct {

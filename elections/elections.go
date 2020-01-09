@@ -64,13 +64,7 @@ func New(is interfaces.IState) *Elections {
 	e.Electing = -1
 	e.Timeout = time.Duration(FaultTimeout) * time.Second
 	e.RoundTimeout = time.Duration(RoundTimeout) * time.Second
-	e.Waiting = make(chan interfaces.IElectionMsg, 500)
-	e.Input = s.ElectionsQueue()
-	//mgr.Enqueue = func(msg interfaces.IMsg) { mgr.Input.Enqueue(msg) }
-	//mgr.Elections.ProcessWaiting = mgr.ProcessWaiting
-
-	// inject reference from state
-	s.Elections = e
+	s.Elections = e // inject reference from state
 
 	return e
 }
