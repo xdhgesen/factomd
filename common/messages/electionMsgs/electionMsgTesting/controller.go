@@ -46,18 +46,18 @@ func NewController(feds, auds int) *Controller {
 	c.feds = make([]interfaces.IServer, feds)
 	c.auds = make([]interfaces.IServer, auds)
 	c.Elections = make([]*elections.Elections, len(c.feds))
+	st := testHelper.CreateAndPopulateTestStateAndStartValidator()
 
 	for i := range c.feds {
-		e := new(elections.Elections)
 		s := state.Server{}
+		e := elections.New(st)
 		s.ChainID, _ = primitives.HexToHash("888888" + fmt.Sprintf("%058d", i))
 		e.FedID = s.ChainID
 		s.Name = fmt.Sprintf("Node%d", i)
 		s.Online = true
 
 		c.feds[i] = &s
-		e.State = testHelper.CreateAndPopulateTestStateAndStartValidator()
-		e.State.SetIdentityChainID(s.ChainID)
+		st.SetIdentityChainID(s.ChainID)
 		c.Elections[i] = e
 	}
 
@@ -74,7 +74,7 @@ func NewController(feds, auds int) *Controller {
 		for j := range c.feds {
 			e.Federated[j] = c.feds[j]
 		}
-		e.State.(*state.State).ProcessLists.Get(1).FedServers = e.Federated
+		st.ProcessLists.Get(1).FedServers = e.Federated
 	}
 
 	for _, e := range c.Elections {
@@ -82,12 +82,12 @@ func NewController(feds, auds int) *Controller {
 		for j := range c.auds {
 			e.Audit[j] = c.auds[j]
 		}
-		e.State.(*state.State).ProcessLists.Get(1).AuditServers = e.Audit
+		st.ProcessLists.Get(1).AuditServers = e.Audit
 	}
 
 	c.ElectionAdapters = make([]*electionMsgs.ElectionAdapter, len(c.Elections))
 	for i, e := range c.Elections {
-		c.ElectionAdapters[i] = electionMsgs.NewElectionAdapter(e, e.State.GetIdentityChainID())
+		c.ElectionAdapters[i] = electionMsgs.NewElectionAdapter(e, st.GetIdentityChainID())
 		c.ElectionAdapters[i].SimulatedElection.AddDisplay(nil)
 	}
 

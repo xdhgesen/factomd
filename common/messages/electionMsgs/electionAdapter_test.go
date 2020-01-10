@@ -63,7 +63,7 @@ func TestElectionAuditOrder(t *testing.T) {
 
 func TestSimpleSigning(t *testing.T) {
 	s := CreateAndPopulateTestStateAndStartValidator()
-	e := NewTestElection()
+	e := NewTestElection(s)
 	v1 := NewTestVolunteerMessage(e, 2, 0)
 	err := v1.Sign(s)
 	if err != nil {
@@ -77,16 +77,16 @@ func TestSimpleSigning(t *testing.T) {
 }
 
 func TestElectionAdapterSimple(t *testing.T) {
-	e := NewTestElection()
-	e.State = CreateAndPopulateTestStateAndStartValidator()
-	e.State.SetIdentityChainID(primitives.NewZeroHash())
+	st := CreateAndPopulateTestStateAndStartValidator()
+	e := NewTestElection(st)
+	st.SetIdentityChainID(primitives.NewZeroHash())
 
 	a := NewElectionAdapter(e, primitives.NewZeroHash())
 	v1 := NewTestVolunteerMessage(e, 2, 0)
 	resp := a.Execute(v1)
 	// Verify resp was a vote
 	if msg, ok := resp.(*FedVoteProposalMsg); ok {
-		if !msg.Signer.IsSameAs(e.State.GetIdentityChainID()) {
+		if !msg.Signer.IsSameAs(st.GetIdentityChainID()) {
 			t.Errorf("Message not signed by self")
 		}
 	} else {
@@ -94,8 +94,8 @@ func TestElectionAdapterSimple(t *testing.T) {
 	}
 }
 
-func NewTestElection() *elections.Elections {
-	e := new(elections.Elections)
+func NewTestElection(s *state.State) *elections.Elections {
+	e := elections.New(s)
 	e.FedID, _ = primitives.NewShaHashFromStr("888888f0b7e308974afc34b2c7f703f25ed2699cb05f818e84e8745644896c55")
 	e.Federated = make([]interfaces.IServer, 3)
 	e.Audit = make([]interfaces.IServer, 3)
