@@ -1573,7 +1573,6 @@ func (s *State) InMsgQueue2() interfaces.IQueue {
 }
 
 func (s *State) ElectionsQueue() interfaces.IQueue {
-	// REVIEW: replace w/ PubSub framework
 	return s.electionsQueue
 }
 

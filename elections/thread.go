@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/modules/event"
-	"github.com/FactomProject/factomd/pubsub"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/worker"
 )
@@ -16,28 +15,16 @@ type hooks struct { // avoid import loop
 var Hooks = hooks{}
 
 type Manager struct {
-	Pub
-	Sub
 	Events
-	exit    chan interface{}
+	Input   interfaces.IQueue //REVIEW: replace with MsgOut pubsub.IPublisher
 	Adapter interfaces.IElectionAdapter
-}
-
-type Pub struct {
-	MsgIn      pubsub.IPublisher
-	MsgWaiting pubsub.IPublisher
-	Input      interfaces.IQueue //REVIEW: replace with MsgOut pubsub.IPublisher
-}
-
-type Sub struct {
-	// Messages that are not valid. They can be processed when an election finishes
-	Waiting chan interfaces.IElectionMsg // REVIEW: replace w/ pubsub.SubChannel
-	Holding *pubsub.SubChannel
+	Waiting chan interfaces.IElectionMsg
+	exit    chan interface{}
 }
 
 // aggregate event data
 type Events struct {
-	Config *event.LeaderConfig //
+	Config *event.LeaderConfig //FIXME: subscribe to this event
 }
 
 func (mgr *Manager) ProcessWaiting() {
@@ -53,34 +40,15 @@ func (mgr *Manager) ProcessWaiting() {
 	}
 }
 
-var buffSize = 100 // FIXME: should calibrate channel depths
-
-func (pub *Pub) Start(nodeName string) {
-	pub.MsgIn = pubsub.PubFactory.Threaded(buffSize).Publish(
-		pubsub.GetPath(nodeName, event.Path.Elections),
-	)
-	go pub.MsgIn.Start()
-
-	pub.MsgWaiting = pubsub.PubFactory.Threaded(buffSize).Publish(
-		pubsub.GetPath(nodeName, event.Path.ElectionWaiting),
-	)
-	go pub.MsgWaiting.Start()
-}
-
-func (*Sub) mkChan() *pubsub.SubChannel {
-	return pubsub.SubFactory.Channel(buffSize)
-}
-
-func (sub *Sub) Start() {
-	sub.Holding = sub.mkChan()
-	//sub.Waiting = sub.mkChan()
+func (mgr *Manager) Enqueue(msg interfaces.IMsg) {
+	mgr.Input.Enqueue(msg)
 }
 
 func (mgr *Manager) Exit() {
 	close(mgr.exit)
-	mgr.Pub.MsgWaiting.Close()
-	mgr.Pub.MsgIn.Close()
 }
+
+var buffSize = 1000 // FIXME: should calibrate channel depths
 
 // Runs the main loop for elections for this instance of factomd
 func Run(w *worker.Thread, s *state.State) {
@@ -90,9 +58,6 @@ func Run(w *worker.Thread, s *state.State) {
 	e.exit = make(chan interface{})
 
 	w.Spawn("Elections", func(w *worker.Thread) {
-		// TODO: actually use pubsub
-		//e.Pub.Start(s.GetFactomNodeName())
-		//w.OnReady(e.Sub.Start)
 		w.OnRun(func() { e.Run(s) })
 		w.OnExit(e.Exit)
 	})
