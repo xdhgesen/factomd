@@ -1,6 +1,7 @@
 package leader
 
 import (
+	"context"
 	"time"
 
 	"github.com/FactomProject/factomd/common/constants"
@@ -78,8 +79,8 @@ func (s *Sub) SetLeaderMode(nodeName string) {
 		return
 	}
 	s.role = FederatedRole
-	s.MsgInput.Subscribe(pubsub.GetPath(nodeName, "bmv", "rest"))
-	s.MovedToHeight.Subscribe(pubsub.GetPath(nodeName, event.Path.Seq))
+	s.MsgInput.Subscribe(pubsub.GetPath(nodeName, event.Path.BMV))
+	s.MovedToHeight.Subscribe(pubsub.GetPath(nodeName, event.Path.DBHT))
 	s.DBlockCreated.Subscribe(pubsub.GetPath(nodeName, event.Path.Directory))
 	s.BalanceChanged.Subscribe(pubsub.GetPath(nodeName, event.Path.Bank))
 }
@@ -111,13 +112,14 @@ func (l *Leader) Start(w *worker.Thread) {
 	}
 
 	w.Spawn("LeaderThread", func(w *worker.Thread) {
+		l.ctx, l.cancel = context.WithCancel(context.Background())
 		w.OnReady(func() {
 			l.Sub.Start(l.Config.NodeName)
 		})
 		w.OnRun(l.Run)
 		w.OnExit(func() {
-			close(l.exit)
 			l.Pub.MsgOut.Close()
+			l.cancel()
 		})
 		l.Pub.Init(l.Config.NodeName)
 		l.Sub.Init()
@@ -127,7 +129,7 @@ func (l *Leader) Start(w *worker.Thread) {
 func (l *Leader) processMin() (ok bool) {
 	go func() {
 		time.Sleep(time.Second * time.Duration(l.Config.BlocktimeInSeconds/10))
-		l.ticker <- true
+		l.eomTicker <- true
 	}()
 
 	for {
@@ -138,10 +140,10 @@ func (l *Leader) processMin() (ok bool) {
 				log.LogMessage(l.logfile, "msgIn ", m)
 				l.sendAck(m)
 			}
-		case <-l.ticker:
+		case <-l.eomTicker:
 			log.LogPrintf(l.logfile, "Ticker:")
 			return true
-		case <-l.exit:
+		case <-l.ctx.Done():
 			return false
 		}
 	}
@@ -163,7 +165,7 @@ func (l *Leader) waitForNextMinute() (min int, ok bool) {
 
 			l.DBHT = evt
 			return l.DBHT.Minute, true
-		case <-l.exit:
+		case <-l.ctx.Done():
 			return -1, false
 		}
 	}
@@ -183,7 +185,7 @@ func (l *Leader) WaitForDBlockCreated() (ok bool) {
 			}
 			l.Directory = v.(*event.Directory)
 			return true
-		case <-l.exit:
+		case <-l.ctx.Done():
 			return false
 		}
 	}
@@ -195,7 +197,7 @@ func (l *Leader) WaitForBalanceChanged() (ok bool) {
 		l.Balance = v.(*event.Balance)
 		log.LogPrintf(l.logfile, "BalChange: %v", v)
 		return true
-	case <-l.exit:
+	case <-l.ctx.Done():
 		return false
 	}
 }
@@ -241,7 +243,7 @@ func (l *Leader) WaitForAuthority() (isLeader bool) {
 			l.Config = v.(*event.LeaderConfig)
 		case v := <-l.Sub.AuthoritySet.Updates:
 			l.Events.AuthoritySet = v.(*event.AuthoritySet)
-		case <-l.exit:
+		case <-l.ctx.Done():
 			return false
 		}
 		if isAuthority, index := l.currentAuthority(); isAuthority {
@@ -263,6 +265,7 @@ func (l *Leader) Run() {
 	// TODO: wait until after boot height
 	// ignore these events during DB loading
 	l.waitForNextMinute()
+	l.ctx, l.cancel = context.WithCancel(context.Background())
 
 blockLoop:
 	for { //blockLoop

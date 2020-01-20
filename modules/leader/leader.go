@@ -1,6 +1,7 @@
 package leader
 
 import (
+	"context"
 	"encoding/binary"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/common/messages"
@@ -14,11 +15,12 @@ import (
 type Leader struct {
 	Pub
 	Sub
-	*Events     // events indexed by VM
-	VMIndex int // vm this leader is responsible fore
-	exit    chan interface{}
-	ticker  chan interface{}
-	logfile string
+	*Events                      // events indexed by VM
+	VMIndex   int                // vm this leader is responsible for
+	ctx       context.Context    // manage thread context
+	cancel    context.CancelFunc // thread cancel
+	eomTicker chan interface{}   // fires on calculated EOM
+	logfile   string             // hardcoded log for now
 }
 
 // initialize the leader event aggregate
@@ -26,8 +28,7 @@ func New(s *state.State) *Leader {
 	l := new(Leader)
 	l.VMIndex = s.LeaderVMIndex
 	l.logfile = strings.ToLower(s.GetFactomNodeName()) + "_leader"
-	l.ticker = make(chan interface{})
-	l.exit = make(chan interface{})
+	l.eomTicker = make(chan interface{})
 
 	l.Events = &Events{
 		Config: &event.LeaderConfig{

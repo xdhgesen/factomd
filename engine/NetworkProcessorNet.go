@@ -7,6 +7,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"github.com/FactomProject/factomd/modules/event"
 	"math/rand"
 	"time"
 
@@ -45,7 +46,7 @@ func sort(parent *worker.Thread, s *state.State) {
 		sub := pubsub.SubFactory.Channel(50)
 
 		w.OnReady(func() {
-			sub.Subscribe(pubsub.GetPath(s.GetFactomNodeName(), "bmv", "rest"))
+			sub.Subscribe(pubsub.GetPath(s.GetFactomNodeName(), event.Path.BMV))
 		})
 
 		w.OnRun(func() {
@@ -243,39 +244,25 @@ func BasicMessageValidation(parent *worker.Thread, fnode *fnode.FactomNode) {
 	for i := 0; i < 2; i++ { // 2 Basic message validators
 		parent.Spawn(fmt.Sprintf("BMV%d", i), func(w *worker.Thread) {
 			ctx, cancel := context.WithCancel(context.Background())
-			// w.Name is my parent?
-			// Init my name object?
-			//w.Init(&parent.Name, "bmv")
-
-			// Run init conditions. Setup publishers
-			msgIn := bmv.NewBasicMessageValidator(fnode.State.GetFactomNodeName())
-
+			msgIn := bmv.NewBasicMessageValidator(fnode.State.GetFactomNodeName()) // Run init conditions. Setup publishers
 			w.OnReady(func() {
 				// Subscribe to publishers
 				msgIn.Subscribe()
 			})
-
 			w.OnRun(func() {
 				// TODO: Temporary print all messages out of bmv. We need to actually use them...
 				//go func() {
-				//	sub := pubsub.SubFactory.Channel(100).Subscribe(pubsub.GetPath(fnode.State.GetFactomNodeName(), "bmv", "rest"))
+				//	sub := pubsub.SubFactory.Channel(100).Subscribe(pubsub.GetPath(fnode.State.GetFactomNodeName(), event.Path.BMV))
 				//	for v := range sub.Channel() {
 				//		fmt.Println("MESSAGE -> ", v)
 				//	}
 				//}()
-
-				// do work
-				msgIn.Run(ctx)
-				cancel() // If run is over, we can end the ctx
+				msgIn.Run(ctx) // do work
+				cancel()       // If run is over, we can end the ctx
 			})
 
-			w.OnExit(func() {
-				cancel()
-			})
-
-			w.OnComplete(func() {
-				msgIn.ClosePublishing()
-			})
+			w.OnExit(cancel)
+			w.OnComplete(msgIn.ClosePublishing)
 		})
 	}
 }

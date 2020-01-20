@@ -3,6 +3,7 @@ package bmv
 import (
 	"context"
 	"fmt"
+	"github.com/FactomProject/factomd/modules/event"
 	"regexp"
 	"time"
 
@@ -58,7 +59,7 @@ func NewBasicMessageValidator(nodeName string) *BasicMessageValidator {
 	// 20min grace period
 	b.preBootFilter = b.bootTime.Add(-20 * time.Minute)
 
-	b.rest = pubsub.PubFactory.Threaded(100).Publish(pubsub.GetPath(b.NodeName, "bmv", "rest"), pubsub.PubMultiWrap())
+	b.rest = pubsub.PubFactory.Threaded(100).Publish(pubsub.GetPath(b.NodeName, event.Path.BMV), pubsub.PubMultiWrap())
 
 	b.replay = NewMsgReplay(6)
 	return b

@@ -7,24 +7,28 @@ import (
 
 type pubSubPaths struct {
 	EOM          string
-	Seq          string
+	DBHT         string
 	Directory    string
 	Bank         string
 	LeaderConfig string
 	LeaderMsgIn  string
 	LeaderMsgOut string
 	AuthoritySet string
+	UnAckMsgs    string
+	BMV          string
 }
 
 var Path = pubSubPaths{
 	EOM:          "EOM",
-	Seq:          "seq",
+	DBHT:         "move-to-ht",
 	Directory:    "directory",
 	Bank:         "bank",
 	LeaderConfig: "leader-config",
 	LeaderMsgIn:  "leader-msg-in",
 	LeaderMsgOut: "leader-msg-out",
 	AuthoritySet: "authority-set",
+	UnAckMsgs:    "un-ack-msg",
+	BMV:          "bmv/rest",
 }
 
 type Balance struct {
@@ -50,6 +54,7 @@ type Ack struct {
 	MessageHash interfaces.IHash
 }
 
+// FIXME replace w/ event.config class
 type LeaderConfig struct {
 	NodeName           string
 	IdentityChainID    interfaces.IHash
