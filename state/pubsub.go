@@ -34,4 +34,5 @@ func (s *State) BindPublishers() {
 	s.Pub.Directory = s.newPublisher(event.Path.Directory)
 	s.Pub.LeaderConfig = s.newPublisher(event.Path.LeaderConfig)
 	s.Pub.AuthoritySet = s.newPublisher(event.Path.AuthoritySet)
+	// TODO: add msgSort as a step between BMV & VM
 }

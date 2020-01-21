@@ -1,6 +1,7 @@
 package msgorder
 
 import (
+	"context"
 	"github.com/FactomProject/factomd/common"
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
@@ -14,19 +15,24 @@ type Handler struct {
 	Pub
 	Sub
 	*Events
-	exit chan interface{}
-	//ticker  chan interface{}
-	//logfile string
+	ctx    context.Context    // manage thread context
+	cancel context.CancelFunc // thread cancel
 }
 
+// FIXME: hookup logging
 func New(nodeName string) *Handler {
 	v := new(Handler)
 	v.Events = &Events{
-		DBHT:   nil,
-		Ack:    nil,
-		Config: &event.LeaderConfig{NodeName: nodeName}, // FIXME should use pubsub.Config
+		DBHT: &event.DBHT{
+			DBHeight: 0,
+			Minute:   0,
+		},
+		Ack: nil,
+		Config: &event.LeaderConfig{
+			NodeName: nodeName,
+		}, // FIXME should use pubsub.Config
 	}
-	v.exit = make(chan interface{})
+	return v
 }
 
 type Pub struct {
@@ -58,7 +64,7 @@ func (s *Sub) Init() {
 // start subscriptions
 func (s *Sub) Start(nodeName string) {
 	s.MovedToHeight.Subscribe(pubsub.GetPath(nodeName, event.Path.DBHT))
-	s.MsgInput.Subscribe(pubsub.GetPath(nodeName, event.Path.BVM))
+	s.MsgInput.Subscribe(pubsub.GetPath(nodeName, event.Path.BMV))
 }
 
 type Events struct {
@@ -70,12 +76,12 @@ type Events struct {
 func (h *Handler) Start(w *worker.Thread) {
 	w.Spawn("MsgOrderThread", func(w *worker.Thread) {
 		w.OnReady(func() {
-			go h.waitForEOM()
+			h.Sub.Start(h.Config.NodeName)
 		})
 		w.OnRun(h.Run)
 		w.OnExit(func() {
-			close(h.exit)
 			h.Pub.UnAck.Close()
+			h.cancel()
 		})
 		h.Pub.Init(h.Config.NodeName)
 		h.Sub.Init()
@@ -83,6 +89,8 @@ func (h *Handler) Start(w *worker.Thread) {
 }
 
 func (h *Handler) Run() {
+	h.ctx, h.cancel = context.WithCancel(context.Background())
+
 runLoop:
 	for {
 		select {
@@ -106,7 +114,7 @@ runLoop:
 
 			// TODO: send UnAcked messages to leader
 			continue runLoop
-		case <-h.exit:
+		case <-h.ctx.Done():
 			return
 		}
 	}

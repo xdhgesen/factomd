@@ -8,7 +8,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/FactomProject/factomd/modules/debugsettings"
 	"github.com/FactomProject/factomd/modules/leader"
+	"github.com/FactomProject/factomd/modules/msgorder"
 	"os"
 	"reflect"
 	"sync"
@@ -24,7 +26,6 @@ import (
 	"github.com/FactomProject/factomd/database/databaseOverlay"
 	"github.com/FactomProject/factomd/elections"
 	"github.com/FactomProject/factomd/fnode"
-	"github.com/FactomProject/factomd/modules/debugsettings"
 	"github.com/FactomProject/factomd/p2p"
 	"github.com/FactomProject/factomd/registry"
 	"github.com/FactomProject/factomd/simulation"
@@ -338,8 +339,8 @@ func makeServer(w *worker.Thread, p *globals.FactomParams) (node *fnode.FactomNo
 	})
 
 	if state.EnableLeaderThread {
-		l := leader.New(node.State)
-		l.Start(w)
+		leader.New(node.State).Start(w)
+		msgorder.New(node.State.GetFactomNodeName()).Start(w)
 	}
 
 	// TODO: Init any settings from the config
