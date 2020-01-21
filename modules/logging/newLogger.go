@@ -31,14 +31,16 @@ func Formatter(format string) func(interface{}) string {
 	return func(v interface{}) string { return fmt.Sprintf(format, v) }
 }
 
+/*
+Example
 func main() {
 	foo := NewModuleLoggerLogger(NewLayerLogger(NewSequenceLogger(NewFileLogger(".")), map[string]string{"thread": "fnode0"}), "test.txt")
 	foo.AddNameField("logname", Formatter("%s"), "unknown_log")
 	foo.AddPrintField("foo", Formatter("%6v"), "FOO").AddPrintField("bar", Formatter("|%6s|"), "BAR")
-
 	foo.Log(LogData{"foo": 1, "bar": "bar", "baz": 5.0})
 
 }
+*/
 
 type Ilogger interface {
 	Log(LogData) bool // return true if logging of specified log data is enabled

@@ -75,6 +75,14 @@ func NeedsAck(t byte) bool {
 	return false
 }
 
+func NeedsPairing(t byte) bool {
+	switch t {
+	case EOM_MSG, COMMIT_CHAIN_MSG, COMMIT_ENTRY_MSG, REVEAL_ENTRY_MSG, DIRECTORY_BLOCK_SIGNATURE_MSG, FACTOID_TRANSACTION_MSG, ADDSERVER_MSG, CHANGESERVER_KEY_MSG, REMOVESERVER_MSG:
+		return true
+	}
+	return false
+}
+
 // Election related messages are full broadcast
 func NormallyPeer2Peer(t byte) bool {
 	switch t {

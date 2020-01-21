@@ -6,22 +6,42 @@ import (
 	"github.com/FactomProject/factomd/common/constants"
 	"github.com/FactomProject/factomd/common/interfaces"
 	"github.com/FactomProject/factomd/modules/event"
+	"github.com/FactomProject/factomd/modules/logging"
 	"github.com/FactomProject/factomd/pubsub"
 	"github.com/FactomProject/factomd/state"
 	"github.com/FactomProject/factomd/worker"
 )
 
+var GetFedServerIndexHash = state.GetFedServerIndexHash
+
+type LogData = logging.LogData
+
 type Handler struct {
 	Pub
 	Sub
 	*Events
-	ctx    context.Context    // manage thread context
-	cancel context.CancelFunc // thread cancel
+	ctx    context.Context         // manage thread context
+	cancel context.CancelFunc      // thread cancel
+	log    func(data LogData) bool //logger hook
 }
 
-// FIXME: hookup logging
+func newLogger(nodeName string) *logging.ModuleLogger {
+	log := logging.NewModuleLoggerLogger(
+		logging.NewLayerLogger(
+			logging.NewSequenceLogger(
+				logging.NewFileLogger(".")),
+			map[string]string{"thread": nodeName},
+		), "msgorder.txt")
+
+	log.AddNameField("logname", logging.Formatter("%s"), "unknown_log")
+	log.AddPrintField("msg", logging.Formatter("%s"), "MSG")
+	return log
+}
+
 func New(nodeName string) *Handler {
 	v := new(Handler)
+	v.log = newLogger(nodeName).Log
+
 	v.Events = &Events{
 		DBHT: &event.DBHT{
 			DBHeight: 0,
@@ -38,9 +58,6 @@ func New(nodeName string) *Handler {
 type Pub struct {
 	UnAck pubsub.IPublisher
 }
-
-// isolate deps on state package - eventually functions will be relocated
-var GetFedServerIndexHash = state.GetFedServerIndexHash
 
 // create and start all publishers
 func (p *Pub) Init(nodeName string) {
@@ -96,8 +113,11 @@ runLoop:
 		select {
 		case v := <-h.MsgInput.Updates:
 			m := v.(interfaces.IMsg)
-			if constants.NeedsAck(m.Type()) {
-				// FIXME: match ACK/Reveals
+			switch {
+			case constants.NeedsAck(m.Type()):
+				h.log(LogData{"msg": m}) // track commit reveal
+			case m.Type() == constants.ACK_MSG:
+				h.log(LogData{"msg": m}) // track matches
 			}
 		case v := <-h.MovedToHeight.Updates:
 			evt := v.(*event.DBHT)
